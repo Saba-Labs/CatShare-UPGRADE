@@ -256,6 +256,8 @@ export function saveProduct(product: Product): void {
 
   try {
     localStorage.setItem('products', JSON.stringify(updated));
+    // Trigger Supabase sync
+    triggerSupabaseSync(updated);
   } catch (err) {
     console.error('Failed to save product:', err);
   }
@@ -268,7 +270,41 @@ export function saveProducts(products: Product[]): void {
   try {
     const normalized = products.map(normalizeProduct);
     localStorage.setItem('products', JSON.stringify(normalized));
+    // Trigger Supabase sync
+    triggerSupabaseSync(normalized);
   } catch (err) {
     console.error('Failed to save products:', err);
+  }
+}
+
+/**
+ * Trigger Supabase sync for products
+ */
+function triggerSupabaseSync(products: Product[]): void {
+  try {
+    // Get current user ID from localStorage (set by AuthContext)
+    const userId = localStorage.getItem('firebaseUserId');
+    console.log('🔄 Attempting to sync products. userId:', userId, 'productsCount:', products.length);
+
+    if (!userId) {
+      console.warn('⚠️ No Firebase user ID found in localStorage. Skipping Supabase sync.');
+      return;
+    }
+
+    // Import and call sync function
+    import('../services/supabaseSync').then(({ syncProducts }) => {
+      console.log('📤 Syncing', products.length, 'products to Supabase for user:', userId);
+      syncProducts(userId, products)
+        .then(result => {
+          console.log('✅ Products synced to Supabase successfully:', result);
+        })
+        .catch(err => {
+          console.error('❌ Failed to sync products to Supabase:', err);
+        });
+    }).catch(importErr => {
+      console.error('❌ Failed to import syncProducts:', importErr);
+    });
+  } catch (err) {
+    console.error('❌ Exception in triggerSupabaseSync:', err);
   }
 }

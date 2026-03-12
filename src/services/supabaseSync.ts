@@ -350,8 +350,28 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
 
     // Check for errors
     if (productsError && productsError.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('❌ Error fetching products:', productsError);
+      console.error('❌ Error fetching products:', JSON.stringify(productsError, null, 2));
       return { success: false, error: productsError.message };
+    }
+
+    if (deletedError && deletedError.code !== 'PGRST116') {
+      console.error('❌ Error fetching deleted products:', JSON.stringify(deletedError, null, 2));
+    }
+
+    if (categoriesError && categoriesError.code !== 'PGRST116') {
+      console.error('❌ Error fetching categories:', JSON.stringify(categoriesError, null, 2));
+    }
+
+    if (cataloguesError && cataloguesError.code !== 'PGRST116') {
+      console.error('❌ Error fetching catalogues definition:', JSON.stringify(cataloguesError, null, 2));
+    }
+
+    if (fieldsError && fieldsError.code !== 'PGRST116') {
+      console.error('❌ Error fetching fields definition:', JSON.stringify(fieldsError, null, 2));
+    }
+
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('❌ Error fetching user settings:', JSON.stringify(settingsError, null, 2));
     }
 
     const userData = {

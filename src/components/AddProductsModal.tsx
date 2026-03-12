@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../config/catalogueProductUtils";
+import { saveProducts } from "../config/productUtils";
 
 interface AddProductsModalProps {
   isOpen: boolean;
@@ -49,8 +50,8 @@ export default function AddProductsModal({
 
     setProducts(updated);
 
-    // Save to localStorage
-    localStorage.setItem("products", JSON.stringify(updated));
+    // Save to localStorage and sync to Supabase
+    saveProducts(updated);
 
     // Notify parent component (this will trigger re-render with updated products)
     onProductsUpdate(updated);
@@ -73,8 +74,8 @@ export default function AddProductsModal({
 
     setProducts(updated);
 
-    // Save to localStorage
-    localStorage.setItem("products", JSON.stringify(updated));
+    // Save to localStorage and sync to Supabase
+    saveProducts(updated);
 
     // Notify parent component (this will trigger re-render with updated products)
     onProductsUpdate(updated);
