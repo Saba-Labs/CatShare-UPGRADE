@@ -30,12 +30,18 @@ import FieldsSettings from "./pages/FieldsSettings";
 import CurrencySettings from "./pages/CurrencySettings";
 import ProInfo from "./pages/ProInfo";
 import Welcome from "./pages/Welcome";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import Account from "./pages/Account";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import Website from "./Website";
 import Tutorial from "./Tutorial";
 import { ToastProvider } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
+import { AuthProvider } from "./context/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
@@ -575,90 +581,150 @@ function AppWithBackHandler() {
       )}
 
       <Routes>
+        {/* Auth Routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* Public Routes */}
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/website" element={<Website />} />
+
+        {/* Protected Routes */}
         <Route
           path="/"
           element={
-            <CatalogueApp
-              products={products}
-              setProducts={setProducts}
-              deletedProducts={deletedProducts}
-              setDeletedProducts={setDeletedProducts}
-              darkMode={darkMode}
-              setDarkMode={setDarkMode}
-              isRendering={isRendering}
-              setIsRendering={setIsRendering}
-              renderProgress={renderProgress}
-              setRenderProgress={setRenderProgress}
-              renderingTotal={renderingTotal}
-              setRenderingTotal={setRenderingTotal}
-              renderResult={renderResult}
-              setRenderResult={setRenderResult}
-              showTutorial={showTutorial}
-              setShowTutorial={setShowTutorial}
-            />
+            <ProtectedRoute>
+              <CatalogueApp
+                products={products}
+                setProducts={setProducts}
+                deletedProducts={deletedProducts}
+                setDeletedProducts={setDeletedProducts}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                isRendering={isRendering}
+                setIsRendering={setIsRendering}
+                renderProgress={renderProgress}
+                setRenderProgress={setRenderProgress}
+                renderingTotal={renderingTotal}
+                setRenderingTotal={setRenderingTotal}
+                renderResult={renderResult}
+                setRenderResult={setRenderResult}
+                showTutorial={showTutorial}
+                setShowTutorial={setShowTutorial}
+              />
+            </ProtectedRoute>
           }
         />
-        <Route path="/create" element={<CreateProduct />} />
+        <Route
+          path="/create"
+          element={
+            <ProtectedRoute>
+              <CreateProduct />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/shelf"
           element={
-            <Shelf
-              deletedProducts={deletedProducts}
-              setDeletedProducts={setDeletedProducts}
-              setProducts={setProducts}
-              products={products}
-              imageMap={imageMap}
-            />
+            <ProtectedRoute>
+              <Shelf
+                deletedProducts={deletedProducts}
+                setDeletedProducts={setDeletedProducts}
+                setProducts={setProducts}
+                products={products}
+                imageMap={imageMap}
+              />
+            </ProtectedRoute>
           }
         />
-        <Route path="/retail" element={<Retail products={products} />} />
+        <Route
+          path="/retail"
+          element={
+            <ProtectedRoute>
+              <Retail products={products} />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/settings"
           element={
-            <Settings
-              darkMode={darkMode}
-              setDarkMode={setDarkMode as any}
-              products={products}
-              setProducts={setProducts as any}
-              deletedProducts={deletedProducts}
-              setDeletedProducts={setDeletedProducts as any}
-              isRendering={isRendering}
-              setIsRendering={setIsRendering as any}
-              renderProgress={renderProgress}
-              setRenderProgress={setRenderProgress as any}
-              showTutorial={showTutorial}
-              setShowTutorial={setShowTutorial}
-            />
+            <ProtectedRoute>
+              <Settings
+                darkMode={darkMode}
+                setDarkMode={setDarkMode as any}
+                products={products}
+                setProducts={setProducts as any}
+                deletedProducts={deletedProducts}
+                setDeletedProducts={setDeletedProducts as any}
+                isRendering={isRendering}
+                setIsRendering={setIsRendering as any}
+                renderProgress={renderProgress}
+                setRenderProgress={setRenderProgress as any}
+                showTutorial={showTutorial}
+                setShowTutorial={setShowTutorial}
+              />
+            </ProtectedRoute>
           }
         />
         <Route
           path="/settings/appearance"
-          element={<AppearanceSettings darkMode={darkMode} setDarkMode={setDarkMode as any} />}
+          element={
+            <ProtectedRoute>
+              <AppearanceSettings darkMode={darkMode} setDarkMode={setDarkMode as any} />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings/themes"
-          element={<ThemesSettings />}
+          element={
+            <ProtectedRoute>
+              <ThemesSettings />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings/watermark"
-          element={<WatermarkSettings />}
+          element={
+            <ProtectedRoute>
+              <WatermarkSettings />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings/fields"
-          element={<FieldsSettings />}
+          element={
+            <ProtectedRoute>
+              <FieldsSettings />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings/currency"
-          element={<CurrencySettings />}
+          element={
+            <ProtectedRoute>
+              <CurrencySettings />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/settings/pro"
-          element={<ProInfo />}
+          element={
+            <ProtectedRoute>
+              <ProInfo />
+            </ProtectedRoute>
+          }
         />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/website" element={<Website />} />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <Account />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </div>
   );
@@ -669,9 +735,11 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
-          <Router>
-            <AppWithBackHandler />
-          </Router>
+          <AuthProvider>
+            <Router>
+              <AppWithBackHandler />
+            </Router>
+          </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </ErrorBoundary>
