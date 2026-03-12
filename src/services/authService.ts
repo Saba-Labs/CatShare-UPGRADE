@@ -90,9 +90,9 @@ function handleAuthError(error: unknown): Error {
     };
 
     const message = errorMessages[authError.code] || authError.message || 'Authentication failed';
-    const error = new Error(message);
-    error.name = authError.code;
-    return error;
+    const authException = new Error(message);
+    authException.name = authError.code;
+    return authException;
   }
   
   return new Error('An unexpected error occurred');
