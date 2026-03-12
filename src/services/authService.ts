@@ -1,7 +1,8 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
@@ -23,14 +24,11 @@ export const authService = {
   registerWithEmail: async (email: string, password: string, displayName: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Update display name
       if (userCredential.user) {
         await updateProfile(userCredential.user, {
           displayName: displayName,
         });
       }
-      
       return userCredential.user;
     } catch (error) {
       throw handleAuthError(error);
@@ -46,11 +44,20 @@ export const authService = {
     }
   },
 
-  // Google Authentication
+  // Google Authentication - Redirect method
   loginWithGoogle: async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      throw handleAuthError(error);
+    }
+  },
+
+  // Handle redirect result after Google login
+  getRedirectResult: async () => {
+    try {
+      const result = await getRedirectResult(auth);
+      return result?.user || null;
     } catch (error) {
       throw handleAuthError(error);
     }
@@ -75,7 +82,7 @@ export const authService = {
 function handleAuthError(error: unknown): Error {
   if (error instanceof Error) {
     const authError = error as AuthError;
-    
+
     const errorMessages: { [key: string]: string } = {
       'auth/email-already-in-use': 'This email is already registered. Please login or use a different email.',
       'auth/invalid-email': 'Invalid email address.',
@@ -94,6 +101,6 @@ function handleAuthError(error: unknown): Error {
     authException.name = authError.code;
     return authException;
   }
-  
+
   return new Error('An unexpected error occurred');
 }
