@@ -44,6 +44,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
+      // Store user UID in localStorage for sync operations
+      if (currentUser && currentUser.uid) {
+        try {
+          localStorage.setItem('firebaseUserId', currentUser.uid);
+        } catch (err) {
+          console.warn('Could not store user ID in localStorage:', err);
+        }
+      } else {
+        try {
+          localStorage.removeItem('firebaseUserId');
+        } catch (err) {
+          console.warn('Could not remove user ID from localStorage:', err);
+        }
+      }
+
       // Fetch Supabase data if user is logged in
       if (currentUser && currentUser.uid) {
         setSupabaseDataLoading(true);
