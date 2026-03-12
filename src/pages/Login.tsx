@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
@@ -15,21 +15,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
-
-  // Handle Google redirect result when page loads
-  useEffect(() => {
-    authService.getRedirectResult()
-      .then((user) => {
-        if (user) {
-          showToast('Login successful!', 'success');
-          navigate('/');
-        }
-      })
-      .catch((err) => {
-        setError(err.message);
-        showToast(err.message, 'error');
-      });
-  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,12 +38,16 @@ export default function Login() {
     setError('');
     setAuthLoading('google');
     try {
-      await authService.loginWithGoogle();
-      // Page will redirect to Google, no code runs after this
+      const user = await authService.loginWithGoogle();
+      if (user) {
+        showToast('Login successful!', 'success');
+        navigate('/');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
       setError(errorMessage);
       showToast(errorMessage, 'error');
+    } finally {
       setAuthLoading(null);
     }
   };
@@ -149,7 +138,7 @@ export default function Login() {
             >
               <FaGoogle className="text-red-600" />
               <span className="text-gray-700 font-medium">
-                {authLoading === 'google' ? 'Redirecting...' : 'Google'}
+                {authLoading === 'google' ? 'Signing in...' : 'Google'}
               </span>
             </button>
           </div>

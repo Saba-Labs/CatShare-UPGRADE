@@ -1,12 +1,10 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
-  User,
   AuthError,
 } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
@@ -44,20 +42,11 @@ export const authService = {
     }
   },
 
-  // Google Authentication - Redirect method
+  // Google Authentication - Popup method
   loginWithGoogle: async () => {
     try {
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
-      throw handleAuthError(error);
-    }
-  },
-
-  // Handle redirect result after Google login
-  getRedirectResult: async () => {
-    try {
-      const result = await getRedirectResult(auth);
-      return result?.user || null;
+      const result = await signInWithPopup(auth, googleProvider);
+      return result.user;
     } catch (error) {
       throw handleAuthError(error);
     }
