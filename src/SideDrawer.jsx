@@ -15,6 +15,7 @@ import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { APP_VERSION } from "./config/version";
 import { useToast } from "./context/ToastContext";
 import { useTheme } from "./context/ThemeContext";
+import { useAuth } from "./context/AuthContext";
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES, getAllCatalogues, createLegacyResellCatalogueIfNeeded } from "./config/catalogueConfig";
 import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
@@ -63,6 +64,7 @@ const [isLoadingBackups, setIsLoadingBackups] = useState(false);
 const navigate = useNavigate();
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
+  const { user } = useAuth();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
 
   const totalProducts = products.length;
@@ -1429,6 +1431,54 @@ const restoreFromDetectedBackup = async (backupFile) => {
               title={showHiddenFeatures ? "Features unlocked! 🎉" : ""}
             >n</span>u
           </h2>
+
+          {user ? (
+            <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <img
+                  src={user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || user.email || "User")}`}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {user.displayName || user.email}
+                  </p>
+                  <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  navigate("/account");
+                  onClose();
+                }}
+                className="w-full text-sm text-blue-600 hover:text-blue-700 font-medium py-1"
+              >
+                Account Settings
+              </button>
+            </div>
+          ) : (
+            <div className="mb-4 flex gap-2">
+              <button
+                onClick={() => {
+                  navigate("/login");
+                  onClose();
+                }}
+                className="flex-1 py-2 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => {
+                  navigate("/register");
+                  onClose();
+                }}
+                className="flex-1 py-2 px-3 rounded-lg bg-gray-200 text-gray-800 text-sm font-medium hover:bg-gray-300 transition"
+              >
+                Create Account
+              </button>
+            </div>
+          )}
 
           {showHiddenFeatures && (
             <button
