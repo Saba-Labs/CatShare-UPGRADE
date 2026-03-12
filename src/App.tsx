@@ -17,6 +17,9 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { safeGetFromStorage, safeSetInStorage } from "./utils/safeStorage";
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
+import { useAuth } from "./context/AuthContext";
+import SyncStatusIndicator from "./components/SyncStatusIndicator";
+import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 
 import CatalogueApp from "./CatalogueApp";
 import CreateProduct from "./CreateProduct";
@@ -52,6 +55,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, supabaseData, supabaseDataLoading } = useAuth();
   const [imageMap, setImageMap] = useState({});
   const [products, setProducts] = useState(() =>
     safeGetFromStorage("products", [])
@@ -67,10 +71,67 @@ function AppWithBackHandler() {
   const [renderingTotal, setRenderingTotal] = useState(0);
   const [renderResult, setRenderResult] = useState(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const renderResultTimeoutRef = useRef(null);
 
   const isNative = Capacitor.getPlatform() !== "web";
 
+  // Merge Supabase data with local storage when user logs in
+  useEffect(() => {
+    if (!user || !supabaseData || supabaseDataLoading) return;
+
+    try {
+      setSupabaseSyncStatus('syncing');
+
+      // Merge products: Supabase data takes precedence if it's newer
+      if (supabaseData.products && supabaseData.products.length > 0) {
+        const merged = mergeProductsData(products, supabaseData.products);
+        setProducts(merged);
+        safeSetInStorage("products", merged);
+        console.log('✅ Merged products from Supabase');
+      }
+
+      // Merge deleted products
+      if (supabaseData.deletedProducts && supabaseData.deletedProducts.length > 0) {
+        const merged = mergeProductsData(deletedProducts, supabaseData.deletedProducts);
+        setDeletedProducts(merged);
+        safeSetInStorage("deletedProducts", merged);
+        console.log('✅ Merged deleted products from Supabase');
+      }
+
+      setSupabaseSyncStatus('synced');
+    } catch (err) {
+      console.error('❌ Error merging Supabase data:', err);
+      setSupabaseSyncStatus('error');
+    }
+  }, [user, supabaseData, supabaseDataLoading]);
+
+  // Merge products by keeping the newer version (based on timestamp)
+  const mergeProductsData = (local: any[], remote: any[]) => {
+    const merged = new Map();
+
+    // Add all local products
+    local.forEach(product => {
+      merged.set(product.id, product);
+    });
+
+    // Merge remote products (newer version wins)
+    remote.forEach(remoteProduct => {
+      const localProduct = merged.get(remoteProduct.id);
+      if (!localProduct) {
+        merged.set(remoteProduct.id, remoteProduct);
+      } else {
+        // Keep the version with the latest timestamp
+        const localTime = new Date(localProduct.updatedAt || 0).getTime();
+        const remoteTime = new Date(remoteProduct.updatedAt || 0).getTime();
+        if (remoteTime > localTime) {
+          merged.set(remoteProduct.id, remoteProduct);
+        }
+      }
+    });
+
+    return Array.from(merged.values());
+  };
 
   // Handle rendering images with chunked processing to prevent UI freeze
   // Processes in small batches with UI yielding between chunks
@@ -535,6 +596,8 @@ function AppWithBackHandler() {
       }}
     >
       <ToastContainer />
+      <SyncStatusIndicator />
+      <OfflineStatusIndicator />
       <RenderingOverlay
         visible={isRendering}
         current={renderProgress}
