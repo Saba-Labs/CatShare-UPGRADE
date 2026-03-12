@@ -6,6 +6,7 @@ import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBulkEdit } from "./config/analyticsEvents";
+import { saveProducts } from "./config/productUtils";
 
 const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
   const baseFields = [
@@ -363,7 +364,8 @@ useEffect(() => {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
 
-    localStorage.setItem("products", JSON.stringify(mergedData));
+    // Save products (this will sync to Supabase and localStorage)
+    saveProducts(mergedData);
     setProducts(mergedData);
     logBulkEdit(cleanData.length, selectedFields.length);
     setShowRenderPopup(true);
