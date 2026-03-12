@@ -284,15 +284,27 @@ function triggerSupabaseSync(products: Product[]): void {
   try {
     // Get current user ID from localStorage (set by AuthContext)
     const userId = localStorage.getItem('firebaseUserId');
-    if (!userId) return;
+    console.log('🔄 Attempting to sync products. userId:', userId, 'productsCount:', products.length);
+
+    if (!userId) {
+      console.warn('⚠️ No Firebase user ID found in localStorage. Skipping Supabase sync.');
+      return;
+    }
 
     // Import and call sync function
     import('../services/supabaseSync').then(({ syncProducts }) => {
-      syncProducts(userId, products).catch(err => {
-        console.error('Failed to sync products to Supabase:', err);
-      });
+      console.log('📤 Syncing', products.length, 'products to Supabase for user:', userId);
+      syncProducts(userId, products)
+        .then(result => {
+          console.log('✅ Products synced to Supabase successfully:', result);
+        })
+        .catch(err => {
+          console.error('❌ Failed to sync products to Supabase:', err);
+        });
+    }).catch(importErr => {
+      console.error('❌ Failed to import syncProducts:', importErr);
     });
   } catch (err) {
-    console.error('Failed to trigger Supabase sync:', err);
+    console.error('❌ Exception in triggerSupabaseSync:', err);
   }
 }

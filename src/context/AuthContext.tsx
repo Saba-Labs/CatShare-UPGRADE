@@ -48,14 +48,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (currentUser && currentUser.uid) {
         try {
           localStorage.setItem('firebaseUserId', currentUser.uid);
+          console.log('✅ Stored Firebase user ID in localStorage:', currentUser.uid);
         } catch (err) {
-          console.warn('Could not store user ID in localStorage:', err);
+          console.warn('⚠️ Could not store user ID in localStorage:', err);
         }
       } else {
         try {
           localStorage.removeItem('firebaseUserId');
+          console.log('🔄 Cleared Firebase user ID from localStorage');
         } catch (err) {
-          console.warn('Could not remove user ID from localStorage:', err);
+          console.warn('⚠️ Could not remove user ID from localStorage:', err);
         }
       }
 
