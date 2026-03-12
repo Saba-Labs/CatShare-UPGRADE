@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
@@ -9,27 +9,12 @@ import { useToast } from '../context/ToastContext';
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
-
-  // Handle Google redirect result when page loads
-  useEffect(() => {
-    authService.getRedirectResult()
-      .then((user) => {
-        if (user) {
-          showToast('Login successful!', 'success');
-          navigate('/');
-        }
-      })
-      .catch((err) => {
-        setError(err.message);
-        showToast(err.message, 'error');
-      });
-  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,16 +37,20 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setError('');
     setAuthLoading('google');
+
     try {
       await authService.loginWithGoogle();
-      // Page will redirect to Google, no code runs after this
+      showToast('Login successful!', 'success');
+      navigate('/');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
       setError(errorMessage);
       showToast(errorMessage, 'error');
+    } finally {
       setAuthLoading(null);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
@@ -149,7 +138,7 @@ export default function Login() {
             >
               <FaGoogle className="text-red-600" />
               <span className="text-gray-700 font-medium">
-                {authLoading === 'google' ? 'Redirecting...' : 'Google'}
+                {authLoading === 'google' ? 'Signing in...' : 'Google'}
               </span>
             </button>
           </div>
