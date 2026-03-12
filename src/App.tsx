@@ -329,6 +329,25 @@ function AppWithBackHandler() {
     safeSetInStorage("products", cleanedProducts);
   }, [products]);
 
+  // Sync products to Supabase whenever they change
+  useEffect(() => {
+    if (!user) return;
+
+    const userId = user.uid;
+    if (!userId || products.length === 0) return;
+
+    // Import and call syncProducts in background (fire and forget)
+    import('./services/supabaseSync').then(({ syncProducts }) => {
+      syncProducts(userId, products).then(result => {
+        if (result.success) {
+          console.log('✅ Products synced to Supabase');
+        } else {
+          console.warn('⚠️ Supabase sync failed:', result.error);
+        }
+      });
+    });
+  }, [products, user]);
+
   useEffect(() => {
     // Strip image data from deleted products too
     const cleanedDeleted = deletedProducts.map(p => {
