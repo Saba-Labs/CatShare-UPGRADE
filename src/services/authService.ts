@@ -3,7 +3,6 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
-  GithubAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
   User,
@@ -11,11 +10,10 @@ import {
 } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 
-// Initialize providers
+// Initialize Google provider
 const googleProvider = new GoogleAuthProvider();
-const githubProvider = new GithubAuthProvider();
 
-// Configure providers
+// Configure provider
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
@@ -52,16 +50,6 @@ export const authService = {
   loginWithGoogle: async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      return result.user;
-    } catch (error) {
-      throw handleAuthError(error);
-    }
-  },
-
-  // GitHub Authentication
-  loginWithGitHub: async () => {
-    try {
-      const result = await signInWithPopup(auth, githubProvider);
       return result.user;
     } catch (error) {
       throw handleAuthError(error);
