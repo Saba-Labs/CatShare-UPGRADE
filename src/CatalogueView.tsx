@@ -1461,24 +1461,30 @@ const handleTouchEnd = useCallback(() => {
                     items,
                   });
 
+                  // Open the order form in a new tab
+                  window.open(url, '_blank');
+
+                  // Also try to share the link if available
                   if (navigator.share) {
                     try {
                       await navigator.share({ title: 'Order link', text: 'Order form link', url });
                     } catch (shareErr: any) {
-                      // If user cancels or permissions denied, fallback to clipboard
-                      if (shareErr.name === 'AbortError' || shareErr.name === 'NotAllowedError') {
-                        await navigator.clipboard.writeText(url);
-                        alert('Link copied to clipboard.');
-                      } else {
-                        throw shareErr;
+                      // If user cancels or permissions denied, silently fail (link is already open)
+                      if (!(shareErr.name === 'AbortError' || shareErr.name === 'NotAllowedError')) {
+                        console.error('Share failed:', shareErr);
                       }
                     }
                   } else {
-                    await navigator.clipboard.writeText(url);
-                    alert('Link copied to clipboard.');
+                    // If no share API, copy to clipboard as fallback
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      alert('Order form opened! Link also copied to clipboard for sharing.');
+                    } catch {
+                      // Clipboard copy failed, but link is already open so just continue
+                    }
                   }
                 } catch (err: any) {
-                  console.error('Failed to share or copy link:', err);
+                  console.error('Failed to create order form link:', err);
                   alert('Failed to create link. Please try again.');
                 }
               }}
