@@ -1,17 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUser, FiMail, FiLogOut, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { syncUserSettings } from '../services/supabaseSync';
 
 export default function Account() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, supabaseData } = useAuth();
   const { showToast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+
+  useEffect(() => {
+    // Try supabaseData first, fallback to localStorage
+    const fromSupabase = supabaseData?.userSettings?.whatsapp_number || '';
+    const fromLocal = localStorage.getItem('whatsappNumber') || '';
+    setWhatsappNumber(fromSupabase || fromLocal);
+  }, [supabaseData?.userSettings]);
+
+  const saveWhatsApp = async () => {
+    if (!user?.uid) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const clean = whatsappNumber.trim();
+      await syncUserSettings(user.uid, {
+        whatsapp_number: clean,  // save as top-level column, not nested in data
+      });
+      // Also save to localStorage so it persists without refetching
+      localStorage.setItem('whatsappNumber', clean);
+      showToast('WhatsApp number saved', 'success');
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : 'Failed to save WhatsApp number';
+      setError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     setIsLoading(true);
@@ -108,7 +138,29 @@ export default function Account() {
           </div>
 
           {/* Logout Button */}
-          <div className="border-t border-gray-200 pt-8">
+          <div className="border-t border-gray-200 pt-8 space-y-6">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">WhatsApp number</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Used for “Share as link” order confirmations (customers will message you on WhatsApp).
+              </p>
+              <div className="flex gap-3">
+                <input
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value)}
+                  placeholder="e.g. +91XXXXXXXXXX"
+                  className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={saveWhatsApp}
+                  disabled={isLoading}
+                  className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+
             <button
               onClick={handleLogout}
               disabled={isLoading}

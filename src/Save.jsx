@@ -220,6 +220,7 @@ export async function saveRenderedImage(product, type, units = {}) {
   console.log(`🖼️ Product image status:`, {
     hasImage: !!product.image,
     hasImagePath: !!product.imagePath,
+    hasImageUrl: !!product.imageUrl,
     imagePath: product.imagePath,
     imageLength: product.image?.length,
   });
@@ -239,6 +240,12 @@ export async function saveRenderedImage(product, type, units = {}) {
     }
   }
 
+  // If we still don't have an image but we do have a cloud URL, use it directly.
+  // `loadImage()` in canvas renderer supports HTTP(S) URLs (requires CORS on the bucket).
+  if (!product.image && product.imageUrl) {
+    product.image = product.imageUrl;
+  }
+
   // ✅ Ensure product.image exists before rendering
   if (!product.image) {
     console.error("❌ Failed to load image for rendering: File does not exist.");
@@ -246,6 +253,7 @@ export async function saveRenderedImage(product, type, units = {}) {
       id: product.id,
       name: product.name,
       imagePath: product.imagePath,
+      imageUrl: product.imageUrl,
       hasImage: !!product.image,
     });
     return;

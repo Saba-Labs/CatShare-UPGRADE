@@ -8,6 +8,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { getCroppedImg } from "../cropUtils";
 import { getPalette } from "../colorUtils";
 import { saveRenderedImage } from "../Save";
+import { uploadProductImageToR2 } from "../services/r2Upload";
 import { useToast } from "../context/ToastContext";
 import { useTheme } from "../context/ThemeContext";
 import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
@@ -930,6 +931,17 @@ export default function CreateProduct() {
       return;
     }
 
+    // Upload source image to Cloudflare R2 (store URL in product for cross-device)
+    let imageUrl: string | undefined;
+    try {
+      if (imagePreview?.startsWith("data:image")) {
+        const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
+        imageUrl = uploaded.url;
+      }
+    } catch (err: any) {
+      console.warn("⚠️ R2 upload failed (continuing with local image):", err?.message || err);
+    }
+
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
     const allCatalogues = getAllCatalogues();
 
@@ -937,6 +949,7 @@ export default function CreateProduct() {
       ...formData,
       id,
       imagePath,
+      ...(imageUrl ? { imageUrl } : {}),
       fontColor: fontColor || "white",
       imageBgColor: imageBgOverride || "white",
       bgColor: overrideColor || "#add8e6",

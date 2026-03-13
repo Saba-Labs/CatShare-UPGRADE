@@ -37,6 +37,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import Account from "./pages/Account";
+import OrderForm from "./pages/OrderForm";
 import PrivacyPolicy from "./PrivacyPolicy";
 import TermsOfService from "./TermsOfService";
 import Website from "./Website";
@@ -73,8 +74,24 @@ function AppWithBackHandler() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const renderResultTimeoutRef = useRef(null);
+  const previousUserIdRef = useRef<string | null>(null);
 
   const isNative = Capacitor.getPlatform() !== "web";
+
+  // Reset local product data when the authenticated user changes
+  useEffect(() => {
+    const currentUserId = user?.uid || null;
+    if (currentUserId !== previousUserIdRef.current) {
+      previousUserIdRef.current = currentUserId;
+
+      // Clear in-memory and local storage products for new user
+      setProducts([]);
+      setDeletedProducts([]);
+      safeSetInStorage("products", []);
+      safeSetInStorage("deletedProducts", []);
+      console.log('🔄 Cleared local products for user change:', currentUserId);
+    }
+  }, [user?.uid]);
 
   // Merge Supabase data with local storage when user logs in
   useEffect(() => {
@@ -670,6 +687,7 @@ function AppWithBackHandler() {
 
         {/* Public Routes */}
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />

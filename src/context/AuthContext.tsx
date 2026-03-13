@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import { fetchAllUserData } from '../services/supabaseSync';
+import { setSupabaseUser } from '../supabaseClient';
 
 interface SupabaseUserData {
   products: any[];
@@ -49,12 +50,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           localStorage.setItem('firebaseUserId', currentUser.uid);
           console.log('✅ Stored Firebase user ID in localStorage:', currentUser.uid);
+          // Also set Supabase user header source for RLS
+          setSupabaseUser(currentUser.uid);
         } catch (err) {
           console.warn('⚠️ Could not store user ID in localStorage:', err);
         }
       } else {
         try {
           localStorage.removeItem('firebaseUserId');
+          localStorage.removeItem('supabase_user_id');
           console.log('🔄 Cleared Firebase user ID from localStorage');
         } catch (err) {
           console.warn('⚠️ Could not remove user ID from localStorage:', err);

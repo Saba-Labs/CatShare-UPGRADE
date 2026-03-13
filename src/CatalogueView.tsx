@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback, Dispatch, Set
 import { flushSync } from "react-dom";
 import { handleShare } from "./Share";
 import { HiCheck } from "react-icons/hi";
-import { FiPlus, FiEdit, FiImage } from "react-icons/fi";
+import { FiPlus, FiEdit, FiImage, FiLink } from "react-icons/fi";
 import { FaRegFilePdf } from "react-icons/fa6";
 import { MdLayers } from "react-icons/md";
 import { RiEdit2Line } from "react-icons/ri";
@@ -19,6 +19,8 @@ import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF } from "./utils/pdfUtils";
+import { useAuth } from "./context/AuthContext";
+import { createShareLink } from "./services/shareLinks";
 
 const ProductCard = React.memo(({
   p,
@@ -268,6 +270,7 @@ export default React.memo(function CatalogueView({
   stockField,
   onBack,
 }: CatalogueViewProps) {
+  const { user, supabaseData } = useAuth();
   // Helper function to get catalogue-specific data for a product
   const getProductCatalogueData = useCallback((product) => {
     if (!catalogueId) return product; // Fallback to product if no catalogueId
@@ -1423,6 +1426,60 @@ const handleTouchEnd = useCallback(() => {
               <div className="text-center">
                 <span className="block font-bold text-slate-900 dark:text-white text-xs">PDF Doc</span>
                 <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em] mt-1">Client Ready</span>
+              </div>
+            </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  setShowShareOptions(false);
+                  if (!user?.uid) {
+                    alert('Please login first.');
+                    return;
+                  }
+                  const sellerWhatsapp = supabaseData?.userSettings?.whatsappNumber || '';
+                  if (!sellerWhatsapp.trim()) {
+                    alert('Please set your WhatsApp number in Account first.');
+                    return;
+                  }
+
+                  const selectedProducts = allProducts.filter((p) => selected.includes(p.id));
+                  const items = selectedProducts.map((p) => {
+                    const cat = getProductCatalogueData(p);
+                    return {
+                      productId: String(p.id),
+                      name: String(p.name || ''),
+                      price: cat.price,
+                      priceUnit: cat.priceUnit,
+                      imageUrl: p.imageUrl,
+                    };
+                  });
+
+                  const { url } = await createShareLink({
+                    sellerUserId: user.uid,
+                    sellerWhatsapp,
+                    items,
+                  });
+
+                  if (navigator.share) {
+                    await navigator.share({ title: 'Order link', text: 'Order form link', url });
+                  } else {
+                    await navigator.clipboard.writeText(url);
+                    alert('Link copied to clipboard.');
+                  }
+                } catch (err: any) {
+                  console.error(err);
+                  alert(err?.message || 'Failed to create link');
+                }
+              }}
+              className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
+            >
+              <div className="w-11 h-11 flex items-center justify-center rounded-xl bg-green-500 text-white shadow-lg shadow-green-500/20 rotate-6 group-hover:rotate-0 transition-transform">
+                <FiLink size={22} className="-rotate-6 group-hover:rotate-0 transition-transform" />
+              </div>
+              <div className="text-center">
+                <span className="block font-bold text-slate-900 dark:text-white text-xs">Link</span>
+                <span className="block text-[9px] text-slate-400 font-bold uppercase tracking-[0.1em] mt-1">Order Form</span>
               </div>
             </button>
           </div>

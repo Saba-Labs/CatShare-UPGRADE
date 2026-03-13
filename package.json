@@ -12,6 +12,7 @@
     "generate-icons": "node scripts/generate-icons.js public/logo-catalogue-share.svg"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1008.0",
     "@byteowls/capacitor-filesharer": "^6.0.0",
     "@capacitor-community/keep-awake": "^5.0.1",
     "@capacitor-firebase/analytics": "^6.3.1",
@@ -32,6 +33,7 @@
     "@emotion/styled": "^11.14.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@mui/material": "^7.2.0",
+    "@netlify/functions": "^5.1.3",
     "@supabase/supabase-js": "^2.53.0",
     "@tailwindcss/forms": "0.5.10",
     "@types/react-beautiful-dnd": "13.1.8",
@@ -39,6 +41,7 @@
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "firebase": "^11.10.0",
+    "firebase-admin": "^13.5.0",
     "framer-motion": "^12.23.9",
     "jspdf": "^4.1.0",
     "jszip": "^3.10.1",
