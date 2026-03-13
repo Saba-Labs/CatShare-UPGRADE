@@ -3,7 +3,7 @@
  * Handles all data synchronization between local state and Supabase
  */
 
-import { setSupabaseUser } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 
 interface SyncOptions {
   userId: string;
