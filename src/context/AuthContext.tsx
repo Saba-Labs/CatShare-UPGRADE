@@ -1,3 +1,4 @@
+import { setSupabaseUser } from '../supabaseClient';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
