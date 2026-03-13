@@ -50,6 +50,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           localStorage.setItem('firebaseUserId', currentUser.uid);
           console.log('✅ Stored Firebase user ID in localStorage:', currentUser.uid);
+          setSupabaseUser(currentUser.uid);
         } catch (err) {
           console.warn('⚠️ Could not store user ID in localStorage:', err);
         }
