@@ -5,6 +5,9 @@
 
 import { getSupabaseClient } from '../supabaseClient';
 
+// Always get a fresh client so user_id header is always current
+const db = () => getSupabaseClient();
+
 interface SyncOptions {
   userId: string;
   retryCount?: number;
