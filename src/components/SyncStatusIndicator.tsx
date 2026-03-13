@@ -74,7 +74,7 @@ export const SyncStatusIndicator: React.FC = () => {
 
   if (!showIndicator) return null;
 
-  const statusConfig = {
+  const statusConfig: Record<string, { icon: string; color: string; bgColor: string; label: string; animate?: boolean }> = {
     idle: {
       icon: '✓',
       color: 'text-gray-400',
