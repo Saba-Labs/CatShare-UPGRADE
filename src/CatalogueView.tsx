@@ -1462,14 +1462,24 @@ const handleTouchEnd = useCallback(() => {
                   });
 
                   if (navigator.share) {
-                    await navigator.share({ title: 'Order link', text: 'Order form link', url });
+                    try {
+                      await navigator.share({ title: 'Order link', text: 'Order form link', url });
+                    } catch (shareErr: any) {
+                      // If user cancels or permissions denied, fallback to clipboard
+                      if (shareErr.name === 'AbortError' || shareErr.name === 'NotAllowedError') {
+                        await navigator.clipboard.writeText(url);
+                        alert('Link copied to clipboard.');
+                      } else {
+                        throw shareErr;
+                      }
+                    }
                   } else {
                     await navigator.clipboard.writeText(url);
                     alert('Link copied to clipboard.');
                   }
                 } catch (err: any) {
-                  console.error(err);
-                  alert(err?.message || 'Failed to create link');
+                  console.error('Failed to share or copy link:', err);
+                  alert('Failed to create link. Please try again.');
                 }
               }}
               className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
