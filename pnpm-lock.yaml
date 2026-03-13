@@ -98,6 +98,9 @@ importers:
       firebase-admin:
         specifier: ^13.5.0
         version: 13.7.0
+      formidable:
+        specifier: ^3.5.4
+        version: 3.5.4
       framer-motion:
         specifier: ^12.23.9
         version: 12.23.22(@emotion/is-prop-valid@1.4.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
