@@ -266,8 +266,9 @@ export async function syncUserSettings(
         .select();
 
       if (error) {
-        console.error('❌ Error updating user settings:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error.message || JSON.stringify(error) || 'Unknown error';
+        console.error('❌ Error updating user settings:', errorMsg);
+        return { success: false, error: errorMsg };
       }
 
       console.log('✅ Updated user settings in Supabase');
@@ -279,8 +280,9 @@ export async function syncUserSettings(
         .select();
 
       if (error) {
-        console.error('❌ Error creating user settings:', error);
-        return { success: false, error: error.message };
+        const errorMsg = error.message || JSON.stringify(error) || 'Unknown error';
+        console.error('❌ Error creating user settings:', errorMsg);
+        return { success: false, error: errorMsg };
       }
 
       console.log('✅ Created user settings in Supabase');
