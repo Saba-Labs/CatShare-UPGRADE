@@ -116,7 +116,7 @@ export function stripDataUriPrefix(base64OrDataUri: string): string {
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const clean = stripDataUriPrefix(base64);
   const byteChars = atob(clean);
-  const byteArrays: Uint8Array[] = [];
+  const byteArrays: BlobPart[] = [];
 
   for (let offset = 0; offset < byteChars.length; offset += 512) {
     const slice = byteChars.slice(offset, offset + 512);
