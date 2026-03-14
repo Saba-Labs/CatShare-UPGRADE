@@ -489,12 +489,13 @@ function AppWithBackHandler() {
   useEffect(() => {
     const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
 
-    // Only redirect to welcome if not already on welcome or admin pages
+    // Only redirect to welcome if not already on welcome, order form, or other public pages
     if (!hasCompletedOnboarding &&
         !location.pathname.includes('/welcome') &&
         !location.pathname.includes('/privacy') &&
         !location.pathname.includes('/terms') &&
-        !location.pathname.includes('/website')) {
+        !location.pathname.includes('/website') &&
+        !location.pathname.includes('/o/')) {
       navigate('/welcome');
     }
   }, [navigate, location.pathname]);
