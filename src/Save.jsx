@@ -7,6 +7,7 @@ import { getAllCatalogues } from "./config/catalogueConfig";
 import { getAllFields } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
+import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
 
 /**
  * Delete all rendered images for a specific product
@@ -465,6 +466,31 @@ export async function saveRenderedImage(product, type, units = {}) {
           directory: Directory.External,
         });
         console.log(`✅ File verified - exists at: ${filePath}`, stat);
+
+        // ── Upload to Cloudflare R2 ────────────────────────────────────────
+        try {
+          const rawBase64 = stripDataUriPrefix(base64); // strip "data:image/png;base64," prefix
+          const uploadResult = await uploadImageToR2(rawBase64, filename, folder);
+
+          if (uploadResult.success && uploadResult.publicUrl) {
+            console.log(`☁️  Image synced to Cloudflare R2: ${uploadResult.publicUrl}`);
+
+            // Optional: attach publicUrl to the product so callers can persist it to Supabase
+            // If your saveRenderedImage caller has access to the product object,
+            // you can return or callback the URL here. Example:
+            //   product.imageUrl = uploadResult.publicUrl;
+            //
+            // Or if you have a Supabase update function available here, call it:
+            //   await updateProductImageUrl(product.id, uploadResult.publicUrl);
+          } else {
+            // R2 upload failed but local file is safe — log and continue
+            console.warn(`⚠️  R2 upload failed (local file preserved): ${uploadResult.error}`);
+          }
+        } catch (r2Err) {
+          // Never block the local save flow due to a cloud upload error
+          console.warn(`⚠️  R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
+        }
+        // ── End R2 upload ──────────────────────────────────────────────────
 
         // Try to get the file URI to see the actual path
         try {
