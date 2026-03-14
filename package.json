@@ -14,6 +14,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",
     "@aws-sdk/s3-request-presigner": "^3.1009.0",
+    "busboy": "^1.6.0",
     "@byteowls/capacitor-filesharer": "^6.0.0",
     "@capacitor-community/keep-awake": "^5.0.1",
     "@capacitor-firebase/analytics": "^6.3.1",
