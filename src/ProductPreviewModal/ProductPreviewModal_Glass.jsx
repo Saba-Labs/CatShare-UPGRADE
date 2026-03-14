@@ -190,6 +190,14 @@ export default function ProductPreviewModal_Glass({
 
   useEffect(() => {
     const loadImage = async () => {
+      // Priority: cloud URL > local file > base64
+      // 1. Try cloud URL first (Cloudflare R2)
+      if (product?.imageUrl) {
+        setImageUrl(product.imageUrl);
+        return;
+      }
+
+      // 2. Try local filesystem image
       if (product?.imagePath) {
         try {
           const result = await Filesystem.readFile({
@@ -202,6 +210,7 @@ export default function ProductPreviewModal_Glass({
           setImageUrl(product.image || "");
         }
       } else {
+        // 3. Fallback to base64 in-memory image
         setImageUrl(product.image || "");
       }
     };
