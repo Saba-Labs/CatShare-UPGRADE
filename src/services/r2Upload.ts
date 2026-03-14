@@ -22,7 +22,7 @@ export async function uploadProductImageToR2(options: {
 
   const idToken = await user.getIdToken();
   const baseUrl = (import.meta as any).env?.VITE_BACKEND_URL || '';
-  const endpoint = `${baseUrl}/upload-product-image`;
+  const endpoint = baseUrl ? `${baseUrl}/upload-product-image` : '/api/upload-product-image';
 
   const { blob, ext } = dataUrlToBlob(options.dataUrl);
 
@@ -48,4 +48,3 @@ export async function uploadProductImageToR2(options: {
   if (!json?.url || !json?.key) throw new Error('Upload response missing url/key');
   return { url: json.url, key: json.key };
 }
-
