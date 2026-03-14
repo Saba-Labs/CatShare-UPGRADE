@@ -479,6 +479,33 @@ export async function saveRenderedImage(product, type, units = {}) {
 
             if (uploadResult && uploadResult.url) {
               console.log(`☁️  Source image uploaded to Cloudflare R2: ${uploadResult.url}`);
+
+              // ✅ Save the Cloudflare image URL back to the product
+              product.imageUrl = uploadResult.url;
+
+              // ✅ Persist to Supabase so it syncs across devices
+              try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                  const { syncProducts } = await import('./services/supabaseSync');
+                  const products = JSON.parse(localStorage.getItem('products') || '[]');
+                  const productIndex = products.findIndex(p => p.id === id);
+
+                  if (productIndex !== -1) {
+                    products[productIndex] = product;
+                    localStorage.setItem('products', JSON.stringify(products));
+
+                    // Sync to Supabase
+                    await syncProducts(userId, products);
+                    console.log(`✅ Product image URL saved to Supabase`);
+                  }
+                } else {
+                  console.warn(`⚠️  No Firebase user ID found - skipping Supabase sync`);
+                }
+              } catch (syncErr) {
+                console.warn(`⚠️  Could not sync image URL to Supabase:`, syncErr?.message || syncErr);
+                // Still OK - the image is uploaded, just not synced yet
+              }
             } else {
               console.warn(`⚠️  Source image upload to R2 failed:`, uploadResult?.error || 'Unknown error');
             }
