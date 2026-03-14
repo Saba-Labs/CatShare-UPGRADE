@@ -10,13 +10,9 @@ import { getAuth } from "firebase-admin/auth";
 
 // ─── Firebase Admin init (runs once per cold start) ──────────────────────────
 if (!getApps().length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!);
   initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Replace escaped newlines that Vercel env vars sometimes introduce
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
+    credential: cert(serviceAccount),
   });
 }
 
