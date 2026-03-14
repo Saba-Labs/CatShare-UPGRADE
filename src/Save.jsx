@@ -472,49 +472,67 @@ export async function saveRenderedImage(product, type, units = {}) {
         try {
           // Upload the source product image (not the rendered card)
           if (product.image) {
-            const uploadResult = await uploadProductImageToR2({
-              productId: id,
-              dataUrl: product.image
-            });
+            try {
+              console.log(`📤 Uploading product image to Cloudflare R2...`);
+              const uploadResult = await uploadProductImageToR2({
+                productId: id,
+                dataUrl: product.image
+              });
 
-            if (uploadResult && uploadResult.url) {
-              console.log(`☁️  Source image uploaded to Cloudflare R2: ${uploadResult.url}`);
+              if (!uploadResult) {
+                throw new Error('Upload returned null/undefined');
+              }
+
+              const imageUrl = uploadResult.url || uploadResult.publicUrl;
+              if (!imageUrl) {
+                throw new Error(`Upload response missing URL. Response: ${JSON.stringify(uploadResult)}`);
+              }
+
+              console.log(`✅ Source image uploaded to Cloudflare R2: ${imageUrl}`);
 
               // ✅ Save the Cloudflare image URL back to the product
-              product.imageUrl = uploadResult.url;
+              product.imageUrl = imageUrl;
+              console.log(`📌 Updated product.imageUrl: ${product.imageUrl}`);
 
               // ✅ Persist to Supabase so it syncs across devices
-              try {
-                const userId = localStorage.getItem('firebaseUserId');
-                if (userId) {
-                  const { syncProducts } = await import('./services/supabaseSync');
-                  const products = JSON.parse(localStorage.getItem('products') || '[]');
-                  const productIndex = products.findIndex(p => p.id === id);
-
-                  if (productIndex !== -1) {
-                    products[productIndex] = product;
-                    localStorage.setItem('products', JSON.stringify(products));
-
-                    // Sync to Supabase
-                    await syncProducts(userId, products);
-                    console.log(`✅ Product image URL saved to Supabase`);
-                  }
-                } else {
-                  console.warn(`⚠️  No Firebase user ID found - skipping Supabase sync`);
-                }
-              } catch (syncErr) {
-                console.warn(`⚠️  Could not sync image URL to Supabase:`, syncErr?.message || syncErr);
-                // Still OK - the image is uploaded, just not synced yet
+              const userId = localStorage.getItem('firebaseUserId');
+              if (!userId) {
+                throw new Error('No Firebase user ID found - cannot sync to Supabase');
               }
-            } else {
-              console.warn(`⚠️  Source image upload to R2 failed:`, uploadResult?.error || 'Unknown error');
+
+              // Update localStorage immediately with the new imageUrl
+              const storedProducts = JSON.parse(localStorage.getItem('products') || '[]');
+              const productIndex = storedProducts.findIndex(p => p.id === id);
+
+              if (productIndex === -1) {
+                throw new Error(`Product not found in localStorage: ${id}`);
+              }
+
+              // Ensure we're updating the same product object
+              storedProducts[productIndex] = { ...storedProducts[productIndex], ...product };
+              localStorage.setItem('products', JSON.stringify(storedProducts));
+              console.log(`💾 Updated localStorage with imageUrl for product ${id}`);
+
+              // Sync to Supabase with the updated product
+              const { syncProducts: syncToSupabase } = await import('./services/supabaseSync');
+              const syncResult = await syncToSupabase(userId, storedProducts);
+
+              if (syncResult.success) {
+                console.log(`✅ Product image URL synced to Supabase successfully`);
+              } else {
+                throw new Error(`Supabase sync failed: ${syncResult.error}`);
+              }
+            } catch (uploadErr) {
+              console.error(`❌ Image upload/sync error:`, uploadErr?.message || uploadErr);
+              // Don't block the local save, but warn the user
+              console.warn(`⚠️  Image URL may not be synced to Supabase. Local save succeeded.`);
             }
           } else {
-            console.warn(`⚠️  No source image available to upload to R2`);
+            console.log(`ℹ️  No source image available to upload to R2`);
           }
         } catch (r2Err) {
           // Never block the local save flow due to a cloud upload error
-          console.warn(`⚠️  Source image R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
+          console.error(`❌ Unexpected error in R2 upload flow (local file preserved):`, r2Err?.message || r2Err);
         }
         // ── End R2 upload ──────────────────────────────────────────────────
 

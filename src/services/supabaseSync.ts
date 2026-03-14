@@ -25,11 +25,13 @@ export async function syncProducts(
 
     const cleanedProducts = products.map(p => {
       const clean = { ...p };
+      // Remove large binary data fields but PRESERVE imageUrl (cloud URL)
       delete clean.image;
       delete clean.imageBase64;
       delete clean.imageData;
       delete clean.imageFilename;
       delete clean.renderedImages;
+      // imageUrl is intentionally preserved - it's the Cloudflare R2 URL needed for sync
       return clean;
     });
 
@@ -47,6 +49,18 @@ export async function syncProducts(
       return { success: true, data: [] };
     }
 
+    // Log details about products being synced (including imageUrl presence)
+    console.log(`📤 Syncing ${upsertData.length} products to Supabase:`, {
+      count: upsertData.length,
+      productsWithImageUrl: upsertData.filter(p => p.data?.imageUrl).length,
+      samples: upsertData.slice(0, 2).map(p => ({
+        id: p.product_id,
+        name: p.name,
+        hasImageUrl: !!p.data?.imageUrl,
+        imageUrl: p.data?.imageUrl || 'N/A'
+      }))
+    });
+
     const { data, error } = await getSupabaseClient()
       .from('products')
       .upsert(upsertData, { onConflict: 'user_id,product_id' })
@@ -57,7 +71,10 @@ export async function syncProducts(
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Synced ${cleanedProducts.length} products to Supabase`);
+    console.log(`✅ Synced ${cleanedProducts.length} products to Supabase`, {
+      withImageUrl: upsertData.filter(p => p.data?.imageUrl).length,
+      total: cleanedProducts.length
+    });
     return { success: true, data };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
