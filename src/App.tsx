@@ -199,7 +199,7 @@ function AppWithBackHandler() {
           const product = all[i];
 
           // Skip products without images
-          if (!product.image && !product.imagePath) {
+          if (!product.image && !product.imagePath && !product.imageUrl) {
             console.warn(`⚠️ Skipping ${product.name} - no image available`);
             flushSync(() => setRenderProgress(i + 1));
             window.dispatchEvent(new CustomEvent("renderProgress", {
@@ -378,6 +378,28 @@ function AppWithBackHandler() {
     });
     safeSetInStorage("deletedProducts", cleanedDeleted);
   }, [deletedProducts]);
+
+  // ✅ Sync deleted products to Supabase whenever they change
+  useEffect(() => {
+    if (!user) return;
+
+    const userId = user.uid;
+    if (!userId) return;
+
+    // Only sync if there are deleted products
+    if (deletedProducts.length === 0) return;
+
+    // Import and call syncDeletedProducts in background (fire and forget)
+    import('./services/supabaseSync').then(({ syncDeletedProducts }) => {
+      syncDeletedProducts(userId, deletedProducts).then(result => {
+        if (result.success) {
+          console.log(`✅ ${deletedProducts.length} deleted products synced to Supabase`);
+        } else {
+          console.warn('⚠️ Deleted products sync failed:', result.error);
+        }
+      });
+    });
+  }, [deletedProducts, user]);
 
   useEffect(() => {
     safeSetInStorage("darkMode", darkMode);
