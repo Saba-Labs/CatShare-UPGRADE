@@ -52,6 +52,24 @@ export default function Login() {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setError('');
+    setAuthLoading('guest');
+    try {
+      const user = await authService.loginAsGuest();
+      if (user) {
+        showToast('Logged in as guest', 'success');
+        navigate('/');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Guest login failed';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+    } finally {
+      setAuthLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
       <motion.div
@@ -130,7 +148,7 @@ export default function Login() {
           </div>
 
           {/* OAuth Buttons */}
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
             <button
               onClick={handleGoogleLogin}
               disabled={authLoading !== null}
@@ -139,6 +157,16 @@ export default function Login() {
               <FaGoogle className="text-red-600" />
               <span className="text-gray-700 font-medium">
                 {authLoading === 'google' ? 'Signing in...' : 'Google'}
+              </span>
+            </button>
+
+            <button
+              onClick={handleGuestLogin}
+              disabled={authLoading !== null}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+            >
+              <span className="text-gray-700 font-medium">
+                {authLoading === 'guest' ? 'Signing in...' : 'Continue as Guest'}
               </span>
             </button>
           </div>
