@@ -43,6 +43,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const handleRestore = (product) => {
     setProducts((prev) => [product, ...prev]);
     setDeletedProducts((prev) => prev.filter((p) => p.id !== product.id));
+    window.dispatchEvent(new CustomEvent("sync-to-supabase"));
   };
 
   const confirmDelete = (id) => {

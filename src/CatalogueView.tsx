@@ -20,7 +20,7 @@ import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
-import { createShareLink } from "./services/shareLinks";
+import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
 
 const ProductCard = React.memo(({
   p,
@@ -1444,16 +1444,9 @@ const handleTouchEnd = useCallback(() => {
                   }
 
                   const selectedProducts = allProducts.filter((p) => selected.includes(p.id));
-                  const items = selectedProducts.map((p) => {
-                    const cat = getProductCatalogueData(p);
-                    return {
-                      productId: String(p.id),
-                      name: String(p.name || ''),
-                      price: cat.price,
-                      priceUnit: cat.priceUnit,
-                      imageUrl: p.imageUrl,
-                    };
-                  });
+                  const items = selectedProducts.map((p) =>
+                    productToShareLinkItem(p, catalogueId)
+                  );
 
                   const { url } = await createShareLink({
                     sellerUserId: user.uid,

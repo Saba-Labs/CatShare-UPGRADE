@@ -914,6 +914,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       setProducts((prev) => prev.filter((x) => x.id !== shelfTarget.id));
                       setDeletedProducts((prev) => [shelfTarget, ...prev]);
 
+                      window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+
                       // If currently previewing this item, move to next
                       if (previewProduct && previewProduct.id === shelfTarget.id) {
                         const idx = previewList.findIndex(p => p.id === shelfTarget.id);
@@ -1110,6 +1112,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               Haptics.impact({ style: ImpactStyle.Heavy });
               setProducts((prev) => prev.filter((p) => p.id !== toShelf.id));
               setDeletedProducts((prev) => [toShelf, ...prev]);
+
+              window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
               // Move to next item in preview
               const idx = previewList.findIndex(p => p.id === toShelf.id);

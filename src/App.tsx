@@ -102,7 +102,12 @@ function AppWithBackHandler() {
 
       // Merge products: Supabase data takes precedence if it's newer
       if (supabaseData.products && supabaseData.products.length > 0) {
-        const merged = mergeProductsData(products, supabaseData.products);
+        // ✅ Build set of shelved product IDs so they never come back from Supabase
+        const currentDeletedIds = new Set([
+          ...deletedProducts.map((p: any) => p.id),
+          ...(supabaseData.deletedProducts || []).map((p: any) => p.id),
+        ]);
+        const merged = mergeProductsData(products, supabaseData.products, currentDeletedIds);
         setProducts(merged);
         safeSetInStorage("products", merged);
         console.log('✅ Merged products from Supabase');
@@ -124,21 +129,21 @@ function AppWithBackHandler() {
   }, [user, supabaseData, supabaseDataLoading]);
 
   // Merge products by keeping the newer version (based on timestamp)
-  const mergeProductsData = (local: any[], remote: any[]) => {
+  const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
     const merged = new Map();
-
-    // Add all local products
+  
     local.forEach(product => {
       merged.set(product.id, product);
     });
-
-    // Merge remote products (newer version wins)
+  
     remote.forEach(remoteProduct => {
+      // ✅ Never bring back shelved/deleted products
+      if (deletedIds.has(remoteProduct.id)) return;
+  
       const localProduct = merged.get(remoteProduct.id);
       if (!localProduct) {
         merged.set(remoteProduct.id, remoteProduct);
       } else {
-        // Keep the version with the latest timestamp
         const localTime = new Date(localProduct.updatedAt || 0).getTime();
         const remoteTime = new Date(remoteProduct.updatedAt || 0).getTime();
         if (remoteTime > localTime) {
@@ -146,7 +151,7 @@ function AppWithBackHandler() {
         }
       }
     });
-
+  
     return Array.from(merged.values());
   };
 
@@ -332,15 +337,17 @@ function AppWithBackHandler() {
   }, [isNative]);
 
   useEffect(() => {
-    // Strip image data before saving to avoid quota exceeded errors
     const cleanedProducts = products.map(p => {
       const clean = { ...p };
-      delete clean.image; // Remove base64 image data
+      delete clean.image;
       delete clean.imageBase64;
       delete clean.imageData;
       delete clean.imageFilename;
       delete clean.renderedImages;
-      // Keep imagePath as a reference only
+      // ✅ Always stamp updatedAt so Supabase merge knows which version is newer
+      if (!clean.updatedAt) {
+        clean.updatedAt = new Date().toISOString();
+      }
       return clean;
     });
     safeSetInStorage("products", cleanedProducts);
