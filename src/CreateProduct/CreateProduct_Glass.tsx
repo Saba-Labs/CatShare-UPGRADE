@@ -608,6 +608,9 @@ export default function CreateProduct() {
 
         if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
           setImagePreview(migratedProduct.image);
+        } else if (migratedProduct.imageUrl) {
+          // ✅ Load from Cloudflare R2
+          setImagePreview(migratedProduct.imageUrl);
         } else if (migratedProduct.imagePath) {
           setImageFilePath(migratedProduct.imagePath);
           Filesystem.readFile({
@@ -615,6 +618,11 @@ export default function CreateProduct() {
             directory: Directory.Data,
           }).then((res) => {
             setImagePreview(`data:image/png;base64,${res.data}`);
+          }).catch(() => {
+            // ✅ Local file missing — fall back to R2
+            if (migratedProduct.imageUrl) {
+              setImagePreview(migratedProduct.imageUrl);
+            }
           });
         }
       }
