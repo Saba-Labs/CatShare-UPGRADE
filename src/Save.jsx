@@ -8,6 +8,7 @@ import { getAllFields } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
+import { uploadProductImageToR2 } from "./services/r2Upload";
 
 /**
  * Delete all rendered images for a specific product
@@ -467,28 +468,26 @@ export async function saveRenderedImage(product, type, units = {}) {
         });
         console.log(`✅ File verified - exists at: ${filePath}`, stat);
 
-        // ── Upload to Cloudflare R2 ────────────────────────────────────────
+        // ── Upload source product image to Cloudflare R2 ────────────────────
         try {
-          const rawBase64 = stripDataUriPrefix(base64); // strip "data:image/png;base64," prefix
-          const uploadResult = await uploadImageToR2(rawBase64, filename, folder);
+          // Upload the source product image (not the rendered card)
+          if (product.image) {
+            const uploadResult = await uploadProductImageToR2({
+              productId: id,
+              dataUrl: product.image
+            });
 
-          if (uploadResult.success && uploadResult.publicUrl) {
-            console.log(`☁️  Image synced to Cloudflare R2: ${uploadResult.publicUrl}`);
-
-            // Optional: attach publicUrl to the product so callers can persist it to Supabase
-            // If your saveRenderedImage caller has access to the product object,
-            // you can return or callback the URL here. Example:
-            //   product.imageUrl = uploadResult.publicUrl;
-            //
-            // Or if you have a Supabase update function available here, call it:
-            //   await updateProductImageUrl(product.id, uploadResult.publicUrl);
+            if (uploadResult && uploadResult.url) {
+              console.log(`☁️  Source image uploaded to Cloudflare R2: ${uploadResult.url}`);
+            } else {
+              console.warn(`⚠️  Source image upload to R2 failed:`, uploadResult?.error || 'Unknown error');
+            }
           } else {
-            // R2 upload failed but local file is safe — log and continue
-            console.warn(`⚠️  R2 upload failed (local file preserved): ${uploadResult.error}`);
+            console.warn(`⚠️  No source image available to upload to R2`);
           }
         } catch (r2Err) {
           // Never block the local save flow due to a cloud upload error
-          console.warn(`⚠️  R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
+          console.warn(`⚠️  Source image R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
         }
         // ── End R2 upload ──────────────────────────────────────────────────
 
