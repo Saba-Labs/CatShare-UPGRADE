@@ -549,6 +549,11 @@ export default function CreateProduct() {
         setImageBgOverride(migratedProduct.imageBgColor || "white");
         setAppliedAspectRatio(migratedProduct.cropAspectRatio || 1);
 
+        // ✅ Restore saved color palette
+if (migratedProduct.suggestedColors?.length > 0) {
+  setSuggestedColors(migratedProduct.suggestedColors);
+}
+
         if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
           setImagePreview(migratedProduct.image);
         } else if (migratedProduct.imageUrl) {
@@ -863,10 +868,10 @@ export default function CreateProduct() {
       showToast("Please upload and crop an image before saving.", "warning");
       return;
     }
-
+  
     const id = editingId || Date.now().toString();
     const imagePath = `catalogue/product-${id}.png`;
-
+  
     try {
       if (imagePreview?.startsWith("data:image")) {
         const base64 = imagePreview.split(",")[1];
@@ -881,75 +886,97 @@ export default function CreateProduct() {
       showToast("Image save failed: " + err.message, "error");
       return;
     }
-
+  
+    // ✅ Preserve existing imageUrl when editing, upload new one when image changed
+    const existingImageUrl = editingId
+      ? JSON.parse(localStorage.getItem("products") || "[]").find((p: any) => p.id === editingId)?.imageUrl
+      : undefined;
+  
+    let imageUrl: string | undefined;
+    try {
+      if (imagePreview?.startsWith("data:image")) {
+        // New or changed image — upload to R2
+        const { uploadProductImageToR2 } = await import("../services/r2Upload");
+        const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
+        imageUrl = uploaded.url;
+      } else if (imagePreview?.startsWith("http")) {
+        // ✅ Image loaded from existing R2 URL — preserve it
+        imageUrl = imagePreview;
+      } else {
+        // ✅ Fallback to existing saved URL
+        imageUrl = existingImageUrl;
+      }
+    } catch (err: any) {
+      console.warn("⚠️ R2 upload failed (continuing with local image):", err?.message || err);
+      // ✅ Preserve existing URL even if upload fails
+      imageUrl = existingImageUrl;
+    }
+  
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
     const allCatalogues = getAllCatalogues();
-
+  
     const newItem: ProductWithCatalogueData = {
       ...formData,
       id,
       imagePath,
+      ...(imageUrl ? { imageUrl } : {}),
+      suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
       fontColor: fontColor || "white",
       imageBgColor: imageBgOverride || "white",
       bgColor: overrideColor || "#add8e6",
       cropAspectRatio: appliedAspectRatio,
       renderingType: "classic",
     };
-
+  
     if (newItem.image) {
       delete newItem.image;
     }
-
+  
     for (const cat of allCatalogues) {
       const catData = getCatalogueData(formData, cat.id);
       newItem[cat.priceField] = catData[cat.priceField] || "";
       newItem[cat.priceUnitField] = catData[cat.priceUnitField] || "/ piece";
       newItem[cat.stockField] = catData[cat.stockField] !== false;
     }
-
+  
     newItem.price1 = newItem.price1 || "";
     newItem.price1Unit = newItem.price1Unit || "/ piece";
-
+  
     for (let i = 1; i <= 10; i++) {
       newItem[`field${i}`] = defaultCatalogueData[`field${i}`] || "";
       newItem[`field${i}Unit`] = defaultCatalogueData[`field${i}Unit`] || "None";
     }
-
+  
     newItem.badge = defaultCatalogueData.badge || "";
     newItem.wholesaleUnit = defaultCatalogueData.price1Unit || "/ piece";
     newItem.packageUnit = defaultCatalogueData.field2Unit || "pcs / set";
     newItem.ageUnit = defaultCatalogueData.field3Unit || "months";
     newItem.wholesale = newItem.price1 || "";
     newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
-
-    // Ensure catalogueData is preserved and all catalogues have the badge synced
+  
     if (newItem.catalogueData) {
       for (const cat of allCatalogues) {
         if (newItem.catalogueData[cat.id]) {
-          // Sync badge to all catalogues to ensure consistency
           newItem.catalogueData[cat.id].badge = newItem.badge;
         }
       }
     }
-
+  
     try {
       const all = JSON.parse(localStorage.getItem("products") || "[]");
       const isNewProduct = !editingId;
       const updated = editingId
         ? all.map((p) => (p.id === editingId ? newItem : p))
         : [...all, newItem];
-
+  
       localStorage.setItem("products", JSON.stringify(updated));
-
-      // Fire custom analytics event when a new product is created
+  
       if (isNewProduct) {
         logProductAdded(updated.length);
       }
-
+  
       window.dispatchEvent(new CustomEvent("product-added"));
-
-      // Check if we should show the rating modal
-      // Pattern: 10, 25 (10+15), 45 (25+20), 70 (45+25), 100 (70+30), etc.
+  
       const totalProducts = updated.length;
       const isRatingMilestone = (count: number): boolean => {
         let milestone = 10;
@@ -961,14 +988,14 @@ export default function CreateProduct() {
         return count === milestone;
       };
       const shouldShowRating = isRatingMilestone(totalProducts);
-
+  
       setTimeout(async () => {
         try {
           const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
-
+  
           for (const cat of enabledCats) {
             const catData = getCatalogueData(newItem, cat.id);
-
+  
             const renderOptions: any = {
               catalogueId: cat.id,
               catalogueLabel: cat.label,
@@ -978,20 +1005,18 @@ export default function CreateProduct() {
               price1Unit: catData.price1Unit || "/ piece",
               wholesaleUnit: catData.price1Unit || "/ piece",
             };
-
+  
             for (let i = 1; i <= 10; i++) {
               renderOptions[`field${i}Unit`] = catData[`field${i}Unit`] || "None";
             }
-
+  
             const legacyType = cat.id === "cat1" ? "wholesale" : cat.id === "cat2" ? "resell" : cat.id;
-
             await saveRenderedImage(newItem, legacyType, renderOptions);
           }
         } catch (err) {
           console.warn("⏱️ PNG render failed:", err);
         }
-
-        // Navigate and show rating modal if applicable
+  
         const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
         const basePath = isCatalogueId ? `/?tab=catalogues&catalogue=${fromParam}` : "/";
         const navigationPath = shouldShowRating

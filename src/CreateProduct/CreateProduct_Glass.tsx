@@ -606,6 +606,11 @@ export default function CreateProduct() {
         setImageBgOverride(migratedProduct.imageBgColor || "white");
         setAppliedAspectRatio(migratedProduct.cropAspectRatio || 1);
 
+        // ✅ Restore saved color palette
+if (migratedProduct.suggestedColors?.length > 0) {
+  setSuggestedColors(migratedProduct.suggestedColors);
+}
+
         if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
           setImagePreview(migratedProduct.image);
         } else if (migratedProduct.imageUrl) {
@@ -940,15 +945,29 @@ export default function CreateProduct() {
     }
 
     // Upload source image to Cloudflare R2 (store URL in product for cross-device)
-    let imageUrl: string | undefined;
-    try {
-      if (imagePreview?.startsWith("data:image")) {
-        const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
-        imageUrl = uploaded.url;
-      }
-    } catch (err: any) {
-      console.warn("⚠️ R2 upload failed (continuing with local image):", err?.message || err);
-    }
+    // ✅ Preserve existing imageUrl when editing
+const existingImageUrl = editingId
+? JSON.parse(localStorage.getItem("products") || "[]").find((p: any) => p.id === editingId)?.imageUrl
+: undefined;
+
+let imageUrl: string | undefined;
+try {
+if (imagePreview?.startsWith("data:image")) {
+  // New or changed image — upload to R2
+  const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
+  imageUrl = uploaded.url;
+} else if (imagePreview?.startsWith("http")) {
+  // ✅ Image loaded from existing R2 URL — preserve it
+  imageUrl = imagePreview;
+} else {
+  // ✅ Fallback to existing saved URL
+  imageUrl = existingImageUrl;
+}
+} catch (err: any) {
+console.warn("⚠️ R2 upload failed (continuing with local image):", err?.message || err);
+// ✅ Preserve existing URL even if upload fails
+imageUrl = existingImageUrl;
+}
 
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
     const allCatalogues = getAllCatalogues();
@@ -958,6 +977,7 @@ export default function CreateProduct() {
       id,
       imagePath,
       ...(imageUrl ? { imageUrl } : {}),
+      suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
       fontColor: fontColor || "white",
       imageBgColor: imageBgOverride || "white",
       bgColor: overrideColor || "#add8e6",
