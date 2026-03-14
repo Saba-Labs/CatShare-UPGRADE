@@ -8,6 +8,7 @@ import { getAllFields } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
+import { uploadProductImageToR2 } from "./services/r2Upload";
 
 /**
  * Delete all rendered images for a specific product
@@ -467,28 +468,53 @@ export async function saveRenderedImage(product, type, units = {}) {
         });
         console.log(`✅ File verified - exists at: ${filePath}`, stat);
 
-        // ── Upload to Cloudflare R2 ────────────────────────────────────────
+        // ── Upload source product image to Cloudflare R2 ────────────────────
         try {
-          const rawBase64 = stripDataUriPrefix(base64); // strip "data:image/png;base64," prefix
-          const uploadResult = await uploadImageToR2(rawBase64, filename, folder);
+          // Upload the source product image (not the rendered card)
+          if (product.image) {
+            const uploadResult = await uploadProductImageToR2({
+              productId: id,
+              dataUrl: product.image
+            });
 
-          if (uploadResult.success && uploadResult.publicUrl) {
-            console.log(`☁️  Image synced to Cloudflare R2: ${uploadResult.publicUrl}`);
+            if (uploadResult && uploadResult.url) {
+              console.log(`☁️  Source image uploaded to Cloudflare R2: ${uploadResult.url}`);
 
-            // Optional: attach publicUrl to the product so callers can persist it to Supabase
-            // If your saveRenderedImage caller has access to the product object,
-            // you can return or callback the URL here. Example:
-            //   product.imageUrl = uploadResult.publicUrl;
-            //
-            // Or if you have a Supabase update function available here, call it:
-            //   await updateProductImageUrl(product.id, uploadResult.publicUrl);
+              // ✅ Save the Cloudflare image URL back to the product
+              product.imageUrl = uploadResult.url;
+
+              // ✅ Persist to Supabase so it syncs across devices
+              try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                  const { syncProducts } = await import('./services/supabaseSync');
+                  const products = JSON.parse(localStorage.getItem('products') || '[]');
+                  const productIndex = products.findIndex(p => p.id === id);
+
+                  if (productIndex !== -1) {
+                    products[productIndex] = product;
+                    localStorage.setItem('products', JSON.stringify(products));
+
+                    // Sync to Supabase
+                    await syncProducts(userId, products);
+                    console.log(`✅ Product image URL saved to Supabase`);
+                  }
+                } else {
+                  console.warn(`⚠️  No Firebase user ID found - skipping Supabase sync`);
+                }
+              } catch (syncErr) {
+                console.warn(`⚠️  Could not sync image URL to Supabase:`, syncErr?.message || syncErr);
+                // Still OK - the image is uploaded, just not synced yet
+              }
+            } else {
+              console.warn(`⚠️  Source image upload to R2 failed:`, uploadResult?.error || 'Unknown error');
+            }
           } else {
-            // R2 upload failed but local file is safe — log and continue
-            console.warn(`⚠️  R2 upload failed (local file preserved): ${uploadResult.error}`);
+            console.warn(`⚠️  No source image available to upload to R2`);
           }
         } catch (r2Err) {
           // Never block the local save flow due to a cloud upload error
-          console.warn(`⚠️  R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
+          console.warn(`⚠️  Source image R2 upload threw unexpectedly (local file preserved):`, r2Err?.message || r2Err);
         }
         // ── End R2 upload ──────────────────────────────────────────────────
 
