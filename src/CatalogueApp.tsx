@@ -199,6 +199,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Load this batch in parallel
         const promises = batch.map(async (p) => {
+          // Priority: cloud URL > local file > base64
+          // 1. Try cloud URL first (Cloudflare R2)
+          if (p.imageUrl) {
+            map[p.id] = p.imageUrl;
+            return;
+          }
+
+          // 2. Try local filesystem image
           if (p.imagePath) {
             try {
               const result = await Filesystem.readFile({ path: p.imagePath, directory: Directory.Data });
@@ -207,6 +215,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               map[p.id] = p.image || "";
             }
           } else {
+            // 3. Fallback to base64 in-memory image
             map[p.id] = p.image || "";
           }
         });
@@ -507,7 +516,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         }
 
         // Skip products without images - don't error, just skip
-        if (!product.image && !product.imagePath) {
+        if (!product.image && !product.imagePath && !product.imageUrl) {
           console.warn(`⚠️ Skipping ${product.name} - no image available`);
           flushSync(() => propSetRenderProgress?.((i + 1)));
           continue;
