@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInAnonymously,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
@@ -46,6 +47,16 @@ export const authService = {
   loginWithGoogle: async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      return result.user;
+    } catch (error) {
+      throw handleAuthError(error);
+    }
+  },
+
+  // Anonymous Authentication - Guest account
+  loginAsGuest: async () => {
+    try {
+      const result = await signInAnonymously(auth);
       return result.user;
     } catch (error) {
       throw handleAuthError(error);

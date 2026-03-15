@@ -452,6 +452,7 @@ export default function CreateProduct() {
   const [ageGroupUnit, setAgeGroupUnit] = useState("months");
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [, setFieldDefinitionsUpdated] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update preview colors when theme changes (unless user has customized them)
   useEffect(() => {
@@ -921,11 +922,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
   };
 
   const saveAndNavigate = async () => {
+    // Prevent multiple rapid clicks
+    if (isSaving) {
+      return;
+    }
+
     if (!imagePreview) {
       showToast("Please upload and crop an image before saving.", "warning");
       return;
     }
 
+    setIsSaving(true);
     const id = editingId || Date.now().toString();
     const imagePath = `catalogue/product-${id}.png`;
 
@@ -940,34 +947,25 @@ if (migratedProduct.suggestedColors?.length > 0) {
         });
       }
     } catch (err) {
+      setIsSaving(false);
       showToast("Image save failed: " + err.message, "error");
       return;
     }
 
-    // Upload source image to Cloudflare R2 (store URL in product for cross-device)
-    // ✅ Preserve existing imageUrl when editing
-const existingImageUrl = editingId
-? JSON.parse(localStorage.getItem("products") || "[]").find((p: any) => p.id === editingId)?.imageUrl
-: undefined;
+    // ✅ Preserve existing imageUrl when editing, upload new one when image changed
+    const existingImageUrl = editingId
+      ? JSON.parse(localStorage.getItem("products") || "[]").find((p: any) => p.id === editingId)?.imageUrl
+      : undefined;
 
-let imageUrl: string | undefined;
-try {
-if (imagePreview?.startsWith("data:image")) {
-  // New or changed image — upload to R2
-  const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
-  imageUrl = uploaded.url;
-} else if (imagePreview?.startsWith("http")) {
-  // ✅ Image loaded from existing R2 URL — preserve it
-  imageUrl = imagePreview;
-} else {
-  // ✅ Fallback to existing saved URL
-  imageUrl = existingImageUrl;
-}
-} catch (err: any) {
-console.warn("⚠️ R2 upload failed (continuing with local image):", err?.message || err);
-// ✅ Preserve existing URL even if upload fails
-imageUrl = existingImageUrl;
-}
+    // Determine imageUrl for local storage immediately (without waiting for R2 upload)
+    let imageUrl: string | undefined;
+    if (imagePreview?.startsWith("http")) {
+      // ✅ Image loaded from existing R2 URL — preserve it
+      imageUrl = imagePreview;
+    } else {
+      // ✅ Fallback to existing saved URL or undefined (will upload in background)
+      imageUrl = existingImageUrl;
+    }
 
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
     const allCatalogues = getAllCatalogues();
@@ -1051,44 +1049,69 @@ imageUrl = existingImageUrl;
       };
       const shouldShowRating = isRatingMilestone(totalProducts);
 
-      setTimeout(async () => {
+      const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
+      const basePath = isCatalogueId ? `/?tab=catalogues&catalogue=${fromParam}` : "/";
+      const navigationPath = shouldShowRating
+        ? `${basePath}${basePath.includes('?') ? '&' : '?'}showRating=true&productCount=${totalProducts}`
+        : basePath;
+
+      // Navigate immediately without waiting for background tasks
+      navigate(navigationPath);
+      setIsSaving(false);
+
+      // Perform R2 upload and PNG rendering in background (fire and forget)
+      (async () => {
         try {
-          const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
+          // Attempt R2 upload if new image
+          if (imagePreview?.startsWith("data:image")) {
+            try {
+              const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
 
-          for (const cat of enabledCats) {
-            const catData = getCatalogueData(newItem, cat.id);
-
-            const renderOptions: any = {
-              catalogueId: cat.id,
-              catalogueLabel: cat.label,
-              folder: cat.folder || cat.label,
-              priceField: cat.priceField,
-              priceUnitField: cat.priceUnitField,
-              price1Unit: catData.price1Unit || "/ piece",
-              wholesaleUnit: catData.price1Unit || "/ piece",
-            };
-
-            for (let i = 1; i <= 10; i++) {
-              renderOptions[`field${i}Unit`] = catData[`field${i}Unit`] || "None";
+              // Update the product with the new imageUrl
+              if (uploaded.url) {
+                const allProducts = JSON.parse(localStorage.getItem("products") || "[]");
+                const updated = allProducts.map((p: any) =>
+                  p.id === id ? { ...p, imageUrl: uploaded.url } : p
+                );
+                localStorage.setItem("products", JSON.stringify(updated));
+                window.dispatchEvent(new CustomEvent("product-added"));
+              }
+            } catch (err: any) {
+              console.warn("⚠️ R2 upload failed in background:", err?.message || err);
             }
+          }
 
-            const legacyType = cat.id === "cat1" ? "wholesale" : cat.id === "cat2" ? "resell" : cat.id;
+          // Render PNG images in background
+          try {
+            const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
+            for (const cat of enabledCats) {
+              const catData = getCatalogueData(newItem, cat.id);
+              const renderOptions: any = {
+                catalogueId: cat.id,
+                catalogueLabel: cat.label,
+                folder: cat.folder || cat.label,
+                priceField: cat.priceField,
+                priceUnitField: cat.priceUnitField,
+                price1Unit: catData.price1Unit || "/ piece",
+                wholesaleUnit: catData.price1Unit || "/ piece",
+              };
 
-            await saveRenderedImage(newItem, legacyType, renderOptions);
+              for (let i = 1; i <= 10; i++) {
+                renderOptions[`field${i}Unit`] = catData[`field${i}Unit`] || "None";
+              }
+
+              const legacyType = cat.id === "cat1" ? "wholesale" : cat.id === "cat2" ? "resell" : cat.id;
+              await saveRenderedImage(newItem, legacyType, renderOptions);
+            }
+          } catch (err) {
+            console.warn("⏱️ PNG render failed in background:", err);
           }
         } catch (err) {
-          console.warn("⏱️ PNG render failed:", err);
+          console.error("Background tasks failed:", err);
         }
-
-        // Navigate and show rating modal if applicable
-        const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
-        const basePath = isCatalogueId ? `/?tab=catalogues&catalogue=${fromParam}` : "/";
-        const navigationPath = shouldShowRating
-          ? `${basePath}${basePath.includes('?') ? '&' : '?'}showRating=true&productCount=${totalProducts}`
-          : basePath;
-        navigate(navigationPath);
-      }, 300);
+      })();
     } catch (err) {
+      setIsSaving(false);
       showToast("Product save failed: " + err.message, "error");
     }
   };
@@ -1877,13 +1900,15 @@ imageUrl = existingImageUrl;
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
             <button
               onClick={saveAndNavigate}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
+              disabled={isSaving}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
             >
-              {editingId ? "Update" : "Save"}
+              {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
             </button>
             <button
               onClick={handleCancel}
-              className="bg-gray-300 hover:bg-gray-400 text-gray-700 py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
+              disabled={isSaving}
+              className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed text-gray-700 py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
             >
               Cancel
             </button>
