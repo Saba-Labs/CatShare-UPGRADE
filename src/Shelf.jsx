@@ -12,6 +12,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [imageMap, setImageMap] = useState({});
 
   const navigate = useNavigate();
@@ -80,6 +81,32 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     }
   };
 
+  const handleDeleteAll = async () => {
+    setShowDeleteAllConfirm(false);
+
+    // Clean up all files
+    for (const product of deletedProducts) {
+      try {
+        // Delete rendered images
+        await deleteRenderedImageForProduct(product.id);
+
+        // Delete source image from Filesystem
+        if (product.imagePath) {
+          await Filesystem.deleteFile({
+            path: product.imagePath,
+            directory: Directory.Data,
+          });
+          console.log(`🗑️ Deleted source image: ${product.imagePath}`);
+        }
+      } catch (err) {
+        console.warn(`⚠️ Failed to fully clean up files for product ${product.id}:`, err);
+      }
+    }
+
+    // Clear all deleted products
+    setDeletedProducts([]);
+  };
+
   return (
     <div className="w-full h-screen flex flex-col bg-gradient-to-b from-white to-gray-100 relative">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
@@ -101,6 +128,15 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
           </svg>
         </button>
         <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Shelf</h1>
+        {deletedProducts.length > 0 && (
+          <button
+            onClick={() => setShowDeleteAllConfirm(true)}
+            className="text-xs font-medium px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700 transition"
+            title="Delete all items permanently"
+          >
+            Delete All
+          </button>
+        )}
         <button
           onClick={() => navigate("/")}
           className="w-8 h-8 flex items-center justify-center rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-200 transition"
@@ -224,6 +260,42 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
               <button
                 className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"
                 onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteAllConfirm && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => setShowDeleteAllConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">
+              Delete all items permanently?
+            </h2>
+            <p className="text-sm text-gray-600 mb-2">
+              This will permanently delete all {deletedProducts.length} item{deletedProducts.length !== 1 ? 's' : ''} in your Shelf.
+            </p>
+            <p className="text-sm text-gray-600 mb-5">
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition"
+                onClick={handleDeleteAll}
+              >
+                Delete All
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"
+                onClick={() => setShowDeleteAllConfirm(false)}
               >
                 Cancel
               </button>
