@@ -911,16 +911,24 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   onClick={async () => {
                     if (shelfTarget) {
                       await Haptics.impact({ style: ImpactStyle.Heavy });
-                      setProducts((prev) => prev.filter((x) => x.id !== shelfTarget.id));
-                      setDeletedProducts((prev) => [shelfTarget, ...prev]);
+                      // ✅ CRITICAL: Get the complete product object from the products array, not from stale shelfTarget
+                      // This ensures all product data (including catalogueData, fields, etc.) is preserved
+                      const completeProduct = products.find(p => p.id === shelfTarget.id);
+                      if (!completeProduct) {
+                        console.warn("Product not found in products array, using shelfTarget as fallback");
+                      }
+                      const productToShelf = completeProduct || shelfTarget;
+
+                      setProducts((prev) => prev.filter((x) => x.id !== productToShelf.id));
+                      setDeletedProducts((prev) => [productToShelf, ...prev]);
 
                       window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
                       // If currently previewing this item, move to next
-                      if (previewProduct && previewProduct.id === shelfTarget.id) {
-                        const idx = previewList.findIndex(p => p.id === shelfTarget.id);
+                      if (previewProduct && previewProduct.id === productToShelf.id) {
+                        const idx = previewList.findIndex(p => p.id === productToShelf.id);
                         if (idx !== -1) {
-                          const newPreviewList = previewList.filter(p => p.id !== shelfTarget.id);
+                          const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
                           setPreviewList(newPreviewList);
                           if (newPreviewList.length > 0) {
                             const nextIdx = idx < newPreviewList.length ? idx : newPreviewList.length - 1;
@@ -933,7 +941,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                         }
                       } else {
                         // Even if not previewing it, update the list in background
-                        setPreviewList(prev => prev.filter(p => p.id !== shelfTarget.id));
+                        setPreviewList(prev => prev.filter(p => p.id !== productToShelf.id));
                       }
                     }
                     setShowShelfConfirm(false);
@@ -1110,15 +1118,24 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               if (!toShelf) return;
 
               Haptics.impact({ style: ImpactStyle.Heavy });
-              setProducts((prev) => prev.filter((p) => p.id !== toShelf.id));
-              setDeletedProducts((prev) => [toShelf, ...prev]);
+
+              // ✅ CRITICAL: Get the complete product object from the products array, not from stale reference
+              // This ensures all product data (including catalogueData, fields, etc.) is preserved
+              const completeProduct = products.find(p => p.id === toShelf.id);
+              if (!completeProduct) {
+                console.warn("Product not found in products array, using toShelf as fallback");
+              }
+              const productToShelf = completeProduct || toShelf;
+
+              setProducts((prev) => prev.filter((p) => p.id !== productToShelf.id));
+              setDeletedProducts((prev) => [productToShelf, ...prev]);
 
               window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
               // Move to next item in preview
-              const idx = previewList.findIndex(p => p.id === toShelf.id);
+              const idx = previewList.findIndex(p => p.id === productToShelf.id);
               if (idx !== -1) {
-                const newPreviewList = previewList.filter(p => p.id !== toShelf.id);
+                const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
                 setPreviewList(newPreviewList);
 
                 if (newPreviewList.length > 0) {
