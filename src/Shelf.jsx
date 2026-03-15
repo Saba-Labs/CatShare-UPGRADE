@@ -6,8 +6,9 @@ import SideDrawer from "./SideDrawer";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { deleteRenderedImageForProduct } from "./Save";
+import { deleteAllDeletedProducts } from "./services/supabaseSync";
 
-export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap }) {
+export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap, user }) {
   const [previewProduct, setPreviewProduct] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -84,7 +85,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const handleDeleteAll = async () => {
     setShowDeleteAllConfirm(false);
 
-    // Clean up all files
+    // Clean up all local files
     for (const product of deletedProducts) {
       try {
         // Delete rendered images
@@ -103,8 +104,22 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       }
     }
 
-    // Clear all deleted products
+    // Clear all deleted products from local state
     setDeletedProducts([]);
+
+    // Sync to Supabase to remove all shelf items
+    if (user?.uid) {
+      try {
+        const result = await deleteAllDeletedProducts(user.uid);
+        if (result.success) {
+          console.log('✅ All shelf items permanently deleted from Supabase');
+        } else {
+          console.error('❌ Failed to sync deletion to Supabase:', result.error);
+        }
+      } catch (err) {
+        console.error('❌ Error syncing shelf deletion:', err);
+      }
+    }
   };
 
   return (

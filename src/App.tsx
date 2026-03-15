@@ -766,6 +766,7 @@ function AppWithBackHandler() {
                 setProducts={setProducts}
                 products={products}
                 imageMap={imageMap}
+                user={user}
               />
             </ProtectedRoute>
           }
