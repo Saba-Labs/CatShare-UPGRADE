@@ -331,6 +331,10 @@ const handleBackup = async () => {
     delete product.imageBase64;
     delete product.image; // Remove any base64 image data
 
+    // ✅ PRESERVE imageUrl (cloud image URL from R2) for cloud sync on restore
+    // This is critical for cross-device access and cloud syncing
+    // imageUrl is NOT removed - it's essential for restoring cloud images
+
     // IMPORTANT: Ensure root-level badge is synced from catalogueData
     // This fixes old products that might only have badge in catalogueData
     if (!product.badge && product.catalogueData) {
@@ -366,6 +370,11 @@ const handleBackup = async () => {
       // Product has some image data - keep it
       console.log(`📝 Including image data for "${p.name}" in backup`);
       product.image = p.image;
+    }
+
+    // ✅ Log if imageUrl is being backed up
+    if (p.imageUrl) {
+      console.log(`☁️ Cloud image URL preserved for "${p.name}": ${p.imageUrl}`);
     }
 
     return product;
@@ -905,16 +914,20 @@ const exportProductsToCSV = (products) => {
         console.log(`   Price Units: ${preservedSettings.priceFieldUnits?.join(', ') || 'Not restored'}`);
       }
 
-      // Aggressively clean products - remove ALL image data except imagePath reference
+      // Aggressively clean products - remove ALL image data except imagePath and imageUrl
       const cleanedProducts = rebuilt.map(p => {
         const clean = { ...p };
-        // Remove ALL image-related fields EXCEPT imagePath (which is the reference to the file on disk)
+        // Remove ALL image-related fields EXCEPT imagePath and imageUrl
         delete clean.image; // base64 image
         delete clean.imageBase64;
         delete clean.imageData;
         delete clean.imageFilename;
         delete clean.renderedImages;
-        // KEEP imagePath - this is the reference to where the image file is stored on the filesystem
+        // ✅ KEEP imagePath - reference to where the image file is stored on the filesystem
+        // ✅ KEEP imageUrl - cloud image URL from R2 (critical for cross-device sync)
+        if (p.imageUrl) {
+          console.log(`☁️ Preserved cloud image URL for "${p.name}": ${p.imageUrl}`);
+        }
         return clean;
       });
 
@@ -988,6 +1001,7 @@ const exportProductsToCSV = (products) => {
             const clean = { ...p };
             delete clean.imageBase64;
             delete clean.imageFilename;
+            // ✅ KEEP imageUrl for cloud sync (same as active products)
             const migrated = migrateProductToNewFormat(clean);
             return migrated;
           })
@@ -1083,6 +1097,38 @@ const exportProductsToCSV = (products) => {
       }
 
       setShowRenderAfterRestore(true);
+
+      // ✅ Sync restored products to Supabase in background for cloud persistence
+      // This ensures imageUrl fields are synced to cloud and available on other devices
+      if (user && user.uid) {
+        (async () => {
+          try {
+            console.log('☁️ Syncing restored products to Supabase in background...');
+            const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
+
+            // Sync active products
+            const productsSyncResult = await syncProducts(user.uid, productsToUse);
+            if (productsSyncResult.success) {
+              console.log(`✅ Restored ${productsToUse.length} products synced to Supabase successfully`);
+            } else {
+              console.warn('⚠️ Products sync warning:', productsSyncResult.error);
+            }
+
+            // Also sync deleted products (shelf items) if any were restored
+            if (Array.isArray(parsed.deleted) && parsed.deleted.length > 0) {
+              const deletedSyncResult = await syncDeletedProducts(user.uid, restoredDeleted || []);
+              if (deletedSyncResult.success) {
+                console.log(`✅ Restored ${(restoredDeleted || []).length} deleted products synced to Supabase successfully`);
+              } else {
+                console.warn('⚠️ Deleted products sync warning:', deletedSyncResult.error);
+              }
+            }
+          } catch (syncErr) {
+            console.warn('⚠️ Background sync of restored products failed:', syncErr.message);
+            // Don't show error to user - restore was successful, just sync failed
+          }
+        })();
+      }
     } catch (err) {
       console.error("❌ Restore failed:", err);
       showToast("Restore failed: " + err.message, "error");
