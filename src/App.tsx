@@ -12,6 +12,7 @@ import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { initializeFieldSystem } from "./config/initializeFields";
+import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
 import { runMigrations } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
@@ -119,6 +120,30 @@ function AppWithBackHandler() {
         setDeletedProducts(merged);
         safeSetInStorage("deletedProducts", merged);
         console.log('✅ Merged deleted products from Supabase');
+      }
+
+      // Apply remote fieldsDefinition from Supabase to local storage
+      if (supabaseData.fieldsDefinition) {
+        const localFieldsDef = getFieldsDefinition();
+        const remoteFieldsDef = supabaseData.fieldsDefinition;
+
+        // Check if remote is newer or local doesn't have a valid definition
+        const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
+
+        if (remoteLastUpdated > localLastUpdated) {
+          setFieldsDefinition(remoteFieldsDef);
+          console.log('✅ Applied remote fieldsDefinition from Supabase:', remoteFieldsDef.industry || 'Custom');
+
+          // Dispatch event so components (like FieldsSettings) refresh their UI
+          window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+            detail: {
+              newDefinition: remoteFieldsDef,
+              template: remoteFieldsDef.industry || 'Custom',
+              isBackupRestore: false
+            }
+          }));
+        }
       }
 
       setSupabaseSyncStatus('synced');
