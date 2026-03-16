@@ -625,9 +625,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = (search || "").toLowerCase();
     return products.filter((p) =>
-      p.name.toLowerCase().includes(q) || (p.subtitle && p.subtitle.toLowerCase().includes(q))
+      (p.name || "").toLowerCase().includes(q) || (p.subtitle && p.subtitle.toLowerCase().includes(q))
     );
   }, [products, search]);
 
@@ -641,9 +641,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     else if (sortBy === "wholesaleStock") v.sort((a, b) => a.wholesaleStock ? -1 : 1);
     else if (sortBy === "resellStock") v.sort((a, b) => a.resellStock ? -1 : 1);
     else if (sortBy === "category") v.sort((a, b) => {
-      const aCat = Array.isArray(a.category) ? a.category[0] || "" : a.category || "";
-      const bCat = Array.isArray(b.category) ? b.category[0] || "" : b.category || "";
-      return aCat.localeCompare(bCat);
+      const aCat = Array.isArray(a.category) ? a.category[0] || "" : (a.category || "");
+      const bCat = Array.isArray(b.category) ? b.category[0] || "" : (b.category || "");
+      return (aCat || "").localeCompare(bCat || "");
     });
     return v;
   }, [filtered, sortBy, catalogues]);

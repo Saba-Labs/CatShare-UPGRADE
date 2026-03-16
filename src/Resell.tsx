@@ -167,8 +167,8 @@ useEffect(() => {
           ? p.category.includes(categoryFilter)
           : p.category === categoryFilter);
       const matchesSearch =
-        p.name?.toLowerCase().includes(search.toLowerCase()) ||
-        p.subtitle?.toLowerCase().includes(search.toLowerCase());
+        (p.name || "").toLowerCase().includes((search || "").toLowerCase()) ||
+        (p.subtitle || "").toLowerCase().includes((search || "").toLowerCase());
       return matchesStock && matchesCategory && matchesSearch;
     });
 }, [filtered, stockFilter, categoryFilter, search, catalogueId, stockField]);
