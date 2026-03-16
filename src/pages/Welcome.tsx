@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { INDUSTRY_PRESETS } from '../config/industryPresets';
 import { DEFAULT_FIELDS, FieldConfig } from '../config/fieldConfig';
 import { safeSetInStorage } from '../utils/safeStorage';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 type WelcomeStep = 'welcome' | 'industry' | 'fields' | 'complete';
 
@@ -41,6 +43,8 @@ const FloatingShapes = () => (
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [step, setStep] = useState<WelcomeStep>('welcome');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('');
   const [selectedFields, setSelectedFields] = useState<SelectedFields>({});
@@ -129,15 +133,35 @@ export default function Welcome() {
         });
       }
 
-      safeSetInStorage('fieldsDefinition', {
+      const fieldsDefinition = {
         version: 1,
         fields: configuredFields,
         industry: selectedIndustry,
         lastUpdated: Date.now(),
-      });
+      };
 
+      // Save to localStorage
+      safeSetInStorage('fieldsDefinition', fieldsDefinition);
       safeSetInStorage('hasCompletedOnboarding', true);
       safeSetInStorage('showTutorialOnInit', true);
+
+      // Sync to Supabase if user is logged in
+      if (user && user.uid) {
+        try {
+          const { syncFieldsDefinition } = await import('../services/supabaseSync');
+          const syncResult = await syncFieldsDefinition(user.uid, fieldsDefinition);
+
+          if (!syncResult.success) {
+            console.warn('⚠️ Failed to sync fields to cloud:', syncResult.error);
+            showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
+          } else {
+            console.log('✅ Fields definition synced to Supabase');
+          }
+        } catch (syncError) {
+          console.error('❌ Error syncing fields:', syncError);
+          showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
+        }
+      }
 
       setStep('complete');
       setIsLoading(false);
