@@ -741,13 +741,20 @@ function AppWithBackHandler() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Public Routes */}
-        <Route path="/welcome" element={<Welcome />} />
         <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />
 
         {/* Protected Routes */}
+        <Route
+          path="/welcome"
+          element={
+            <ProtectedRoute>
+              <Welcome />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={

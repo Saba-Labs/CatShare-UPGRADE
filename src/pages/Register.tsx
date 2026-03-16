@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiUser, FiAlertCircle, FiCheck } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { supabaseData, supabaseDataLoading } = useAuth();
   
   const [formData, setFormData] = useState({
     displayName: '',
@@ -19,6 +21,17 @@ export default function Register() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
+  const [hasJustSignedUp, setHasJustSignedUp] = useState(false);
+
+  // After user signs up and supabaseData loads, redirect to onboarding
+  useEffect(() => {
+    if (hasJustSignedUp && !supabaseDataLoading) {
+      showToast('Account created successfully!', 'success');
+      // New users always go to onboarding for industry/field setup
+      navigate('/welcome');
+      setHasJustSignedUp(false);
+    }
+  }, [hasJustSignedUp, supabaseDataLoading, navigate, showToast]);
 
   const validatePassword = (password: string) => {
     const errors = [];
@@ -61,8 +74,7 @@ export default function Register() {
         formData.password,
         formData.displayName
       );
-      showToast('Account created successfully!', 'success');
-      navigate('/');
+      setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);
@@ -78,8 +90,7 @@ export default function Register() {
 
     try {
       await authService.loginWithGoogle();
-      showToast('Account created successfully!', 'success');
-      navigate('/');
+      setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google signup failed';
       setError(errorMessage);

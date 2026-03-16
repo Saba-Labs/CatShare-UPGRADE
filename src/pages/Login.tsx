@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { supabaseData, supabaseDataLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
+  const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
+
+  // After user logs in and supabaseData loads, check if they need onboarding
+  useEffect(() => {
+    if (hasJustLoggedIn && !supabaseDataLoading && supabaseData) {
+      showToast('Login successful!', 'success');
+
+      // Check if user has already configured their fields
+      if (supabaseData.fieldsDefinition && supabaseData.fieldsDefinition.fields && supabaseData.fieldsDefinition.fields.length > 0) {
+        // Returning user - go to main app
+        navigate('/');
+      } else {
+        // New user - go to onboarding
+        navigate('/welcome');
+      }
+
+      setHasJustLoggedIn(false);
+    }
+  }, [hasJustLoggedIn, supabaseDataLoading, supabaseData, navigate, showToast]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,8 +44,7 @@ export default function Login() {
 
     try {
       await authService.loginWithEmail(email, password);
-      showToast('Login successful!', 'success');
-      navigate('/');
+      setHasJustLoggedIn(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
@@ -40,8 +60,7 @@ export default function Login() {
     try {
       const user = await authService.loginWithGoogle();
       if (user) {
-        showToast('Login successful!', 'success');
-        navigate('/');
+        setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
@@ -58,8 +77,7 @@ export default function Login() {
     try {
       const user = await authService.loginAsGuest();
       if (user) {
-        showToast('Logged in as guest', 'success');
-        navigate('/');
+        setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Guest login failed';
