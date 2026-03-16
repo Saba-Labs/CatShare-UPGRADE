@@ -172,6 +172,18 @@ export function getFieldsDefinition(): FieldsDefinition {
  */
 export function setFieldsDefinition(definition: FieldsDefinition): void {
   try {
+    // Validate that definition has required fields
+    if (!definition || !Array.isArray(definition.fields) || definition.fields.length === 0) {
+      console.warn('Invalid fieldsDefinition, using defaults instead:', definition);
+      // Use default fields instead
+      definition = {
+        version: 1,
+        fields: DEFAULT_FIELDS,
+        industry: definition?.industry || 'General Products (Custom)',
+        lastUpdated: Date.now(),
+      };
+    }
+
     localStorage.setItem('fieldsDefinition', JSON.stringify({
       ...definition,
       lastUpdated: Date.now(),
@@ -211,6 +223,7 @@ export function getFieldConfig(key: string): FieldConfig | undefined {
  * e.g., 'color' -> field1 config
  */
 export function getFieldConfigByLegacyKey(legacyKey: string): FieldConfig | undefined {
+  if (!legacyKey) return undefined;
   const definition = getFieldsDefinition();
   return definition.fields.find(f =>
     f.legacyKeys?.some(lk => lk.toLowerCase() === legacyKey.toLowerCase())
@@ -222,6 +235,7 @@ export function getFieldConfigByLegacyKey(legacyKey: string): FieldConfig | unde
  * e.g., 'color' -> 'field1'
  */
 export function mapLegacyKeyToNewKey(legacyKey: string): string | undefined {
+  if (!legacyKey) return undefined;
   const config = getFieldConfigByLegacyKey(legacyKey);
   return config?.key;
 }

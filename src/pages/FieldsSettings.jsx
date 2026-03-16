@@ -12,12 +12,14 @@ import {
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { INDUSTRY_PRESETS } from "../config/industryPresets";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 export default function FieldsSettings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [definition, setDefinition] = useState(null);
   const [savedDefinition, setSavedDefinition] = useState(null);
   const [activePriceFields, setActivePriceFields] = useState([]);
@@ -156,6 +158,22 @@ export default function FieldsSettings() {
       try {
         await Haptics.impact({ style: ImpactStyle.Medium });
       } catch (e) {}
+
+      // Sync to Supabase in background
+      if (user && user.uid) {
+        try {
+          const { syncFieldsDefinition } = await import('../services/supabaseSync');
+          const syncResult = await syncFieldsDefinition(user.uid, definition);
+          if (syncResult.success) {
+            console.log('✅ Fields definition synced to Supabase');
+          } else {
+            console.warn('⚠️ Failed to sync fields definition:', syncResult.error);
+          }
+        } catch (syncErr) {
+          console.warn('⚠️ Background sync error:', syncErr.message);
+        }
+      }
+
       showToast("Field settings saved successfully", "success");
       setShowSaveConfirmation(false);
     }

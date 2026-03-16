@@ -123,7 +123,7 @@ function AppWithBackHandler() {
       }
 
       // Apply remote fieldsDefinition from Supabase to local storage
-      if (supabaseData.fieldsDefinition) {
+      if (supabaseData.fieldsDefinition && Array.isArray(supabaseData.fieldsDefinition?.fields)) {
         const localFieldsDef = getFieldsDefinition();
         const remoteFieldsDef = supabaseData.fieldsDefinition;
 
@@ -139,7 +139,7 @@ function AppWithBackHandler() {
           window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
             detail: {
               newDefinition: remoteFieldsDef,
-              template: remoteFieldsDef.industry || 'Custom',
+              template: remoteFieldsDef?.industry || 'Custom',
               isBackupRestore: false
             }
           }));

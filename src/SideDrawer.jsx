@@ -1104,7 +1104,7 @@ const exportProductsToCSV = (products) => {
         (async () => {
           try {
             console.log('☁️ Syncing restored products to Supabase in background...');
-            const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
+            const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
 
             // Sync active products
             const productsSyncResult = await syncProducts(user.uid, productsToUse);
@@ -1121,6 +1121,16 @@ const exportProductsToCSV = (products) => {
                 console.log(`✅ Restored ${(restoredDeleted || []).length} deleted products synced to Supabase successfully`);
               } else {
                 console.warn('⚠️ Deleted products sync warning:', deletedSyncResult.error);
+              }
+            }
+
+            // Sync fieldsDefinition to Supabase if it was restored
+            if (backupFieldDef) {
+              const fieldsSyncResult = await syncFieldsDefinition(user.uid, backupFieldDef);
+              if (fieldsSyncResult.success) {
+                console.log(`✅ Fields definition synced to Supabase: ${backupFieldDef.industry || 'Custom'}`);
+              } else {
+                console.warn('⚠️ Fields definition sync warning:', fieldsSyncResult.error);
               }
             }
           } catch (syncErr) {
