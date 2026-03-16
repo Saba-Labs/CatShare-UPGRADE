@@ -777,7 +777,7 @@ const exportProductsToCSV = (products) => {
               }
 
               // ✅ ADD THIS BLOCK HERE
-              if (!p.imageUrl && imageRestored) {
+              if (!p.imageUrl && imageRestored && false) {
                 try {
                   const { uploadImageToR2 } = await import('./services/cloudflareService');
                   const folder = p.imagePath.split("/")[0];
@@ -1123,13 +1123,45 @@ const exportProductsToCSV = (products) => {
       // ✅ Sync restored products to Supabase in background for cloud persistence
       // This ensures imageUrl fields are synced to cloud and available on other devices
       if (user && user.uid) {
-        (async () => {
+  (async () => {
+    try {
+      // ✅ Upload missing images to R2 now that user is confirmed authenticated
+      const { uploadImageToR2 } = await import('./services/cloudflareService');
+      const updatedProducts = await Promise.all(
+        productsToUse.map(async (p) => {
+          if (p.imageUrl || !p.imagePath) return p; // already has cloud URL, skip
+
           try {
-            console.log('☁️ Syncing restored products to Supabase in background...');
+            // Read the local file we just restored
+            const fileData = await Filesystem.readFile({
+              path: p.imagePath,
+              directory: Directory.Data,
+            });
+
+            const folder = p.imagePath.split("/")[0];
+            const filename = p.imagePath.split("/").pop();
+            const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
+
+            const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
+            if (result.success) {
+              console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
+              return { ...p, imageUrl: result.publicUrl };
+            }
+          } catch (err) {
+            console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
+          }
+          return p;
+        })
+      );
+
+      // Save updated products with new imageUrls to localStorage
+      localStorage.setItem("products", JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
+      console.log('✅ Products updated with R2 image URLs');
             const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
 
             // Sync active products
-            const productsSyncResult = await syncProducts(user.uid, productsToUse);
+            const productsSyncResult = await syncProducts(user.uid, updatedProducts);
             if (productsSyncResult.success) {
               console.log(`✅ Restored ${productsToUse.length} products synced to Supabase successfully`);
             } else {
@@ -1276,7 +1308,7 @@ const restoreFromDetectedBackup = async (backupFile) => {
                 }
 
                 // ✅ ADD THIS BLOCK HERE
-                if (!p.imageUrl && imageRestored) {
+                if (!p.imageUrl && imageRestored && false) {
                   try {
                     const { uploadImageToR2 } = await import('./services/cloudflareService');
                     const folder = p.imagePath.split("/")[0];
@@ -1486,9 +1518,49 @@ const restoreFromDetectedBackup = async (backupFile) => {
         }));
         console.log(`🔄 Dispatched fieldDefinitionsChanged event - Template: ${templateName}`);
 
-        setShowRenderAfterRestore(true);
-        setShowBackupPopup(false);
-        setShowBrowseForBackup(false);
+       // ✅ Upload missing images to R2 and sync to Supabase
+if (user && user.uid) {
+  (async () => {
+    try {
+      const { uploadImageToR2 } = await import('./services/cloudflareService');
+      const updatedProducts = await Promise.all(
+        productsToUse.map(async (p) => {
+          if (p.imageUrl || !p.imagePath) return p;
+          try {
+            const fileData = await Filesystem.readFile({
+              path: p.imagePath,
+              directory: Directory.Data,
+            });
+            const folder = p.imagePath.split("/")[0];
+            const filename = p.imagePath.split("/").pop();
+            const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
+            const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
+            if (result.success) {
+              console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
+              return { ...p, imageUrl: result.publicUrl };
+            }
+          } catch (err) {
+            console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
+          }
+          return p;
+        })
+      );
+
+      localStorage.setItem("products", JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
+      console.log('✅ Products updated with R2 image URLs');
+
+      const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
+      await syncProducts(user.uid, updatedProducts);
+    } catch (err) {
+      console.warn('⚠️ Background sync failed:', err.message);
+    }
+  })();
+}
+
+setShowRenderAfterRestore(true);
+setShowBackupPopup(false);
+setShowBrowseForBackup(false);
       } catch (err) {
         console.error("❌ Restore failed:", err);
         showToast("Restore failed: " + err.message, "error");
