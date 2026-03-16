@@ -211,9 +211,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             try {
               const result = await Filesystem.readFile({ path: p.imagePath, directory: Directory.Data });
               map[p.id] = `data:image/png;base64,${result.data}`;
-            } catch {
-              map[p.id] = p.image || "";
-            }
+              } catch (err) {
+    console.warn(`❌ Failed to load image for "${p.name}" from path: ${p.imagePath}`, err.message);
+    map[p.id] = p.image || "";
+  }
           } else {
             // 3. Fallback to base64 in-memory image
             map[p.id] = p.image || "";
