@@ -6,11 +6,12 @@ import { FaGoogle } from 'react-icons/fa';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { safeGetFromStorage } from '../utils/safeStorage';
 
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { supabaseData, supabaseDataLoading } = useAuth();
+  const { user, supabaseData, supabaseDataLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,20 +23,58 @@ export default function Login() {
   // After user logs in and supabaseData loads, check if they need onboarding
   useEffect(() => {
     if (hasJustLoggedIn && !supabaseDataLoading && supabaseData) {
+      console.log('🔍 Login check - supabaseData:', supabaseData);
+      console.log('🔍 fieldsDefinition from Supabase:', supabaseData.fieldsDefinition);
+
       showToast('Login successful!', 'success');
 
       // Check if user has already configured their fields
-      if (supabaseData.fieldsDefinition && supabaseData.fieldsDefinition.fields && supabaseData.fieldsDefinition.fields.length > 0) {
+      // First check Supabase, then fallback to localStorage for old users
+      const hasSupabaseFields = supabaseData.fieldsDefinition &&
+                               supabaseData.fieldsDefinition.fields &&
+                               Array.isArray(supabaseData.fieldsDefinition.fields) &&
+                               supabaseData.fieldsDefinition.fields.length > 0;
+
+      const localStorageFields = safeGetFromStorage('fieldsDefinition', null);
+      const hasLocalFields = localStorageFields &&
+                            localStorageFields.fields &&
+                            Array.isArray(localStorageFields.fields) &&
+                            localStorageFields.fields.length > 0;
+
+      const hasFieldsDefinition = hasSupabaseFields || hasLocalFields;
+
+      console.log('🔍 hasSupabaseFields:', hasSupabaseFields);
+      console.log('🔍 hasLocalFields:', hasLocalFields);
+      console.log('🔍 hasFieldsDefinition (combined):', hasFieldsDefinition);
+
+      // If user has local fields but no Supabase fields, sync them to cloud (for old users)
+      if (hasLocalFields && !hasSupabaseFields && user?.uid) {
+        console.log('🔄 Syncing local fields to Supabase for old user...');
+        import('../services/supabaseSync').then(({ syncFieldsDefinition }) => {
+          syncFieldsDefinition(user.uid, localStorageFields)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ Successfully synced local fields to Supabase');
+              } else {
+                console.warn('⚠️ Failed to sync local fields:', result.error);
+              }
+            });
+        });
+      }
+
+      if (hasFieldsDefinition) {
         // Returning user - go to main app
+        console.log('✅ User has fields definition (Supabase or localStorage) - redirecting to home');
         navigate('/');
       } else {
         // New user - go to onboarding
+        console.log('🆕 No fields definition found - redirecting to welcome');
         navigate('/welcome');
       }
 
       setHasJustLoggedIn(false);
     }
-  }, [hasJustLoggedIn, supabaseDataLoading, supabaseData, navigate, showToast]);
+  }, [hasJustLoggedIn, supabaseDataLoading, supabaseData, user, navigate, showToast]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
