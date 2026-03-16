@@ -24,6 +24,7 @@ import { safeGetFromStorage, safeSetInStorage } from "./utils/safeStorage";
 import { getCurrentCurrency } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBackupCreated, logBackupRestored, logBackupSharedFileSharer, logBackupDownloaded, logCsvExported, logFileSharerError, logCategoryManaged } from "./config/analyticsEvents";
+import { syncCategories } from "./services/supabaseSync";
 
 
 export default function SideDrawer({
@@ -2085,6 +2086,7 @@ function DragWrapper({ children, provided }) {
 
 // 🔁 Updated Category Modal with drag & drop
 function CategoryModal({ onClose }) {
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [newCat, setNewCat] = useState("");
   const [editIndex, setEditIndex] = useState(null);
@@ -2100,6 +2102,19 @@ function CategoryModal({ onClose }) {
   const save = (list) => {
     setCategories(list);
     localStorage.setItem("categories", JSON.stringify(list));
+
+    // Sync categories to Supabase
+    if (user?.uid) {
+      // Convert simple category strings to objects with id and name for Supabase sync
+      const categoriesForSync = list.map((cat, index) => ({
+        id: cat, // Use the category name as the ID
+        name: cat,
+      }));
+
+      syncCategories(user.uid, categoriesForSync).catch(err => {
+        console.warn('⚠️ Failed to sync categories to Supabase:', err);
+      });
+    }
   };
 
   const add = () => {
