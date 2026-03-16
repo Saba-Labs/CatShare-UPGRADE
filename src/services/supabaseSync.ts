@@ -125,6 +125,34 @@ export async function syncDeletedProducts(
 }
 
 /**
+ * Delete all deleted products from Supabase (permanent shelf cleanup)
+ */
+export async function deleteAllDeletedProducts(userId: string): Promise<SyncResult> {
+  try {
+    if (!userId) {
+      return { success: false, error: 'Invalid input: userId missing' };
+    }
+
+    const { data, error } = await getSupabaseClient()
+      .from('deleted_products')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('❌ Error deleting all shelf products from Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Permanently deleted all shelf products from Supabase');
+    return { success: true, data };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in deleteAllDeletedProducts:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
  * Sync categories to Supabase
  */
 export async function syncCategories(

@@ -625,9 +625,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = (search || "").toLowerCase();
     return products.filter((p) =>
-      p.name.toLowerCase().includes(q) || (p.subtitle && p.subtitle.toLowerCase().includes(q))
+      (p.name || "").toLowerCase().includes(q) || (p.subtitle && p.subtitle.toLowerCase().includes(q))
     );
   }, [products, search]);
 
@@ -641,9 +641,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     else if (sortBy === "wholesaleStock") v.sort((a, b) => a.wholesaleStock ? -1 : 1);
     else if (sortBy === "resellStock") v.sort((a, b) => a.resellStock ? -1 : 1);
     else if (sortBy === "category") v.sort((a, b) => {
-      const aCat = Array.isArray(a.category) ? a.category[0] || "" : a.category || "";
-      const bCat = Array.isArray(b.category) ? b.category[0] || "" : b.category || "";
-      return aCat.localeCompare(bCat);
+      const aCat = Array.isArray(a.category) ? a.category[0] || "" : (a.category || "");
+      const bCat = Array.isArray(b.category) ? b.category[0] || "" : (b.category || "");
+      return (aCat || "").localeCompare(bCat || "");
     });
     return v;
   }, [filtered, sortBy, catalogues]);
@@ -905,7 +905,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               <p className="text-sm text-gray-600 mb-5">
                 It stays safe and can be restored or deleted later.
               </p>
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-2 flex-wrap">
                 <button
                   className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-800 transition"
                   onClick={async () => {
@@ -949,6 +949,24 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   }}
                 >
                   Shelf
+                </button>
+                <button
+                  className="px-4 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-800 transition"
+                  onClick={async () => {
+                    await Haptics.impact({ style: ImpactStyle.Heavy });
+                    // Move all products to shelf
+                    setDeletedProducts((prev) => [...prev, ...products]);
+                    setProducts([]);
+                    setPreviewProduct(null);
+                    setPreviewList([]);
+
+                    window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+
+                    setShowShelfConfirm(false);
+                    setShelfTarget(null);
+                  }}
+                >
+                  Shelf All
                 </button>
                 <button
                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"

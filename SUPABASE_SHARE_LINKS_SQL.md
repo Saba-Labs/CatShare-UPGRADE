@@ -11,7 +11,7 @@ create table if not exists public.share_links (
   seller_whatsapp text not null,
   items jsonb not null,
   created_at timestamptz not null default now(),
-  expires_at timestamptz not null default (now() + interval '7 days')
+  expires_at timestamptz not null default (now() + interval '1 day')
 );
 
 create index if not exists share_links_seller_user_id_idx
