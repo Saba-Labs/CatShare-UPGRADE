@@ -1,20 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
 import { FaGoogle } from 'react-icons/fa';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { safeGetFromStorage } from '../utils/safeStorage';
 
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user, supabaseData, supabaseDataLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
+  const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
+
+  // After user logs in and supabaseData loads, check if they need onboarding
+  useEffect(() => {
+    if (hasJustLoggedIn && !supabaseDataLoading && supabaseData) {
+      console.log('🔍 Login check - supabaseData:', supabaseData);
+      console.log('🔍 fieldsDefinition from Supabase:', supabaseData.fieldsDefinition);
+
+      showToast('Login successful!', 'success');
+
+      // Check if user has already configured their fields
+      // First check Supabase, then fallback to localStorage for old users
+      const hasSupabaseFields = supabaseData.fieldsDefinition &&
+                               supabaseData.fieldsDefinition.fields &&
+                               Array.isArray(supabaseData.fieldsDefinition.fields) &&
+                               supabaseData.fieldsDefinition.fields.length > 0;
+
+      const localStorageFields = safeGetFromStorage('fieldsDefinition', null);
+      const hasLocalFields = localStorageFields &&
+                            localStorageFields.fields &&
+                            Array.isArray(localStorageFields.fields) &&
+                            localStorageFields.fields.length > 0;
+
+      const hasFieldsDefinition = hasSupabaseFields || hasLocalFields;
+
+      console.log('🔍 hasSupabaseFields:', hasSupabaseFields);
+      console.log('🔍 hasLocalFields:', hasLocalFields);
+      console.log('🔍 hasFieldsDefinition (combined):', hasFieldsDefinition);
+
+      // If user has local fields but no Supabase fields, sync them to cloud (for old users)
+      if (hasLocalFields && !hasSupabaseFields && user?.uid) {
+        console.log('🔄 Syncing local fields to Supabase for old user...');
+        import('../services/supabaseSync').then(({ syncFieldsDefinition }) => {
+          syncFieldsDefinition(user.uid, localStorageFields)
+            .then(result => {
+              if (result.success) {
+                console.log('✅ Successfully synced local fields to Supabase');
+              } else {
+                console.warn('⚠️ Failed to sync local fields:', result.error);
+              }
+            });
+        });
+      }
+
+      if (hasFieldsDefinition) {
+        // Returning user - go to main app
+        console.log('✅ User has fields definition (Supabase or localStorage) - redirecting to home');
+        navigate('/');
+      } else {
+        // New user - go to onboarding
+        console.log('🆕 No fields definition found - redirecting to welcome');
+        navigate('/welcome');
+      }
+
+      setHasJustLoggedIn(false);
+    }
+  }, [hasJustLoggedIn, supabaseDataLoading, supabaseData, user, navigate, showToast]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,8 +83,7 @@ export default function Login() {
 
     try {
       await authService.loginWithEmail(email, password);
-      showToast('Login successful!', 'success');
-      navigate('/');
+      setHasJustLoggedIn(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
@@ -40,8 +99,7 @@ export default function Login() {
     try {
       const user = await authService.loginWithGoogle();
       if (user) {
-        showToast('Login successful!', 'success');
-        navigate('/');
+        setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
@@ -58,8 +116,7 @@ export default function Login() {
     try {
       const user = await authService.loginAsGuest();
       if (user) {
-        showToast('Logged in as guest', 'success');
-        navigate('/');
+        setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Guest login failed';
