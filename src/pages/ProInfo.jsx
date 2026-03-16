@@ -1,9 +1,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MdArrowBack, MdStar, MdOutlineHome } from "react-icons/md";
+import { useSubscription } from "../context/SubscriptionContext";
 
 export default function ProInfo() {
   const navigate = useNavigate();
+  const { isPro } = useSubscription();
 
   const proFeatures = [
     { name: "Bulk Editor", description: "Edit multiple products at once with batch operations" },
@@ -40,27 +42,28 @@ export default function ProInfo() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
         <div className="space-y-6 max-w-2xl">
-          {/* Header with emoji */}
+
+          {/* Header */}
           <div className="flex items-center justify-center gap-2 mb-6">
             <MdStar className="text-yellow-500 text-2xl" />
             <h2 className="text-2xl font-bold text-gray-800">CatShare Pro</h2>
           </div>
 
           {/* Current Status */}
-          <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-300 shadow-sm">
-            <p className="text-sm text-green-900 mb-2">
-              <span className="font-semibold">🎉 Special Offer:</span> Pro Features - Completely Free
+          <div className={`p-4 rounded-lg border shadow-sm ${isPro ? "bg-green-50 border-green-300" : "bg-yellow-50 border-yellow-300"}`}>
+            <p className={`text-sm mb-2 ${isPro ? "text-green-900" : "text-yellow-900"}`}>
+              <span className="font-semibold">Status:</span> {isPro ? "Pro active" : "Free plan"}
             </p>
-            <p className="text-xs text-green-800 leading-relaxed">
-              You have unlimited access to all CatShare Pro features at no cost. Make the most of it while you can!
+            <p className={`text-xs leading-relaxed ${isPro ? "text-green-800" : "text-yellow-800"}`}>
+              {isPro ? "Thanks for supporting CatShare." : "Upgrade to unlock Pro features like PDF and Link sharing."}
             </p>
           </div>
 
-          {/* Coming Soon Notice */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm font-semibold text-blue-900 mb-2">⏰ Limited Time Offer</p>
+          {/* Coming Soon */}
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
+            <p className="text-sm font-semibold text-blue-900">Upgrade</p>
             <p className="text-xs text-blue-800">
-              You're getting Pro features for free during our beta phase. When CatShare Pro officially launches, these premium features will require a subscription. Enjoy everything now!
+              In-app purchases coming soon. Pro features are free during beta — enjoy full access now!
             </p>
           </div>
 
@@ -122,6 +125,7 @@ export default function ProInfo() {
             <span className="text-green-600 font-semibold block">✓ Free access to Pro features during beta</span>
             <span className="text-gray-500 block mt-1">Pricing model coming soon</span>
           </p>
+
         </div>
       </main>
     </div>

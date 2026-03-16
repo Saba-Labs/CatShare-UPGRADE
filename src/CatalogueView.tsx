@@ -21,6 +21,8 @@ import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtil
 import { generateProductPDF, downloadPDF, sharePDF } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
 import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
+import { useSubscription } from "./context/SubscriptionContext";
+import { useNavigate } from "react-router-dom";
 
 const ProductCard = React.memo(({
   p,
@@ -271,6 +273,8 @@ export default React.memo(function CatalogueView({
   onBack,
 }: CatalogueViewProps) {
   const { user, supabaseData } = useAuth();
+  const { isPro } = useSubscription();
+  const navigate = useNavigate();
   // Helper function to get catalogue-specific data for a product
   const getProductCatalogueData = useCallback((product) => {
     if (!catalogueId) return product; // Fallback to product if no catalogueId
@@ -1416,6 +1420,10 @@ const handleTouchEnd = useCallback(() => {
             <button
               onClick={() => {
                 setShowShareOptions(false);
+                if (!isPro) {
+                  navigate("/settings/pro");
+                  return;
+                }
                 handleGeneratePDF('share');
               }}
               className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
@@ -1433,6 +1441,10 @@ const handleTouchEnd = useCallback(() => {
               onClick={async () => {
                 try {
                   setShowShareOptions(false);
+                  if (!isPro) {
+                    navigate("/settings/pro");
+                    return;
+                  }
                   if (!user?.uid) {
                     alert('Please login first.');
                     return;

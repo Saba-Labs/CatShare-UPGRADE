@@ -599,8 +599,18 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     }
   };
 
-  const handlePermanentDelete = (id) => {
+  const handlePermanentDelete = async (id) => {
     if (window.confirm("Permanently delete this item?")) {
+      // Delete image from R2 if product has a cloud URL
+      const product = deletedProducts.find(p => p.id === id);
+      if (product?.imageUrl && !product.imageUrl.startsWith('undefined')) {
+        try {
+          const { deleteImageFromR2 } = await import('./services/cloudflareService');
+          await deleteImageFromR2(product.imageUrl);
+        } catch (err) {
+          console.warn("⚠️ Could not delete R2 image:", err);
+        }
+      }
       setDeletedProducts((prev) => prev.filter((p) => p.id !== id));
     }
   };

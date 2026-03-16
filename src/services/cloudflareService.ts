@@ -129,3 +129,34 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 
   return new Blob(byteArrays, { type: mimeType });
 }
+
+// ─── Delete image from R2 ─────────────────────────────────────────────────────
+
+export async function deleteImageFromR2(imageUrl: string): Promise<void> {
+  try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user || !imageUrl) return;
+
+    // Extract the key from the URL by removing the base URL prefix
+    const baseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+    const key = imageUrl.replace(`${baseUrl}/`, '');
+    if (!key || key === imageUrl) {
+      console.warn("⚠️ Could not extract R2 key from URL:", imageUrl);
+      return;
+    }
+
+    const idToken = await user.getIdToken();
+    await fetch(`${API_BASE}/api/delete-image`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ key }),
+    });
+    console.log(`🗑️ Deleted R2 image: ${key}`);
+  } catch (err: any) {
+    console.warn("⚠️ Failed to delete R2 image:", err?.message || err);
+  }
+}

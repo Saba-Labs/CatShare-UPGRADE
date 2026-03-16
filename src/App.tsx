@@ -47,6 +47,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SubscriptionProvider } from "./context/SubscriptionContext";
 import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
@@ -76,15 +77,19 @@ function AppWithBackHandler() {
   const [supabaseSyncStatus, setSupabaseSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const renderResultTimeoutRef = useRef(null);
   const previousUserIdRef = useRef<string | null>(null);
+  const [showFirstSyncBanner, setShowFirstSyncBanner] = useState(false);
 
   const isNative = Capacitor.getPlatform() !== "web";
 
   // Reset local product data when the authenticated user changes
   useEffect(() => {
     const currentUserId = user?.uid || null;
-    if (currentUserId !== previousUserIdRef.current) {
-      previousUserIdRef.current = currentUserId;
+    const previous = previousUserIdRef.current;
 
+    // Only clear when switching between two different logged-in users.
+    // Do NOT clear when going from "no user" -> first login, so existing
+    // offline data can be synced into the account.
+    if (previous && currentUserId && currentUserId !== previous) {
       // Clear in-memory and local storage products for new user
       setProducts([]);
       setDeletedProducts([]);
@@ -92,6 +97,8 @@ function AppWithBackHandler() {
       safeSetInStorage("deletedProducts", []);
       console.log('🔄 Cleared local products for user change:', currentUserId);
     }
+
+    previousUserIdRef.current = currentUserId;
   }, [user?.uid]);
 
   // Merge Supabase data with local storage when user logs in
@@ -152,6 +159,39 @@ function AppWithBackHandler() {
       setSupabaseSyncStatus('error');
     }
   }, [user, supabaseData, supabaseDataLoading]);
+
+  // Show a one-time banner when we detect existing offline products
+  // being synced to the logged-in account on this device.
+  useEffect(() => {
+    if (!user || supabaseDataLoading) return;
+
+    const userId = user.uid;
+    const key = `cloudSyncDone::${userId}`;
+    const already = localStorage.getItem(key) === 'true';
+
+    const localProducts = safeGetFromStorage("products", []);
+    const hasLocalProducts = Array.isArray(localProducts) && localProducts.length > 0;
+
+    if (!already && hasLocalProducts) {
+      setShowFirstSyncBanner(true);
+    }
+  }, [user, supabaseDataLoading]);
+
+  // When initial sync finishes, mark done and optionally auto-hide banner.
+  useEffect(() => {
+    if (!user) return;
+    if (supabaseSyncStatus !== 'synced') return;
+    if (!showFirstSyncBanner) return;
+
+    const userId = user.uid;
+    const key = `cloudSyncDone::${userId}`;
+    localStorage.setItem(key, 'true');
+
+    const timeout = setTimeout(() => {
+      setShowFirstSyncBanner(false);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [user, supabaseSyncStatus, showFirstSyncBanner]);
 
   // Merge products by keeping the newer version (based on timestamp)
   const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
@@ -689,6 +729,21 @@ function AppWithBackHandler() {
       <ToastContainer />
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
+      {showFirstSyncBanner && (
+        <div className="fixed top-[40px] inset-x-0 z-[60] px-4">
+          <div className="mx-auto max-w-md bg-blue-50 border border-blue-200 text-blue-900 rounded-xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
+            <span className="pr-3">
+              We found your existing products on this device and are syncing them securely to your account.
+            </span>
+            <button
+              onClick={() => setShowFirstSyncBanner(false)}
+              className="text-[11px] font-semibold text-blue-800 hover:text-blue-900"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <RenderingOverlay
         visible={isRendering}
         current={renderProgress}
@@ -899,9 +954,11 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <Router>
-              <AppWithBackHandler />
-            </Router>
+            <SubscriptionProvider>
+              <Router>
+                <AppWithBackHandler />
+              </Router>
+            </SubscriptionProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
