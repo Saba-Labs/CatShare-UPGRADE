@@ -840,7 +840,6 @@ const exportProductsToCSV = (products) => {
       const preservedSettings = {
         hasCompletedOnboarding: safeGetFromStorage('hasCompletedOnboarding', false),
         darkMode: safeGetFromStorage('darkMode', false),
-        // For v3 backups, restore from metadata; otherwise keep current settings
         showWatermark: isV3Backup && parsed.metadata?.watermarkSettings
           ? parsed.metadata.watermarkSettings.showWatermark
           : safeGetFromStorage('showWatermark', true),
@@ -850,8 +849,9 @@ const exportProductsToCSV = (products) => {
         watermarkPosition: isV3Backup && parsed.metadata?.watermarkSettings
           ? parsed.metadata.watermarkSettings.watermarkPosition
           : safeGetFromStorage('watermarkPosition', 'bottom-left'),
-        fieldsDefinition: backupFieldDef, // Use the newly analyzed field definition
+        fieldsDefinition: backupFieldDef,
         userId: localStorage.getItem('userId'),
+        supabase_user_id: localStorage.getItem('supabase_user_id'), // ✅ ADD THIS LINE
       };
 
       // Restore currency and price units from backup if available
@@ -908,11 +908,9 @@ const exportProductsToCSV = (products) => {
       console.log("♻️ Restoring preserved settings...");
       Object.entries(preservedSettings).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          if (key === 'userId') {
-            // userId is plain string
-            localStorage.setItem(key, value);
+          if (key === 'userId' || key === 'supabase_user_id') {
+            localStorage.setItem(key, value); // ✅ plain string, no JSON
           } else {
-            // Use safe setter for other values
             safeSetInStorage(key, value);
           }
         }
@@ -1372,6 +1370,7 @@ const restoreFromDetectedBackup = async (backupFile) => {
             : safeGetFromStorage('watermarkPosition', 'bottom-left'),
           fieldsDefinition: backupFieldDef,
           userId: localStorage.getItem('userId'),
+          supabase_user_id: localStorage.getItem('supabase_user_id'), // ✅ ADD THIS LINE
         };
 
         if (isV3Backup && parsed.metadata?.currencySettings) {
@@ -1388,11 +1387,15 @@ const restoreFromDetectedBackup = async (backupFile) => {
         }
 
         localStorage.clear();
-        Object.entries(preservedSettings).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-          }
-        });
+Object.entries(preservedSettings).forEach(([key, value]) => {
+  if (value !== undefined && value !== null) {
+    if (key === 'userId' || key === 'supabase_user_id') {
+      localStorage.setItem(key, value); // ✅ plain string, no JSON
+    } else {
+      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+    }
+  }
+});
 
         const cleanedProducts = rebuilt.map(p => {
           const clean = { ...p };
