@@ -775,6 +775,27 @@ const exportProductsToCSV = (products) => {
               } catch (err) {
                 console.warn(`❌ Image write failed for "${p.name}":`, p.imagePath, err);
               }
+
+              // ✅ ADD THIS BLOCK HERE
+              if (!p.imageUrl && imageRestored) {
+                try {
+                  const { uploadImageToR2 } = await import('./services/cloudflareService');
+                  const folder = p.imagePath.split("/")[0];
+                  const filename = p.imageFilename;
+                  const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
+
+                  const result = await uploadImageToR2(base64, filename, folder, mimeType);
+                  if (result.success) {
+                    p.imageUrl = result.publicUrl;
+                    console.log(`☁️ Uploaded to R2 for "${p.name}": ${result.publicUrl}`);
+                  } else {
+                    console.warn(`⚠️ R2 upload failed for "${p.name}":`, result.error);
+                  }
+                } catch (err) {
+                  console.warn(`⚠️ R2 upload error for "${p.name}":`, err.message);
+                }
+              }
+
             } else {
               console.warn(`⚠️ Image file not found in ZIP for "${p.name}": images/${p.imageFilename}`);
             }
@@ -1253,6 +1274,27 @@ const restoreFromDetectedBackup = async (backupFile) => {
                 } catch (err) {
                   console.warn(`❌ Image write failed for "${p.name}":`, p.imagePath, err);
                 }
+
+                // ✅ ADD THIS BLOCK HERE
+                if (!p.imageUrl && imageRestored) {
+                  try {
+                    const { uploadImageToR2 } = await import('./services/cloudflareService');
+                    const folder = p.imagePath.split("/")[0];
+                    const filename = p.imageFilename;
+                    const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
+
+                    const result = await uploadImageToR2(base64, filename, folder, mimeType);
+                    if (result.success) {
+                      p.imageUrl = result.publicUrl;
+                      console.log(`☁️ Uploaded to R2 for "${p.name}": ${result.publicUrl}`);
+                    } else {
+                      console.warn(`⚠️ R2 upload failed for "${p.name}":`, result.error);
+                    }
+                  } catch (err) {
+                    console.warn(`⚠️ R2 upload error for "${p.name}":`, err.message);
+                  }
+                }
+
               } else {
                 console.warn(`⚠️ Image file not found in ZIP for "${p.name}": images/${p.imageFilename}`);
               }
