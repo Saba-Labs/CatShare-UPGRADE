@@ -1141,9 +1141,11 @@ const exportProductsToCSV = (products) => {
             const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
 
             const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
-            if (result.success) {
+            if (result.success && result.publicUrl && !result.publicUrl.startsWith('undefined')) {
               console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
               return { ...p, imageUrl: result.publicUrl };
+            } else {
+              console.warn(`⚠️ Invalid publicUrl for "${p.name}":`, result.publicUrl);
             }
           } catch (err) {
             console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
@@ -1538,9 +1540,11 @@ if (user && user.uid) {
             const filename = p.imagePath.split("/").pop();
             const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
             const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
-            if (result.success) {
+            if (result.success && result.publicUrl && !result.publicUrl.startsWith('undefined')) {
               console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
               return { ...p, imageUrl: result.publicUrl };
+            } else {
+              console.warn(`⚠️ Invalid publicUrl for "${p.name}":`, result.publicUrl);
             }
           } catch (err) {
             console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);

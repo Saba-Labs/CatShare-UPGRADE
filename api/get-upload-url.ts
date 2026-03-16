@@ -101,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // The public URL your app will store in Supabase after upload
-    const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
+    const publicUrl = `${process.env.R2_PUBLIC_BASE_URL}/${key}`;
 
     return res.status(200).json({ presignedUrl, publicUrl, key });
   } catch (err) {
