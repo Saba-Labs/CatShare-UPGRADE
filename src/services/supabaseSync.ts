@@ -126,6 +126,7 @@ export async function syncDeletedProducts(
 
 /**
  * Delete all deleted products from Supabase (permanent shelf cleanup)
+ * This deletes both from deleted_products table AND the actual products from products table
  */
 export async function deleteAllDeletedProducts(userId: string): Promise<SyncResult> {
   try {
@@ -133,18 +134,52 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
       return { success: false, error: 'Invalid input: userId missing' };
     }
 
-    const { data, error } = await getSupabaseClient()
+    const client = getSupabaseClient();
+
+    // First, fetch all deleted product IDs for this user
+    const { data: deletedProducts, error: fetchError } = await client
+      .from('deleted_products')
+      .select('product_id')
+      .eq('user_id', userId);
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('❌ Error fetching deleted products:', fetchError);
+      return { success: false, error: fetchError.message };
+    }
+
+    // Extract product IDs
+    const productIds = deletedProducts?.map(dp => dp.product_id) || [];
+
+    // Delete from deleted_products table
+    const { error: deleteShelfError } = await client
       .from('deleted_products')
       .delete()
       .eq('user_id', userId);
 
-    if (error) {
-      console.error('❌ Error deleting all shelf products from Supabase:', error);
-      return { success: false, error: error.message };
+    if (deleteShelfError) {
+      console.error('❌ Error deleting from shelf:', deleteShelfError);
+      return { success: false, error: deleteShelfError.message };
     }
 
-    console.log('✅ Permanently deleted all shelf products from Supabase');
-    return { success: true, data };
+    // Delete the actual products from products table if there are any
+    if (productIds.length > 0) {
+      const { error: deleteProductsError } = await client
+        .from('products')
+        .delete()
+        .eq('user_id', userId)
+        .in('product_id', productIds);
+
+      if (deleteProductsError) {
+        console.error('❌ Error deleting products from database:', deleteProductsError);
+        return { success: false, error: deleteProductsError.message };
+      }
+
+      console.log(`✅ Permanently deleted all ${productIds.length} shelf products from Supabase`);
+    } else {
+      console.log('✅ Shelf is already empty - no products to delete');
+    }
+
+    return { success: true, data: { deletedCount: productIds.length } };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in deleteAllDeletedProducts:', errorMessage);
@@ -377,16 +412,41 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
     if (fieldsError && fieldsError.code !== 'PGRST116') console.error('❌ Error fetching fields definition:', fieldsError);
     if (settingsError && settingsError.code !== 'PGRST116') console.error('❌ Error fetching user settings:', settingsError);
 
+    // Enrich deleted products with their product data from the products table
+    let enrichedDeletedProducts = [];
+    if (deletedProducts && deletedProducts.length > 0 && products && products.length > 0) {
+      // Create a map of product_id -> product data for quick lookup
+      const productMap = new Map();
+      products.forEach(p => {
+        productMap.set(p.product_id, p.data);
+      });
+
+      // Map deleted products to include their full product data
+      enrichedDeletedProducts = deletedProducts
+        .map(dp => {
+          const productData = productMap.get(dp.product_id);
+          if (productData) {
+            return { ...productData, id: dp.product_id };
+          }
+          return null;
+        })
+        .filter(p => p !== null);
+    }
+
     const userData = {
       products: products?.map(p => p.data) || [],
-      deletedProducts: deletedProducts?.map(p => ({ ...p.data, id: p.product_id })) || [],
+      deletedProducts: enrichedDeletedProducts,
       categories: categories?.map(c => c.data) || [],
       cataloguesDefinition: cataloguesDef?.[0]?.data || null,
       fieldsDefinition: fieldsDef?.[0]?.data || null,
       userSettings: settings?.data || null,
     };
 
-    console.log('✅ Fetched all user data from Supabase');
+    console.log('✅ Fetched all user data from Supabase', {
+      productsCount: userData.products.length,
+      deletedProductsCount: userData.deletedProducts.length,
+      enrichedDeletedProducts: enrichedDeletedProducts.length
+    });
     return { success: true, data: userData };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -396,7 +456,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
 }
 
 /**
- * Perform a soft delete of a product in Supabase
+ * Permanently delete a product from Supabase (hard delete from products table)
  */
 export async function deleteProductFromSupabase(
   userId: string,
@@ -407,35 +467,67 @@ export async function deleteProductFromSupabase(
       return { success: false, error: 'Invalid input: userId or productId missing' };
     }
 
-    const { error: updateError } = await getSupabaseClient()
-      .from('products')
-      .update({ deleted_at: new Date().toISOString() })
+    // First, delete from deleted_products table to remove from shelf
+    const { error: deleteFromShelfError } = await getSupabaseClient()
+      .from('deleted_products')
+      .delete()
       .eq('user_id', userId)
       .eq('product_id', productId);
 
-    if (updateError) {
-      console.error('❌ Error marking product as deleted:', updateError);
-      return { success: false, error: updateError.message };
+    if (deleteFromShelfError) {
+      console.error('❌ Error removing from shelf:', deleteFromShelfError);
+      return { success: false, error: deleteFromShelfError.message };
     }
 
-    const { error: insertError } = await getSupabaseClient()
-      .from('deleted_products')
-      .upsert({
-        user_id: userId,
-        product_id: productId,
-        deleted_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,product_id' });
+    // Then, permanently delete the product from products table
+    const { error: deleteError } = await getSupabaseClient()
+      .from('products')
+      .delete()
+      .eq('user_id', userId)
+      .eq('product_id', productId);
 
-    if (insertError) {
-      console.error('❌ Error adding to deleted_products:', insertError);
-      return { success: false, error: insertError.message };
+    if (deleteError) {
+      console.error('❌ Error permanently deleting product:', deleteError);
+      return { success: false, error: deleteError.message };
     }
 
-    console.log(`✅ Soft deleted product ${productId} from Supabase`);
+    console.log(`✅ Permanently deleted product ${productId} from Supabase`);
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in deleteProductFromSupabase:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Remove a product from deleted_products table (used when restoring from shelf)
+ */
+export async function removeProductFromDeletedProducts(
+  userId: string,
+  productId: string
+): Promise<SyncResult> {
+  try {
+    if (!userId || !productId) {
+      return { success: false, error: 'Invalid input: userId or productId missing' };
+    }
+
+    const { error } = await getSupabaseClient()
+      .from('deleted_products')
+      .delete()
+      .eq('user_id', userId)
+      .eq('product_id', productId);
+
+    if (error) {
+      console.error('❌ Error removing product from shelf:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✅ Removed product ${productId} from shelf in Supabase`);
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in removeProductFromDeletedProducts:', errorMessage);
     return { success: false, error: errorMessage };
   }
 }

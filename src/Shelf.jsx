@@ -6,7 +6,7 @@ import SideDrawer from "./SideDrawer";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { deleteRenderedImageForProduct } from "./Save";
-import { deleteAllDeletedProducts } from "./services/supabaseSync";
+import { deleteAllDeletedProducts, deleteProductFromSupabase, removeProductFromDeletedProducts } from "./services/supabaseSync";
 
 export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap, user }) {
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -42,10 +42,24 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     loadShelfImages();
   }, [deletedProducts]);
 
-  const handleRestore = (product) => {
+  const handleRestore = async (product) => {
     setProducts((prev) => [product, ...prev]);
     setDeletedProducts((prev) => prev.filter((p) => p.id !== product.id));
     window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+
+    // Sync restoration to Supabase by removing from deleted_products
+    if (user?.uid) {
+      try {
+        const result = await removeProductFromDeletedProducts(user.uid, product.id);
+        if (result.success) {
+          console.log(`✅ Product ${product.id} restored and removed from shelf in Supabase`);
+        } else {
+          console.error(`❌ Failed to sync restoration to Supabase:`, result.error);
+        }
+      } catch (err) {
+        console.error(`❌ Error syncing restoration:`, err);
+      }
+    }
   };
 
   const confirmDelete = (id) => {
@@ -74,6 +88,16 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
               directory: Directory.Data,
             });
             console.log(`🗑️ Deleted source image: ${toDelete.imagePath}`);
+          }
+
+          // Sync permanent deletion to Supabase
+          if (user?.uid) {
+            const result = await deleteProductFromSupabase(user.uid, toDelete.id);
+            if (result.success) {
+              console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
+            } else {
+              console.error(`❌ Failed to sync deletion to Supabase:`, result.error);
+            }
           }
         } catch (err) {
           console.warn(`⚠️ Failed to fully clean up files for product ${toDelete.id}:`, err);
