@@ -10,6 +10,8 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { deleteRenderedImagesFromFolder, renameRenderedImagesForCatalogue } from "./Save";
 import { FiX, FiPlus, FiEdit2, FiTrash2, FiImage, FiCheck, FiLoader } from "react-icons/fi";
 import { logCatalogueCreated, logCatalogueDeleted } from "./config/analyticsEvents";
+import { useAuth } from "./context/AuthContext";
+import { syncCataloguesDefinition } from "./services/supabaseSync";
 
 interface ManageCataloguesProps {
   onClose: () => void;
@@ -26,6 +28,7 @@ export default React.memo(function ManageCatalogues({
   setProducts,
   renamingCatalogueIds = new Set(),
 }: ManageCataloguesProps) {
+  const { user } = useAuth();
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState<Catalogue | null>(null);
@@ -111,6 +114,13 @@ export default React.memo(function ManageCatalogues({
           setCatalogues(updated);
           onCataloguesChanged(updated);
 
+          // Sync catalogues to Supabase
+          if (user?.uid) {
+            syncCataloguesDefinition(user.uid, updated).catch(err => {
+              console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+            });
+          }
+
           // Log catalogue creation event with the new catalogue name
           logCatalogueCreated(newCatalogue.label);
 
@@ -192,6 +202,13 @@ export default React.memo(function ManageCatalogues({
       setCatalogues(updated);
       onCataloguesChanged(updated);
 
+      // Sync catalogues to Supabase
+      if (user?.uid) {
+        syncCataloguesDefinition(user.uid, updated).catch(err => {
+          console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+        });
+      }
+
       logCatalogueCreated(newLabel);
 
       setShowEditForm(null);
@@ -219,6 +236,14 @@ export default React.memo(function ManageCatalogues({
         const updated = getAllCatalogues();
         setCatalogues(updated);
         onCataloguesChanged(updated);
+
+        // Sync catalogues to Supabase
+        if (user?.uid) {
+          syncCataloguesDefinition(user.uid, updated).catch(err => {
+            console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+          });
+        }
+
         logCatalogueDeleted(catalogue.label);
         setShowDeleteConfirm(null);
       } else {
