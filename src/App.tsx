@@ -58,7 +58,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, supabaseData, supabaseDataLoading } = useAuth();
+  const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
   const [imageMap, setImageMap] = useState({});
   const [products, setProducts] = useState(() =>
     safeGetFromStorage("products", [])
@@ -552,18 +552,24 @@ function AppWithBackHandler() {
 
   // Check if user needs to complete onboarding
   useEffect(() => {
+    // Don't redirect while auth is still loading to prevent redirect loops
+    if (loading) return;
+
     const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
 
-    // Only redirect to welcome if not already on welcome, order form, or other public pages
+    // Only redirect to welcome if not already on welcome, order form, login, or other public pages
     if (!hasCompletedOnboarding &&
         !location.pathname.includes('/welcome') &&
+        !location.pathname.includes('/login') &&
+        !location.pathname.includes('/register') &&
+        !location.pathname.includes('/forgot-password') &&
         !location.pathname.includes('/privacy') &&
         !location.pathname.includes('/terms') &&
         !location.pathname.includes('/website') &&
         !location.pathname.includes('/o/')) {
       navigate('/welcome');
     }
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, loading]);
 
   // Initialize watermark settings with defaults on first load
   useEffect(() => {
