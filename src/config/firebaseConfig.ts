@@ -22,11 +22,25 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
-export const messaging = getMessaging(app);
-export const analytics = getAnalytics(app);
 
-// Log app open event
-logEvent(analytics, "app_open");
+// Messaging is not supported in Android WebView — wrap in try-catch
+let messagingInstance: ReturnType<typeof getMessaging> | null = null;
+try {
+  messagingInstance = getMessaging(app);
+} catch (e) {
+  console.warn("Firebase Messaging not supported in this environment:", e);
+}
+export const messaging = messagingInstance;
+
+// Analytics — also wrap in try-catch for safety
+let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
+try {
+  analyticsInstance = getAnalytics(app);
+  logEvent(analyticsInstance, "app_open");
+} catch (e) {
+  console.warn("Firebase Analytics not supported in this environment:", e);
+}
+export const analytics = analyticsInstance;
 
 // Register service worker for FCM on web
 export const registerServiceWorker = async () => {
@@ -47,18 +61,17 @@ export const registerServiceWorker = async () => {
 
 // Request notification permission and get token
 export const requestNotificationPermission = async () => {
+  if (!messaging) return null;
   try {
     if (!('Notification' in window)) {
       console.log('Notifications not supported in this browser');
       return null;
     }
-
     try {
       await registerServiceWorker();
     } catch (swError) {
       console.warn('Service worker registration optional, continuing...');
     }
-
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
       try {
@@ -79,10 +92,12 @@ export const requestNotificationPermission = async () => {
     console.warn("Error requesting notification permission:", error);
     return null;
   }
+  return null;
 };
 
 // Listen for incoming FCM messages
 export const setupMessageListener = (callback: (payload: any) => void) => {
+  if (!messaging) return;
   onMessage(messaging, (payload) => {
     console.log("Message received from Firebase:", payload);
     callback(payload);

@@ -11,8 +11,7 @@ const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPro, setIsPro] = useState<boolean>(() => {
-    const cached = localStorage.getItem('isPro');
-    return cached === 'true';
+    return localStorage.getItem('isPro') === 'true';
   });
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -26,16 +25,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
     setLoading(true);
     try {
-      const token = await user.getIdToken();
-      const baseUrl = (import.meta as any).env?.VITE_BACKEND_URL || '';
-      const resp = await fetch(`${baseUrl}/subscription`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
+      const resp = await fetch(`${baseUrl}/api/subscription?userId=${user.uid}`);
       if (!resp.ok) throw new Error(`Subscription fetch failed (${resp.status})`);
       const json = await resp.json();
       const next = !!json?.isPro;
       setIsPro(next);
       localStorage.setItem('isPro', next ? 'true' : 'false');
+    } catch {
+      // keep cached value if offline/error
     } finally {
       setLoading(false);
     }
@@ -43,12 +41,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(() => {
-      refresh().catch(() => {
-        setLoading(false);
-      });
+      refresh().catch(() => setLoading(false));
     });
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo(() => ({ isPro, loading, refresh }), [isPro, loading]);
