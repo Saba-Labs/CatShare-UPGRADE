@@ -22,7 +22,7 @@ export async function uploadProductImageToR2(options: {
 
   const idToken = await user.getIdToken();
   const baseUrl = (import.meta as any).env?.VITE_BACKEND_URL || '';
-  const endpoint = baseUrl ? `${baseUrl}/upload-product-image` : '/api/upload-product-image';
+  const endpoint = baseUrl ? `${baseUrl}/api/upload-product-image` : '/api/upload-product-image';
 
   const { blob, ext } = dataUrlToBlob(options.dataUrl);
 
