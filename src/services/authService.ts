@@ -61,6 +61,9 @@ export const authService = {
     localStorage.setItem('guestUserId', guestId);
     localStorage.setItem('isOfflineGuest', 'true');
 
+    // Dispatch custom event to notify AuthContext of guest mode activation
+    window.dispatchEvent(new CustomEvent('guestModeActivated', { detail: { guestId } }));
+
     // Return a minimal user-like object for compatibility
     return {
       uid: guestId,

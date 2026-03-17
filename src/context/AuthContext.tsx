@@ -44,24 +44,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     // Check if user is in offline guest mode
-    const isOfflineGuest = authService.isOfflineGuest();
+    const checkGuestMode = () => {
+      const isOfflineGuest = authService.isOfflineGuest();
 
-    if (isOfflineGuest) {
-      // Offline guest mode - set up guest user without Firebase
-      const guestId = localStorage.getItem('guestUserId');
-      const guestUser = {
-        uid: guestId || `guest-${Date.now()}`,
-        email: null,
-        displayName: 'Guest User',
-        isAnonymous: true,
-      } as any;
+      if (isOfflineGuest) {
+        // Offline guest mode - set up guest user without Firebase
+        const guestId = localStorage.getItem('guestUserId');
+        const guestUser = {
+          uid: guestId || `guest-${Date.now()}`,
+          email: null,
+          displayName: 'Guest User',
+          isAnonymous: true,
+        } as any;
 
-      setUser(guestUser);
-      console.log('👤 Offline guest mode activated');
-      setLoading(false);
-      setSupabaseData(defaultSupabaseData); // No cloud data for guests
+        setUser(guestUser);
+        console.log('👤 Offline guest mode activated');
+        setLoading(false);
+        setSupabaseData(defaultSupabaseData); // No cloud data for guests
+        return true;
+      }
+      return false;
+    };
+
+    // Check guest mode on mount
+    if (checkGuestMode()) {
       return;
     }
+
+    // Listen for guest mode activation (can happen after initial mount)
+    const handleGuestModeActivated = () => {
+      console.log('🎯 Guest mode activation detected');
+      checkGuestMode();
+    };
+
+    window.addEventListener('guestModeActivated', handleGuestModeActivated);
 
     // Normal Firebase authentication flow
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -117,7 +133,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      window.removeEventListener('guestModeActivated', handleGuestModeActivated);
+    };
   }, []);
 
   const logout = async () => {
