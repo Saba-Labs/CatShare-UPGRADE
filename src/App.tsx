@@ -58,7 +58,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, supabaseData, supabaseDataLoading } = useAuth();
+  const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
   const [imageMap, setImageMap] = useState({});
   const [products, setProducts] = useState(() =>
     safeGetFromStorage("products", [])
@@ -422,6 +422,10 @@ function AppWithBackHandler() {
   useEffect(() => {
     if (!user) return;
 
+    // Skip sync for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
+
     const userId = user.uid;
     if (!userId || products.length === 0) return;
 
@@ -454,6 +458,10 @@ function AppWithBackHandler() {
   // ✅ Sync deleted products to Supabase whenever they change
   useEffect(() => {
     if (!user) return;
+
+    // Skip sync for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
 
     const userId = user.uid;
     if (!userId) return;
@@ -550,20 +558,35 @@ function AppWithBackHandler() {
     runAsyncMigrations();
   }, []);
 
-  // Check if user needs to complete onboarding
+  // Check if user needs to complete onboarding (only show for new users)
   useEffect(() => {
+    // Don't redirect while auth is still loading to prevent redirect loops
+    if (loading) return;
+
+    // Guest users (offline mode) should skip onboarding entirely
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) {
+      return; // Guest users skip onboarding
+    }
+
+    // Only redirect to welcome for NEW users (those without fieldsDefinition in Supabase)
+    // Returning users who log in on a new device already have fieldsDefinition and should skip onboarding
+    const isNewUser = !supabaseData?.fieldsDefinition;
     const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
 
-    // Only redirect to welcome if not already on welcome, order form, or other public pages
-    if (!hasCompletedOnboarding &&
+    // Only redirect to welcome if user is new AND not already on welcome/login/public pages
+    if (isNewUser && !hasCompletedOnboarding &&
         !location.pathname.includes('/welcome') &&
+        !location.pathname.includes('/login') &&
+        !location.pathname.includes('/register') &&
+        !location.pathname.includes('/forgot-password') &&
         !location.pathname.includes('/privacy') &&
         !location.pathname.includes('/terms') &&
         !location.pathname.includes('/website') &&
         !location.pathname.includes('/o/')) {
       navigate('/welcome');
     }
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, loading, supabaseData?.fieldsDefinition]);
 
   // Initialize watermark settings with defaults on first load
   useEffect(() => {

@@ -3,6 +3,7 @@ import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import { fetchAllUserData } from '../services/supabaseSync';
 import { setSupabaseUser } from '../supabaseClient';
+import { authService } from '../services/authService';
 
 interface SupabaseUserData {
   products: any[];
@@ -42,6 +43,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
   useEffect(() => {
+    // Check if user is in offline guest mode
+    const isOfflineGuest = authService.isOfflineGuest();
+
+    if (isOfflineGuest) {
+      // Offline guest mode - set up guest user without Firebase
+      const guestId = localStorage.getItem('guestUserId');
+      const guestUser = {
+        uid: guestId || `guest-${Date.now()}`,
+        email: null,
+        displayName: 'Guest User',
+        isAnonymous: true,
+      } as any;
+
+      setUser(guestUser);
+      console.log('👤 Offline guest mode activated');
+      setLoading(false);
+      setSupabaseData(defaultSupabaseData); // No cloud data for guests
+      return;
+    }
+
+    // Normal Firebase authentication flow
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
@@ -101,7 +123,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async () => {
     try {
       setError(null);
-      await signOut(auth);
+
+      // Handle offline guest logout
+      if (authService.isOfflineGuest()) {
+        authService.logoutOfflineGuest();
+        console.log('👤 Guest user logged out');
+      } else {
+        // Normal Firebase logout
+        await signOut(auth);
+      }
+
       setUser(null);
       setSupabaseData(null);
     } catch (err) {

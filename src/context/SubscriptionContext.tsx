@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { auth } from '../config/firebaseConfig';
 
 type SubscriptionContextValue = {
@@ -15,7 +15,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   });
   const [loading, setLoading] = useState<boolean>(true);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const user = auth.currentUser;
     if (!user) {
       setIsPro(false);
@@ -37,16 +37,25 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    // Skip subscription check for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) {
+      // Guests don't have subscriptions, just use free tier
+      setIsPro(false);
+      setLoading(false);
+      return;
+    }
+
     const unsub = auth.onAuthStateChanged(() => {
       refresh().catch(() => setLoading(false));
     });
     return () => unsub();
-  }, []);
+  }, [refresh]);
 
-  const value = useMemo(() => ({ isPro, loading, refresh }), [isPro, loading]);
+  const value = useMemo(() => ({ isPro, loading, refresh }), [isPro, loading, refresh]);
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 };

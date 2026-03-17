@@ -132,22 +132,36 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
 
 // ─── Delete image from R2 ─────────────────────────────────────────────────────
 
-export async function deleteImageFromR2(imageUrl: string): Promise<void> {
+/**
+ * Delete an image from Cloudflare R2.
+ *
+ * @param imageUrl The public URL of the image to delete
+ * @returns Promise with success/error status for proper error handling
+ */
+export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult> {
   try {
     const auth = getAuth();
     const user = auth.currentUser;
-    if (!user || !imageUrl) return;
+
+    if (!user) {
+      return { success: false, error: "User not authenticated" };
+    }
+
+    if (!imageUrl) {
+      return { success: false, error: "No image URL provided" };
+    }
 
     // Extract the key from the URL by removing the base URL prefix
     const baseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
     const key = imageUrl.replace(`${baseUrl}/`, '');
+
     if (!key || key === imageUrl) {
       console.warn("⚠️ Could not extract R2 key from URL:", imageUrl);
-      return;
+      return { success: false, error: "Could not extract image key from URL" };
     }
 
     const idToken = await user.getIdToken();
-    await fetch(`${API_BASE}/api/delete-image`, {
+    const response = await fetch(`${API_BASE}/api/delete-image`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -155,8 +169,20 @@ export async function deleteImageFromR2(imageUrl: string): Promise<void> {
       },
       body: JSON.stringify({ key }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("❌ R2 deletion failed:", response.status, errorData);
+      return {
+        success: false,
+        error: `R2 deletion failed: ${response.status} ${errorData.error || response.statusText}`,
+      };
+    }
+
     console.log(`🗑️ Deleted R2 image: ${key}`);
+    return { success: true };
   } catch (err: any) {
-    console.warn("⚠️ Failed to delete R2 image:", err?.message || err);
+    console.error("❌ deleteImageFromR2 threw:", err?.message || err);
+    return { success: false, error: err?.message || "Unknown deletion error" };
   }
 }

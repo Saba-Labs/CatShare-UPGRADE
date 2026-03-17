@@ -4,6 +4,7 @@
  */
 
 import { getSupabaseClient } from '../supabaseClient';
+import { deleteImageFromR2 } from './cloudflareService';
 
 interface SyncResult {
   success: boolean;
@@ -136,21 +137,62 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
 
     const client = getSupabaseClient();
 
-    // First, fetch all deleted product IDs for this user
-    const { data: deletedProducts, error: fetchError } = await client
+    // Step 1: Fetch all deleted products with their imageUrls for R2 cleanup
+    const { data: deletedProducts, error: fetchDeletedError } = await client
       .from('deleted_products')
       .select('product_id')
       .eq('user_id', userId);
 
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('❌ Error fetching deleted products:', fetchError);
-      return { success: false, error: fetchError.message };
+    if (fetchDeletedError && fetchDeletedError.code !== 'PGRST116') {
+      console.error('❌ Error fetching deleted products:', fetchDeletedError);
+      return { success: false, error: fetchDeletedError.message };
     }
 
     // Extract product IDs
     const productIds = deletedProducts?.map(dp => dp.product_id) || [];
 
-    // Delete from deleted_products table
+    // If there are products to delete, fetch their imageUrls for R2 cleanup
+    let productsWithImages: any[] = [];
+    if (productIds.length > 0) {
+      const { data: products, error: fetchProductsError } = await client
+        .from('products')
+        .select('product_id, imageUrl')
+        .eq('user_id', userId)
+        .in('product_id', productIds);
+
+      if (fetchProductsError && fetchProductsError.code !== 'PGRST116') {
+        console.warn('⚠️ Warning fetching products for R2 cleanup:', fetchProductsError.message);
+        // Continue anyway - image cleanup is secondary
+      } else {
+        productsWithImages = products || [];
+      }
+    }
+
+    // Step 2: Delete all images from Cloudflare R2 in parallel
+    if (productsWithImages.length > 0) {
+      console.log(`🗑️ Deleting ${productsWithImages.length} images from R2`);
+
+      const deletePromises = productsWithImages
+        .filter(p => p.imageUrl) // Only delete products that have images
+        .map(p => deleteImageFromR2(p.imageUrl));
+
+      const results = await Promise.all(deletePromises);
+
+      // Check if any R2 deletion failed
+      const failedDeletions = results.filter(r => !r.success);
+      if (failedDeletions.length > 0) {
+        console.error(`❌ Failed to delete ${failedDeletions.length} images from R2:`, failedDeletions);
+        // Per requirement: fail the entire deletion if any R2 deletion fails
+        return {
+          success: false,
+          error: `Failed to delete ${failedDeletions.length} images from cloud storage. Please try again.`,
+        };
+      }
+
+      console.log(`✅ Successfully deleted all ${productsWithImages.length} images from R2`);
+    }
+
+    // Step 3: Delete from deleted_products table
     const { error: deleteShelfError } = await client
       .from('deleted_products')
       .delete()
@@ -161,7 +203,7 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
       return { success: false, error: deleteShelfError.message };
     }
 
-    // Delete the actual products from products table if there are any
+    // Step 4: Delete the actual products from products table if there are any
     if (productIds.length > 0) {
       const { error: deleteProductsError } = await client
         .from('products')
@@ -174,7 +216,7 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
         return { success: false, error: deleteProductsError.message };
       }
 
-      console.log(`✅ Permanently deleted all ${productIds.length} shelf products from Supabase`);
+      console.log(`✅ Permanently deleted all ${productIds.length} shelf products and their images from Supabase`);
     } else {
       console.log('✅ Shelf is already empty - no products to delete');
     }
@@ -467,8 +509,38 @@ export async function deleteProductFromSupabase(
       return { success: false, error: 'Invalid input: userId or productId missing' };
     }
 
-    // First, delete from deleted_products table to remove from shelf
-    const { error: deleteFromShelfError } = await getSupabaseClient()
+    const client = getSupabaseClient();
+
+    // Step 1: Fetch the product to get the imageUrl before deleting
+    const { data: product, error: fetchError } = await client
+      .from('products')
+      .select('imageUrl')
+      .eq('user_id', userId)
+      .eq('product_id', productId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.warn('⚠️ Warning fetching product for R2 cleanup:', fetchError.message);
+      // Continue anyway - image cleanup is secondary to DB deletion
+    }
+
+    // Step 2: Delete image from Cloudflare R2 if it exists
+    if (product?.imageUrl) {
+      console.log(`🗑️ Attempting to delete R2 image for product ${productId}`);
+      const deleteResult = await deleteImageFromR2(product.imageUrl);
+
+      if (!deleteResult.success) {
+        console.error('❌ Failed to delete R2 image:', deleteResult.error);
+        // Per requirement: fail the entire deletion if R2 deletion fails
+        return {
+          success: false,
+          error: `Cannot delete product: ${deleteResult.error}. Please try again or contact support.`,
+        };
+      }
+    }
+
+    // Step 3: Delete from deleted_products table to remove from shelf
+    const { error: deleteFromShelfError } = await client
       .from('deleted_products')
       .delete()
       .eq('user_id', userId)
@@ -479,8 +551,8 @@ export async function deleteProductFromSupabase(
       return { success: false, error: deleteFromShelfError.message };
     }
 
-    // Then, permanently delete the product from products table
-    const { error: deleteError } = await getSupabaseClient()
+    // Step 4: Permanently delete the product from products table
+    const { error: deleteError } = await client
       .from('products')
       .delete()
       .eq('user_id', userId)
@@ -491,7 +563,7 @@ export async function deleteProductFromSupabase(
       return { success: false, error: deleteError.message };
     }
 
-    console.log(`✅ Permanently deleted product ${productId} from Supabase`);
+    console.log(`✅ Permanently deleted product ${productId} and its R2 image from Supabase`);
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
