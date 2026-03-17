@@ -117,8 +117,10 @@ export default function Login() {
       // Use offline guest mode - no Firebase authentication
       await authService.loginAsOfflineGuest();
       showToast('Guest mode activated - offline only', 'success');
-      // Note: Don't navigate here, let the useEffect below handle it
-      // when the AuthContext updates the user state
+      // Wait a brief moment for AuthContext to process the custom event, then navigate
+      setTimeout(() => {
+        navigate('/', { replace: true });
+      }, 100);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Guest login failed';
       setError(errorMessage);
@@ -126,14 +128,6 @@ export default function Login() {
       setAuthLoading(null);
     }
   };
-
-  // Navigate when guest mode user is set in AuthContext
-  useEffect(() => {
-    if (authLoading === 'guest' && user && user.isAnonymous) {
-      setAuthLoading(null);
-      navigate('/', { replace: true });
-    }
-  }, [user, authLoading, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
