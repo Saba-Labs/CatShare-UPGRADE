@@ -550,15 +550,18 @@ function AppWithBackHandler() {
     runAsyncMigrations();
   }, []);
 
-  // Check if user needs to complete onboarding
+  // Check if user needs to complete onboarding (only show for new users)
   useEffect(() => {
     // Don't redirect while auth is still loading to prevent redirect loops
     if (loading) return;
 
+    // Only redirect to welcome for NEW users (those without fieldsDefinition in Supabase)
+    // Returning users who log in on a new device already have fieldsDefinition and should skip onboarding
+    const isNewUser = !supabaseData?.fieldsDefinition;
     const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
 
-    // Only redirect to welcome if not already on welcome, order form, login, or other public pages
-    if (!hasCompletedOnboarding &&
+    // Only redirect to welcome if user is new AND not already on welcome/login/public pages
+    if (isNewUser && !hasCompletedOnboarding &&
         !location.pathname.includes('/welcome') &&
         !location.pathname.includes('/login') &&
         !location.pathname.includes('/register') &&
@@ -569,7 +572,7 @@ function AppWithBackHandler() {
         !location.pathname.includes('/o/')) {
       navigate('/welcome');
     }
-  }, [navigate, location.pathname, loading]);
+  }, [navigate, location.pathname, loading, supabaseData?.fieldsDefinition]);
 
   // Initialize watermark settings with defaults on first load
   useEffect(() => {
