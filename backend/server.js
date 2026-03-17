@@ -18,7 +18,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-const PRO_PRODUCT_IDS = new Set(["catshare_pro_monthly", "catshare_pro_yearly"]);
+const PRO_SUBSCRIPTION_IDS = new Set(["catshare_pro_monthly", "catshare_pro_yearly"]);
+const PRO_INAPP_IDS = new Set(["catshare_pro_lifetime"]);
 
 // ---------- Firebase Admin (verify ID tokens) ----------
 function initFirebaseAdmin() {
@@ -225,7 +226,7 @@ app.post("/iap/android/receipt", requireFirebaseUser, async (req, res) => {
     if (!packageName || !subscriptionId || !purchaseToken) {
       return res.status(400).json({ error: "Missing packageName/subscriptionId/purchaseToken" });
     }
-    if (!PRO_PRODUCT_IDS.has(subscriptionId)) {
+    if (!PRO_SUBSCRIPTION_IDS.has(subscriptionId)) {
       return res.status(400).json({ error: "Unknown subscriptionId" });
     }
 
@@ -269,6 +270,65 @@ app.post("/iap/android/receipt", requireFirebaseUser, async (req, res) => {
     return res.json({ isPro: isActive, expiresAt });
   } catch (err) {
     console.error("❌ Android receipt verify failed:", err?.message || err);
+    return res.status(500).json({ error: err?.message || "Verify failed" });
+  }
+});
+
+/**
+ * Verify Android one-time (managed) product purchase (lifetime).
+ * Body: { packageName, productId, purchaseToken }
+ */
+app.post("/iap/android/product", requireFirebaseUser, async (req, res) => {
+  try {
+    const uid = req.firebaseUser?.uid;
+    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+
+    const { packageName, productId, purchaseToken } = req.body || {};
+    if (!packageName || !productId || !purchaseToken) {
+      return res.status(400).json({ error: "Missing packageName/productId/purchaseToken" });
+    }
+    if (!PRO_INAPP_IDS.has(productId)) {
+      return res.status(400).json({ error: "Unknown productId" });
+    }
+
+    const svcJson = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+    if (!svcJson) return res.status(501).json({ error: "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" });
+
+    const creds = JSON.parse(svcJson);
+    const auth = new google.auth.GoogleAuth({
+      credentials: creds,
+      scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+    });
+    const client = await auth.getClient();
+    const androidpublisher = google.androidpublisher({ version: "v3", auth: client });
+
+    const resp = await androidpublisher.purchases.products.get({
+      packageName,
+      productId,
+      token: purchaseToken,
+    });
+
+    const p = resp.data;
+    // purchaseState: 0 purchased, 1 canceled, 2 pending (varies by API version)
+    const purchaseState = Number(p?.purchaseState ?? 0);
+    const isPurchased = purchaseState === 0;
+
+    const sb = getSupabaseAdmin();
+    const { error } = await sb
+      .from("user_subscriptions")
+      .upsert({
+        user_id: uid,
+        platform: "android",
+        product_id: productId,
+        status: isPurchased ? "active" : "expired",
+        expires_at: null, // lifetime
+        updated_at: new Date().toISOString(),
+      });
+    if (error) return res.status(500).json({ error: error.message });
+
+    return res.json({ isPro: isPurchased });
+  } catch (err) {
+    console.error("❌ Android product verify failed:", err?.message || err);
     return res.status(500).json({ error: err?.message || "Verify failed" });
   }
 });
@@ -318,7 +378,7 @@ app.post("/iap/ios/receipt", requireFirebaseUser, async (req, res) => {
     }
 
     const latest = data?.latest_receipt_info || [];
-    const relevant = latest.filter((r) => PRO_PRODUCT_IDS.has(r.product_id));
+    const relevant = latest.filter((r) => PRO_SUBSCRIPTION_IDS.has(r.product_id));
     const chosen = relevant.sort((a, b) => Number(b.expires_date_ms || 0) - Number(a.expires_date_ms || 0))[0];
     if (!chosen) return res.status(400).json({ error: "No matching subscription in receipt" });
 

@@ -31,9 +31,13 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setLoading(false);
         return;
       }
-      const resp = await fetch(`${baseUrl}/api/subscription?userId=${user.uid}`, {
+      const idToken = await user.getIdToken();
+      const resp = await fetch(`${baseUrl}/subscription`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
       });
       if (!resp.ok) throw new Error(`Subscription fetch failed (${resp.status})`);
       const json = await resp.json();

@@ -5,43 +5,85 @@ import { Capacitor } from "@capacitor/core";
 import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
 import { auth } from "../config/firebaseConfig";
+import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
 
-const PRODUCT_ID = "catshare_pro_monthly";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+const ANDROID_PACKAGE_NAME = "com.catshare.official";
 
 export default function ProInfo() {
   const navigate = useNavigate();
   const { isPro, refresh } = useSubscription();
   const [loading, setLoading] = useState(false);
-  const [productInfo, setProductInfo] = useState(null);
+  const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
 
   const isAndroid = Capacitor.getPlatform() === "android";
 
-  // Load product price from Google Play
+  // Load prices from Google Play
   useEffect(() => {
     if (!isAndroid) return;
     (async () => {
       try {
-        const result = await BillingPlugin.querySkuDetails({
-          product: PRODUCT_ID,
-          type: "subs",
-        });
-        const parsed = JSON.parse(result.value);
-        setProductInfo(parsed);
+        const next = {};
+
+        // subs: monthly + yearly
+        for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
+          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "subs" });
+          const parsed = JSON.parse(result.value);
+          // plugin returns different shapes across versions; try a few common fields
+          next[sku] =
+            parsed?.price ||
+            parsed?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice ||
+            parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
+            null;
+        }
+
+        // inapp: lifetime
+        {
+          const sku = INAPP_SKUS.lifetime;
+          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
+          const parsed = JSON.parse(result.value);
+          next[sku] =
+            parsed?.price ||
+            parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
+            parsed?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice ||
+            null;
+        }
+
+        setPrices(next);
       } catch (e) {
         console.error("querySkuDetails failed", e);
       }
     })();
   }, []);
 
-  const handleBuy = async () => {
+  async function verifyWithBackend(path, body) {
+    if (!BACKEND_URL) throw new Error("Missing VITE_BACKEND_URL");
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not logged in");
+    const idToken = await user.getIdToken();
+    const resp = await fetch(`${BACKEND_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const json = await resp.json().catch(() => ({}));
+      throw new Error(json?.error || `Verification failed (${resp.status})`);
+    }
+    return resp.json().catch(() => ({}));
+  }
+
+  const handleBuySubscription = async (sku) => {
     setLoading(true);
     setError(null);
     try {
       // Launch Google Play billing sheet
       const result = await BillingPlugin.launchBillingFlow({
-        product: PRODUCT_ID,
+        product: sku,
         type: "subs",
       });
       const purchase = JSON.parse(result.value);
@@ -50,24 +92,46 @@ export default function ProInfo() {
       // Acknowledge the purchase
       await BillingPlugin.sendAck({ purchaseToken });
 
-      // Send to backend to store in Supabase
-      const user = auth.currentUser;
-      const resp = await fetch(`${BACKEND_URL}/api/verify-purchase`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          purchaseToken,
-          productId: PRODUCT_ID,
-          userId: user.uid,
-        }),
+      // Verify with backend + store in Supabase
+      await verifyWithBackend("/iap/android/receipt", {
+        packageName: ANDROID_PACKAGE_NAME,
+        subscriptionId: sku,
+        purchaseToken,
       });
-
-      if (!resp.ok) throw new Error("Verification failed");
 
       await refresh();
     } catch (e) {
       console.error("Purchase failed", e);
-      setError("Purchase failed. Please try again.");
+      setError(e?.message || "Purchase failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBuyLifetime = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const sku = INAPP_SKUS.lifetime;
+      const result = await BillingPlugin.launchBillingFlow({
+        product: sku,
+        type: "inapp",
+      });
+      const purchase = JSON.parse(result.value);
+      const purchaseToken = purchase.purchaseToken;
+
+      await BillingPlugin.sendAck({ purchaseToken });
+
+      await verifyWithBackend("/iap/android/product", {
+        packageName: ANDROID_PACKAGE_NAME,
+        productId: sku,
+        purchaseToken,
+      });
+
+      await refresh();
+    } catch (e) {
+      console.error("Purchase failed", e);
+      setError(e?.message || "Purchase failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -145,15 +209,39 @@ export default function ProInfo() {
               {isAndroid ? (
                 <>
                   <button
-                    onClick={handleBuy}
+                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.monthly)}
                     disabled={loading}
                     className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition font-medium"
                   >
                     {loading
                       ? "Processing..."
-                      : productInfo?.price
-                      ? `Subscribe for ${productInfo.price}/month`
-                      : "Subscribe to Pro"}
+                      : prices?.[SUBSCRIPTION_SKUS.monthly]
+                      ? `Monthly ${prices[SUBSCRIPTION_SKUS.monthly]}`
+                      : "Monthly subscription"}
+                  </button>
+
+                  <button
+                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.yearly)}
+                    disabled={loading}
+                    className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition font-medium"
+                  >
+                    {loading
+                      ? "Processing..."
+                      : prices?.[SUBSCRIPTION_SKUS.yearly]
+                      ? `Yearly ${prices[SUBSCRIPTION_SKUS.yearly]}`
+                      : "Yearly subscription"}
+                  </button>
+
+                  <button
+                    onClick={handleBuyLifetime}
+                    disabled={loading}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
+                  >
+                    {loading
+                      ? "Processing..."
+                      : prices?.[INAPP_SKUS.lifetime]
+                      ? `Lifetime ${prices[INAPP_SKUS.lifetime]}`
+                      : "Lifetime (one-time)"}
                   </button>
                   <button
                     onClick={handleRestore}
