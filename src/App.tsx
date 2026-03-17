@@ -196,15 +196,15 @@ function AppWithBackHandler() {
   // Merge products by keeping the newer version (based on timestamp)
   const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
     const merged = new Map();
-  
+
     local.forEach(product => {
       merged.set(product.id, product);
     });
-  
+
     remote.forEach(remoteProduct => {
       // ✅ Never bring back shelved/deleted products
       if (deletedIds.has(remoteProduct.id)) return;
-  
+
       const localProduct = merged.get(remoteProduct.id);
       if (!localProduct) {
         merged.set(remoteProduct.id, remoteProduct);
@@ -216,8 +216,15 @@ function AppWithBackHandler() {
         }
       }
     });
-  
-    return Array.from(merged.values());
+
+    // Sort merged products by updatedAt (newest first) for consistent ordering across devices
+    const result = Array.from(merged.values());
+    result.sort((a, b) => {
+      const timeA = new Date(a.updatedAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || 0).getTime();
+      return timeB - timeA; // Descending order (newest first)
+    });
+    return result;
   };
 
   // Handle rendering images with chunked processing to prevent UI freeze
