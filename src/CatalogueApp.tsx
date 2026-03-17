@@ -644,7 +644,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const visible = useMemo(() => {
     const v = [...filtered];
-    if (sortBy === "name") v.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === "name") v.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     else if (sortBy.endsWith(":out")) {
       const field = sortBy.replace(":out", "");
       v.sort((a, b) => (a[field] ? 1 : -1));
