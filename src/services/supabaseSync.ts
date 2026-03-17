@@ -156,7 +156,7 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
     if (productIds.length > 0) {
       const { data: products, error: fetchProductsError } = await client
         .from('products')
-        .select('product_id, imageUrl')
+        .select('product_id, data')
         .eq('user_id', userId)
         .in('product_id', productIds);
 
@@ -173,8 +173,8 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
       console.log(`🗑️ Deleting ${productsWithImages.length} images from R2`);
 
       const deletePromises = productsWithImages
-        .filter(p => p.imageUrl) // Only delete products that have images
-        .map(p => deleteImageFromR2(p.imageUrl));
+      .filter(p => p.data?.imageUrl)
+      .map(p => deleteImageFromR2(p.data.imageUrl));
 
       const results = await Promise.all(deletePromises);
 
@@ -514,7 +514,7 @@ export async function deleteProductFromSupabase(
     // Step 1: Fetch the product to get the imageUrl before deleting
     const { data: product, error: fetchError } = await client
       .from('products')
-      .select('imageUrl')
+      .select('data')
       .eq('user_id', userId)
       .eq('product_id', productId)
       .single();
@@ -525,9 +525,9 @@ export async function deleteProductFromSupabase(
     }
 
     // Step 2: Delete image from Cloudflare R2 if it exists
-    if (product?.imageUrl) {
+    if (product?.data?.imageUrl) {
       console.log(`🗑️ Attempting to delete R2 image for product ${productId}`);
-      const deleteResult = await deleteImageFromR2(product.imageUrl);
+      const deleteResult = await deleteImageFromR2(product.data.imageUrl);
 
       if (!deleteResult.success) {
         console.error('❌ Failed to delete R2 image:', deleteResult.error);

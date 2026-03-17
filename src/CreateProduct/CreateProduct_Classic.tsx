@@ -422,6 +422,7 @@ export default function CreateProduct() {
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [, setFieldDefinitionsUpdated] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const uploadingProductId = useRef<string | null>(null);
 
   // Update preview colors when theme changes (unless user has customized them)
   useEffect(() => {
@@ -1001,24 +1002,25 @@ if (migratedProduct.suggestedColors?.length > 0) {
       (async () => {
         try {
           // Attempt R2 upload if new image
-          if (imagePreview?.startsWith("data:image")) {
-            try {
-              const { uploadProductImageToR2 } = await import("../services/r2Upload");
-              const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
-
-              // Update the product with the new imageUrl
-              if (uploaded.url) {
-                const allProducts = JSON.parse(localStorage.getItem("products") || "[]");
-                const updated = allProducts.map((p: any) =>
-                  p.id === id ? { ...p, imageUrl: uploaded.url } : p
-                );
-                localStorage.setItem("products", JSON.stringify(updated));
-                window.dispatchEvent(new CustomEvent("product-added"));
-              }
-            } catch (err: any) {
-              console.warn("⚠️ R2 upload failed in background:", err?.message || err);
-            }
-          }
+if (imagePreview?.startsWith("data:image") && uploadingProductId.current !== id) {
+  uploadingProductId.current = id;
+  try {
+    const { uploadProductImageToR2 } = await import("../services/r2Upload");
+    const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
+    if (uploaded.url) {
+      const allProducts = JSON.parse(localStorage.getItem("products") || "[]");
+      const updated = allProducts.map((p: any) =>
+        p.id === id ? { ...p, imageUrl: uploaded.url } : p
+      );
+      localStorage.setItem("products", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("product-added"));
+    }
+  } catch (err: any) {
+    console.warn("⚠️ R2 upload failed in background:", err?.message || err);
+  } finally {
+    uploadingProductId.current = null;
+  }
+}
 
           // Render PNG images in background
           try {
