@@ -52,7 +52,7 @@ import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
-import { getAllCatalogues } from "./config/catalogueConfig";
+import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
 
 function AppWithBackHandler() {
@@ -153,6 +153,29 @@ function AppWithBackHandler() {
         }
       }
 
+      // Apply remote cataloguesDefinition from Supabase to local storage
+      if (supabaseData.cataloguesDefinition) {
+        const localCataloguesDef = getCataloguesDefinition();
+        const remoteCataloguesDef = supabaseData.cataloguesDefinition;
+
+        // Check if remote is newer or local doesn't have a valid definition
+        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
+
+        if (remoteLastUpdated > localLastUpdated) {
+          setCataloguesDefinition(remoteCataloguesDef);
+          console.log('✅ Applied remote cataloguesDefinition from Supabase');
+
+          // Dispatch event so components (like CatalogueApp) refresh their UI
+          window.dispatchEvent(new CustomEvent('catalogues-changed', {
+            detail: {
+              action: 'update',
+              catalogues: remoteCataloguesDef.catalogues
+            }
+          }));
+        }
+      }
+
       setSupabaseSyncStatus('synced');
     } catch (err) {
       console.error('❌ Error merging Supabase data:', err);
@@ -196,15 +219,15 @@ function AppWithBackHandler() {
   // Merge products by keeping the newer version (based on timestamp)
   const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
     const merged = new Map();
-  
+
     local.forEach(product => {
       merged.set(product.id, product);
     });
-  
+
     remote.forEach(remoteProduct => {
       // ✅ Never bring back shelved/deleted products
       if (deletedIds.has(remoteProduct.id)) return;
-  
+
       const localProduct = merged.get(remoteProduct.id);
       if (!localProduct) {
         merged.set(remoteProduct.id, remoteProduct);
@@ -216,8 +239,15 @@ function AppWithBackHandler() {
         }
       }
     });
-  
-    return Array.from(merged.values());
+
+    // Sort merged products by updatedAt (newest first) for consistent ordering across devices
+    const result = Array.from(merged.values());
+    result.sort((a, b) => {
+      const timeA = new Date(a.updatedAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || 0).getTime();
+      return timeB - timeA; // Descending order (newest first)
+    });
+    return result;
   };
 
   // Handle rendering images with chunked processing to prevent UI freeze

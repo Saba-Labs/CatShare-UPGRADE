@@ -644,7 +644,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const visible = useMemo(() => {
     const v = [...filtered];
-    if (sortBy === "name") v.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === "name") v.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     else if (sortBy.endsWith(":out")) {
       const field = sortBy.replace(":out", "");
       v.sort((a, b) => (a[field] ? 1 : -1));
@@ -800,9 +800,22 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         {tab === "products" && visible.length > 0 && (
           <DragDropContext onDragEnd={({ source, destination }) => {
             if (!destination) return;
+            // Map visible indices to actual product indices by ID
+            const movedProductId = visible[source.index]?.id;
+            const targetProductId = visible[destination.index]?.id;
+
+            if (!movedProductId || !targetProductId) return;
+
+            const movedProductIndex = products.findIndex(p => p.id === movedProductId);
+            const targetProductIndex = products.findIndex(p => p.id === targetProductId);
+
+            if (movedProductIndex === -1 || targetProductIndex === -1) return;
+
             const copy = [...products];
-            const [removed] = copy.splice(source.index, 1);
-            copy.splice(destination.index, 0, removed);
+            const [removed] = copy.splice(movedProductIndex, 1);
+            // Adjust target index if moved item was before target
+            const adjustedTargetIndex = movedProductIndex < targetProductIndex ? targetProductIndex - 1 : targetProductIndex;
+            copy.splice(adjustedTargetIndex, 0, removed);
             setProducts(copy);
           }}>
             <Droppable droppableId="product-list">

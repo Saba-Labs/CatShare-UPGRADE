@@ -436,7 +436,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       { data: fieldsDef, error: fieldsError },
       { data: settings, error: settingsError },
     ] = await Promise.all([
-      client.from('products').select('*').eq('user_id', userId),
+      client.from('products').select('*').eq('user_id', userId).order('updated_at', { ascending: false }),
       client.from('deleted_products').select('*').eq('user_id', userId),
       client.from('categories').select('*').eq('user_id', userId),
       client.from('catalogues_definition').select('*').eq('user_id', userId),

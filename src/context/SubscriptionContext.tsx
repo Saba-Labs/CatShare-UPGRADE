@@ -26,14 +26,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setLoading(true);
     try {
       const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
-      const resp = await fetch(`${baseUrl}/api/subscription?userId=${user.uid}`);
+      // Skip subscription check if backend URL is not configured
+      if (!baseUrl) {
+        setLoading(false);
+        return;
+      }
+      const resp = await fetch(`${baseUrl}/api/subscription?userId=${user.uid}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
       if (!resp.ok) throw new Error(`Subscription fetch failed (${resp.status})`);
       const json = await resp.json();
       const next = !!json?.isPro;
       setIsPro(next);
       localStorage.setItem('isPro', next ? 'true' : 'false');
-    } catch {
-      // keep cached value if offline/error
+    } catch (error) {
+      // Keep cached value if offline/error, log for debugging
+      console.warn('⚠️ Failed to fetch subscription status:', error instanceof Error ? error.message : error);
     } finally {
       setLoading(false);
     }
