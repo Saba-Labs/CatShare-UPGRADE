@@ -157,35 +157,55 @@ export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult>
       return { success: false, error: "No image URL provided" };
     }
 
-    // Extract the key from the URL by removing the base URL prefix
-    const baseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
-    const key = imageUrl.replace(`${baseUrl}/`, '');
+    // Extract the object key from a public URL (works even if base URL changes)
+    let key = "";
+    try {
+      const u = new URL(imageUrl);
+      key = decodeURIComponent(u.pathname || "").replace(/^\/+/, "");
+    } catch {
+      // Fallback for non-standard URLs
+      const baseUrl = import.meta.env.VITE_R2_PUBLIC_BASE_URL || "";
+      key = imageUrl.replace(`${baseUrl}/`, "").replace(/^\/+/, "");
+    }
 
-    if (!key || key === imageUrl) {
+    if (!key) {
       console.warn("⚠️ Could not extract R2 key from URL:", imageUrl);
       return { success: false, error: "Could not extract image key from URL" };
     }
 
-    const idToken = await user.getIdToken();
-    const response = await fetch(`${API_BASE}/api/delete-image`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ key }),
-    });
+    // Backwards-compat cleanup: older versions used png; current uses deterministic jpg.
+    const candidateKeys = Array.from(
+      new Set([
+        key,
+        key.endsWith(".png") ? key.slice(0, -4) + ".jpg" : "",
+        key.endsWith(".png") ? key.slice(0, -4) + ".jpeg" : "",
+        key.endsWith(".jpg") ? key.slice(0, -4) + ".png" : "",
+        key.endsWith(".jpeg") ? key.slice(0, -5) + ".png" : "",
+      ].filter(Boolean))
+    );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("❌ R2 deletion failed:", response.status, errorData);
-      return {
-        success: false,
-        error: `R2 deletion failed: ${response.status} ${errorData.error || response.statusText}`,
-      };
+    const idToken = await user.getIdToken();
+    for (const k of candidateKeys) {
+      const response = await fetch(`${API_BASE}/api/delete-image`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ key: k }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("❌ R2 deletion failed:", response.status, errorData);
+        return {
+          success: false,
+          error: `R2 deletion failed: ${response.status} ${errorData.error || response.statusText}`,
+        };
+      }
     }
 
-    console.log(`🗑️ Deleted R2 image: ${key}`);
+    console.log(`🗑️ Deleted R2 image(s):`, candidateKeys);
     return { success: true };
   } catch (err: any) {
     console.error("❌ deleteImageFromR2 threw:", err?.message || err);

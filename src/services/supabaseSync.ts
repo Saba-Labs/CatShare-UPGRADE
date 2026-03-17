@@ -505,7 +505,8 @@ export async function deleteProductFromSupabase(
   productId: string
 ): Promise<SyncResult> {
   try {
-    if (!userId || !productId) {
+    const normalizedProductId = String(productId ?? '').trim();
+    if (!userId || !normalizedProductId) {
       return { success: false, error: 'Invalid input: userId or productId missing' };
     }
 
@@ -516,7 +517,7 @@ export async function deleteProductFromSupabase(
       .from('products')
       .select('data')
       .eq('user_id', userId)
-      .eq('product_id', productId)
+      .eq('product_id', normalizedProductId)
       .maybeSingle();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
@@ -526,7 +527,7 @@ export async function deleteProductFromSupabase(
 
     // Step 2: Delete image from Cloudflare R2 if it exists
     if (product?.data?.imageUrl) {
-      console.log(`🗑️ Attempting to delete R2 image for product ${productId}`);
+      console.log(`🗑️ Attempting to delete R2 image for product ${normalizedProductId}`);
       const deleteResult = await deleteImageFromR2(product.data.imageUrl);
 
       if (!deleteResult.success) {
@@ -540,30 +541,46 @@ export async function deleteProductFromSupabase(
     }
 
     // Step 3: Delete from deleted_products table to remove from shelf
-    const { error: deleteFromShelfError } = await client
+    const { data: shelfDeleted, error: deleteFromShelfError } = await client
       .from('deleted_products')
       .delete()
       .eq('user_id', userId)
-      .eq('product_id', productId);
+      .eq('product_id', normalizedProductId)
+      .select('product_id');
 
     if (deleteFromShelfError) {
       console.error('❌ Error removing from shelf:', deleteFromShelfError);
       return { success: false, error: deleteFromShelfError.message };
     }
 
+    if (!shelfDeleted || shelfDeleted.length === 0) {
+      return {
+        success: false,
+        error: `Shelf item not found in Supabase for product_id=${normalizedProductId} (nothing deleted).`,
+      };
+    }
+
     // Step 4: Permanently delete the product from products table
-    const { error: deleteError } = await client
+    const { data: productsDeleted, error: deleteError } = await client
       .from('products')
       .delete()
       .eq('user_id', userId)
-      .eq('product_id', productId);
+      .eq('product_id', normalizedProductId)
+      .select('product_id');
 
     if (deleteError) {
       console.error('❌ Error permanently deleting product:', deleteError);
       return { success: false, error: deleteError.message };
     }
 
-    console.log(`✅ Permanently deleted product ${productId} and its R2 image from Supabase`);
+    if (!productsDeleted || productsDeleted.length === 0) {
+      return {
+        success: false,
+        error: `Product not found in Supabase for product_id=${normalizedProductId} (nothing deleted).`,
+      };
+    }
+
+    console.log(`✅ Permanently deleted product ${normalizedProductId} and its R2 image from Supabase`);
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -580,22 +597,31 @@ export async function removeProductFromDeletedProducts(
   productId: string
 ): Promise<SyncResult> {
   try {
-    if (!userId || !productId) {
+    const normalizedProductId = String(productId ?? '').trim();
+    if (!userId || !normalizedProductId) {
       return { success: false, error: 'Invalid input: userId or productId missing' };
     }
 
-    const { error } = await getSupabaseClient()
+    const { data, error } = await getSupabaseClient()
       .from('deleted_products')
       .delete()
       .eq('user_id', userId)
-      .eq('product_id', productId);
+      .eq('product_id', normalizedProductId)
+      .select('product_id');
 
     if (error) {
       console.error('❌ Error removing product from shelf:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Removed product ${productId} from shelf in Supabase`);
+    if (!data || data.length === 0) {
+      return {
+        success: false,
+        error: `Shelf item not found in Supabase for product_id=${normalizedProductId} (nothing deleted).`,
+      };
+    }
+
+    console.log(`✅ Removed product ${normalizedProductId} from shelf in Supabase`);
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';

@@ -58,6 +58,13 @@ export const authService = {
           );
         }
 
+        // Force account chooser (otherwise Android may silently reuse last account)
+        try {
+          await GoogleAuth.signOut();
+        } catch {
+          // ignore
+        }
+
         const res = await GoogleAuth.signIn();
         const idToken = (res as any)?.authentication?.idToken;
         if (!idToken) {

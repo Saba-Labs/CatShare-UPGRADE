@@ -50,7 +50,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     // Sync restoration to Supabase by removing from deleted_products
     if (user?.uid) {
       try {
-        const result = await removeProductFromDeletedProducts(user.uid, product.id);
+          const result = await removeProductFromDeletedProducts(user.uid, String(product.id));
         if (result.success) {
           console.log(`✅ Product ${product.id} restored and removed from shelf in Supabase`);
         } else {
@@ -92,7 +92,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
           // Sync permanent deletion to Supabase
           if (user?.uid) {
-            const result = await deleteProductFromSupabase(user.uid, toDelete.id);
+            const result = await deleteProductFromSupabase(user.uid, String(toDelete.id));
             if (result.success) {
               console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
             } else {
