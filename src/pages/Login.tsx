@@ -114,10 +114,11 @@ export default function Login() {
     setError('');
     setAuthLoading('guest');
     try {
-      const user = await authService.loginAsGuest();
-      if (user) {
-        setHasJustLoggedIn(true);
-      }
+      // Use offline guest mode - no Firebase authentication
+      await authService.loginAsOfflineGuest();
+      showToast('Guest mode activated - offline only', 'success');
+      // Skip onboarding for guest users and go directly to home
+      navigate('/', { replace: true });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Guest login failed';
       setError(errorMessage);
@@ -217,15 +218,20 @@ export default function Login() {
               </span>
             </button>
 
-            <button
-              onClick={handleGuestLogin}
-              disabled={authLoading !== null}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
-            >
-              <span className="text-gray-700 font-medium">
-                {authLoading === 'guest' ? 'Signing in...' : 'Continue as Guest'}
-              </span>
-            </button>
+            <div>
+              <button
+                onClick={handleGuestLogin}
+                disabled={authLoading !== null}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+              >
+                <span className="text-gray-700 font-medium">
+                  {authLoading === 'guest' ? 'Starting...' : 'Try as Guest (Offline)'}
+                </span>
+              </button>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                No account needed • Local use only
+              </p>
+            </div>
           </div>
 
           {/* Footer Links */}

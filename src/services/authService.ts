@@ -53,14 +53,32 @@ export const authService = {
     }
   },
 
-  // Anonymous Authentication - Guest account
-  loginAsGuest: async () => {
-    try {
-      const result = await signInAnonymously(auth);
-      return result.user;
-    } catch (error) {
-      throw handleAuthError(error);
-    }
+  // Offline Guest Mode - No Firebase authentication
+  // This is for offline/demo use only without any backend connection
+  loginAsOfflineGuest: async () => {
+    // Create a pseudo guest user object stored only in localStorage
+    const guestId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('guestUserId', guestId);
+    localStorage.setItem('isOfflineGuest', 'true');
+
+    // Return a minimal user-like object for compatibility
+    return {
+      uid: guestId,
+      email: null,
+      displayName: 'Guest User',
+      isAnonymous: true,
+    };
+  },
+
+  // Check if user is in offline guest mode
+  isOfflineGuest: () => {
+    return localStorage.getItem('isOfflineGuest') === 'true';
+  },
+
+  // Logout guest user from offline mode
+  logoutOfflineGuest: () => {
+    localStorage.removeItem('guestUserId');
+    localStorage.removeItem('isOfflineGuest');
   },
 
   // Password Reset

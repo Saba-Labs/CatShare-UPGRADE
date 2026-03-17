@@ -40,6 +40,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   useEffect(() => {
+    // Skip subscription check for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) {
+      // Guests don't have subscriptions, just use free tier
+      setIsPro(false);
+      setLoading(false);
+      return;
+    }
+
     const unsub = auth.onAuthStateChanged(() => {
       refresh().catch(() => setLoading(false));
     });

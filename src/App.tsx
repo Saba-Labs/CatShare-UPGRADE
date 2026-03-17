@@ -422,6 +422,10 @@ function AppWithBackHandler() {
   useEffect(() => {
     if (!user) return;
 
+    // Skip sync for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
+
     const userId = user.uid;
     if (!userId || products.length === 0) return;
 
@@ -454,6 +458,10 @@ function AppWithBackHandler() {
   // ✅ Sync deleted products to Supabase whenever they change
   useEffect(() => {
     if (!user) return;
+
+    // Skip sync for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
 
     const userId = user.uid;
     if (!userId) return;
@@ -554,6 +562,12 @@ function AppWithBackHandler() {
   useEffect(() => {
     // Don't redirect while auth is still loading to prevent redirect loops
     if (loading) return;
+
+    // Guest users (offline mode) should skip onboarding entirely
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) {
+      return; // Guest users skip onboarding
+    }
 
     // Only redirect to welcome for NEW users (those without fieldsDefinition in Supabase)
     // Returning users who log in on a new device already have fieldsDefinition and should skip onboarding
