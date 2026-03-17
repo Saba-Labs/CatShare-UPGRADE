@@ -1124,7 +1124,8 @@ const exportProductsToCSV = (products) => {
   (async () => {
     try {
       // ✅ Upload missing images to R2 now that user is confirmed authenticated
-      const { uploadImageToR2 } = await import('./services/cloudflareService');
+      // Standardized: use the single deterministic per-product uploader (JPEG only)
+      const { uploadProductImageToR2 } = await import('./services/r2Upload');
       const updatedProducts = await Promise.all(
         productsToUse.map(async (p) => {
           if (p.imageUrl || !p.imagePath) return p; // already has cloud URL, skip
@@ -1136,16 +1137,19 @@ const exportProductsToCSV = (products) => {
               directory: Directory.Data,
             });
 
-            const folder = p.imagePath.split("/")[0];
-            const filename = p.imagePath.split("/").pop();
-            const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
+            const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
+            const dataUrlPrefix = filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+              ? "data:image/jpeg;base64,"
+              : "data:image/png;base64,";
 
-            const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
-            if (result.success && result.publicUrl && !result.publicUrl.startsWith('undefined')) {
-              console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
-              return { ...p, imageUrl: result.publicUrl };
-            } else {
-              console.warn(`⚠️ Invalid publicUrl for "${p.name}":`, result.publicUrl);
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${fileData.data}`,
+            });
+
+            if (uploaded?.url && !uploaded.url.startsWith('undefined')) {
+              console.log(`☁️ R2 upload success for "${p.name}": ${uploaded.url}`);
+              return { ...p, imageUrl: uploaded.url };
             }
           } catch (err) {
             console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
@@ -1527,7 +1531,8 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
 if (user && user.uid) {
   (async () => {
     try {
-      const { uploadImageToR2 } = await import('./services/cloudflareService');
+      // Standardized: use single deterministic per-product uploader (JPEG only)
+      const { uploadProductImageToR2 } = await import('./services/r2Upload');
       const updatedProducts = await Promise.all(
         productsToUse.map(async (p) => {
           if (p.imageUrl || !p.imagePath) return p;
@@ -1536,15 +1541,19 @@ if (user && user.uid) {
               path: p.imagePath,
               directory: Directory.Data,
             });
-            const folder = p.imagePath.split("/")[0];
-            const filename = p.imagePath.split("/").pop();
-            const mimeType = filename.endsWith(".jpg") ? "image/jpeg" : "image/png";
-            const result = await uploadImageToR2(fileData.data, filename, folder, mimeType);
-            if (result.success && result.publicUrl && !result.publicUrl.startsWith('undefined')) {
-              console.log(`☁️ R2 upload success for "${p.name}": ${result.publicUrl}`);
-              return { ...p, imageUrl: result.publicUrl };
-            } else {
-              console.warn(`⚠️ Invalid publicUrl for "${p.name}":`, result.publicUrl);
+            const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
+            const dataUrlPrefix = filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+              ? "data:image/jpeg;base64,"
+              : "data:image/png;base64,";
+
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${fileData.data}`,
+            });
+
+            if (uploaded?.url && !uploaded.url.startsWith('undefined')) {
+              console.log(`☁️ R2 upload success for "${p.name}": ${uploaded.url}`);
+              return { ...p, imageUrl: uploaded.url };
             }
           } catch (err) {
             console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);

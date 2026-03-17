@@ -12,7 +12,28 @@
           "package_name": "com.catshare.official"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "787555935594-1217aerpq69pn2giafsol770d5f8cnhs.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.catshare.official",
+            "certificate_hash": "d990c3d504014a5fd93f3c0c08219d846d872313"
+          }
+        },
+        {
+          "client_id": "787555935594-co3tt2brontgg0ie6pa0hn14jkrhfifu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.catshare.official",
+            "certificate_hash": "e0703d646fd37e6143b46756db9492ad0906a35f"
+          }
+        },
+        {
+          "client_id": "787555935594-pa3345h2lhd1k49mosa1ftom05lc08oa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDPM3e8-ubj--2ZIzurs6I-wBC9RFQjIlg"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787555935594-pa3345h2lhd1k49mosa1ftom05lc08oa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

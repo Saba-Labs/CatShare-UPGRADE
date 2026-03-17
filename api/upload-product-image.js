@@ -157,14 +157,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing productId' });
     }
 
-    const mime = fileInfo.mimeType || 'application/octet-stream';
-    const providedExt = (fields.ext || '').toString().trim().toLowerCase();
-    const ext =
-      providedExt ||
-      (mime.includes('png') ? 'png' : mime.includes('jpeg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'bin');
-
-    const hash = crypto.createHash('sha1').update(file).digest('hex').slice(0, 12);
-    const key = `users/${uid}/products/${productId}/source_${hash}.${ext}`;
+    // Standardize: store exactly ONE product source image per product (JPEG only)
+    // Deterministic key ensures overwrites instead of creating duplicates.
+    const key = `users/${uid}/products/${productId}/source.jpg`;
+    const mime = 'image/jpeg';
 
     // Upload to Cloudflare R2
     const r2 = getR2Client();
@@ -174,7 +170,8 @@ export default async function handler(req, res) {
         Key: key,
         Body: file,
         ContentType: mime,
-        CacheControl: 'public, max-age=31536000, immutable',
+        // We overwrite the same key on edits, so do not use immutable caching.
+        CacheControl: 'public, max-age=0, must-revalidate',
       })
     );
 

@@ -4,11 +4,14 @@ import {
   signInWithPopup,
   signInAnonymously,
   GoogleAuthProvider,
+  signInWithCredential,
   sendPasswordResetEmail,
   updateProfile,
   AuthError,
 } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Initialize Google provider
 const googleProvider = new GoogleAuthProvider();
@@ -46,6 +49,26 @@ export const authService = {
   // Google Authentication - Popup method
   loginWithGoogle: async () => {
     try {
+      // Native (Capacitor): use GoogleAuth plugin to avoid broken browser popup/redirect flows.
+      if (Capacitor.getPlatform() !== 'web') {
+        const clientId = (import.meta as any).env?.VITE_GOOGLE_WEB_CLIENT_ID;
+        if (!clientId) {
+          throw new Error(
+            'Missing VITE_GOOGLE_WEB_CLIENT_ID. Set your Google OAuth Web Client ID in .env.local, then rebuild & run npx cap sync.'
+          );
+        }
+
+        const res = await GoogleAuth.signIn();
+        const idToken = (res as any)?.authentication?.idToken;
+        if (!idToken) {
+          throw new Error('Google sign-in failed: missing idToken');
+        }
+        const credential = GoogleAuthProvider.credential(idToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        return userCredential.user;
+      }
+
+      // Web: popup works fine
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
     } catch (error) {
@@ -114,6 +137,7 @@ function handleAuthError(error: unknown): Error {
       'auth/popup-closed-by-user': 'Sign-in popup was closed. Please try again.',
       'auth/account-exists-with-different-credential': 'An account already exists with this email.',
       'auth/network-request-failed': 'Network error. Please check your internet connection.',
+      'auth/invalid-credential': 'Google login failed. Please try again.',
       'auth/internal-error': 'An internal error occurred. Please try again.',
     };
 

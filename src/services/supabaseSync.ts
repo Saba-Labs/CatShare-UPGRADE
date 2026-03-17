@@ -441,7 +441,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       client.from('categories').select('*').eq('user_id', userId),
       client.from('catalogues_definition').select('*').eq('user_id', userId),
       client.from('fields_definition').select('*').eq('user_id', userId),
-      client.from('user_settings').select('*').eq('user_id', userId).single(),
+      client.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
     ]);
 
     if (productsError && productsError.code !== 'PGRST116') {
@@ -517,7 +517,7 @@ export async function deleteProductFromSupabase(
       .select('data')
       .eq('user_id', userId)
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       console.warn('⚠️ Warning fetching product for R2 cleanup:', fetchError.message);

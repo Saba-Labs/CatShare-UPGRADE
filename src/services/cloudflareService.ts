@@ -46,6 +46,12 @@ export async function uploadImageToR2(
       return { success: false, error: "User not authenticated" };
     }
 
+    // If user chose local-only, block cloud uploads until they opt in.
+    const choice = localStorage.getItem(`offlineSyncChoice::${user.uid}`);
+    if (choice && choice !== 'sync') {
+      return { success: false, error: "Cloud sync is disabled (local-only mode)." };
+    }
+
     const idToken = await user.getIdToken();
 
     // ── Step 2: Request presigned URL from Vercel API ──────────────────────

@@ -8,6 +8,7 @@ import com.getcapacitor.BridgeActivity;
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.capacitorjs.plugins.localnotifications.LocalNotificationsPlugin;
 import com.catshare.official.BackgroundRendererPlugin;
+import com.codetrixstudio.capacitor.GoogleAuth.GoogleAuth;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -19,5 +20,6 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PushNotificationsPlugin.class);
         registerPlugin(LocalNotificationsPlugin.class);
         registerPlugin(BackgroundRendererPlugin.class);
+        registerPlugin(GoogleAuth.class);
     }
 }

@@ -78,8 +78,79 @@ function AppWithBackHandler() {
   const renderResultTimeoutRef = useRef(null);
   const previousUserIdRef = useRef<string | null>(null);
   const [showFirstSyncBanner, setShowFirstSyncBanner] = useState(false);
+  const [offlineSyncChoice, setOfflineSyncChoice] = useState<'sync' | 'local_only' | null>(null);
+  const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
+  const [localOnlyBannerDismissed, setLocalOnlyBannerDismissed] = useState(false);
+  const [syncNowLoading, setSyncNowLoading] = useState(false);
 
   const isNative = Capacitor.getPlatform() !== "web";
+
+  const getOfflineChoiceKey = (uid: string) => `offlineSyncChoice::${uid}`;
+
+  const syncOfflineDataNow = useCallback(async () => {
+    if (!user?.uid) return;
+    setSyncNowLoading(true);
+    try {
+      const userId = user.uid;
+      let localProducts = safeGetFromStorage("products", []);
+      const localDeleted = safeGetFromStorage("deletedProducts", []);
+
+      // Upload missing images to R2 BEFORE syncing products, so other devices can display them.
+      // (This is still opt-in: this function is only invoked after the user chooses "sync".)
+      if (Array.isArray(localProducts) && localProducts.length > 0) {
+        const { uploadProductImageToR2 } = await import('./services/r2Upload');
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+        const updated = await Promise.all(
+          localProducts.map(async (p: any) => {
+            if (p.imageUrl) return p;
+            if (!p.imagePath) return p;
+            try {
+              const fileData = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.Data,
+              });
+              const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
+              const dataUrlPrefix =
+                filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+                  ? "data:image/jpeg;base64,"
+                  : "data:image/png;base64,";
+
+              const uploaded = await uploadProductImageToR2({
+                productId: String(p.id),
+                dataUrl: `${dataUrlPrefix}${fileData.data}`,
+              });
+              return uploaded?.url ? { ...p, imageUrl: uploaded.url } : p;
+            } catch (e) {
+              // If upload fails, keep local image; syncing can still proceed
+              return p;
+            }
+          })
+        );
+
+        localProducts = updated;
+        safeSetInStorage("products", updated);
+        setProducts(updated);
+      }
+
+      const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
+      if (Array.isArray(localProducts) && localProducts.length > 0) {
+        const productsRes = await syncProducts(userId, localProducts);
+        if (!productsRes.success) throw new Error(productsRes.error || 'Products sync failed');
+      }
+      if (Array.isArray(localDeleted) && localDeleted.length > 0) {
+        const deletedRes = await syncDeletedProducts(userId, localDeleted);
+        if (!deletedRes.success) throw new Error(deletedRes.error || 'Deleted products sync failed');
+      }
+
+      localStorage.setItem(`cloudSyncDone::${userId}`, 'true');
+      setShowFirstSyncBanner(false);
+      setLocalOnlyBannerDismissed(true);
+      console.log('✅ Offline data synced to account');
+    } finally {
+      setSyncNowLoading(false);
+    }
+  }, [user]);
 
   // Reset local product data when the authenticated user changes
   useEffect(() => {
@@ -100,6 +171,34 @@ function AppWithBackHandler() {
 
     previousUserIdRef.current = currentUserId;
   }, [user?.uid]);
+
+  // Load per-user offline sync choice on login
+  useEffect(() => {
+    if (!user?.uid) {
+      setOfflineSyncChoice(null);
+      setShowOfflineSyncModal(false);
+      setLocalOnlyBannerDismissed(false);
+      return;
+    }
+
+    const key = getOfflineChoiceKey(user.uid);
+    const raw = localStorage.getItem(key);
+    const choice = raw === 'sync' || raw === 'local_only' ? raw : null;
+    setOfflineSyncChoice(choice);
+    setLocalOnlyBannerDismissed(false);
+  }, [user?.uid]);
+
+  // If offline products exist and no choice yet, ask user on login
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (offlineSyncChoice) return;
+
+    const localProducts = safeGetFromStorage("products", []);
+    const hasLocalProducts = Array.isArray(localProducts) && localProducts.length > 0;
+    if (hasLocalProducts) {
+      setShowOfflineSyncModal(true);
+    }
+  }, [user?.uid, offlineSyncChoice]);
 
   // Merge Supabase data with local storage when user logs in
   useEffect(() => {
@@ -187,6 +286,7 @@ function AppWithBackHandler() {
   // being synced to the logged-in account on this device.
   useEffect(() => {
     if (!user || supabaseDataLoading) return;
+    if (offlineSyncChoice && offlineSyncChoice !== 'sync') return;
 
     const userId = user.uid;
     const key = `cloudSyncDone::${userId}`;
@@ -198,7 +298,7 @@ function AppWithBackHandler() {
     if (!already && hasLocalProducts) {
       setShowFirstSyncBanner(true);
     }
-  }, [user, supabaseDataLoading]);
+  }, [user, supabaseDataLoading, offlineSyncChoice]);
 
   // When initial sync finishes, mark done and optionally auto-hide banner.
   useEffect(() => {
@@ -456,6 +556,10 @@ function AppWithBackHandler() {
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
 
+    // Gate sync unless user explicitly opted in
+    const choice = localStorage.getItem(`offlineSyncChoice::${user.uid}`);
+    if (choice !== 'sync') return;
+
     const userId = user.uid;
     if (!userId || products.length === 0) return;
 
@@ -492,6 +596,10 @@ function AppWithBackHandler() {
     // Skip sync for offline guest users
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
+
+    // Gate sync unless user explicitly opted in
+    const choice = localStorage.getItem(`offlineSyncChoice::${user.uid}`);
+    if (choice !== 'sync') return;
 
     const userId = user.uid;
     if (!userId) return;
@@ -779,6 +887,60 @@ function AppWithBackHandler() {
         backgroundColor: "#fff",
       }}
     >
+      {/* Offline sync opt-in modal */}
+      {showOfflineSyncModal && user?.uid && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => {}}
+          />
+          <div className="relative w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-5">
+            <div className="text-lg font-bold text-gray-900">Sync offline products?</div>
+            <div className="text-sm text-gray-600 mt-2">
+              We found products on this device created offline. Do you want to sync them to this account so they appear on other devices?
+            </div>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                disabled={syncNowLoading}
+                onClick={async () => {
+                  const key = getOfflineChoiceKey(user.uid);
+                  localStorage.setItem(key, 'sync');
+                  setOfflineSyncChoice('sync');
+                  setShowOfflineSyncModal(false);
+                  setShowFirstSyncBanner(true);
+                  try {
+                    await syncOfflineDataNow();
+                  } catch (e: any) {
+                    console.warn('Sync now failed:', e?.message || e);
+                  }
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm"
+              >
+                Sync to my account
+              </button>
+              <button
+                disabled={syncNowLoading}
+                onClick={() => {
+                  const key = getOfflineChoiceKey(user.uid);
+                  localStorage.setItem(key, 'local_only');
+                  setOfflineSyncChoice('local_only');
+                  setShowOfflineSyncModal(false);
+                  setShowFirstSyncBanner(false);
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-200 text-gray-900 font-semibold text-sm"
+              >
+                Keep on this device
+              </button>
+            </div>
+
+            <div className="text-[11px] text-gray-500 mt-3">
+              You can sync later anytime.
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer />
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
@@ -794,6 +956,42 @@ function AppWithBackHandler() {
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Persistent banner when user chose local-only */}
+      {user?.uid && offlineSyncChoice === 'local_only' && !localOnlyBannerDismissed && (
+        <div className="fixed top-[40px] inset-x-0 z-[60] px-4">
+          <div className="mx-auto max-w-md bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
+            <span className="pr-3">
+              Offline data is staying on this device only. Sync to your account?
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                disabled={syncNowLoading}
+                onClick={async () => {
+                  if (!user?.uid) return;
+                  localStorage.setItem(getOfflineChoiceKey(user.uid), 'sync');
+                  setOfflineSyncChoice('sync');
+                  setShowFirstSyncBanner(true);
+                  try {
+                    await syncOfflineDataNow();
+                  } catch (e: any) {
+                    console.warn('Sync now failed:', e?.message || e);
+                  }
+                }}
+                className="text-[11px] font-semibold text-yellow-900 underline disabled:text-yellow-700"
+              >
+                Sync now
+              </button>
+              <button
+                onClick={() => setLocalOnlyBannerDismissed(true)}
+                className="text-[11px] font-semibold text-yellow-800 hover:text-yellow-900"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
       )}
