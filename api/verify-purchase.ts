@@ -1,10 +1,21 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
+import { google } from "googleapis";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const androidPublisher = google.androidpublisher("v3");
+
+async function getGoogleAuthClient() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!),
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  return auth;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -15,9 +26,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Set subscription active for 30 days
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    // ✅ Verify purchase with Google Play
+    const auth = await getGoogleAuthClient();
+    const response = await androidPublisher.purchases.subscriptions.get({
+      auth,
+      packageName: process.env.ANDROID_PACKAGE_NAME!,
+      subscriptionId: productId,
+      token: purchaseToken,
+    });
+
+    const subscription = response.data;
+
+    // ✅ Check if payment is valid (paymentState 1 = received, 2 = free trial)
+    if (subscription.paymentState !== 1 && subscription.paymentState !== 2) {
+      return res.status(400).json({ error: "Payment not completed" });
+    }
+
+    // ✅ Use real expiry from Google Play
+    const expiresAt = new Date(Number(subscription.expiryTimeMillis));
 
     const { error } = await supabase
       .from("user_subscriptions")
@@ -36,6 +62,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ success: true });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: "Failed" });
+    return res.status(500).json({ error: "Failed to verify purchase" });
   }
 }
