@@ -84,7 +84,7 @@ export default function Account() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-lg p-4 sm:p-8"
+          className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8"
         >
           {/* Error Message */}
           {error && (
@@ -95,15 +95,18 @@ export default function Account() {
           )}
 
           {/* Profile Info */}
-          <div className="space-y-6 mb-8">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Profile Information</h2>
+          <div className="space-y-4 mb-8">
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Profile Information</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Your account details</p>
+            </div>
 
             {/* Name */}
             {user?.displayName && (
-              <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3 sm:gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-xl border border-blue-100 hover:border-blue-200 transition-colors">
                 <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-100">
-                    <FiUser className="text-blue-600 text-base sm:text-lg" />
+                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-500 shadow-lg shadow-blue-500/30">
+                    <FiUser className="text-white text-base sm:text-lg" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -115,10 +118,10 @@ export default function Account() {
 
             {/* Email */}
             {user?.email && (
-              <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3 sm:gap-4 p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-100 hover:border-emerald-200 transition-colors">
                 <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-100">
-                    <FiMail className="text-blue-600 text-base sm:text-lg" />
+                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30">
+                    <FiMail className="text-white text-base sm:text-lg" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -129,21 +132,29 @@ export default function Account() {
             )}
 
             {/* Email Verified */}
-            <div className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs sm:text-sm text-gray-600 mb-1">Email Verification</p>
+            <div className={`p-4 rounded-xl border transition-colors ${
+              user?.emailVerified
+                ? 'bg-gradient-to-br from-green-50 to-green-100/50 border-green-100 hover:border-green-200'
+                : 'bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-100 hover:border-yellow-200'
+            }`}>
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Email Verification</p>
               <div className="flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full ${user?.emailVerified ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                <p className="text-base sm:text-lg font-medium text-gray-900">
+                <div className={`h-2.5 w-2.5 rounded-full shadow-lg ${
+                  user?.emailVerified ? 'bg-green-500 shadow-green-500/30' : 'bg-yellow-500 shadow-yellow-500/30'
+                }`}></div>
+                <p className={`text-sm sm:text-base font-semibold ${
+                  user?.emailVerified ? 'text-green-700' : 'text-yellow-700'
+                }`}>
                   {user?.emailVerified ? 'Verified' : 'Not Verified'}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Logout Button */}
+          {/* Settings Section */}
           <div className="border-t border-gray-200 pt-6 sm:pt-8 space-y-6">
             <div>
-              <h3 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">WhatsApp number</h3>
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-1">WhatsApp number</h3>
               <p className="text-xs text-gray-500 mb-3">
                 Used for “Share as link” order confirmations (customers will message you on WhatsApp).
               </p>
@@ -152,27 +163,30 @@ export default function Account() {
                   value={whatsappNumber}
                   onChange={(e) => setWhatsappNumber(e.target.value)}
                   placeholder="e.g. +91XXXXXXXXXX"
-                  className="flex-1 px-4 py-3 rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
                 />
                 <button
                   onClick={saveWhatsApp}
                   disabled={isLoading}
-                  className="px-5 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold whitespace-nowrap"
+                  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold whitespace-nowrap transition-colors"
                 >
-                  Save
+                  {isLoading ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-            >
-              <FiLogOut className="text-lg" />
-              <span>{isLoading ? 'Logging out...' : 'Log Out'}</span>
-            </button>
-            <p className="text-center text-xs sm:text-sm text-gray-500 mt-4">
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-3">Danger Zone</h3>
+              <button
+                onClick={handleLogout}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-colors text-sm sm:text-base"
+              >
+                <FiLogOut className="text-lg" />
+                <span>{isLoading ? 'Logging out...' : 'Log Out'}</span>
+              </button>
+            </div>
+            <p className="text-center text-xs sm:text-sm text-gray-500">
               You'll be logged out from this device
             </p>
           </div>
