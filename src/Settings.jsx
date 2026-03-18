@@ -171,7 +171,7 @@ export default function Settings({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 py-4 pb-24">
-        <div className="max-w-lg">
+        <div className="w-full max-w-4xl mx-auto">
           {/* Settings List */}
           <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
             {/* Dark Mode Setting */}

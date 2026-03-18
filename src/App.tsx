@@ -889,74 +889,91 @@ return result;
     >
       {/* Offline sync opt-in modal */}
       {showOfflineSyncModal && user?.uid && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => {}}
           />
-          <div className="relative w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-5">
-            <div className="text-lg font-bold text-gray-900">Sync offline products?</div>
-            <div className="text-sm text-gray-600 mt-2">
-              We found products on this device created offline. Do you want to sync them to this account so they appear on other devices?
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button
-                  disabled={syncNowLoading}
-                  onClick={async () => {
-                    const key = getOfflineChoiceKey(user.uid);
-                    localStorage.setItem(key, 'sync');
-                    setOfflineSyncChoice('sync');
-                    setShowOfflineSyncModal(false);
-                    setShowFirstSyncBanner(true);
-                    try {
-                      await syncOfflineDataNow();
-                    } catch (e: any) {
-                      console.warn('Sync now failed:', e?.message || e);
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm"
-                >
-                  Sync to my account
-                </button>
-                <button
-                  disabled={syncNowLoading}
-                  onClick={() => {
-                    const key = getOfflineChoiceKey(user.uid);
-                    localStorage.setItem(key, 'local_only');
-                    setOfflineSyncChoice('local_only');
-                    setShowOfflineSyncModal(false);
-                    setShowFirstSyncBanner(false);
-                  }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-200 text-gray-900 font-semibold text-sm"
-                >
-                  Keep on this device
-                </button>
-              </div>
+            {/* Title */}
+            <h2 className="text-2xl sm:text-xl font-bold text-gray-900 text-center mb-2">Sync offline products?</h2>
+
+            {/* Description */}
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              We found products on this device created offline. Sync them to your account so they appear on all your devices.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 mb-4">
+              <button
+                disabled={syncNowLoading}
+                onClick={async () => {
+                  const key = getOfflineChoiceKey(user.uid);
+                  localStorage.setItem(key, 'sync');
+                  setOfflineSyncChoice('sync');
+                  setShowOfflineSyncModal(false);
+                  setShowFirstSyncBanner(true);
+                  try {
+                    await syncOfflineDataNow();
+                  } catch (e: any) {
+                    console.warn('Sync now failed:', e?.message || e);
+                  }
+                }}
+                className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm sm:text-base transition-colors"
+              >
+                {syncNowLoading ? 'Syncing...' : 'Sync to my account'}
+              </button>
               <button
                 disabled={syncNowLoading}
                 onClick={() => {
                   const key = getOfflineChoiceKey(user.uid);
-                  // Clear local offline products and remember this decision
-                  setProducts([]);
-                  setDeletedProducts([]);
-                  safeSetInStorage("products", []);
-                  safeSetInStorage("deletedProducts", []);
-                  localStorage.setItem(key, 'cleared');
-                  setOfflineSyncChoice('cleared');
+                  localStorage.setItem(key, 'local_only');
+                  setOfflineSyncChoice('local_only');
                   setShowOfflineSyncModal(false);
                   setShowFirstSyncBanner(false);
                 }}
-                className="w-full px-4 py-2 rounded-xl bg-red-50 border border-red-200 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:bg-gray-200 text-gray-900 font-semibold text-sm sm:text-base transition-colors"
               >
-                Clear offline products from this device
+                Keep on this device
               </button>
             </div>
 
-            <div className="text-[11px] text-gray-500 mt-3">
+            {/* Divider */}
+            <div className="border-t border-gray-200 my-4"></div>
+
+            {/* Danger Zone */}
+            <button
+              disabled={syncNowLoading}
+              onClick={() => {
+                const key = getOfflineChoiceKey(user.uid);
+                // Clear local offline products and remember this decision
+                setProducts([]);
+                setDeletedProducts([]);
+                safeSetInStorage("products", []);
+                safeSetInStorage("deletedProducts", []);
+                localStorage.setItem(key, 'cleared');
+                setOfflineSyncChoice('cleared');
+                setShowOfflineSyncModal(false);
+                setShowFirstSyncBanner(false);
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
+            >
+              Clear offline products
+            </button>
+
+            {/* Help Text */}
+            <p className="text-xs text-gray-500 text-center mt-4">
               You can sync later anytime from Settings.
-            </div>
+            </p>
           </div>
         </div>
       )}
@@ -965,16 +982,23 @@ return result;
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
       {showFirstSyncBanner && (
-        <div className="fixed top-[40px] inset-x-0 z-[60] px-4">
-          <div className="mx-auto max-w-md bg-blue-50 border border-blue-200 text-blue-900 rounded-xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
-            <span className="pr-3">
-              We found your existing products on this device and are syncing them securely to your account.
-            </span>
+        <div className="fixed top-[40px] inset-x-0 z-[60] px-4 py-3">
+          <div className="mx-auto max-w-2xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+              <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1V3a1 1 0 011-1h5a1 1 0 011 1v1h1V3a1 1 0 011-1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v6h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2a1 1 0 01-1-1v-1h-1v1a1 1 0 01-1 1H7a2 2 0 01-2-2v-2H4a1 1 0 110-2h1V7H4a1 1 0 012-2h2V3a1 1 0 01-1-1H5a1 1 0 01-1-1zm9 6H6v6h8V8z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span className="text-xs sm:text-sm font-medium text-blue-900">
+                We found your existing products on this device and are syncing them securely to your account.
+              </span>
+            </div>
             <button
               onClick={() => setShowFirstSyncBanner(false)}
-              className="text-[11px] font-semibold text-blue-800 hover:text-blue-900"
+              className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-gray-600 hover:bg-white/60 text-xs sm:text-sm font-semibold transition-colors flex-shrink-0"
             >
-              OK
+              ✕
             </button>
           </div>
         </div>
@@ -982,12 +1006,19 @@ return result;
 
       {/* Persistent banner when user chose local-only */}
       {user?.uid && offlineSyncChoice === 'local_only' && !localOnlyBannerDismissed && (
-        <div className="fixed top-[40px] inset-x-0 z-[60] px-4">
-          <div className="mx-auto max-w-md bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
-            <span className="pr-3">
-              Offline data is staying on this device only. Sync to your account?
-            </span>
-            <div className="flex items-center gap-3">
+        <div className="fixed top-[40px] inset-x-0 z-[60] px-4 py-3">
+          <div className="mx-auto max-w-2xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+              <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M13.828 10.172a4 4 0 00-5.656 0l-4.242-4.242a6 6 0 018.485 0l-4.242 4.242zM9.172 16.172a4 4 0 015.656 0l4.242 4.242a6 6 0 01-8.485 0l4.242-4.242zm6.364-1.414a2 2 0 010 2.828L15.5 17.5a2 2 0 11-2.828-2.828l1.414-1.414zM5 10.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span className="text-xs sm:text-sm font-medium text-amber-900">
+                Offline data is staying on this device only. Sync to your account?
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 disabled={syncNowLoading}
                 onClick={async () => {
@@ -1001,15 +1032,15 @@ return result;
                     console.warn('Sync now failed:', e?.message || e);
                   }
                 }}
-                className="text-[11px] font-semibold text-yellow-900 underline disabled:text-yellow-700"
+                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white text-xs sm:text-sm font-semibold transition-colors"
               >
-                Sync now
+                {syncNowLoading ? 'Syncing...' : 'Sync now'}
               </button>
               <button
                 onClick={() => setLocalOnlyBannerDismissed(true)}
-                className="text-[11px] font-semibold text-yellow-800 hover:text-yellow-900"
+                className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-gray-600 hover:bg-white/60 text-xs sm:text-sm font-semibold transition-colors"
               >
-                Dismiss
+                ✕
               </button>
             </div>
           </div>
