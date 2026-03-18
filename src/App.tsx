@@ -982,16 +982,23 @@ return result;
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
       {showFirstSyncBanner && (
-        <div className="fixed top-[40px] inset-x-0 z-[60] px-4">
-          <div className="mx-auto max-w-md bg-blue-50 border border-blue-200 text-blue-900 rounded-xl px-4 py-3 text-xs flex items-center justify-between shadow-sm">
-            <span className="pr-3">
-              We found your existing products on this device and are syncing them securely to your account.
-            </span>
+        <div className="fixed top-[40px] inset-x-0 z-[60] px-4 py-3">
+          <div className="mx-auto max-w-2xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+              <div className="flex-shrink-0 mt-0.5 sm:mt-0">
+                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1V3a1 1 0 011-1h5a1 1 0 011 1v1h1V3a1 1 0 011-1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v6h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2a1 1 0 01-1-1v-1h-1v1a1 1 0 01-1 1H7a2 2 0 01-2-2v-2H4a1 1 0 110-2h1V7H4a1 1 0 012-2h2V3a1 1 0 01-1-1H5a1 1 0 01-1-1zm9 6H6v6h8V8z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span className="text-xs sm:text-sm font-medium text-blue-900">
+                We found your existing products on this device and are syncing them securely to your account.
+              </span>
+            </div>
             <button
               onClick={() => setShowFirstSyncBanner(false)}
-              className="text-[11px] font-semibold text-blue-800 hover:text-blue-900"
+              className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-gray-600 hover:bg-white/60 text-xs sm:text-sm font-semibold transition-colors flex-shrink-0"
             >
-              OK
+              ✕
             </button>
           </div>
         </div>
