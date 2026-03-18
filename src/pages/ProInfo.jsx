@@ -29,8 +29,14 @@ export default function ProInfo() {
         // subs: monthly + yearly
         for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "subs" });
-          console.log("querySkuDetails subs raw result", sku, result);
-          const parsed = JSON.parse(result.value);
+          // Use console.error so it shows up in release Logcat (chromium)
+          console.error("querySkuDetails subs raw result", sku, result);
+          let parsed = {};
+          try {
+            parsed = JSON.parse(result.value);
+          } catch (parseErr) {
+            console.error("querySkuDetails subs JSON.parse failed", sku, result?.value, parseErr);
+          }
           // plugin returns different shapes across versions; try a few common fields
           next[sku] =
             parsed?.price ||
@@ -43,8 +49,13 @@ export default function ProInfo() {
         {
           const sku = INAPP_SKUS.lifetime;
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
-          console.log("querySkuDetails inapp raw result", sku, result);
-          const parsed = JSON.parse(result.value);
+          console.error("querySkuDetails inapp raw result", sku, result);
+          let parsed = {};
+          try {
+            parsed = JSON.parse(result.value);
+          } catch (parseErr) {
+            console.error("querySkuDetails inapp JSON.parse failed", sku, result?.value, parseErr);
+          }
           next[sku] =
             parsed?.price ||
             parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
@@ -83,12 +94,20 @@ export default function ProInfo() {
     setLoading(true);
     setError(null);
     try {
+      console.error("launchBillingFlow subs start", sku);
       // Launch Google Play billing sheet
       const result = await BillingPlugin.launchBillingFlow({
         product: sku,
         type: "subs",
       });
-      const purchase = JSON.parse(result.value);
+      console.error("launchBillingFlow subs raw result", sku, result);
+      let purchase;
+      try {
+        purchase = JSON.parse(result.value);
+      } catch (parseErr) {
+        console.error("launchBillingFlow subs JSON.parse failed", sku, result?.value, parseErr);
+        throw new Error("Billing response parse failed");
+      }
       const purchaseToken = purchase.purchaseToken;
 
       // Acknowledge the purchase
@@ -103,8 +122,12 @@ export default function ProInfo() {
 
       await refresh();
     } catch (e) {
-      console.error("Purchase failed", e);
-      setError(e?.message || "Purchase failed. Please try again.");
+      console.error("Purchase failed (subs)", sku, e);
+      const msg =
+        e?.message ||
+        (typeof e === "string" ? e : "") ||
+        "Purchase failed. Please try again.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -115,11 +138,19 @@ export default function ProInfo() {
     setError(null);
     try {
       const sku = INAPP_SKUS.lifetime;
+      console.error("launchBillingFlow inapp start", sku);
       const result = await BillingPlugin.launchBillingFlow({
         product: sku,
         type: "inapp",
       });
-      const purchase = JSON.parse(result.value);
+      console.error("launchBillingFlow inapp raw result", sku, result);
+      let purchase;
+      try {
+        purchase = JSON.parse(result.value);
+      } catch (parseErr) {
+        console.error("launchBillingFlow inapp JSON.parse failed", sku, result?.value, parseErr);
+        throw new Error("Billing response parse failed");
+      }
       const purchaseToken = purchase.purchaseToken;
 
       await BillingPlugin.sendAck({ purchaseToken });
@@ -132,8 +163,12 @@ export default function ProInfo() {
 
       await refresh();
     } catch (e) {
-      console.error("Purchase failed", e);
-      setError(e?.message || "Purchase failed. Please try again.");
+      console.error("Purchase failed (inapp)", e);
+      const msg =
+        e?.message ||
+        (typeof e === "string" ? e : "") ||
+        "Purchase failed. Please try again.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
