@@ -18,6 +18,7 @@ import { MdInventory2 } from "react-icons/md";
 import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import RatingModal from "./components/RatingModal";
+import { useAuth } from "./context/AuthContext";
 
 declare global {
   interface Window {
@@ -35,7 +36,7 @@ export function openPreviewHtml(id, tab = null) {
 }
 
 export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>> }) {
-
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scrollRef = useRef(null);
@@ -601,8 +602,22 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const handlePermanentDelete = async (id) => {
     if (window.confirm("Permanently delete this item?")) {
-      // Delete image from R2 if product has a cloud URL
       const product = deletedProducts.find(p => p.id === id);
+  
+      // ✅ Delete local filesystem image
+      if (product?.imagePath) {
+        try {
+          await Filesystem.deleteFile({
+            path: product.imagePath,
+            directory: Directory.Data,
+          });
+          console.log(`🗑️ Deleted source image: ${product.imagePath}`);
+        } catch (err) {
+          console.warn("⚠️ Could not delete local image file:", err);
+        }
+      }
+  
+      // Delete image from R2 if product has a cloud URL
       if (product?.imageUrl && !product.imageUrl.startsWith('undefined')) {
         try {
           const { deleteImageFromR2 } = await import('./services/cloudflareService');
@@ -611,6 +626,23 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           console.warn("⚠️ Could not delete R2 image:", err);
         }
       }
+  
+      // ✅ Delete from Supabase (both products and deleted_products tables)
+      if (user?.uid) {
+        try {
+          const { deleteProductFromSupabase } = await import('./services/supabaseSync');
+          const result = await deleteProductFromSupabase(user.uid, id);
+          if (!result.success) {
+            console.warn("⚠️ Supabase delete failed:", result.error);
+          } else {
+            console.log(`✅ Product ${id} permanently deleted from Supabase`);
+          }
+        } catch (err) {
+          console.warn("⚠️ Could not delete from Supabase:", err);
+        }
+      }
+  
+      // Remove from local state
       setDeletedProducts((prev) => prev.filter((p) => p.id !== id));
     }
   };
@@ -812,11 +844,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             if (movedProductIndex === -1 || targetProductIndex === -1) return;
 
             const copy = [...products];
-            const [removed] = copy.splice(movedProductIndex, 1);
-            // Adjust target index if moved item was before target
-            const adjustedTargetIndex = movedProductIndex < targetProductIndex ? targetProductIndex - 1 : targetProductIndex;
-            copy.splice(adjustedTargetIndex, 0, removed);
-            setProducts(copy);
+const [removed] = copy.splice(movedProductIndex, 1);
+// Adjust target index if moved item was before target
+const adjustedTargetIndex = movedProductIndex < targetProductIndex ? targetProductIndex - 1 : targetProductIndex;
+copy.splice(adjustedTargetIndex, 0, removed);
+setProducts(copy);
+window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
           }}>
             <Droppable droppableId="product-list">
               {(provided) => (

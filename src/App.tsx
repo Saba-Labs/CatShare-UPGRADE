@@ -345,14 +345,9 @@ function AppWithBackHandler() {
       }
     });
 
-    // Sort merged products by updatedAt (newest first) for consistent ordering across devices
-    const result = Array.from(merged.values());
-    result.sort((a, b) => {
-      const timeA = new Date(a.updatedAt || 0).getTime();
-      const timeB = new Date(b.updatedAt || 0).getTime();
-      return timeB - timeA; // Descending order (newest first)
-    });
-    return result;
+    // Keep the order as-is — position is now managed by the position column in Supabase
+const result = Array.from(merged.values());
+return result;
   };
 
   // Handle rendering images with chunked processing to prevent UI freeze

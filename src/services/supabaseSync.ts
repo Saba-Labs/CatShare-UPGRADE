@@ -36,15 +36,16 @@ export async function syncProducts(
       return clean;
     });
 
-    const upsertData = cleanedProducts.map(product => ({
-      user_id: userId,
-      product_id: product.id,
-      name: product.name || '',
-      sku: product.sku || null,
-      category_id: product.categoryId || null,
-      data: product,
-      updated_at: new Date().toISOString(),
-    }));
+    const upsertData = cleanedProducts.map((product, index) => ({
+  user_id: userId,
+  product_id: product.id,
+  name: product.name || '',
+  sku: product.sku || null,
+  category_id: product.categoryId || null,
+  data: product,
+  position: index, // ✅ preserve drag order
+  updated_at: new Date().toISOString(),
+}));
 
     if (upsertData.length === 0) {
       return { success: true, data: [] };
@@ -436,7 +437,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       { data: fieldsDef, error: fieldsError },
       { data: settings, error: settingsError },
     ] = await Promise.all([
-      client.from('products').select('*').eq('user_id', userId).order('updated_at', { ascending: false }),
+      client.from('products').select('*').eq('user_id', userId).order('position', { ascending: true }),
       client.from('deleted_products').select('*').eq('user_id', userId),
       client.from('categories').select('*').eq('user_id', userId),
       client.from('catalogues_definition').select('*').eq('user_id', userId),
