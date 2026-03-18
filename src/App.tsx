@@ -889,74 +889,91 @@ return result;
     >
       {/* Offline sync opt-in modal */}
       {showOfflineSyncModal && user?.uid && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => {}}
           />
-          <div className="relative w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-5">
-            <div className="text-lg font-bold text-gray-900">Sync offline products?</div>
-            <div className="text-sm text-gray-600 mt-2">
-              We found products on this device created offline. Do you want to sync them to this account so they appear on other devices?
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button
-                  disabled={syncNowLoading}
-                  onClick={async () => {
-                    const key = getOfflineChoiceKey(user.uid);
-                    localStorage.setItem(key, 'sync');
-                    setOfflineSyncChoice('sync');
-                    setShowOfflineSyncModal(false);
-                    setShowFirstSyncBanner(true);
-                    try {
-                      await syncOfflineDataNow();
-                    } catch (e: any) {
-                      console.warn('Sync now failed:', e?.message || e);
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm"
-                >
-                  Sync to my account
-                </button>
-                <button
-                  disabled={syncNowLoading}
-                  onClick={() => {
-                    const key = getOfflineChoiceKey(user.uid);
-                    localStorage.setItem(key, 'local_only');
-                    setOfflineSyncChoice('local_only');
-                    setShowOfflineSyncModal(false);
-                    setShowFirstSyncBanner(false);
-                  }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-200 text-gray-900 font-semibold text-sm"
-                >
-                  Keep on this device
-                </button>
-              </div>
+            {/* Title */}
+            <h2 className="text-2xl sm:text-xl font-bold text-gray-900 text-center mb-2">Sync offline products?</h2>
+
+            {/* Description */}
+            <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+              We found products on this device created offline. Sync them to your account so they appear on all your devices.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 mb-4">
+              <button
+                disabled={syncNowLoading}
+                onClick={async () => {
+                  const key = getOfflineChoiceKey(user.uid);
+                  localStorage.setItem(key, 'sync');
+                  setOfflineSyncChoice('sync');
+                  setShowOfflineSyncModal(false);
+                  setShowFirstSyncBanner(true);
+                  try {
+                    await syncOfflineDataNow();
+                  } catch (e: any) {
+                    console.warn('Sync now failed:', e?.message || e);
+                  }
+                }}
+                className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm sm:text-base transition-colors"
+              >
+                {syncNowLoading ? 'Syncing...' : 'Sync to my account'}
+              </button>
               <button
                 disabled={syncNowLoading}
                 onClick={() => {
                   const key = getOfflineChoiceKey(user.uid);
-                  // Clear local offline products and remember this decision
-                  setProducts([]);
-                  setDeletedProducts([]);
-                  safeSetInStorage("products", []);
-                  safeSetInStorage("deletedProducts", []);
-                  localStorage.setItem(key, 'cleared');
-                  setOfflineSyncChoice('cleared');
+                  localStorage.setItem(key, 'local_only');
+                  setOfflineSyncChoice('local_only');
                   setShowOfflineSyncModal(false);
                   setShowFirstSyncBanner(false);
                 }}
-                className="w-full px-4 py-2 rounded-xl bg-red-50 border border-red-200 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm"
+                className="w-full px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:bg-gray-200 text-gray-900 font-semibold text-sm sm:text-base transition-colors"
               >
-                Clear offline products from this device
+                Keep on this device
               </button>
             </div>
 
-            <div className="text-[11px] text-gray-500 mt-3">
+            {/* Divider */}
+            <div className="border-t border-gray-200 my-4"></div>
+
+            {/* Danger Zone */}
+            <button
+              disabled={syncNowLoading}
+              onClick={() => {
+                const key = getOfflineChoiceKey(user.uid);
+                // Clear local offline products and remember this decision
+                setProducts([]);
+                setDeletedProducts([]);
+                safeSetInStorage("products", []);
+                safeSetInStorage("deletedProducts", []);
+                localStorage.setItem(key, 'cleared');
+                setOfflineSyncChoice('cleared');
+                setShowOfflineSyncModal(false);
+                setShowFirstSyncBanner(false);
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
+            >
+              Clear offline products
+            </button>
+
+            {/* Help Text */}
+            <p className="text-xs text-gray-500 text-center mt-4">
               You can sync later anytime from Settings.
-            </div>
+            </p>
           </div>
         </div>
       )}
