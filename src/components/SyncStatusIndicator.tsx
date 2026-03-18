@@ -34,6 +34,13 @@ export const SyncStatusIndicator: React.FC = () => {
       setSyncStatus('syncing');
     } else {
       setSyncStatus('synced');
+
+      // Auto-hide after 3 seconds when sync completes
+      const timeout = setTimeout(() => {
+        setSyncStatus('idle');
+      }, 3000);
+
+      return () => clearTimeout(timeout);
     }
   }, [user, supabaseDataLoading]);
 
@@ -57,10 +64,10 @@ export const SyncStatusIndicator: React.FC = () => {
         setSyncStatus('synced');
         setLastError(null);
 
-        // Auto-hide success indicator after 2 seconds
+        // Auto-hide success indicator after 3 seconds
         const timeout = setTimeout(() => {
           setSyncStatus('idle');
-        }, 2000);
+        }, 3000);
 
         return () => clearTimeout(timeout);
       }
@@ -72,15 +79,9 @@ export const SyncStatusIndicator: React.FC = () => {
     };
   }, []);
 
-  if (!showIndicator) return null;
+  if (!showIndicator || syncStatus === 'idle') return null;
 
   const statusConfig: Record<string, { icon: string; color: string; bgColor: string; label: string; animate?: boolean }> = {
-    idle: {
-      icon: '✓',
-      color: 'text-gray-400',
-      bgColor: 'bg-gray-50',
-      label: 'Synced',
-    },
     syncing: {
       icon: '⟳',
       color: 'text-blue-500',
@@ -102,7 +103,7 @@ export const SyncStatusIndicator: React.FC = () => {
     },
   };
 
-  const config = statusConfig[syncStatus];
+  const config = statusConfig[syncStatus as 'syncing' | 'synced' | 'error'];
 
   return (
     <div
