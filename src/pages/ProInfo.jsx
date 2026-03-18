@@ -64,8 +64,11 @@ export default function ProInfo() {
         }
 
         setPrices(next);
-      } catch (e) {
-        console.error("querySkuDetails failed", e);
+      } catch (e: any) {
+        console.error("Billing Error Code:", e?.code);
+        console.error("Billing Error Message:", e?.message);
+        console.error("Billing Full Error:", JSON.stringify(e));
+        alert("Billing Error: " + e?.message + " (Code: " + e?.code + ")");
       }
     })();
   }, []);
