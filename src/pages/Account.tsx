@@ -176,7 +176,6 @@ export default function Account() {
             </div>
 
             <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-3">Danger Zone</h3>
               <button
                 onClick={handleLogout}
                 disabled={isLoading}
