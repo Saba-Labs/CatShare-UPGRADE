@@ -82,6 +82,7 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
             force "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
             force "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3"
+            force "com.android.billingclient:billing:7.1.0"
         }
     }
 }

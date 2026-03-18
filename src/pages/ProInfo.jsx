@@ -20,57 +20,61 @@ export default function ProInfo() {
   const isAndroid = Capacitor.getPlatform() === "android";
 
   // Load prices from Google Play
-  useEffect(() => {
-    if (!isAndroid) return;
-    (async () => {
-      try {
-        const next = {};
+useEffect(() => {
+  if (!isAndroid) return;
+  (async () => {
+    try {
+      const next = {};
 
-        // subs: monthly + yearly
-        for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
+      // Subscriptions: monthly + yearly
+      for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
+        try {
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "subs" });
-          // Use console.error so it shows up in release Logcat (chromium)
-          console.error("querySkuDetails subs raw result", sku, result);
-          let parsed = {};
-          try {
-            parsed = JSON.parse(result.value);
-          } catch (parseErr) {
-            console.error("querySkuDetails subs JSON.parse failed", sku, result?.value, parseErr);
-          }
-          // plugin returns different shapes across versions; try a few common fields
+          console.error("querySkuDetails [subs] raw", sku, result?.value);
+
+          const raw = result?.value ? JSON.parse(result.value) : {};
+          const parsed = Array.isArray(raw) ? raw[0] : raw;
+
           next[sku] =
             parsed?.price ||
             parsed?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice ||
-            parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
+            parsed?.basePlans?.[0]?.offers?.[0]?.pricingPhases?.[0]?.formattedPrice ||
             null;
-        }
 
-        // inapp: lifetime
-        {
-          const sku = INAPP_SKUS.lifetime;
-          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
-          console.error("querySkuDetails inapp raw result", sku, result);
-          let parsed = {};
-          try {
-            parsed = JSON.parse(result.value);
-          } catch (parseErr) {
-            console.error("querySkuDetails inapp JSON.parse failed", sku, result?.value, parseErr);
-          }
-          next[sku] =
-            parsed?.price ||
-            parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
-            parsed?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice ||
-            null;
+          console.error("querySkuDetails [subs] price", sku, next[sku]);
+        } catch (skuErr) {
+          console.error("querySkuDetails failed for", sku, skuErr);
+          next[sku] = null;
         }
-
-        setPrices(next);
-      } catch (e) {
-        const fullError = JSON.stringify(e, Object.getOwnPropertyNames(e));
-        console.error("Billing Full Error:", fullError);
-        alert("Full Error: " + fullError);
       }
-    })();
-  }, []);
+
+      // Lifetime in-app
+      try {
+        const sku = INAPP_SKUS.lifetime;
+        const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
+        console.error("querySkuDetails [inapp] raw", sku, result?.value);
+
+        const raw = result?.value ? JSON.parse(result.value) : {};
+        const parsed = Array.isArray(raw) ? raw[0] : raw;
+
+        next[sku] =
+          parsed?.price ||
+          parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
+          null;
+
+        console.error("querySkuDetails [inapp] price", sku, next[sku]);
+      } catch (inappErr) {
+        console.error("querySkuDetails failed for lifetime", inappErr);
+        next[INAPP_SKUS.lifetime] = null;
+      }
+
+      setPrices(next);
+    } catch (e) {
+      console.error("Billing init error:", JSON.stringify(e, Object.getOwnPropertyNames(e)));
+      setError("Could not load prices. Please try again.");
+    }
+  })();
+}, [isAndroid]);
 
   async function verifyWithBackend(path, body) {
     if (!BACKEND_URL) throw new Error("Missing VITE_BACKEND_URL");
@@ -93,88 +97,82 @@ export default function ProInfo() {
   }
 
   const handleBuySubscription = async (sku) => {
-    setLoading(true);
-    setError(null);
+  setLoading(true);
+  setError(null);
+  try {
+    const cleanSku = sku.split(":")[0]; // safety strip any accidental suffix
+    console.error("launchBillingFlow [subs] start", cleanSku);
+
+    const result = await BillingPlugin.launchBillingFlow({
+      product: cleanSku,
+      type: "subs",
+    });
+    console.error("launchBillingFlow [subs] raw", cleanSku, result?.value);
+
+    let purchase;
     try {
-      console.error("launchBillingFlow subs start", sku);
-      // Launch Google Play billing sheet
-      const result = await BillingPlugin.launchBillingFlow({
-        product: sku,
-        type: "subs",
-      });
-      console.error("launchBillingFlow subs raw result", sku, result);
-      let purchase;
-      try {
-        purchase = JSON.parse(result.value);
-      } catch (parseErr) {
-        console.error("launchBillingFlow subs JSON.parse failed", sku, result?.value, parseErr);
-        throw new Error("Billing response parse failed");
-      }
-      const purchaseToken = purchase.purchaseToken;
-
-      // Acknowledge the purchase
-      await BillingPlugin.sendAck({ purchaseToken });
-
-      // Verify with backend + store in Supabase
-      await verifyWithBackend("/iap/android/receipt", {
-        packageName: ANDROID_PACKAGE_NAME,
-        subscriptionId: sku,
-        purchaseToken,
-      });
-
-      await refresh();
-    } catch (e) {
-      console.error("Purchase failed (subs)", sku, e);
-      const msg =
-        e?.message ||
-        (typeof e === "string" ? e : "") ||
-        "Purchase failed. Please try again.";
-      setError(msg);
-    } finally {
-      setLoading(false);
+      purchase = JSON.parse(result.value);
+    } catch (parseErr) {
+      console.error("launchBillingFlow [subs] parse failed", cleanSku, result?.value, parseErr);
+      throw new Error("Billing response parse failed");
     }
-  };
+
+    const purchaseToken = purchase.purchaseToken;
+    await BillingPlugin.sendAck({ purchaseToken });
+
+    await verifyWithBackend("/iap/android/receipt", {
+      packageName: ANDROID_PACKAGE_NAME,
+      subscriptionId: cleanSku,
+      purchaseToken,
+    });
+
+    await refresh();
+  } catch (e) {
+    console.error("Purchase failed [subs]", sku, e);
+    setError(e?.message || "Purchase failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleBuyLifetime = async () => {
-    setLoading(true);
-    setError(null);
+  setLoading(true);
+  setError(null);
+  try {
+    const sku = INAPP_SKUS.lifetime;
+    console.error("launchBillingFlow [inapp] start", sku);
+
+    const result = await BillingPlugin.launchBillingFlow({
+      product: sku,
+      type: "inapp",
+    });
+    console.error("launchBillingFlow [inapp] raw", sku, result?.value);
+
+    let purchase;
     try {
-      const sku = INAPP_SKUS.lifetime;
-      console.error("launchBillingFlow inapp start", sku);
-      const result = await BillingPlugin.launchBillingFlow({
-        product: sku,
-        type: "inapp",
-      });
-      console.error("launchBillingFlow inapp raw result", sku, result);
-      let purchase;
-      try {
-        purchase = JSON.parse(result.value);
-      } catch (parseErr) {
-        console.error("launchBillingFlow inapp JSON.parse failed", sku, result?.value, parseErr);
-        throw new Error("Billing response parse failed");
-      }
-      const purchaseToken = purchase.purchaseToken;
-
-      await BillingPlugin.sendAck({ purchaseToken });
-
-      await verifyWithBackend("/iap/android/product", {
-        packageName: ANDROID_PACKAGE_NAME,
-        productId: sku,
-        purchaseToken,
-      });
-
-      await refresh();
-    } catch (e) {
-      console.error("Purchase failed (inapp)", e);
-      const msg =
-        e?.message ||
-        (typeof e === "string" ? e : "") ||
-        "Purchase failed. Please try again.";
-      setError(msg);
-    } finally {
-      setLoading(false);
+      purchase = JSON.parse(result.value);
+    } catch (parseErr) {
+      console.error("launchBillingFlow [inapp] parse failed", sku, result?.value, parseErr);
+      throw new Error("Billing response parse failed");
     }
-  };
+
+    const purchaseToken = purchase.purchaseToken;
+    await BillingPlugin.sendAck({ purchaseToken });
+
+    await verifyWithBackend("/iap/android/product", {
+      packageName: ANDROID_PACKAGE_NAME,
+      productId: sku,
+      purchaseToken,
+    });
+
+    await refresh();
+  } catch (e) {
+    console.error("Purchase failed [inapp]", e);
+    setError(e?.message || "Purchase failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRestore = async () => {
     setLoading(true);
