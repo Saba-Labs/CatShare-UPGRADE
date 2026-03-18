@@ -62,8 +62,11 @@ export default function Account() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
+      {/* Status bar placeholder */}
+      <div className="sticky top-0 h-[40px] bg-black z-50"></div>
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-200 sticky top-[40px] z-40">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
