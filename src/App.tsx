@@ -78,7 +78,8 @@ function AppWithBackHandler() {
   const renderResultTimeoutRef = useRef(null);
   const previousUserIdRef = useRef<string | null>(null);
   const [showFirstSyncBanner, setShowFirstSyncBanner] = useState(false);
-  const [offlineSyncChoice, setOfflineSyncChoice] = useState<'sync' | 'local_only' | null>(null);
+  const [offlineSyncChoice, setOfflineSyncChoice] = useState<'sync' | 'local_only' | 'cleared' | null>(null);
+  const [offlineSyncDecisionLoaded, setOfflineSyncDecisionLoaded] = useState(false);
   const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
   const [localOnlyBannerDismissed, setLocalOnlyBannerDismissed] = useState(false);
   const [syncNowLoading, setSyncNowLoading] = useState(false);
@@ -178,19 +179,23 @@ function AppWithBackHandler() {
       setOfflineSyncChoice(null);
       setShowOfflineSyncModal(false);
       setLocalOnlyBannerDismissed(false);
+      setOfflineSyncDecisionLoaded(false);
       return;
     }
 
     const key = getOfflineChoiceKey(user.uid);
     const raw = localStorage.getItem(key);
-    const choice = raw === 'sync' || raw === 'local_only' ? raw : null;
-    setOfflineSyncChoice(choice);
+    const choice =
+      raw === 'sync' || raw === 'local_only' || raw === 'cleared' ? raw : null;
+    setOfflineSyncChoice(choice as 'sync' | 'local_only' | 'cleared' | null);
     setLocalOnlyBannerDismissed(false);
+    setOfflineSyncDecisionLoaded(true);
   }, [user?.uid]);
 
   // If offline products exist and no choice yet, ask user on login
   useEffect(() => {
     if (!user?.uid) return;
+    if (!offlineSyncDecisionLoaded) return;
     if (offlineSyncChoice) return;
 
     const localProducts = safeGetFromStorage("products", []);
@@ -198,7 +203,7 @@ function AppWithBackHandler() {
     if (hasLocalProducts) {
       setShowOfflineSyncModal(true);
     }
-  }, [user?.uid, offlineSyncChoice]);
+  }, [user?.uid, offlineSyncChoice, offlineSyncDecisionLoaded]);
 
   // Merge Supabase data with local storage when user logs in
   useEffect(() => {
@@ -900,42 +905,62 @@ function AppWithBackHandler() {
               We found products on this device created offline. Do you want to sync them to this account so they appear on other devices?
             </div>
 
-            <div className="mt-4 flex gap-3">
-              <button
-                disabled={syncNowLoading}
-                onClick={async () => {
-                  const key = getOfflineChoiceKey(user.uid);
-                  localStorage.setItem(key, 'sync');
-                  setOfflineSyncChoice('sync');
-                  setShowOfflineSyncModal(false);
-                  setShowFirstSyncBanner(true);
-                  try {
-                    await syncOfflineDataNow();
-                  } catch (e: any) {
-                    console.warn('Sync now failed:', e?.message || e);
-                  }
-                }}
-                className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm"
-              >
-                Sync to my account
-              </button>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button
+                  disabled={syncNowLoading}
+                  onClick={async () => {
+                    const key = getOfflineChoiceKey(user.uid);
+                    localStorage.setItem(key, 'sync');
+                    setOfflineSyncChoice('sync');
+                    setShowOfflineSyncModal(false);
+                    setShowFirstSyncBanner(true);
+                    try {
+                      await syncOfflineDataNow();
+                    } catch (e: any) {
+                      console.warn('Sync now failed:', e?.message || e);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm"
+                >
+                  Sync to my account
+                </button>
+                <button
+                  disabled={syncNowLoading}
+                  onClick={() => {
+                    const key = getOfflineChoiceKey(user.uid);
+                    localStorage.setItem(key, 'local_only');
+                    setOfflineSyncChoice('local_only');
+                    setShowOfflineSyncModal(false);
+                    setShowFirstSyncBanner(false);
+                  }}
+                  className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-200 text-gray-900 font-semibold text-sm"
+                >
+                  Keep on this device
+                </button>
+              </div>
               <button
                 disabled={syncNowLoading}
                 onClick={() => {
                   const key = getOfflineChoiceKey(user.uid);
-                  localStorage.setItem(key, 'local_only');
-                  setOfflineSyncChoice('local_only');
+                  // Clear local offline products and remember this decision
+                  setProducts([]);
+                  setDeletedProducts([]);
+                  safeSetInStorage("products", []);
+                  safeSetInStorage("deletedProducts", []);
+                  localStorage.setItem(key, 'cleared');
+                  setOfflineSyncChoice('cleared');
                   setShowOfflineSyncModal(false);
                   setShowFirstSyncBanner(false);
                 }}
-                className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 disabled:bg-gray-200 text-gray-900 font-semibold text-sm"
+                className="w-full px-4 py-2 rounded-xl bg-red-50 border border-red-200 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm"
               >
-                Keep on this device
+                Clear offline products from this device
               </button>
             </div>
 
             <div className="text-[11px] text-gray-500 mt-3">
-              You can sync later anytime.
+              You can sync later anytime from Settings.
             </div>
           </div>
         </div>

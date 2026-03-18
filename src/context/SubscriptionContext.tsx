@@ -32,7 +32,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
       const idToken = await user.getIdToken();
-      const resp = await fetch(`${baseUrl}/subscription`, {
+      const resp = await fetch(`${baseUrl}/api/subscription`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

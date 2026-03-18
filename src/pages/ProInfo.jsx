@@ -29,6 +29,7 @@ export default function ProInfo() {
         // subs: monthly + yearly
         for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "subs" });
+          console.log("querySkuDetails subs raw result", sku, result);
           const parsed = JSON.parse(result.value);
           // plugin returns different shapes across versions; try a few common fields
           next[sku] =
@@ -42,6 +43,7 @@ export default function ProInfo() {
         {
           const sku = INAPP_SKUS.lifetime;
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
+          console.log("querySkuDetails inapp raw result", sku, result);
           const parsed = JSON.parse(result.value);
           next[sku] =
             parsed?.price ||
