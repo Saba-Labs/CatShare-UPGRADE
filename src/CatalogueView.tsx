@@ -1441,10 +1441,6 @@ const handleTouchEnd = useCallback(() => {
               onClick={async () => {
                 try {
                   setShowShareOptions(false);
-                  if (!isPro) {
-                    navigate("/settings/pro");
-                    return;
-                  }
                   if (!user?.uid) {
                     alert('Please login first.');
                     return;
