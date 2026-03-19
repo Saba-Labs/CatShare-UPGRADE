@@ -11,6 +11,7 @@
  */
 
 import { INDUSTRY_PRESETS } from './industryPresets';
+import { getStorageKey } from '../utils/safeStorage';
 
 export interface FieldConfig {
   key: string; // Internal key: field1, field2, field3, etc.
@@ -137,10 +138,23 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
 /**
  * Get current field definition from localStorage
  * Falls back to default if not found
+ * @param userId - Optional user ID for keyed storage
  */
-export function getFieldsDefinition(): FieldsDefinition {
+export function getFieldsDefinition(userId?: string): FieldsDefinition {
   try {
-    const stored = localStorage.getItem('fieldsDefinition');
+    // Determine storage key
+    let storageKey = 'fieldsDefinition';
+    if (userId) {
+      storageKey = getStorageKey('fieldsDefinition', userId);
+    } else {
+      // Try to get from keyed storage using localStorage fallback
+      const firebaseUserId = localStorage.getItem('firebaseUserId');
+      if (firebaseUserId) {
+        storageKey = getStorageKey('fieldsDefinition', firebaseUserId);
+      }
+    }
+
+    const stored = localStorage.getItem(storageKey);
     if (stored) {
       const parsed = JSON.parse(stored);
       // Prune price2 and remove fields beyond field10 (legacy cleanup)
@@ -169,8 +183,10 @@ export function getFieldsDefinition(): FieldsDefinition {
 
 /**
  * Save field definition to localStorage
+ * @param definition - The fields definition to save
+ * @param userId - Optional user ID for keyed storage
  */
-export function setFieldsDefinition(definition: FieldsDefinition): void {
+export function setFieldsDefinition(definition: FieldsDefinition, userId?: string): void {
   try {
     // Validate that definition has required fields
     if (!definition || !Array.isArray(definition.fields) || definition.fields.length === 0) {
@@ -184,7 +200,11 @@ export function setFieldsDefinition(definition: FieldsDefinition): void {
       };
     }
 
-    localStorage.setItem('fieldsDefinition', JSON.stringify({
+    // Determine storage key
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const storageKey = effectiveUserId ? getStorageKey('fieldsDefinition', effectiveUserId) : 'fieldsDefinition';
+
+    localStorage.setItem(storageKey, JSON.stringify({
       ...definition,
       lastUpdated: Date.now(),
     }));

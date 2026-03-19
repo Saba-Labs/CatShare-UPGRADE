@@ -7,6 +7,8 @@
 
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } from "../config/catalogueConfig";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { getStorageKey } from "./safeStorage";
+import { getFieldsDefinition, setFieldsDefinition } from "../config/fieldConfig";
 
 /**
  * Move base64 images to Filesystem and remove from localStorage
@@ -383,4 +385,116 @@ export function getMigrationStatus(): {
       : "Legacy product system detected",
     hasLegacyData,
   };
+}
+
+/**
+ * Migrate unkeyed localStorage data to per-user keyed data
+ * This runs once per user on first login to convert old data format
+ * @param userId - The user ID to migrate data for
+ */
+export function migrateUnkeyedDataToUserKeyed(userId: string): void {
+  try {
+    console.log(`🔄 Starting per-user data migration for user: ${userId}`);
+
+    // Check if migration has already been done for this user
+    const migrationKey = `dataKeyedMigration::${userId}`;
+    if (localStorage.getItem(migrationKey) === 'done') {
+      console.log(`⏭️  Data migration already completed for user ${userId}`);
+      return;
+    }
+
+    // Read all unkeyed data from localStorage
+    const unKeyedProducts = localStorage.getItem('products');
+    const unKeyedDeleted = localStorage.getItem('deletedProducts');
+    const unKeyedCategories = localStorage.getItem('categories');
+    const unKeyedCatalogues = localStorage.getItem('cataloguesDefinition');
+    const unKeyedFields = localStorage.getItem('fieldsDefinition');
+
+    let hasMigratedData = false;
+
+    // Migrate products to keyed storage
+    if (unKeyedProducts) {
+      try {
+        const products = JSON.parse(unKeyedProducts);
+        if (Array.isArray(products) && products.length > 0) {
+          const keyedKey = getStorageKey('products', userId);
+          localStorage.setItem(keyedKey, unKeyedProducts);
+          hasMigratedData = true;
+          console.log(`✅ Migrated ${products.length} products to keyed storage`);
+        }
+      } catch (err) {
+        console.warn(`⚠️  Failed to migrate products:`, err);
+      }
+    }
+
+    // Migrate deleted products to keyed storage
+    if (unKeyedDeleted) {
+      try {
+        const deleted = JSON.parse(unKeyedDeleted);
+        if (Array.isArray(deleted) && deleted.length > 0) {
+          const keyedKey = getStorageKey('deletedProducts', userId);
+          localStorage.setItem(keyedKey, unKeyedDeleted);
+          hasMigratedData = true;
+          console.log(`✅ Migrated ${deleted.length} deleted products to keyed storage`);
+        }
+      } catch (err) {
+        console.warn(`⚠️  Failed to migrate deletedProducts:`, err);
+      }
+    }
+
+    // Migrate categories to keyed storage
+    if (unKeyedCategories) {
+      try {
+        const categories = JSON.parse(unKeyedCategories);
+        if (Array.isArray(categories) && categories.length > 0) {
+          const keyedKey = getStorageKey('categories', userId);
+          localStorage.setItem(keyedKey, unKeyedCategories);
+          hasMigratedData = true;
+          console.log(`✅ Migrated ${categories.length} categories to keyed storage`);
+        }
+      } catch (err) {
+        console.warn(`⚠️  Failed to migrate categories:`, err);
+      }
+    }
+
+    // Migrate catalogues definition to keyed storage
+    if (unKeyedCatalogues) {
+      try {
+        const catalogues = JSON.parse(unKeyedCatalogues);
+        const keyedKey = getStorageKey('cataloguesDefinition', userId);
+        localStorage.setItem(keyedKey, unKeyedCatalogues);
+        hasMigratedData = true;
+        console.log(`✅ Migrated catalogues definition to keyed storage`);
+      } catch (err) {
+        console.warn(`⚠️  Failed to migrate cataloguesDefinition:`, err);
+      }
+    }
+
+    // Migrate fields definition to keyed storage
+    if (unKeyedFields) {
+      try {
+        const fields = JSON.parse(unKeyedFields);
+        const keyedKey = getStorageKey('fieldsDefinition', userId);
+        localStorage.setItem(keyedKey, unKeyedFields);
+        hasMigratedData = true;
+        console.log(`✅ Migrated fields definition to keyed storage`);
+      } catch (err) {
+        console.warn(`⚠️  Failed to migrate fieldsDefinition:`, err);
+      }
+    }
+
+    // If we migrated data, don't delete the unkeyed data yet - it will be deleted after sync
+    // This allows the app to still access it if needed before sync
+    if (hasMigratedData) {
+      // Mark this user as having completed the migration
+      localStorage.setItem(migrationKey, 'done');
+      console.log(`✅ Per-user data migration completed for ${userId}`);
+    } else {
+      console.log(`ℹ️  No unkeyed data found to migrate for user ${userId}`);
+      // Still mark as done so we don't try again
+      localStorage.setItem(migrationKey, 'done');
+    }
+  } catch (err) {
+    console.error(`❌ Error during per-user data migration:`, err);
+  }
 }

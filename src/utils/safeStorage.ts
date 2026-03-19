@@ -4,6 +4,16 @@
  */
 
 /**
+ * Generate a per-user storage key
+ * @param baseKey - Base key name (e.g., "products", "categories")
+ * @param userId - User ID to namespace the key
+ * @returns Keyed string (e.g., "products::user123")
+ */
+export function getStorageKey(baseKey: string, userId: string): string {
+  return `${baseKey}::${userId}`;
+}
+
+/**
  * Safely parse JSON from localStorage with fallback
  * @param key - localStorage key to retrieve
  * @param fallback - Default value if parsing fails

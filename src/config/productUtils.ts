@@ -15,6 +15,7 @@ import {
   migrateProductToNewFormat,
 } from './fieldMigration';
 import { getFieldsDefinition, getFieldConfig, FieldConfig } from './fieldConfig';
+import { getStorageKey } from '../utils/safeStorage';
 
 /**
  * Product interface that works with both old and new field names
@@ -230,10 +231,23 @@ export function prepareProduct(product: Product): Product {
 
 /**
  * Read all products from localStorage and ensure they're normalized
+ * @param userId - Optional user ID for keyed storage. If not provided, tries localStorage fallback
  */
-export function getAllProducts(): Product[] {
+export function getAllProducts(userId?: string): Product[] {
   try {
-    const stored = localStorage.getItem('products');
+    // Determine which storage key to use
+    let storageKey = 'products';
+    if (userId) {
+      storageKey = getStorageKey('products', userId);
+    } else {
+      // Try to get userId from localStorage as fallback
+      const firebaseUserId = localStorage.getItem('firebaseUserId');
+      if (firebaseUserId) {
+        storageKey = getStorageKey('products', firebaseUserId);
+      }
+    }
+
+    const stored = localStorage.getItem(storageKey);
     if (!stored) return [];
 
     const products = JSON.parse(stored);
@@ -246,18 +260,22 @@ export function getAllProducts(): Product[] {
 
 /**
  * Save a product to localStorage, ensuring it's normalized
+ * @param product - Product to save
+ * @param userId - Optional user ID for keyed storage
  */
-export function saveProduct(product: Product): void {
-  const all = getAllProducts();
+export function saveProduct(product: Product, userId?: string): void {
+  const all = getAllProducts(userId);
   const normalized = normalizeProduct(product);
   const updated = product.id
     ? all.map(p => (p.id === product.id ? normalized : p))
     : [...all, normalized];
 
   try {
-    localStorage.setItem('products', JSON.stringify(updated));
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
+    localStorage.setItem(storageKey, JSON.stringify(updated));
     // Trigger Supabase sync
-    triggerSupabaseSync(updated);
+    triggerSupabaseSync(updated, effectiveUserId);
   } catch (err) {
     console.error('Failed to save product:', err);
   }
@@ -265,13 +283,17 @@ export function saveProduct(product: Product): void {
 
 /**
  * Save multiple products to localStorage
+ * @param products - Products to save
+ * @param userId - Optional user ID for keyed storage
  */
-export function saveProducts(products: Product[]): void {
+export function saveProducts(products: Product[], userId?: string): void {
   try {
     const normalized = products.map(normalizeProduct);
-    localStorage.setItem('products', JSON.stringify(normalized));
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
+    localStorage.setItem(storageKey, JSON.stringify(normalized));
     // Trigger Supabase sync
-    triggerSupabaseSync(normalized);
+    triggerSupabaseSync(normalized, effectiveUserId);
   } catch (err) {
     console.error('Failed to save products:', err);
   }
@@ -279,22 +301,24 @@ export function saveProducts(products: Product[]): void {
 
 /**
  * Trigger Supabase sync for products
+ * @param products - Products to sync
+ * @param userId - User ID for sync (optional, will try localStorage fallback if not provided)
  */
-function triggerSupabaseSync(products: Product[]): void {
+function triggerSupabaseSync(products: Product[], userId?: string): void {
   try {
-    // Get current user ID from localStorage (set by AuthContext)
-    const userId = localStorage.getItem('firebaseUserId');
-    console.log('🔄 Attempting to sync products. userId:', userId, 'productsCount:', products.length);
+    // Get current user ID from parameter or localStorage
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
+    console.log('🔄 Attempting to sync products. userId:', effectiveUserId, 'productsCount:', products.length);
 
-    if (!userId) {
-      console.warn('⚠️ No Firebase user ID found in localStorage. Skipping Supabase sync.');
+    if (!effectiveUserId) {
+      console.warn('⚠️ No Firebase user ID found. Skipping Supabase sync.');
       return;
     }
 
     // Import and call sync function
     import('../services/supabaseSync').then(({ syncProducts }) => {
-      console.log('📤 Syncing', products.length, 'products to Supabase for user:', userId);
-      syncProducts(userId, products)
+      console.log('📤 Syncing', products.length, 'products to Supabase for user:', effectiveUserId);
+      syncProducts(effectiveUserId, products)
         .then(result => {
           console.log('✅ Products synced to Supabase successfully:', result);
         })

@@ -16,7 +16,7 @@ import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
 import { runMigrations } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
-import { safeGetFromStorage, safeSetInStorage } from "./utils/safeStorage";
+import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { useAuth } from "./context/AuthContext";
 import SyncStatusIndicator from "./components/SyncStatusIndicator";
@@ -60,12 +60,8 @@ function AppWithBackHandler() {
   const location = useLocation();
   const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
   const [imageMap, setImageMap] = useState({});
-  const [products, setProducts] = useState(() =>
-    safeGetFromStorage("products", [])
-  );
-  const [deletedProducts, setDeletedProducts] = useState(() =>
-    safeGetFromStorage("deletedProducts", [])
-  );
+  const [products, setProducts] = useState<any[]>([]);
+  const [deletedProducts, setDeletedProducts] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(() => {
     return safeGetFromStorage("darkMode", false);
   });
@@ -87,14 +83,16 @@ function AppWithBackHandler() {
   const isNative = Capacitor.getPlatform() !== "web";
 
   const getOfflineChoiceKey = (uid: string) => `offlineSyncChoice::${uid}`;
+  const getProductsKey = (uid: string) => getStorageKey('products', uid);
+  const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
 
   const syncOfflineDataNow = useCallback(async () => {
     if (!user?.uid) return;
     setSyncNowLoading(true);
     try {
       const userId = user.uid;
-      let localProducts = safeGetFromStorage("products", []);
-      const localDeleted = safeGetFromStorage("deletedProducts", []);
+      let localProducts = safeGetFromStorage(getProductsKey(userId), []);
+      const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
 
       // Upload missing images to R2 BEFORE syncing products, so other devices can display them.
       // (This is still opt-in: this function is only invoked after the user chooses "sync".)
@@ -130,7 +128,7 @@ function AppWithBackHandler() {
         );
 
         localProducts = updated;
-        safeSetInStorage("products", updated);
+        safeSetInStorage(getProductsKey(user.uid), updated);
         setProducts(updated);
       }
 
@@ -145,6 +143,12 @@ function AppWithBackHandler() {
       }
 
       localStorage.setItem(`cloudSyncDone::${userId}`, 'true');
+      // Delete old unkeyed data after sync
+      localStorage.removeItem('products');
+      localStorage.removeItem('deletedProducts');
+      localStorage.removeItem('categories');
+      localStorage.removeItem('cataloguesDefinition');
+      localStorage.removeItem('fieldsDefinition');
       setShowFirstSyncBanner(false);
       setLocalOnlyBannerDismissed(true);
       console.log('✅ Offline data synced to account');
@@ -221,7 +225,7 @@ function AppWithBackHandler() {
         ]);
         const merged = mergeProductsData(products, supabaseData.products, currentDeletedIds);
         setProducts(merged);
-        safeSetInStorage("products", merged);
+        safeSetInStorage(getProductsKey(user.uid), merged);
         console.log('✅ Merged products from Supabase');
       }
 
@@ -229,7 +233,7 @@ function AppWithBackHandler() {
       if (supabaseData.deletedProducts && supabaseData.deletedProducts.length > 0) {
         const merged = mergeProductsData(deletedProducts, supabaseData.deletedProducts);
         setDeletedProducts(merged);
-        safeSetInStorage("deletedProducts", merged);
+        safeSetInStorage(getDeletedProductsKey(user.uid), merged);
         console.log('✅ Merged deleted products from Supabase');
       }
 
@@ -297,7 +301,7 @@ function AppWithBackHandler() {
     const key = `cloudSyncDone::${userId}`;
     const already = localStorage.getItem(key) === 'true';
 
-    const localProducts = safeGetFromStorage("products", []);
+    const localProducts = safeGetFromStorage(getProductsKey(userId), []);
     const hasLocalProducts = Array.isArray(localProducts) && localProducts.length > 0;
 
     if (!already && hasLocalProducts) {
@@ -545,8 +549,10 @@ return result;
       }
       return clean;
     });
-    safeSetInStorage("products", cleanedProducts);
-  }, [products]);
+    if (user?.uid) {
+      safeSetInStorage(getProductsKey(user.uid), cleanedProducts);
+    }
+  }, [products, user?.uid]);
 
   // Sync products to Supabase whenever they change
   useEffect(() => {
@@ -586,8 +592,10 @@ return result;
       delete clean.renderedImages;
       return clean;
     });
-    safeSetInStorage("deletedProducts", cleanedDeleted);
-  }, [deletedProducts]);
+    if (user?.uid) {
+      safeSetInStorage(getDeletedProductsKey(user.uid), cleanedDeleted);
+    }
+  }, [deletedProducts, user?.uid]);
 
   // ✅ Sync deleted products to Supabase whenever they change
   useEffect(() => {
@@ -744,12 +752,14 @@ return result;
   }, []);
 
   useEffect(() => {
-    const handleNewProduct = () =>
-      setProducts(JSON.parse(localStorage.getItem("products") || "[]"));
+    const handleNewProduct = () => {
+      if (!user?.uid) return;
+      setProducts(safeGetFromStorage(getProductsKey(user.uid), []));
+    };
     window.addEventListener("product-added", handleNewProduct);
     return () =>
       window.removeEventListener("product-added", handleNewProduct);
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     let removeListener: any;
@@ -958,8 +968,8 @@ return result;
                 // Clear local offline products and remember this decision
                 setProducts([]);
                 setDeletedProducts([]);
-                safeSetInStorage("products", []);
-                safeSetInStorage("deletedProducts", []);
+                safeSetInStorage(getProductsKey(user.uid), []);
+                safeSetInStorage(getDeletedProductsKey(user.uid), []);
                 localStorage.setItem(key, 'cleared');
                 setOfflineSyncChoice('cleared');
                 setShowOfflineSyncModal(false);
