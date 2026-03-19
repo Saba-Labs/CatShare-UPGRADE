@@ -27,7 +27,7 @@ export default function OrderForm() {
         setSellerWhatsapp(data.sellerWhatsapp);
         setItems(data.items || []);
         const initial: QtyMap = {};
-        (data.items || []).forEach((i) => { initial[i.productId] = 1; });
+        (data.items || []).forEach((i) => { initial[i.productId] = 0; });
         setQty(initial);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load order form.');
@@ -48,12 +48,40 @@ export default function OrderForm() {
   );
 
   const message = useMemo(() => {
-    const lines: string[] = ['New order from CatShare link:'];
-    items.forEach((i) => {
-      const q = qty[i.productId] ?? 0;
-      if (q > 0) lines.push(`- ${i.name} x ${q}`);
+    const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
+    
+    if (selectedItems.length === 0) return 'No items selected.';
+  
+    const date = new Date().toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric'
     });
-    if (lines.length === 1) lines.push('- (No items selected)');
+  
+    const lines: string[] = [];
+    lines.push(`🛍️ *New Order — ${date}*`);
+    lines.push(`_via CatShare Order Form_`);
+    lines.push('');
+    lines.push('*Items Ordered:*');
+  
+    let total = 0;
+    selectedItems.forEach((i, idx) => {
+      const q = qty[i.productId] ?? 0;
+      const price = i.price ? parseFloat(String(i.price).replace(/[^\d.]/g, '')) : 0;
+      const itemTotal = price * q;
+      total += itemTotal;
+  
+      lines.push(`${idx + 1}. *${i.name}*`);
+      lines.push(`   Qty: ${q}${i.price ? ` | Price: ${i.price}${i.priceUnit ? ' ' + i.priceUnit : ''}` : ''}`);
+      if (itemTotal > 0) lines.push(`   Subtotal: ₹${itemTotal.toLocaleString('en-IN')}`);
+    });
+  
+    if (total > 0) {
+      lines.push('');
+      lines.push(`💰 *Total: ₹${total.toLocaleString('en-IN')}*`);
+    }
+  
+    lines.push('');
+    lines.push('Please confirm availability and share payment details. Thank you! 🙏');
+  
     return lines.join('\n');
   }, [items, qty]);
 

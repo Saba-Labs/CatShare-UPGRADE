@@ -30,18 +30,12 @@ useEffect(() => {
       for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
         try {
           const result = await BillingPlugin.querySkuDetails({ product: sku, type: "SUBS" });
-          console.error("querySkuDetails [subs] raw", sku, result?.value);
+console.error("querySkuDetails [subs] raw", sku, JSON.stringify(result));
 
-          const raw = result?.value ? JSON.parse(result.value) : {};
-          const parsed = Array.isArray(raw) ? raw[0] : raw;
+const parsed = Array.isArray(result) ? result[0] : result;
+next[sku] = parsed?.price || null;
 
-          next[sku] =
-            parsed?.price ||
-            parsed?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]?.formattedPrice ||
-            parsed?.basePlans?.[0]?.offers?.[0]?.pricingPhases?.[0]?.formattedPrice ||
-            null;
-
-          console.error("querySkuDetails [subs] price", sku, next[sku]);
+console.error("querySkuDetails [subs] price", sku, next[sku]);
         } catch (skuErr) {
           console.error("querySkuDetails failed for", sku, skuErr);
           next[sku] = null;
@@ -52,17 +46,12 @@ useEffect(() => {
       try {
         const sku = INAPP_SKUS.lifetime;
         const result = await BillingPlugin.querySkuDetails({ product: sku, type: "inapp" });
-        console.error("querySkuDetails [inapp] raw", sku, result?.value);
+console.error("querySkuDetails [inapp] raw", sku, JSON.stringify(result));
 
-        const raw = result?.value ? JSON.parse(result.value) : {};
-        const parsed = Array.isArray(raw) ? raw[0] : raw;
+const parsed = Array.isArray(result) ? result[0] : result;
+next[sku] = parsed?.price || null;
 
-        next[sku] =
-          parsed?.price ||
-          parsed?.oneTimePurchaseOfferDetails?.formattedPrice ||
-          null;
-
-        console.error("querySkuDetails [inapp] price", sku, next[sku]);
+console.error("querySkuDetails [inapp] price", sku, next[sku]);
       } catch (inappErr) {
         console.error("querySkuDetails failed for lifetime", inappErr);
         next[INAPP_SKUS.lifetime] = null;
@@ -289,9 +278,35 @@ useEffect(() => {
                   </button>
                 </>
               ) : (
-                <p className="text-xs text-blue-800">
-                  In-app purchases available on Android only. Pro features are free during beta!
-                </p>
+                <>
+                  <button
+                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
+                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition font-medium"
+                  >
+                    Monthly subscription
+                  </button>
+              
+                  <button
+                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
+                    className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition font-medium"
+                  >
+                    Yearly subscription
+                  </button>
+              
+                  <button
+                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
+                  >
+                    Lifetime (one-time)
+                  </button>
+              
+                  <button
+                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
+                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
+                  >
+                    Restore purchases
+                  </button>
+                </>
               )}
             </div>
           )}

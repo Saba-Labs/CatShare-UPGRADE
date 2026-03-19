@@ -1445,7 +1445,10 @@ const handleTouchEnd = useCallback(() => {
                     alert('Please login first.');
                     return;
                   }
-                  const sellerWhatsapp = supabaseData?.userSettings?.whatsappNumber || '';
+                  const sellerWhatsapp = supabaseData?.userSettings?.whatsapp_number 
+  || supabaseData?.userSettings?.whatsappNumber 
+  || localStorage.getItem('whatsappNumber') 
+  || '';
                   if (!sellerWhatsapp.trim()) {
                     alert('Please set your WhatsApp number in Account first.');
                     return;

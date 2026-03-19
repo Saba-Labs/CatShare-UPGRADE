@@ -280,11 +280,28 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   }, [navigate, scrollRef]);
 
   useEffect(() => {
-    const handleNewProduct = () => {
+    const handleNewProduct = async () => {
       const updated = JSON.parse(localStorage.getItem("products") || "[]");
       setProducts(updated);
+  
+      // Force reload thumbnails from local filesystem immediately
+      // so the new image shows without waiting for R2 upload
+      for (const p of updated) {
+        if (p.imagePath) {
+          try {
+            const result = await Filesystem.readFile({
+              path: p.imagePath,
+              directory: Directory.Data,
+            });
+            const base64 = `data:image/png;base64,${result.data}`;
+            setImageMap(prev => ({ ...prev, [p.id]: base64 }));
+          } catch (err) {
+            // Local file not found, keep existing imageMap entry
+          }
+        }
+      }
     };
-
+  
     window.addEventListener("product-added", handleNewProduct);
     return () => window.removeEventListener("product-added", handleNewProduct);
   }, []);
