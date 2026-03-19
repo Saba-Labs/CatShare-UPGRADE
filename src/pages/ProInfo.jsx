@@ -283,7 +283,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 {/* Price */}
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-gray-900">$0</span>
-                  <span className="text-gray-600 ml-2">/month</span>
+                  <span className="text-gray-600 ml-2 text-lg">Forever</span>
                 </div>
 
                 {/* Description */}
@@ -350,8 +350,19 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Price */}
                 <div className="relative z-10 mb-6">
-                  <span className="text-4xl font-bold text-gray-900">$9.99</span>
-                  <span className="text-gray-600 ml-2">/month</span>
+                  {isAndroid && prices?.[SUBSCRIPTION_SKUS.monthly] ? (
+                    <>
+                      <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.monthly]}</span>
+                      <span className="text-gray-600 ml-2">/month</span>
+                    </>
+                  ) : isAndroid ? (
+                    <span className="text-lg font-semibold text-gray-500">Loading price...</span>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-bold text-gray-900">$9.99</span>
+                      <span className="text-gray-600 ml-2">/month</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Description */}
