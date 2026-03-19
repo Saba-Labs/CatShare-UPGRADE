@@ -70,18 +70,36 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const handleDelete = async () => {
     if (deleteTargetId) {
       const toDelete = deletedProducts.find(p => p.id === deleteTargetId);
-
-      setDeletedProducts((prev) => prev.filter((p) => p.id !== deleteTargetId));
-      setDeleteTargetId(null);
-      setShowDeleteConfirm(false);
+      if (!toDelete) {
+        setDeleteTargetId(null);
+        setShowDeleteConfirm(false);
+        return;
+      }
 
       // 🧹 Final cleanup: delete source image and rendered images
-      if (toDelete) {
-        try {
-          // Delete rendered images (already done when shelved, but good to be sure)
-          await deleteRenderedImageForProduct(toDelete.id);
+      try {
+        // 1) Delete from Supabase + R2 FIRST (do not remove locally until success)
+        if (user?.uid) {
+          const result = await deleteProductFromSupabase(user.uid, String(toDelete.id));
+          if (!result.success) {
+            console.error(`❌ Failed to sync deletion to Supabase:`, result.error);
+            alert(result.error || "Failed to delete from cloud. Please try again.");
+            return;
+          }
+          console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
+        } else {
+          alert("Please login to permanently delete from cloud.");
+          return;
+        }
 
-          // Delete source image from Filesystem
+        // 2) After cloud success, remove from local state/UI
+        setDeletedProducts((prev) => prev.filter((p) => p.id !== deleteTargetId));
+        setDeleteTargetId(null);
+        setShowDeleteConfirm(false);
+
+        // 3) Local cleanup (best-effort)
+        try {
+          await deleteRenderedImageForProduct(toDelete.id);
           if (toDelete.imagePath) {
             await Filesystem.deleteFile({
               path: toDelete.imagePath,
@@ -89,19 +107,11 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
             });
             console.log(`🗑️ Deleted source image: ${toDelete.imagePath}`);
           }
-
-          // Sync permanent deletion to Supabase
-          if (user?.uid) {
-            const result = await deleteProductFromSupabase(user.uid, String(toDelete.id));
-            if (result.success) {
-              console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
-            } else {
-              console.error(`❌ Failed to sync deletion to Supabase:`, result.error);
-            }
-          }
         } catch (err) {
           console.warn(`⚠️ Failed to fully clean up files for product ${toDelete.id}:`, err);
         }
+      } finally {
+        // Ensure dialog closes if the item was removed; otherwise keep it open for retry
       }
     }
   };
@@ -109,40 +119,41 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const handleDeleteAll = async () => {
     setShowDeleteAllConfirm(false);
 
-    // Clean up all local files
-    for (const product of deletedProducts) {
-      try {
-        // Delete rendered images
-        await deleteRenderedImageForProduct(product.id);
-
-        // Delete source image from Filesystem
-        if (product.imagePath) {
-          await Filesystem.deleteFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          console.log(`🗑️ Deleted source image: ${product.imagePath}`);
-        }
-      } catch (err) {
-        console.warn(`⚠️ Failed to fully clean up files for product ${product.id}:`, err);
-      }
-    }
-
-    // Clear all deleted products from local state
-    setDeletedProducts([]);
-
     // Sync to Supabase to remove all shelf items
     if (user?.uid) {
       try {
         const result = await deleteAllDeletedProducts(user.uid);
         if (result.success) {
           console.log('✅ All shelf items permanently deleted from Supabase');
+          // Only clear locally after cloud success
+          const snapshot = [...deletedProducts];
+          setDeletedProducts([]);
+
+          // Local cleanup (best-effort)
+          for (const product of snapshot) {
+            try {
+              await deleteRenderedImageForProduct(product.id);
+              if (product.imagePath) {
+                await Filesystem.deleteFile({
+                  path: product.imagePath,
+                  directory: Directory.Data,
+                });
+                console.log(`🗑️ Deleted source image: ${product.imagePath}`);
+              }
+            } catch (err) {
+              console.warn(`⚠️ Failed to fully clean up files for product ${product.id}:`, err);
+            }
+          }
         } else {
           console.error('❌ Failed to sync deletion to Supabase:', result.error);
+          alert(result.error || "Failed to delete shelf items from cloud. Please try again.");
         }
       } catch (err) {
         console.error('❌ Error syncing shelf deletion:', err);
+        alert("Failed to delete shelf items from cloud. Please try again.");
       }
+    } else {
+      alert("Please login to permanently delete from cloud.");
     }
   };
 

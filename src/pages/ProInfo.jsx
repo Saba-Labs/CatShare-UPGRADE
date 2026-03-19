@@ -29,7 +29,7 @@ useEffect(() => {
       // Subscriptions: monthly + yearly
       for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
         try {
-          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "subs" });
+          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "SUBS" });
           console.error("querySkuDetails [subs] raw", sku, result?.value);
 
           const raw = result?.value ? JSON.parse(result.value) : {};
@@ -105,7 +105,7 @@ useEffect(() => {
 
     const result = await BillingPlugin.launchBillingFlow({
       product: cleanSku,
-      type: "subs",
+      type: "SUBS",
     });
     console.error("launchBillingFlow [subs] raw", cleanSku, result?.value);
 
