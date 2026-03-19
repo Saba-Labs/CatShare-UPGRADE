@@ -611,20 +611,18 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 </div>
               )}
 
-              {/* Payment Options - Always Show (with warning on non-Android) */}
-              <div className={`space-y-4 relative ${!isAndroid ? "opacity-60" : ""}`}>
-                {!isAndroid && (
-                  <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 pointer-events-none">
-                    <div className="bg-white px-4 py-2 rounded-lg shadow-lg">
-                      <p className="text-sm font-semibold text-orange-600">⚠️ Android Only</p>
-                    </div>
-                  </div>
-                )}
-
+              {/* Payment Options - Always Show (warning only on click for non-Android) */}
+              <div className="space-y-4">
                 {/* Monthly */}
                 <button
-                  onClick={() => isAndroid && handleBuySubscription(SUBSCRIPTION_SKUS.monthly)}
-                  disabled={loading || !isAndroid}
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuySubscription(SUBSCRIPTION_SKUS.monthly);
+                    }
+                  }}
+                  disabled={loading}
                   className="w-full p-4 border-2 border-blue-300 bg-white hover:bg-blue-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between">
@@ -642,8 +640,14 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Yearly */}
                 <button
-                  onClick={() => isAndroid && handleBuySubscription(SUBSCRIPTION_SKUS.yearly)}
-                  disabled={loading || !isAndroid}
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuySubscription(SUBSCRIPTION_SKUS.yearly);
+                    }
+                  }}
+                  disabled={loading}
                   className="w-full p-4 border-2 border-purple-300 bg-white hover:bg-purple-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between">
@@ -661,8 +665,14 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Lifetime */}
                 <button
-                  onClick={() => isAndroid && handleBuyLifetime()}
-                  disabled={loading || !isAndroid}
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuyLifetime();
+                    }
+                  }}
+                  disabled={loading}
                   className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between">
@@ -680,8 +690,14 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Restore */}
                 <button
-                  onClick={() => isAndroid && handleRestore()}
-                  disabled={loading || !isAndroid}
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleRestore();
+                    }
+                  }}
+                  disabled={loading}
                   className="w-full p-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Restoring..." : "Restore Previous Purchases"}
@@ -691,7 +707,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
               {!isAndroid && (
                 <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mt-4">
                   <p className="text-sm text-blue-800 font-semibold">
-                    💡 These payment options will be fully functional on Android devices. Buttons are shown here for preview purposes.
+                    💡 You're viewing on desktop. Payment buttons will work on Android devices. Clicking will show a message on this device.
                   </p>
                 </div>
               )}
