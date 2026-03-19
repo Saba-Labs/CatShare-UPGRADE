@@ -189,15 +189,33 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
   const features = [
     {
       name: "Product Creation",
-      free: `${freePlanLimits.products} limit`,
+      free: `Up to ${freePlanLimits.products}`,
       pro: "Unlimited",
       locked: true,
     },
     {
       name: "Catalogue Creation",
-      free: `${freePlanLimits.catalogues} limit`,
+      free: `Up to ${freePlanLimits.catalogues}`,
       pro: "Unlimited",
       locked: true,
+    },
+    {
+      name: "Product Editing",
+      free: "Basic",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Bulk Editor",
+      free: "Available",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Theme Selection",
+      free: "Basic Themes",
+      pro: "All Themes",
+      locked: false,
     },
     {
       name: "Watermark Settings",
@@ -218,10 +236,16 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
       locked: true,
     },
     {
-      name: "Bulk Editor",
-      free: "Locked",
-      pro: "Available",
-      locked: true,
+      name: "PDF Export",
+      free: "Basic",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Priority Support",
+      free: "Community",
+      pro: "Email Support",
+      locked: false,
     },
   ];
 
@@ -354,15 +378,27 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   <ul className="space-y-3 text-sm">
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">100 Product Limit</span>
+                      <span className="text-gray-700">Up to 100 Products</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">5 Catalogue Limit</span>
+                      <span className="text-gray-700">Up to 5 Catalogues</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Basic Sharing</span>
+                      <span className="text-gray-700">Product Editing</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Bulk Editor</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Basic Themes</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Basic PDF Export</span>
                     </li>
                   </ul>
                 </div>
@@ -486,6 +522,10 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Advanced Bulk Editor</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Watermark Control</span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -498,7 +538,11 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Bulk Editor</span>
+                      <span className="text-gray-700">Advanced PDF Export</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Email Support</span>
                     </li>
                   </ul>
                 </div>
@@ -531,14 +575,20 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                         {feature.locked ? (
                           <span className="inline-flex items-center gap-2 text-orange-600 font-semibold text-sm">
                             <span className="text-lg">🔒</span>
-                            {feature.free}
+                            <span className="text-xs">{feature.free}</span>
                           </span>
                         ) : (
-                          <span className="text-green-600 font-bold text-lg">✓</span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                            <span className="text-gray-700 text-sm">{feature.free}</span>
+                          </span>
                         )}
                       </td>
                       <td className="text-center py-4 px-6">
-                        <span className="text-green-600 font-bold text-lg">✓</span>
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-blue-600 font-bold text-lg">✓</span>
+                          <span className="text-gray-700 text-sm">{feature.pro}</span>
+                        </span>
                       </td>
                     </tr>
                   ))}
