@@ -611,78 +611,87 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 </div>
               )}
 
-              {isAndroid ? (
-                <div className="space-y-4">
-                  {/* Monthly */}
-                  <button
-                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.monthly)}
-                    disabled={loading}
-                    className="w-full p-4 border-2 border-blue-300 bg-white hover:bg-blue-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-gray-900">Monthly Plan</p>
-                        <p className="text-sm text-gray-600">
-                          {prices?.[SUBSCRIPTION_SKUS.monthly]
-                            ? `${prices[SUBSCRIPTION_SKUS.monthly]} per month`
-                            : "Cancel anytime"}
-                        </p>
-                      </div>
-                      <div className="text-blue-600 font-bold text-lg">→</div>
+              {/* Payment Options - Always Show (with warning on non-Android) */}
+              <div className={`space-y-4 relative ${!isAndroid ? "opacity-60" : ""}`}>
+                {!isAndroid && (
+                  <div className="absolute inset-0 bg-white/40 backdrop-blur-sm rounded-xl flex items-center justify-center z-10 pointer-events-none">
+                    <div className="bg-white px-4 py-2 rounded-lg shadow-lg">
+                      <p className="text-sm font-semibold text-orange-600">⚠️ Android Only</p>
                     </div>
-                  </button>
+                  </div>
+                )}
 
-                  {/* Yearly */}
-                  <button
-                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.yearly)}
-                    disabled={loading}
-                    className="w-full p-4 border-2 border-purple-300 bg-white hover:bg-purple-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-gray-900">Yearly Plan</p>
-                        <p className="text-sm text-gray-600">
-                          {prices?.[SUBSCRIPTION_SKUS.yearly]
-                            ? `${prices[SUBSCRIPTION_SKUS.yearly]} per year (Save 20%)`
-                            : "Best value"}
-                        </p>
-                      </div>
-                      <div className="text-purple-600 font-bold text-lg">→</div>
+                {/* Monthly */}
+                <button
+                  onClick={() => isAndroid && handleBuySubscription(SUBSCRIPTION_SKUS.monthly)}
+                  disabled={loading || !isAndroid}
+                  className="w-full p-4 border-2 border-blue-300 bg-white hover:bg-blue-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Monthly Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[SUBSCRIPTION_SKUS.monthly]
+                          ? `${prices[SUBSCRIPTION_SKUS.monthly]} per month`
+                          : "Cancel anytime"}
+                      </p>
                     </div>
-                  </button>
+                    <div className="text-blue-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
 
-                  {/* Lifetime */}
-                  <button
-                    onClick={handleBuyLifetime}
-                    disabled={loading}
-                    className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-gray-900">Lifetime Plan</p>
-                        <p className="text-sm text-gray-600">
-                          {prices?.[INAPP_SKUS.lifetime]
-                            ? `${prices[INAPP_SKUS.lifetime]} one-time`
-                            : "One-time purchase"}
-                        </p>
-                      </div>
-                      <div className="text-pink-600 font-bold text-lg">→</div>
+                {/* Yearly */}
+                <button
+                  onClick={() => isAndroid && handleBuySubscription(SUBSCRIPTION_SKUS.yearly)}
+                  disabled={loading || !isAndroid}
+                  className="w-full p-4 border-2 border-purple-300 bg-white hover:bg-purple-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Yearly Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[SUBSCRIPTION_SKUS.yearly]
+                          ? `${prices[SUBSCRIPTION_SKUS.yearly]} per year (Save 20%)`
+                          : "Best value"}
+                      </p>
                     </div>
-                  </button>
+                    <div className="text-purple-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
 
-                  {/* Restore */}
-                  <button
-                    onClick={handleRestore}
-                    disabled={loading}
-                    className="w-full p-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? "Restoring..." : "Restore Previous Purchases"}
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
+                {/* Lifetime */}
+                <button
+                  onClick={() => isAndroid && handleBuyLifetime()}
+                  disabled={loading || !isAndroid}
+                  className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Lifetime Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[INAPP_SKUS.lifetime]
+                          ? `${prices[INAPP_SKUS.lifetime]} one-time`
+                          : "One-time purchase"}
+                      </p>
+                    </div>
+                    <div className="text-pink-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
+
+                {/* Restore */}
+                <button
+                  onClick={() => isAndroid && handleRestore()}
+                  disabled={loading || !isAndroid}
+                  className="w-full p-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Restoring..." : "Restore Previous Purchases"}
+                </button>
+              </div>
+
+              {!isAndroid && (
+                <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mt-4">
                   <p className="text-sm text-blue-800 font-semibold">
-                    💡 Payments are available on the Android app. Please open CatShare on your Android device to upgrade.
+                    💡 These payment options will be fully functional on Android devices. Buttons are shown here for preview purposes.
                   </p>
                 </div>
               )}
