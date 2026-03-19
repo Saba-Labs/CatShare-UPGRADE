@@ -16,6 +16,7 @@ export default function ProInfo() {
   const [loading, setLoading] = useState(false);
   const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
+  const [billingFrequency, setBillingFrequency] = useState("monthly"); // "monthly", "yearly", "lifetime"
 
   const isAndroid = Capacitor.getPlatform() === "android";
 
@@ -175,20 +176,86 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
     }
   };
 
-  const proFeatures = [
-    { name: "Bulk Editor", description: "Edit multiple products at once with batch operations" },
-    { name: "Watermark Customization", description: "Change watermark text and customize it for your brand" },
-    { name: "Manage Categories", description: "Create, edit, and organize unlimited product categories" },
-    { name: "Stock Control", description: "Toggle wholesale and resell stock IN/OUT status" },
+  // Free plan feature limits
+  const freePlanLimits = {
+    products: 100,
+    catalogues: 5,
+    watermarkSettings: false,
+    shareAsLink: false,
+    glassTheme: false,
+  };
+
+  // Feature comparison data
+  const features = [
+    {
+      name: "Product Creation",
+      free: `Up to ${freePlanLimits.products}`,
+      pro: "Unlimited",
+      locked: true,
+    },
+    {
+      name: "Catalogue Creation",
+      free: `Up to ${freePlanLimits.catalogues}`,
+      pro: "Unlimited",
+      locked: true,
+    },
+    {
+      name: "Product Editing",
+      free: "Basic",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Bulk Editor",
+      free: "Available",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Theme Selection",
+      free: "Basic Themes",
+      pro: "All Themes",
+      locked: false,
+    },
+    {
+      name: "Watermark Settings",
+      free: "Locked",
+      pro: "Full Control",
+      locked: true,
+    },
+    {
+      name: "Share as Link",
+      free: "Locked",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Glass Theme",
+      free: "Locked",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "PDF Export",
+      free: "Basic",
+      pro: "Advanced",
+      locked: false,
+    },
+    {
+      name: "Priority Support",
+      free: "Community",
+      pro: "Email Support",
+      locked: false,
+    },
   ];
 
   return (
-    <div className="w-full h-screen flex flex-col bg-gradient-to-b from-white to-gray-100 relative">
+    <div className="w-full min-h-screen flex flex-col bg-gradient-to-br from-white via-gray-50 to-gray-100 relative">
       {/* Status bar placeholder */}
       <div className="sticky top-0 h-[40px] bg-black z-50"></div>
 
       {/* Header */}
-      <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+      <header className="sticky top-[40px] z-40 bg-white/70 backdrop-blur-md border-b border-gray-200/50 h-14 flex items-center gap-3 px-4 relative">
         <button
           onClick={() => navigate("/settings")}
           className="w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-200 rounded-md transition"
@@ -196,7 +263,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
         >
           <MdArrowBack size={24} />
         </button>
-        <h1 className="text-xl font-bold flex-1 text-center">CatShare Pro</h1>
+        <h1 className="text-xl font-bold flex-1 text-center text-gray-800">Pricing Plans</h1>
         <button
           onClick={() => navigate("/")}
           className="w-8 h-8 flex items-center justify-center rounded-md text-gray-700 hover:bg-gray-200 transition"
@@ -206,157 +273,474 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-24">
-        <div className="space-y-6 max-w-2xl">
+      <main className="flex-1 overflow-y-auto px-4 py-8 pb-24">
+        <div className="space-y-8 max-w-6xl mx-auto">
 
-          {/* Title */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <MdStar className="text-yellow-500 text-2xl" />
-            <h2 className="text-2xl font-bold text-gray-800">CatShare Pro</h2>
+          {/* HERO SECTION */}
+          <div className="text-center space-y-3 mb-8">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900">Choose Your Plan</h2>
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+              Select the plan that fits your needs. Upgrade anytime to unlock unlimited features.
+            </p>
+            {isPro && (
+              <div className="inline-block mt-4 px-4 py-2 bg-green-100 border border-green-300 rounded-full">
+                <p className="text-sm font-semibold text-green-700">✓ You are on Pro Plan</p>
+              </div>
+            )}
           </div>
 
-          {/* Status */}
-          <div className={`p-4 rounded-lg border shadow-sm ${isPro ? "bg-green-50 border-green-300" : "bg-yellow-50 border-yellow-300"}`}>
-            <p className={`text-sm mb-2 ${isPro ? "text-green-900" : "text-yellow-900"}`}>
-              <span className="font-semibold">Status:</span> {isPro ? "Pro active ✓" : "Free plan"}
-            </p>
-            <p className={`text-xs leading-relaxed ${isPro ? "text-green-800" : "text-yellow-800"}`}>
-              {isPro ? "Thanks for supporting CatShare!" : "Upgrade to unlock Pro features like PDF and Link sharing."}
-            </p>
+          {/* BILLING FREQUENCY SELECTOR */}
+          {!isPro && isAndroid && (
+            <div className="flex gap-3 justify-center mb-8">
+              <button
+                onClick={() => setBillingFrequency("monthly")}
+                className={`px-6 py-3 rounded-lg font-semibold transition ${
+                  billingFrequency === "monthly"
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-300"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingFrequency("yearly")}
+                className={`px-6 py-3 rounded-lg font-semibold transition relative ${
+                  billingFrequency === "yearly"
+                    ? "bg-purple-600 text-white shadow-lg"
+                    : "bg-white border-2 border-gray-200 text-gray-700 hover:border-purple-300"
+                }`}
+              >
+                Yearly
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                  Save 20%
+                </span>
+              </button>
+              <button
+                onClick={() => setBillingFrequency("lifetime")}
+                className={`px-6 py-3 rounded-lg font-semibold transition ${
+                  billingFrequency === "lifetime"
+                    ? "bg-pink-600 text-white shadow-lg"
+                    : "bg-white border-2 border-gray-200 text-gray-700 hover:border-pink-300"
+                }`}
+              >
+                Lifetime
+              </button>
+            </div>
+          )}
+
+          {/* PLAN CARDS SECTION */}
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* FREE PLAN CARD */}
+            <div className="relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative h-full p-8 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col">
+                {/* Badge */}
+                {!isPro && (
+                  <div className="absolute -top-3 left-4 px-3 py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded-full">
+                    Current Plan
+                  </div>
+                )}
+
+                {/* Plan Name */}
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Free</h3>
+
+                {/* Price */}
+                <div className="mb-6">
+                  <span className="text-4xl font-bold text-gray-900">$0</span>
+                  <span className="text-gray-600 ml-2 text-lg">Forever</span>
+                </div>
+
+                {/* Description */}
+                <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                  Perfect for getting started with CatShare's core features.
+                </p>
+
+                {/* Button */}
+                {!isPro ? (
+                  <button
+                    disabled
+                    className="w-full py-3 px-4 bg-gray-200 text-gray-600 font-semibold rounded-lg mb-6 cursor-not-allowed"
+                  >
+                    Current Plan
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate("/settings")}
+                    className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition mb-6"
+                  >
+                    Manage Account
+                  </button>
+                )}
+
+                {/* Features */}
+                <div className="space-y-4 flex-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Included</p>
+                  <ul className="space-y-3 text-sm">
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Up to 100 Products</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Up to 5 Catalogues</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Product Editing</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Bulk Editor</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Basic Themes</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Basic PDF Export</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* PRO PLAN CARD */}
+            <div className="relative group md:scale-105 md:origin-center">
+              {/* Glow Effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 to-purple-400/30 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+              <div className="relative h-full p-8 bg-white/80 backdrop-blur-xl border-2 border-transparent bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-2xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden">
+                {/* Gradient Border Effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-transparent rounded-2xl pointer-events-none"></div>
+
+                {/* Badge */}
+                <div className="relative z-10 absolute -top-3 right-4 px-4 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold rounded-full">
+                  Most Popular
+                </div>
+
+                {/* Plan Name */}
+                <h3 className="relative z-10 text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                  Pro
+                </h3>
+
+                {/* Price */}
+                <div className="relative z-10 mb-6">
+                  {!isPro ? (
+                    isAndroid ? (
+                      billingFrequency === "monthly" && prices?.[SUBSCRIPTION_SKUS.monthly] ? (
+                        <>
+                          <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.monthly]}</span>
+                          <span className="text-gray-600 ml-2">/month</span>
+                        </>
+                      ) : billingFrequency === "yearly" && prices?.[SUBSCRIPTION_SKUS.yearly] ? (
+                        <>
+                          <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.yearly]}</span>
+                          <span className="text-gray-600 ml-2">/year</span>
+                        </>
+                      ) : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime] ? (
+                        <>
+                          <span className="text-4xl font-bold text-gray-900">{prices[INAPP_SKUS.lifetime]}</span>
+                          <span className="text-gray-600 ml-2">one-time</span>
+                        </>
+                      ) : (
+                        <span className="text-lg font-semibold text-gray-500">Loading price...</span>
+                      )
+                    ) : (
+                      <>
+                        <span className="text-4xl font-bold text-gray-900">$9.99</span>
+                        <span className="text-gray-600 ml-2">/month</span>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <span className="text-4xl font-bold text-gray-900">Pro</span>
+                      <span className="text-gray-600 ml-2">Active</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Description */}
+                <p className="relative z-10 text-sm text-gray-600 mb-6 leading-relaxed">
+                  Unlock unlimited possibilities and professional features.
+                </p>
+
+                {/* Button */}
+                {!isPro ? (
+                  isAndroid ? (
+                    <button
+                      onClick={() => {
+                        if (billingFrequency === "monthly") {
+                          handleBuySubscription(SUBSCRIPTION_SKUS.monthly);
+                        } else if (billingFrequency === "yearly") {
+                          handleBuySubscription(SUBSCRIPTION_SKUS.yearly);
+                        } else if (billingFrequency === "lifetime") {
+                          handleBuyLifetime();
+                        }
+                      }}
+                      disabled={loading}
+                      className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-bold rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
+                    >
+                      {loading ? "Processing..." : `Upgrade Now${
+                        billingFrequency === "monthly" && prices?.[SUBSCRIPTION_SKUS.monthly]
+                          ? ` — ${prices[SUBSCRIPTION_SKUS.monthly]}`
+                          : billingFrequency === "yearly" && prices?.[SUBSCRIPTION_SKUS.yearly]
+                          ? ` — ${prices[SUBSCRIPTION_SKUS.yearly]}`
+                          : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime]
+                          ? ` — ${prices[INAPP_SKUS.lifetime]}`
+                          : ""
+                      }`}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
+                      className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
+                    >
+                      Upgrade Now
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={() => navigate("/settings")}
+                    className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg mb-6 shadow-lg hover:shadow-xl"
+                  >
+                    Manage Account
+                  </button>
+                )}
+
+                {/* Features */}
+                <div className="relative z-10 space-y-4 flex-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Everything in Free, plus:</p>
+                  <ul className="space-y-3 text-sm">
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Unlimited Products</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Unlimited Catalogues</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Advanced Bulk Editor</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Watermark Control</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Share as Link</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Glass Theme Access</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Advanced PDF Export</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Email Support</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Upgrade Section — only show if not Pro */}
+          {/* FEATURE COMPARISON TABLE */}
+          <div className="mt-12 mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Feature Comparison</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-gray-200">
+                    <th className="text-left py-4 px-6 font-bold text-gray-900">Feature</th>
+                    <th className="text-center py-4 px-6 font-bold text-gray-700">Free</th>
+                    <th className="text-center py-4 px-6 font-bold text-gray-700">Pro</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {features.map((feature, idx) => (
+                    <tr
+                      key={idx}
+                      className={`border-b border-gray-200 hover:bg-gray-50 transition ${
+                        idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
+                      }`}
+                    >
+                      <td className="py-4 px-6 font-medium text-gray-800">{feature.name}</td>
+                      <td className="text-center py-4 px-6">
+                        {feature.locked ? (
+                          <span className="inline-flex items-center gap-2 text-orange-600 font-semibold text-sm">
+                            <span className="text-lg">🔒</span>
+                            <span className="text-xs">{feature.free}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-green-600 font-bold text-lg">✓</span>
+                            <span className="text-gray-700 text-sm">{feature.free}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="text-center py-4 px-6">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-blue-600 font-bold text-lg">✓</span>
+                          <span className="text-gray-700 text-sm">{feature.pro}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* PURCHASE OPTIONS - Only show if not Pro */}
           {!isPro && (
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
-              <p className="text-sm font-semibold text-blue-900">Upgrade to Pro</p>
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-8 space-y-6">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Choose Your Billing Plan</h3>
+                <p className="text-gray-600">Select the subscription option that works best for you.</p>
+              </div>
 
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {error && (
+                <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                  <p className="text-sm text-red-700 font-medium">{error}</p>
+                </div>
+              )}
 
-              {isAndroid ? (
-                <>
-                  <button
-                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.monthly)}
-                    disabled={loading}
-                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition font-medium"
-                  >
-                    {loading
-                      ? "Processing..."
-                      : prices?.[SUBSCRIPTION_SKUS.monthly]
-                      ? `Monthly ${prices[SUBSCRIPTION_SKUS.monthly]}`
-                      : "Monthly subscription"}
-                  </button>
+              {/* Payment Options - Always Show (warning only on click for non-Android) */}
+              <div className="space-y-4">
+                {/* Monthly */}
+                <button
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuySubscription(SUBSCRIPTION_SKUS.monthly);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full p-4 border-2 border-blue-300 bg-white hover:bg-blue-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Monthly Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[SUBSCRIPTION_SKUS.monthly]
+                          ? `${prices[SUBSCRIPTION_SKUS.monthly]} per month`
+                          : "Cancel anytime"}
+                      </p>
+                    </div>
+                    <div className="text-blue-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
 
-                  <button
-                    onClick={() => handleBuySubscription(SUBSCRIPTION_SKUS.yearly)}
-                    disabled={loading}
-                    className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition font-medium"
-                  >
-                    {loading
-                      ? "Processing..."
-                      : prices?.[SUBSCRIPTION_SKUS.yearly]
-                      ? `Yearly ${prices[SUBSCRIPTION_SKUS.yearly]}`
-                      : "Yearly subscription"}
-                  </button>
+                {/* Yearly */}
+                <button
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuySubscription(SUBSCRIPTION_SKUS.yearly);
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full p-4 border-2 border-purple-300 bg-white hover:bg-purple-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Yearly Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[SUBSCRIPTION_SKUS.yearly]
+                          ? `${prices[SUBSCRIPTION_SKUS.yearly]} per year (Save 20%)`
+                          : "Best value"}
+                      </p>
+                    </div>
+                    <div className="text-purple-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
 
-                  <button
-                    onClick={handleBuyLifetime}
-                    disabled={loading}
-                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
-                  >
-                    {loading
-                      ? "Processing..."
-                      : prices?.[INAPP_SKUS.lifetime]
-                      ? `Lifetime ${prices[INAPP_SKUS.lifetime]}`
-                      : "Lifetime (one-time)"}
-                  </button>
-                  <button
-                    onClick={handleRestore}
-                    disabled={loading}
-                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
-                  >
-                    Restore purchases
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
-                    className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition font-medium"
-                  >
-                    Monthly subscription
-                  </button>
-              
-                  <button
-                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
-                    className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition font-medium"
-                  >
-                    Yearly subscription
-                  </button>
-              
-                  <button
-                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
-                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
-                  >
-                    Lifetime (one-time)
-                  </button>
-              
-                  <button
-                    onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
-                    className="w-full px-3 py-2 bg-white border border-blue-200 hover:bg-blue-100 text-blue-900 text-sm rounded-lg transition font-medium"
-                  >
-                    Restore purchases
-                  </button>
-                </>
+                {/* Lifetime */}
+                <button
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleBuyLifetime();
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-900">Lifetime Plan</p>
+                      <p className="text-sm text-gray-600">
+                        {prices?.[INAPP_SKUS.lifetime]
+                          ? `${prices[INAPP_SKUS.lifetime]} one-time`
+                          : "One-time purchase"}
+                      </p>
+                    </div>
+                    <div className="text-pink-600 font-bold text-lg">→</div>
+                  </div>
+                </button>
+
+                {/* Restore */}
+                <button
+                  onClick={() => {
+                    if (!isAndroid) {
+                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
+                    } else {
+                      handleRestore();
+                    }
+                  }}
+                  disabled={loading}
+                  className="w-full p-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Restoring..." : "Restore Previous Purchases"}
+                </button>
+              </div>
+
+              {!isAndroid && (
+                <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mt-4">
+                  <p className="text-sm text-blue-800 font-semibold">
+                    💡 You're viewing on desktop. Payment buttons will work on Android devices. Clicking will show a message on this device.
+                  </p>
+                </div>
               )}
             </div>
           )}
 
-          {/* Pro Features */}
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <MdStar className="text-yellow-500" />
-              Pro Features {!isPro && "(Available Now - Free!)"}
-            </h3>
-            <div className="space-y-3">
-              {proFeatures.map((feature, idx) => (
-                <div key={idx} className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition">
-                  <p className="text-sm font-medium text-gray-800">{feature.name}</p>
-                  <p className="text-xs text-gray-600 mt-1">{feature.description}</p>
+          {/* STATUS PANEL */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Account Status</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Current Plan</p>
+                <p className={`text-2xl font-bold ${isPro ? "text-blue-600" : "text-gray-900"}`}>
+                  {isPro ? "Pro" : "Free"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Status</p>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${isPro ? "bg-green-500" : "bg-gray-400"}`}></span>
+                  <p className="text-gray-700">{isPro ? "Active" : "Inactive"}</p>
                 </div>
-              ))}
+              </div>
+            </div>
+            <div className="pt-4 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => navigate("/settings")}
+                className="flex-1 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition"
+              >
+                Back to Settings
+              </button>
             </div>
           </div>
-
-          {/* Benefits */}
-          <div>
-            <h3 className="font-semibold text-gray-800 mb-3">Why Upgrade to Pro?</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex gap-2"><span className="text-blue-600 font-bold">✓</span><span>Edit bulk products at once to save time</span></li>
-              <li className="flex gap-2"><span className="text-blue-600 font-bold">✓</span><span>Full control over watermark and branding</span></li>
-              <li className="flex gap-2"><span className="text-blue-600 font-bold">✓</span><span>Unlimited categories for organizing products</span></li>
-              <li className="flex gap-2"><span className="text-blue-600 font-bold">✓</span><span>Advanced inventory management with stock control</span></li>
-            </ul>
-          </div>
-
-          {/* CTA */}
-          <div className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white">
-            <p className="text-sm font-semibold mb-2">🚀 Make the Most of It</p>
-            <p className="text-xs mb-4 opacity-90">
-              {isPro ? "You have full Pro access. Enjoy all features!" : "Pro features are free during beta — enjoy full access now!"}
-            </p>
-            <button
-              onClick={() => navigate("/settings")}
-              className="w-full px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-sm rounded-lg transition font-medium"
-            >
-              Back to Settings
-            </button>
-          </div>
-
-          {/* Footer */}
-          <p className="text-xs text-center">
-            <span className="text-green-600 font-semibold block">✓ Free access to Pro features during beta</span>
-            <span className="text-gray.500 block mt-1">Pricing model coming soon</span>
-          </p>
 
         </div>
       </main>
