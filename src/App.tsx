@@ -13,7 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { initializeFieldSystem } from "./config/initializeFields";
 import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
-import { runMigrations } from "./utils/dataMigration";
+import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -162,16 +162,16 @@ function AppWithBackHandler() {
     const currentUserId = user?.uid || null;
     const previous = previousUserIdRef.current;
 
-    // Only clear when switching between two different logged-in users.
-    // Do NOT clear when going from "no user" -> first login, so existing
-    // offline data can be synced into the account.
-    if (previous && currentUserId && currentUserId !== previous) {
-      // Clear in-memory and local storage products for new user
-      setProducts([]);
-      setDeletedProducts([]);
-      safeSetInStorage("products", []);
-      safeSetInStorage("deletedProducts", []);
-      console.log('🔄 Cleared local products for user change:', currentUserId);
+    if (currentUserId && currentUserId !== previous) {
+      // Run per-user data migration (converts unkeyed data to keyed format)
+      migrateUnkeyedDataToUserKeyed(currentUserId);
+
+      // Load data for the new user from keyed storage
+      const userProducts = safeGetFromStorage(getProductsKey(currentUserId), []);
+      const userDeleted = safeGetFromStorage(getDeletedProductsKey(currentUserId), []);
+      setProducts(userProducts);
+      setDeletedProducts(userDeleted);
+      console.log('🔄 Loaded data for user:', currentUserId, '| products:', userProducts.length, '| deleted:', userDeleted.length);
     }
 
     previousUserIdRef.current = currentUserId;
