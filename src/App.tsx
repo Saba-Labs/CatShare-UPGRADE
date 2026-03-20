@@ -13,7 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { initializeFieldSystem } from "./config/initializeFields";
 import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
-import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
+import { runMigrations, migrateUnkeyedDataToUserKeyed, migrateProductImagePaths } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -169,6 +169,25 @@ function AppWithBackHandler() {
       // Load data for the new user from keyed storage
       const userProducts = safeGetFromStorage(getProductsKey(currentUserId), []);
       const userDeleted = safeGetFromStorage(getDeletedProductsKey(currentUserId), []);
+
+      // Migrate image paths to user-specific format (async, but don't block on it)
+      if (userProducts.length > 0) {
+        migrateProductImagePaths(userProducts, currentUserId).then(() => {
+          // Update products in storage after image migration
+          safeSetInStorage(getProductsKey(currentUserId), userProducts);
+        }).catch(err => {
+          console.warn('⚠️ Image path migration encountered errors:', err);
+          // Continue anyway - images might just use old paths
+        });
+      }
+      if (userDeleted.length > 0) {
+        migrateProductImagePaths(userDeleted, currentUserId).then(() => {
+          safeSetInStorage(getDeletedProductsKey(currentUserId), userDeleted);
+        }).catch(err => {
+          console.warn('⚠️ Image path migration for deleted products encountered errors:', err);
+        });
+      }
+
       setProducts(userProducts);
       setDeletedProducts(userDeleted);
       console.log('🔄 Loaded data for user:', currentUserId, '| products:', userProducts.length, '| deleted:', userDeleted.length);
@@ -202,7 +221,7 @@ function AppWithBackHandler() {
     if (!offlineSyncDecisionLoaded) return;
     if (offlineSyncChoice) return;
 
-    const localProducts = safeGetFromStorage("products", []);
+    const localProducts = safeGetFromStorage(getProductsKey(user.uid), []);
     const hasLocalProducts = Array.isArray(localProducts) && localProducts.length > 0;
     if (hasLocalProducts) {
       setShowOfflineSyncModal(true);

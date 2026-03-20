@@ -7,7 +7,7 @@
 
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } from "../config/catalogueConfig";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import { getStorageKey } from "./safeStorage";
+import { getStorageKey, getUserImagePath } from "./safeStorage";
 import { getFieldsDefinition, setFieldsDefinition } from "../config/fieldConfig";
 
 /**
@@ -385,6 +385,64 @@ export function getMigrationStatus(): {
       : "Legacy product system detected",
     hasLegacyData,
   };
+}
+
+/**
+ * Migrate image paths to per-user format
+ * Moves images from old paths (e.g., catalogue/product-id.png) to user-specific paths
+ * @param products - Array of products to migrate
+ * @param userId - The user ID for the new path
+ */
+export async function migrateProductImagePaths(products: any[], userId: string): Promise<void> {
+  try {
+    for (const product of products) {
+      if (!product.imagePath) continue;
+
+      // Check if image path is already in user-specific format
+      if (product.imagePath.startsWith(`user-${userId}/`)) {
+        continue; // Already migrated
+      }
+
+      // Generate new user-specific path
+      const newImagePath = getUserImagePath(product.id, userId);
+
+      try {
+        // Try to read from old path
+        const result = await Filesystem.readFile({
+          path: product.imagePath,
+          directory: Directory.Data,
+        });
+
+        // Write to new user-specific path
+        await Filesystem.writeFile({
+          path: newImagePath,
+          data: result.data,
+          directory: Directory.Data,
+          recursive: true,
+        });
+
+        // Update product reference
+        product.imagePath = newImagePath;
+
+        console.log(`✅ Migrated image for product ${product.id} to user-specific path`);
+
+        // Try to delete old file (non-critical, so catch errors)
+        try {
+          await Filesystem.deleteFile({
+            path: product.imagePath.split('/').slice(1).join('/'), // Remove user prefix to get old path
+            directory: Directory.Data,
+          });
+        } catch (delErr) {
+          // Old file might not exist, that's ok
+        }
+      } catch (err) {
+        console.warn(`⚠️ Could not migrate image for product ${product.id}:`, err);
+        // Keep the original imagePath reference even if we can't migrate the file
+      }
+    }
+  } catch (err) {
+    console.error(`❌ Error during image path migration:`, err);
+  }
 }
 
 /**

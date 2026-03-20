@@ -14,6 +14,17 @@ export function getStorageKey(baseKey: string, userId: string): string {
 }
 
 /**
+ * Generate a per-user image path for Filesystem storage
+ * @param productId - Product ID
+ * @param userId - User ID (optional, will use localStorage fallback if not provided)
+ * @returns File path (e.g., "user-uid123/catalogue/product-xyz.png")
+ */
+export function getUserImagePath(productId: string, userId?: string): string {
+  const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || 'anonymous';
+  return `user-${effectiveUserId}/catalogue/product-${productId}.png`;
+}
+
+/**
  * Safely parse JSON from localStorage with fallback
  * @param key - localStorage key to retrieve
  * @param fallback - Default value if parsing fails
