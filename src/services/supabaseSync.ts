@@ -242,6 +242,19 @@ export async function syncCategories(
       return { success: false, error: 'Invalid input: userId or categories array missing' };
     }
 
+    // Strict/replace semantics:
+    // categories are "catalogue metadata" that should match the offline snapshot exactly.
+    // So we delete existing categories for the user first.
+    const { error: deleteError } = await getSupabaseClient()
+      .from('categories')
+      .delete()
+      .eq('user_id', userId);
+
+    if (deleteError) {
+      console.error('❌ Error deleting old categories:', deleteError);
+      return { success: false, error: deleteError.message };
+    }
+
     const upsertData = categories.map(category => ({
       user_id: userId,
       category_id: category.id,
@@ -256,7 +269,7 @@ export async function syncCategories(
 
     const { data, error } = await getSupabaseClient()
       .from('categories')
-      .upsert(upsertData, { onConflict: 'user_id,category_id' })
+      .insert(upsertData)
       .select();
 
     if (error) {
@@ -482,7 +495,9 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       categories: categories?.map(c => c.data) || [],
       cataloguesDefinition: cataloguesDef?.[0]?.data || null,
       fieldsDefinition: fieldsDef?.[0]?.data || null,
-      userSettings: settings?.data || null,
+      // `settings` is already the row object from Supabase (not wrapped in { data: ... }).
+      // Keeping this correct is required for strict "cloud snapshot" sync.
+      userSettings: settings || null,
     };
 
     console.log('✅ Fetched all user data from Supabase', {

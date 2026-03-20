@@ -81,9 +81,17 @@ export default function Account() {
       }
 
       const clean = `${whatsappCountryCode}${local}`;
-      await syncUserSettings(user.uid, {
+      const res = await syncUserSettings(user.uid, {
         whatsapp_number: clean,  // save as top-level column, not nested in data
       });
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to sync WhatsApp number to cloud');
+      }
+
+      const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+      if (strictOnline) {
+        window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+      }
       // Also save to localStorage so it persists without refetching
       localStorage.setItem('whatsappNumber', clean);
       showToast('WhatsApp number saved', 'success');

@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { MdArrowBack, MdCheck, MdAdd, MdClose, MdOutlineHome } from "react-icons/md";
 import { useToast } from "../context/ToastContext";
 import { getAllCurrencies } from "../utils/currencyUtils";
+import { safeGetFromStorage } from "../utils/safeStorage";
+import { useAuth } from "../context/AuthContext";
 
 export default function CurrencySettings() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [selectedCurrency, setSelectedCurrency] = useState(() => {
     const stored = localStorage.getItem("defaultCurrency");
     return stored || "INR";
@@ -28,14 +31,47 @@ export default function CurrencySettings() {
     }
   }, []);
 
-  const handleCurrencySelect = (currencyCode) => {
+  const handleCurrencySelect = async (currencyCode) => {
     setSelectedCurrency(currencyCode);
     localStorage.setItem("defaultCurrency", currencyCode);
     window.dispatchEvent(new CustomEvent("currencyChanged", { detail: { currency: currencyCode } }));
     showToast(`Currency changed to ${currencyCode}`, "success");
+
+    const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+    if (!strictOnline || !user?.uid) return;
+
+    try {
+      const { syncUserSettings } = await import('../services/supabaseSync');
+
+      const showWatermark = safeGetFromStorage('showWatermark', true);
+      const watermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
+      const watermarkPosition = safeGetFromStorage('watermarkPosition', 'bottom-left');
+      const priceUnits = safeGetFromStorage('priceFieldUnits', ['/ piece', '/ dozen', '/ set', '/ kg']);
+      const customCurrencies = safeGetFromStorage('customCurrencies', {});
+
+      const res = await syncUserSettings(user.uid, {
+        watermark_enabled: !!showWatermark,
+        watermark_text: watermarkText,
+        currency: currencyCode,
+        price_units: priceUnits,
+        data: {
+          watermarkPosition,
+          customCurrencies,
+        },
+      });
+
+      if (res.success) {
+        window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+      } else {
+        throw new Error(res.error || 'Currency settings sync failed');
+      }
+    } catch (e) {
+      console.error('❌ Currency cloud sync failed:', e);
+      showToast('Failed to sync currency to cloud', 'error');
+    }
   };
 
-  const handleAddCustomCurrency = () => {
+  const handleAddCustomCurrency = async () => {
     if (!customCode.trim() || !customSymbol.trim()) {
       showToast("Please enter both currency code and symbol", "error");
       return;
@@ -61,7 +97,7 @@ export default function CurrencySettings() {
     localStorage.setItem("customCurrencies", JSON.stringify(updated));
 
     // Select it immediately
-    handleCurrencySelect(code);
+    await handleCurrencySelect(code);
 
     // Reset form
     setCustomCode("");

@@ -5,8 +5,10 @@ import { MdCircle } from "react-icons/md";
 
 import { safeGetFromStorage, safeSetInStorage } from "../utils/safeStorage";
 import { logWatermarkApplied } from "../config/analyticsEvents";
+import { useAuth } from "../context/AuthContext";
 
 export default function WatermarkSettings() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [showWatermark, setShowWatermark] = useState(() => {
     return safeGetFromStorage("showWatermark", true);
@@ -94,10 +96,43 @@ export default function WatermarkSettings() {
   }, [renderBoxRef]);
 
   const handleWatermarkToggle = (value) => {
+    // Local state update
     setShowWatermark(value);
     safeSetInStorage("showWatermark", value);
     logWatermarkApplied(value ? "enabled" : "disabled");
     window.dispatchEvent(new CustomEvent("watermarkChanged", { detail: { value } }));
+
+    // Strict cloud sync (definitions/settings)
+    const strictOnline = localStorage.getItem("strictOnlineMode::device") === "true";
+    if (!strictOnline || !user?.uid) return;
+
+    (async () => {
+      try {
+        const { syncUserSettings } = await import("../services/supabaseSync");
+        const currency = localStorage.getItem("defaultCurrency") || "INR";
+        const priceUnits = safeGetFromStorage("priceFieldUnits", ["/ piece", "/ dozen", "/ set", "/ kg"]);
+        const customCurrencies = safeGetFromStorage("customCurrencies", {});
+
+        const res = await syncUserSettings(user.uid, {
+          watermark_enabled: !!value,
+          watermark_text: watermarkText,
+          currency,
+          price_units: priceUnits,
+          data: {
+            watermarkPosition,
+            customCurrencies,
+          },
+        });
+
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent("strict-refresh-from-cloud"));
+        } else {
+          console.warn("⚠️ Failed to sync watermark settings:", res.error);
+        }
+      } catch (e) {
+        console.error("❌ Watermark cloud sync failed:", e);
+      }
+    })();
   };
 
   const handleSaveWatermarkText = () => {
@@ -110,6 +145,37 @@ export default function WatermarkSettings() {
     safeSetInStorage("watermarkText", trimmedText);
     logWatermarkApplied("text_changed", { textLength: trimmedText.length });
     window.dispatchEvent(new CustomEvent("watermarkTextChanged", { detail: { text: trimmedText } }));
+
+    const strictOnline = localStorage.getItem("strictOnlineMode::device") === "true";
+    if (!strictOnline || !user?.uid) return;
+
+    (async () => {
+      try {
+        const { syncUserSettings } = await import("../services/supabaseSync");
+        const currency = localStorage.getItem("defaultCurrency") || "INR";
+        const priceUnits = safeGetFromStorage("priceFieldUnits", ["/ piece", "/ dozen", "/ set", "/ kg"]);
+        const customCurrencies = safeGetFromStorage("customCurrencies", {});
+
+        const res = await syncUserSettings(user.uid, {
+          watermark_enabled: !!showWatermark,
+          watermark_text: trimmedText,
+          currency,
+          price_units: priceUnits,
+          data: {
+            watermarkPosition,
+            customCurrencies,
+          },
+        });
+
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent("strict-refresh-from-cloud"));
+        } else {
+          console.warn("⚠️ Failed to sync watermark text to cloud:", res.error);
+        }
+      } catch (e) {
+        console.error("❌ Watermark text cloud sync failed:", e);
+      }
+    })();
   };
 
   const handleResetWatermarkText = () => {
@@ -119,6 +185,37 @@ export default function WatermarkSettings() {
     safeSetInStorage("watermarkText", defaultText);
     logWatermarkApplied("text_reset");
     window.dispatchEvent(new CustomEvent("watermarkTextChanged", { detail: { text: defaultText } }));
+
+    const strictOnline = localStorage.getItem("strictOnlineMode::device") === "true";
+    if (!strictOnline || !user?.uid) return;
+
+    (async () => {
+      try {
+        const { syncUserSettings } = await import("../services/supabaseSync");
+        const currency = localStorage.getItem("defaultCurrency") || "INR";
+        const priceUnits = safeGetFromStorage("priceFieldUnits", ["/ piece", "/ dozen", "/ set", "/ kg"]);
+        const customCurrencies = safeGetFromStorage("customCurrencies", {});
+
+        const res = await syncUserSettings(user.uid, {
+          watermark_enabled: !!showWatermark,
+          watermark_text: defaultText,
+          currency,
+          price_units: priceUnits,
+          data: {
+            watermarkPosition,
+            customCurrencies,
+          },
+        });
+
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent("strict-refresh-from-cloud"));
+        } else {
+          console.warn("⚠️ Failed to sync watermark reset to cloud:", res.error);
+        }
+      } catch (e) {
+        console.error("❌ Watermark reset cloud sync failed:", e);
+      }
+    })();
   };
 
   const handlePositionChange = (position) => {
@@ -126,6 +223,37 @@ export default function WatermarkSettings() {
     safeSetInStorage("watermarkPosition", position);
     logWatermarkApplied("position_changed", { position });
     window.dispatchEvent(new CustomEvent("watermarkPositionChanged", { detail: { position } }));
+
+    const strictOnline = localStorage.getItem("strictOnlineMode::device") === "true";
+    if (!strictOnline || !user?.uid) return;
+
+    (async () => {
+      try {
+        const { syncUserSettings } = await import("../services/supabaseSync");
+        const currency = localStorage.getItem("defaultCurrency") || "INR";
+        const priceUnits = safeGetFromStorage("priceFieldUnits", ["/ piece", "/ dozen", "/ set", "/ kg"]);
+        const customCurrencies = safeGetFromStorage("customCurrencies", {});
+
+        const res = await syncUserSettings(user.uid, {
+          watermark_enabled: !!showWatermark,
+          watermark_text: watermarkText,
+          currency,
+          price_units: priceUnits,
+          data: {
+            watermarkPosition: position,
+            customCurrencies,
+          },
+        });
+
+        if (res.success) {
+          window.dispatchEvent(new CustomEvent("strict-refresh-from-cloud"));
+        } else {
+          console.warn("⚠️ Failed to sync watermark position to cloud:", res.error);
+        }
+      } catch (e) {
+        console.error("❌ Watermark position cloud sync failed:", e);
+      }
+    })();
   };
 
   return (

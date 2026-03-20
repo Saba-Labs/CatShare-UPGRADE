@@ -166,6 +166,10 @@ export default function FieldsSettings() {
           const syncResult = await syncFieldsDefinition(user.uid, definition);
           if (syncResult.success) {
             console.log('✅ Fields definition synced to Supabase');
+            const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+            if (strictOnline) {
+              window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+            }
           } else {
             console.warn('⚠️ Failed to sync fields definition:', syncResult.error);
           }

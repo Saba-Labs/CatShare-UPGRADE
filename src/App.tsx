@@ -67,6 +67,7 @@ function AppWithBackHandler() {
   const [imageMap, setImageMap] = useState({});
   const [products, setProducts] = useState<any[]>([]);
   const [deletedProducts, setDeletedProducts] = useState<any[]>([]);
+  const [isApplyingCloudSnapshot, setIsApplyingCloudSnapshot] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     return safeGetFromStorage("darkMode", false);
   });
@@ -83,6 +84,10 @@ function AppWithBackHandler() {
   const [offlineSyncDecisionLoaded, setOfflineSyncDecisionLoaded] = useState(false);
   const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
   const [syncNowLoading, setSyncNowLoading] = useState(false);
+  const isApplyingCloudSnapshotRef = useRef(false);
+  const [isStrictSyncing, setIsStrictSyncing] = useState(false);
+  const isStrictSyncingRef = useRef(false);
+  const strictSyncDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isNative = Capacitor.getPlatform() !== "web";
 
@@ -116,6 +121,130 @@ function AppWithBackHandler() {
     localStorage.removeItem('retailProducts');
   }, []);
 
+  const refreshFromCloudSnapshot = useCallback(async () => {
+    if (!user?.uid) return;
+    setIsApplyingCloudSnapshot(true);
+    isApplyingCloudSnapshotRef.current = true;
+    try {
+      const userId = user.uid;
+      console.log('🔄 [strict] refreshFromCloudSnapshot start', { userId });
+      const { fetchAllUserData } = await import('./services/supabaseSync');
+
+      const result = await fetchAllUserData(userId);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch cloud snapshot');
+      }
+
+      const snapshot = result.data;
+
+      // 1) Replace product state + user-scoped caches
+      const nextProducts = Array.isArray(snapshot.products) ? snapshot.products : [];
+      const nextDeleted = Array.isArray(snapshot.deletedProducts) ? snapshot.deletedProducts : [];
+
+      // Ensure shelved items (deleted_products) never appear in the products list.
+      const deletedIds = new Set((nextDeleted || []).map((p: any) => p.id));
+      const filteredProducts = (nextProducts || []).filter((p: any) => !deletedIds.has(p.id));
+
+      setProducts(filteredProducts);
+      safeSetInStorage(getProductsKey(userId), filteredProducts);
+
+      setDeletedProducts(nextDeleted);
+      safeSetInStorage(getDeletedProductsKey(userId), nextDeleted);
+
+      // 2) Replace unkeyed legacy categories cache (strict mode => always overwritten from cloud)
+      localStorage.setItem('categories', JSON.stringify(snapshot.categories || []));
+
+      // 3) Replace definitions (keyed)
+      if (snapshot.fieldsDefinition) {
+        setFieldsDefinition(snapshot.fieldsDefinition, userId);
+      }
+      if (snapshot.cataloguesDefinition) {
+        setCataloguesDefinition(snapshot.cataloguesDefinition, userId);
+      }
+
+      // 4) Replace rendering settings from `user_settings` row (if stored there)
+      const us = snapshot.userSettings || {};
+
+      // Current Supabase schema (SUPABASE_SETUP.sql):
+      // - watermark_enabled (boolean)
+      // - watermark_text (text)
+      // - currency (text)
+      // - price_units (JSONB array)
+      // - data (JSONB)
+      // - whatsapp_number is not part of the schema by default; kept for backward compatibility.
+      if (typeof us.watermark_enabled === 'boolean') {
+        safeSetInStorage('showWatermark', us.watermark_enabled);
+      } else if (typeof us.showWatermark === 'boolean') {
+        // Legacy / previous client keys
+        safeSetInStorage('showWatermark', us.showWatermark);
+      }
+
+      if (typeof us.watermark_text === 'string' && us.watermark_text.length > 0) {
+        safeSetInStorage('watermarkText', us.watermark_text);
+      } else if (typeof us.watermarkText === 'string' && us.watermarkText.length > 0) {
+        safeSetInStorage('watermarkText', us.watermarkText);
+      }
+
+      if (typeof us.currency === 'string' && us.currency.length > 0) {
+        localStorage.setItem('defaultCurrency', us.currency);
+      } else if (typeof us.defaultCurrency === 'string' && us.defaultCurrency.length > 0) {
+        localStorage.setItem('defaultCurrency', us.defaultCurrency);
+      }
+
+      if (Array.isArray(us.price_units)) {
+        localStorage.setItem('priceFieldUnits', JSON.stringify(us.price_units));
+      }
+
+      const watermarkPosition =
+        (us.data && typeof us.data === 'object' ? us.data.watermarkPosition : undefined) ||
+        (typeof us.watermarkPosition === 'string' ? us.watermarkPosition : undefined);
+      if (typeof watermarkPosition === 'string' && watermarkPosition.length > 0) {
+        safeSetInStorage('watermarkPosition', watermarkPosition);
+      }
+
+      if (us.data && typeof us.data === 'object' && us.data.customCurrencies && typeof us.data.customCurrencies === 'object') {
+        safeSetInStorage('customCurrencies', us.data.customCurrencies);
+      }
+
+      // Account page expects plain string (no JSON parsing)
+      if (typeof us.whatsapp_number === 'string' && us.whatsapp_number.length > 0) {
+        localStorage.setItem('whatsappNumber', us.whatsapp_number);
+      }
+
+      console.log('✅ [strict] Applied cloud snapshot (strict mode)');
+    } finally {
+      isApplyingCloudSnapshotRef.current = false;
+      setIsApplyingCloudSnapshot(false);
+    }
+  }, [user?.uid]);
+
+  // Strict-mode trigger: definitions/settings components can dispatch this event
+  // after their awaited cloud sync completes. App will then refresh exact snapshot.
+  useEffect(() => {
+    const handleStrictRefresh = async () => {
+      const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+      if (!strictOnline) return;
+
+      if (isApplyingCloudSnapshotRef.current) return;
+      if (isStrictSyncingRef.current) return;
+
+      console.log('🔄 [strict] strict-refresh-from-cloud event');
+      isStrictSyncingRef.current = true;
+      setIsStrictSyncing(true);
+      try {
+        await refreshFromCloudSnapshot();
+      } catch (e) {
+        console.error('❌ strict-refresh-from-cloud failed:', e);
+      } finally {
+        isStrictSyncingRef.current = false;
+        setIsStrictSyncing(false);
+      }
+    };
+
+    window.addEventListener('strict-refresh-from-cloud', handleStrictRefresh as any);
+    return () => window.removeEventListener('strict-refresh-from-cloud', handleStrictRefresh as any);
+  }, [refreshFromCloudSnapshot]);
+
   const syncOfflineDataNow = useCallback(async () => {
     if (!user?.uid) return;
     setSyncNowLoading(true);
@@ -124,8 +253,17 @@ function AppWithBackHandler() {
       let localProducts = safeGetFromStorage(getProductsKey(userId), []);
       const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
 
-      // Upload missing images to R2 BEFORE syncing products, so other devices can display them.
-      // (This is still opt-in: this function is only invoked after the user chooses "sync".)
+      const {
+        fetchAllUserData,
+        syncProducts,
+        syncDeletedProducts,
+        syncCategories,
+        syncCataloguesDefinition,
+        syncFieldsDefinition,
+        syncUserSettings,
+      } = await import('./services/supabaseSync');
+
+      // 1) Upload missing images to R2 BEFORE syncing products, so other devices can display them.
       if (Array.isArray(localProducts) && localProducts.length > 0) {
         const { uploadProductImageToR2 } = await import('./services/r2Upload');
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
@@ -134,41 +272,108 @@ function AppWithBackHandler() {
           localProducts.map(async (p: any) => {
             if (p.imageUrl) return p;
             if (!p.imagePath) return p;
-            try {
-              const fileData = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.Data,
-              });
-              const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
-              const dataUrlPrefix =
-                filename.endsWith(".jpg") || filename.endsWith(".jpeg")
-                  ? "data:image/jpeg;base64,"
-                  : "data:image/png;base64,";
 
-              const uploaded = await uploadProductImageToR2({
-                productId: String(p.id),
-                dataUrl: `${dataUrlPrefix}${fileData.data}`,
-              });
-              return uploaded?.url ? { ...p, imageUrl: uploaded.url } : p;
-            } catch (e) {
-              // If upload fails, keep local image; syncing can still proceed
-              return p;
+            const fileData = await Filesystem.readFile({
+              path: p.imagePath,
+              directory: Directory.Data,
+            });
+
+            const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
+            const dataUrlPrefix =
+              filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+                ? 'data:image/jpeg;base64,'
+                : 'data:image/png;base64,';
+
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${fileData.data}`,
+            });
+
+            if (!uploaded?.url) {
+              throw new Error(`R2 upload failed for product ${p.id}`);
             }
+
+            return { ...p, imageUrl: uploaded.url };
           })
         );
 
         localProducts = updated;
-        safeSetInStorage(getProductsKey(user.uid), updated);
-        setProducts(updated);
+        safeSetInStorage(getProductsKey(userId), updated);
       }
 
-      const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
-      if (Array.isArray(localProducts) && localProducts.length > 0) {
-        const productsRes = await syncProducts(userId, localProducts);
+      // 2) Replace cloud definitions/settings from current local snapshot.
+      let localCategories: any[] = [];
+      try {
+        localCategories = JSON.parse(localStorage.getItem('categories') || '[]');
+      } catch {
+        localCategories = [];
+      }
+
+      const localCataloguesDefinition = getCataloguesDefinition(userId);
+      const localFieldsDefinition = getFieldsDefinition(userId);
+
+      const localShowWatermark = safeGetFromStorage('showWatermark', true);
+      const localWatermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
+      const localWatermarkPosition = safeGetFromStorage('watermarkPosition', 'bottom-left');
+      const localCurrency = localStorage.getItem('defaultCurrency') || 'INR';
+      const localPriceUnits = safeGetFromStorage('priceFieldUnits', ['/ piece', '/ dozen', '/ set', '/ kg']);
+      const localCustomCurrencies = safeGetFromStorage('customCurrencies', {});
+
+      {
+        const categoriesRes = await syncCategories(userId, Array.isArray(localCategories) ? localCategories : []);
+        if (!categoriesRes.success) throw new Error(categoriesRes.error || 'Categories sync failed');
+      }
+      {
+        const cataloguesRes = await syncCataloguesDefinition(userId, localCataloguesDefinition);
+        if (!cataloguesRes.success) throw new Error(cataloguesRes.error || 'Catalogues definition sync failed');
+      }
+      {
+        const fieldsRes = await syncFieldsDefinition(userId, localFieldsDefinition);
+        if (!fieldsRes.success) throw new Error(fieldsRes.error || 'Fields definition sync failed');
+      }
+      {
+        const settingsRes = await syncUserSettings(userId, {
+        watermark_enabled: !!localShowWatermark,
+        watermark_text: localWatermarkText,
+        currency: localCurrency,
+        price_units: localPriceUnits,
+        data: {
+          watermarkPosition: localWatermarkPosition,
+          customCurrencies: localCustomCurrencies,
+        },
+        });
+        if (!settingsRes.success) throw new Error(settingsRes.error || 'User settings sync failed');
+      }
+
+      // 3) Products merge: remote first, newer by `updatedAt` wins.
+      const remoteSnapshot = await fetchAllUserData(userId);
+      if (!remoteSnapshot.success || !remoteSnapshot.data) {
+        throw new Error(remoteSnapshot.error || 'Failed to fetch remote snapshot for merge');
+      }
+
+      const remoteProducts = Array.isArray(remoteSnapshot.data.products) ? remoteSnapshot.data.products : [];
+      const remoteDeleted = Array.isArray(remoteSnapshot.data.deletedProducts)
+        ? remoteSnapshot.data.deletedProducts
+        : [];
+
+      const deletedIds = new Set([
+        ...(Array.isArray(localDeleted) ? localDeleted : []).map((p: any) => p.id),
+        ...(remoteDeleted || []).map((p: any) => p.id),
+      ]);
+
+      const localProductsFiltered = (Array.isArray(localProducts) ? localProducts : []).filter(
+        (p: any) => !deletedIds.has(p.id)
+      );
+
+      const mergedProducts = mergeProductsData(localProductsFiltered, remoteProducts, deletedIds);
+      const mergedDeleted = mergeProductsData(localDeleted || [], remoteDeleted || []);
+
+      {
+        const productsRes = await syncProducts(userId, mergedProducts);
         if (!productsRes.success) throw new Error(productsRes.error || 'Products sync failed');
       }
-      if (Array.isArray(localDeleted) && localDeleted.length > 0) {
-        const deletedRes = await syncDeletedProducts(userId, localDeleted);
+      {
+        const deletedRes = await syncDeletedProducts(userId, mergedDeleted);
         if (!deletedRes.success) throw new Error(deletedRes.error || 'Deleted products sync failed');
       }
 
@@ -292,6 +497,94 @@ function AppWithBackHandler() {
     try {
       setSupabaseSyncStatus('syncing');
       const userId = user.uid;
+
+      // Strict online mode: cloud is the source of truth.
+      // Skip any local+remote merge and overwrite local caches/state with Supabase snapshot.
+      const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+      if (strictOnline) {
+        const nextProducts = Array.isArray(supabaseData.products) ? supabaseData.products : [];
+        const nextDeleted = Array.isArray(supabaseData.deletedProducts) ? supabaseData.deletedProducts : [];
+
+        // Ensure shelved items (deleted_products) never appear in the products list.
+        const deletedIds = new Set((nextDeleted || []).map((p: any) => p.id));
+        const filteredProducts = (nextProducts || []).filter((p: any) => !deletedIds.has(p.id));
+
+        setProducts(filteredProducts);
+        safeSetInStorage(getProductsKey(userId), filteredProducts);
+
+        setDeletedProducts(nextDeleted);
+        safeSetInStorage(getDeletedProductsKey(userId), nextDeleted);
+
+        // Categories cache (unkeyed in app) must be overwritten from cloud on every strict login.
+        localStorage.setItem('categories', JSON.stringify(supabaseData.categories || []));
+
+        if (supabaseData.fieldsDefinition) {
+          setFieldsDefinition(supabaseData.fieldsDefinition, userId);
+          window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+            detail: {
+              newDefinition: supabaseData.fieldsDefinition,
+              template: supabaseData.fieldsDefinition?.industry || 'Custom',
+              isBackupRestore: false
+            }
+          }));
+        }
+
+        if (supabaseData.cataloguesDefinition) {
+          setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
+
+          // Keep consistent with existing merge logic event payload.
+          window.dispatchEvent(new CustomEvent('catalogues-changed', {
+            detail: {
+              action: 'update',
+              catalogues: supabaseData.cataloguesDefinition.catalogues
+            }
+          }));
+        }
+
+        // Apply rendering settings from `user_settings` row.
+        const us = supabaseData.userSettings || {};
+
+        if (typeof us.watermark_enabled === 'boolean') {
+          safeSetInStorage('showWatermark', us.watermark_enabled);
+        } else if (typeof us.showWatermark === 'boolean') {
+          safeSetInStorage('showWatermark', us.showWatermark);
+        }
+
+        if (typeof us.watermark_text === 'string' && us.watermark_text.length > 0) {
+          safeSetInStorage('watermarkText', us.watermark_text);
+        } else if (typeof us.watermarkText === 'string' && us.watermarkText.length > 0) {
+          safeSetInStorage('watermarkText', us.watermarkText);
+        }
+
+        if (typeof us.currency === 'string' && us.currency.length > 0) {
+          localStorage.setItem('defaultCurrency', us.currency);
+        } else if (typeof us.defaultCurrency === 'string' && us.defaultCurrency.length > 0) {
+          localStorage.setItem('defaultCurrency', us.defaultCurrency);
+        }
+
+        if (Array.isArray(us.price_units)) {
+          localStorage.setItem('priceFieldUnits', JSON.stringify(us.price_units));
+        }
+
+        const watermarkPosition =
+          (us.data && typeof us.data === 'object' ? us.data.watermarkPosition : undefined) ||
+          (typeof us.watermarkPosition === 'string' ? us.watermarkPosition : undefined);
+        if (typeof watermarkPosition === 'string' && watermarkPosition.length > 0) {
+          safeSetInStorage('watermarkPosition', watermarkPosition);
+        }
+
+        if (us.data && typeof us.data === 'object' && us.data.customCurrencies && typeof us.data.customCurrencies === 'object') {
+          safeSetInStorage('customCurrencies', us.data.customCurrencies);
+        }
+
+        // Backward compatibility: old client stored whatsapp number in user_settings.
+        if (typeof us.whatsapp_number === 'string' && us.whatsapp_number.length > 0) {
+          localStorage.setItem('whatsappNumber', us.whatsapp_number);
+        }
+
+        setSupabaseSyncStatus('synced');
+        return;
+      }
 
       // Always read fresh keyed storage to avoid accidentally merging
       // stale React state from the previously logged-in account.
@@ -642,6 +935,9 @@ return result;
   useEffect(() => {
     if (!user) return;
 
+    const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+    if (strictOnline) return; // strict mode uses a different (awaited) sync flow
+
     // Skip sync for offline guest users
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
@@ -685,6 +981,9 @@ return result;
   useEffect(() => {
     if (!user) return;
 
+    const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+    if (strictOnline) return; // strict mode uses a different (awaited) sync flow
+
     // Skip sync for offline guest users
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
@@ -710,6 +1009,128 @@ return result;
       });
     });
   }, [deletedProducts, user]);
+
+  // Strict sync: whenever products/deleted-products change, wait for:
+  // 1) missing image uploads to R2
+  // 2) Supabase upserts
+  // 3) cloud snapshot refresh
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+    if (!strictOnline) return;
+
+    if (isStrictSyncingRef.current) return;
+    if (isApplyingCloudSnapshotRef.current) return;
+
+    // Skip strict sync for offline guest users
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
+
+    // No-op when nothing to sync
+    const hasProducts = Array.isArray(products) && products.length > 0;
+    const hasDeleted = Array.isArray(deletedProducts) && deletedProducts.length > 0;
+    if (!hasProducts && !hasDeleted) return;
+
+    let cancelled = false;
+
+    const runStrictSync = async () => {
+      isStrictSyncingRef.current = true;
+      setIsStrictSyncing(true);
+      try {
+        const userId = user.uid;
+        console.log('🔄 [strict] strict product/deleted sync start', {
+          userId,
+          productsCount: Array.isArray(products) ? products.length : 0,
+          deletedCount: Array.isArray(deletedProducts) ? deletedProducts.length : 0,
+        });
+
+        let nextProductsForSync = Array.isArray(products) ? products : [];
+
+        // Upload missing images to R2 before syncing products
+        if (nextProductsForSync.length > 0) {
+          const missing = nextProductsForSync.filter((p: any) => !p.imageUrl && p.imagePath);
+          if (missing.length > 0) {
+            const { uploadProductImageToR2 } = await import('./services/r2Upload');
+            const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+            const uploadedPairs = await Promise.all(
+              missing.map(async (p: any) => {
+                const fileData = await Filesystem.readFile({
+                  path: p.imagePath,
+                  directory: Directory.Data,
+                });
+
+                const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
+                const dataUrlPrefix =
+                  filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+                    ? 'data:image/jpeg;base64,'
+                    : 'data:image/png;base64,';
+
+                const uploaded = await uploadProductImageToR2({
+                  productId: String(p.id),
+                  dataUrl: `${dataUrlPrefix}${fileData.data}`,
+                });
+
+                if (!uploaded?.url) {
+                  throw new Error(`R2 upload failed for product ${p.id}`);
+                }
+
+                return { productId: p.id, imageUrl: uploaded.url };
+              })
+            );
+
+            // Patch imageUrl into the array used for Supabase sync.
+            const imageUrlById = new Map(uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl]));
+            nextProductsForSync = nextProductsForSync.map((p: any) => {
+              const nextUrl = imageUrlById.get(String(p.id));
+              return nextUrl ? { ...p, imageUrl: nextUrl } : p;
+            });
+          }
+        }
+
+        // Sync to Supabase (awaited).
+        const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
+
+        if (nextProductsForSync.length > 0) {
+          const productsRes = await syncProducts(userId, nextProductsForSync);
+          if (!productsRes.success) throw new Error(productsRes.error || 'Products sync failed');
+        }
+
+        if (Array.isArray(deletedProducts) && deletedProducts.length > 0) {
+          const deletedRes = await syncDeletedProducts(userId, deletedProducts);
+          if (!deletedRes.success) throw new Error(deletedRes.error || 'Deleted products sync failed');
+        }
+
+        // Refresh full cloud snapshot and apply.
+        await refreshFromCloudSnapshot();
+        console.log('✅ [strict] strict product/deleted sync done', { userId });
+      } finally {
+        if (!cancelled) {
+          isStrictSyncingRef.current = false;
+          setIsStrictSyncing(false);
+        }
+      }
+    };
+
+    // Debounce strict sync so rapid successive edits don't trigger many upsert+refresh cycles.
+    if (strictSyncDebounceTimerRef.current) {
+      clearTimeout(strictSyncDebounceTimerRef.current);
+    }
+    strictSyncDebounceTimerRef.current = setTimeout(() => {
+      if (cancelled) return;
+      runStrictSync().catch(err => {
+        console.error('❌ strict sync error:', err);
+      });
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      if (strictSyncDebounceTimerRef.current) {
+        clearTimeout(strictSyncDebounceTimerRef.current);
+      }
+    };
+  }, [products, deletedProducts, user?.uid, refreshFromCloudSnapshot]);
 
   useEffect(() => {
     safeSetInStorage("darkMode", darkMode);
@@ -1009,7 +1430,7 @@ return result;
             {/* Action Buttons */}
             <div className="space-y-3 mb-4">
               <button
-                disabled={syncNowLoading}
+                disabled={syncNowLoading || isApplyingCloudSnapshot}
                 onClick={async () => {
                   const key = getOfflineChoiceKey(user.uid);
                   localStorage.setItem(key, 'sync');
@@ -1021,6 +1442,19 @@ return result;
                   } catch (e: any) {
                     console.warn('Sync now failed:', e?.message || e);
                   }
+
+                  // Enter strict online mode and re-fetch exact cloud snapshot.
+                  localStorage.setItem('strictOnlineMode::device', 'true');
+                  try {
+                    await refreshFromCloudSnapshot();
+                  } catch (e) {
+                    console.error('❌ Cloud snapshot refresh failed after legacy sync:', e);
+                  }
+
+                  // Stop legacy background sync loops once snapshot is applied.
+                  localStorage.setItem(getOfflineChoiceKey(user.uid), 'cleared');
+                  setOfflineSyncChoice('cleared');
+                  setShowFirstSyncBanner(false);
                 }}
                 className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm sm:text-base transition-colors"
               >
@@ -1033,7 +1467,7 @@ return result;
 
             {/* Danger Zone */}
             <button
-              disabled={syncNowLoading}
+              disabled={syncNowLoading || isApplyingCloudSnapshot}
               onClick={() => {
                 const ok = window.confirm(
                   "Delete offline products from this device permanently? This cannot be undone."
@@ -1055,6 +1489,23 @@ return result;
                 clearAllOfflineCaches();
               // Extra safety: clear legacy unkeyed caches too.
               clearLegacyUnkeyedProductCaches();
+
+                // Enter strict online mode (the legacy dataset is deleted locally only).
+                localStorage.setItem('strictOnlineMode::device', 'true');
+
+                // Wipe legacy/local metadata so user must go through welcome flow again.
+                // (We do NOT delete Supabase data; strict mode will overwrite local caches from cloud.)
+                localStorage.removeItem('categories');
+                localStorage.removeItem('cataloguesDefinition');
+                localStorage.removeItem('fieldsDefinition');
+                localStorage.removeItem(getStorageKey('cataloguesDefinition', user.uid));
+                localStorage.removeItem(getStorageKey('fieldsDefinition', user.uid));
+                localStorage.removeItem('showTutorialOnInit');
+                safeSetInStorage('hasCompletedOnboarding', false);
+
+                // Restart onboarding from welcome screen.
+                navigate('/welcome');
+
               }}
               className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
             >
@@ -1091,6 +1542,19 @@ return result;
             >
               ✕
             </button>
+          </div>
+        </div>
+      )}
+
+      {isStrictSyncing && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-5 max-w-sm w-full text-center">
+            <div className="text-gray-800 font-semibold text-sm sm:text-base mb-2">
+              Syncing changes to cloud...
+            </div>
+            <div className="text-gray-600 text-xs">
+              Please wait. Your updated catalogue will appear after cloud sync completes.
+            </div>
           </div>
         </div>
       )}

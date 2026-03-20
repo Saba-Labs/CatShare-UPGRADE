@@ -124,9 +124,18 @@ export default React.memo(function ManageCatalogues({
 
           // Sync catalogues to Supabase
           if (user?.uid) {
-            syncCataloguesDefinition(user.uid, updated).catch(err => {
-              console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
-            });
+            const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+            if (strictOnline) {
+              const syncRes = await syncCataloguesDefinition(user.uid, updated);
+              if (!syncRes.success) {
+                throw new Error(syncRes.error || 'Failed to sync catalogues to Supabase');
+              }
+              window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+            } else {
+              syncCataloguesDefinition(user.uid, updated).catch(err => {
+                console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+              });
+            }
           }
 
           // Log catalogue creation event with the new catalogue name
@@ -212,9 +221,18 @@ export default React.memo(function ManageCatalogues({
 
       // Sync catalogues to Supabase
       if (user?.uid) {
-        syncCataloguesDefinition(user.uid, updated).catch(err => {
-          console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
-        });
+        const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+        if (strictOnline) {
+          const syncRes = await syncCataloguesDefinition(user.uid, updated);
+          if (!syncRes.success) {
+            throw new Error(syncRes.error || 'Failed to sync catalogues to Supabase');
+          }
+          window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+        } else {
+          syncCataloguesDefinition(user.uid, updated).catch(err => {
+            console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+          });
+        }
       }
 
       logCatalogueCreated(newLabel);
@@ -247,9 +265,18 @@ export default React.memo(function ManageCatalogues({
 
         // Sync catalogues to Supabase
         if (user?.uid) {
-          syncCataloguesDefinition(user.uid, updated).catch(err => {
-            console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
-          });
+          const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+          if (strictOnline) {
+            const syncRes = await syncCataloguesDefinition(user.uid, updated);
+            if (!syncRes.success) {
+              throw new Error(syncRes.error || 'Failed to sync catalogues to Supabase');
+            }
+            window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+          } else {
+            syncCataloguesDefinition(user.uid, updated).catch(err => {
+              console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
+            });
+          }
         }
 
         logCatalogueDeleted(catalogue.label);
