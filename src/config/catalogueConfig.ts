@@ -1,14 +1,16 @@
 /**
  * Catalogue Management System
- * 
+ *
  * Supports dynamic creation of multiple catalogues (originally Wholesale and Resell)
  * Each catalogue has its own pricing fields and stock status field
- * 
+ *
  * Backward Compatibility:
  * - Old products with price1/price2 and wholesaleStock/resellStock are automatically
  *   mapped to default catalogues "Catalogue 1" and "Catalogue 2"
  * - Existing backups and data remain unchanged and work seamlessly
  */
+
+import { getStorageKey } from '../utils/safeStorage';
 
 export interface Catalogue {
   id: string; // unique identifier (e.g., "cat1", "cat2", "custom1")
@@ -51,10 +53,23 @@ export const DEFAULT_CATALOGUES: Catalogue[] = [
 /**
  * Get current catalogues definition from localStorage
  * Falls back to defaults if not found (first time setup)
+ * @param userId - Optional user ID for keyed storage
  */
-export function getCataloguesDefinition(): CataloguesDefinition {
+export function getCataloguesDefinition(userId?: string): CataloguesDefinition {
   try {
-    const stored = localStorage.getItem("cataloguesDefinition");
+    // Determine storage key
+    let storageKey = "cataloguesDefinition";
+    if (userId) {
+      storageKey = getStorageKey("cataloguesDefinition", userId);
+    } else {
+      // Try to get from keyed storage using localStorage fallback
+      const firebaseUserId = localStorage.getItem('firebaseUserId');
+      if (firebaseUserId) {
+        storageKey = getStorageKey("cataloguesDefinition", firebaseUserId);
+      }
+    }
+
+    const stored = localStorage.getItem(storageKey);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -72,17 +87,21 @@ export function getCataloguesDefinition(): CataloguesDefinition {
 
 /**
  * Save catalogues definition to localStorage
+ * @param definition - The catalogue definition to save
+ * @param userId - Optional user ID for keyed storage
  */
-export function setCataloguesDefinition(definition: CataloguesDefinition): void {
+export function setCataloguesDefinition(definition: CataloguesDefinition, userId?: string): void {
   try {
     const updated = {
       ...definition,
       lastUpdated: Date.now(),
     };
-    localStorage.setItem(
-      "cataloguesDefinition",
-      JSON.stringify(updated)
-    );
+
+    // Determine storage key
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const storageKey = effectiveUserId ? getStorageKey("cataloguesDefinition", effectiveUserId) : "cataloguesDefinition";
+
+    localStorage.setItem(storageKey, JSON.stringify(updated));
 
     // Dispatch event to notify all listening components to refresh their catalogue state
     if (typeof window !== 'undefined') {
@@ -97,38 +116,47 @@ export function setCataloguesDefinition(definition: CataloguesDefinition): void 
 
 /**
  * Get all catalogues (sorted by order)
+ * @param userId - Optional user ID for keyed storage
  */
-export function getAllCatalogues(): Catalogue[] {
-  const definition = getCataloguesDefinition();
+export function getAllCatalogues(userId?: string): Catalogue[] {
+  const definition = getCataloguesDefinition(userId);
   return definition.catalogues.sort((a, b) => a.order - b.order);
 }
 
 /**
  * Get a specific catalogue by ID
+ * @param id - Catalogue ID
+ * @param userId - Optional user ID for keyed storage
  */
-export function getCatalogueById(id: string): Catalogue | undefined {
-  const definition = getCataloguesDefinition();
+export function getCatalogueById(id: string, userId?: string): Catalogue | undefined {
+  const definition = getCataloguesDefinition(userId);
   return definition.catalogues.find((c) => c.id === id);
 }
 
 /**
  * Get catalogue by folder name (for backward compatibility)
  * e.g., "Wholesale" -> cat1, "Resell" -> cat2
+ * @param folder - Folder name
+ * @param userId - Optional user ID for keyed storage
  */
-export function getCatalogueByFolder(folder: string): Catalogue | undefined {
-  const definition = getCataloguesDefinition();
+export function getCatalogueByFolder(folder: string, userId?: string): Catalogue | undefined {
+  const definition = getCataloguesDefinition(userId);
   return definition.catalogues.find((c) => c.folder === folder);
 }
 
 /**
  * Add a new catalogue
  * Returns the created catalogue or null if failed
+ * @param label - Catalogue label
+ * @param options - Optional catalogue options
+ * @param userId - Optional user ID for keyed storage
  */
 export function addCatalogue(
   label: string,
-  options?: Partial<Omit<Catalogue, "id" | "createdAt">>
+  options?: Partial<Omit<Catalogue, "id" | "createdAt">>,
+  userId?: string
 ): Catalogue | null {
-  const definition = getCataloguesDefinition();
+  const definition = getCataloguesDefinition(userId);
 
   // Generate unique ID
   const id = `cat${Date.now()}`;
@@ -160,19 +188,23 @@ export function addCatalogue(
   };
 
   definition.catalogues.push(newCatalogue);
-  setCataloguesDefinition(definition);
+  setCataloguesDefinition(definition, userId);
 
   return newCatalogue;
 }
 
 /**
  * Update an existing catalogue
+ * @param id - Catalogue ID
+ * @param updates - Updates to apply
+ * @param userId - Optional user ID for keyed storage
  */
 export function updateCatalogue(
   id: string,
-  updates: Partial<Catalogue>
+  updates: Partial<Catalogue>,
+  userId?: string
 ): Catalogue | null {
-  const definition = getCataloguesDefinition();
+  const definition = getCataloguesDefinition(userId);
   const index = definition.catalogues.findIndex((c) => c.id === id);
 
   if (index === -1) {
@@ -187,15 +219,17 @@ export function updateCatalogue(
     createdAt: definition.catalogues[index].createdAt, // Prevent timestamp changes
   };
 
-  setCataloguesDefinition(definition);
+  setCataloguesDefinition(definition, userId);
   return definition.catalogues[index];
 }
 
 /**
  * Delete a catalogue (cannot delete default catalogues)
+ * @param id - Catalogue ID
+ * @param userId - Optional user ID for keyed storage
  */
-export function deleteCatalogue(id: string): boolean {
-  const definition = getCataloguesDefinition();
+export function deleteCatalogue(id: string, userId?: string): boolean {
+  const definition = getCataloguesDefinition(userId);
   const catalogue = definition.catalogues.find((c) => c.id === id);
 
   if (!catalogue) {
@@ -209,7 +243,7 @@ export function deleteCatalogue(id: string): boolean {
   }
 
   definition.catalogues = definition.catalogues.filter((c) => c.id !== id);
-  setCataloguesDefinition(definition);
+  setCataloguesDefinition(definition, userId);
 
   return true;
 }
@@ -217,9 +251,11 @@ export function deleteCatalogue(id: string): boolean {
 /**
  * Reorder catalogues (for tab arrangement)
  * Pass array of catalogue IDs in desired order
+ * @param ids - Array of catalogue IDs in desired order
+ * @param userId - Optional user ID for keyed storage
  */
-export function reorderCatalogues(ids: string[]): boolean {
-  const definition = getCataloguesDefinition();
+export function reorderCatalogues(ids: string[], userId?: string): boolean {
+  const definition = getCataloguesDefinition(userId);
 
   // Validate all IDs exist
   if (!ids.every((id) => definition.catalogues.some((c) => c.id === id))) {
@@ -233,21 +269,22 @@ export function reorderCatalogues(ids: string[]): boolean {
     order: ids.indexOf(c.id),
   }));
 
-  setCataloguesDefinition(definition);
+  setCataloguesDefinition(definition, userId);
   return true;
 }
 
 /**
  * Reset to default catalogues
  * (Use with caution - this discards any custom catalogues)
+ * @param userId - Optional user ID for keyed storage
  */
-export function resetToDefaultCatalogues(): void {
+export function resetToDefaultCatalogues(userId?: string): void {
   const definition: CataloguesDefinition = {
     version: 1,
     catalogues: DEFAULT_CATALOGUES,
     lastUpdated: Date.now(),
   };
-  setCataloguesDefinition(definition);
+  setCataloguesDefinition(definition, userId);
 }
 
 /**
