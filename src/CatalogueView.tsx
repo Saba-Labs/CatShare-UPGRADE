@@ -1228,12 +1228,11 @@ const handleTouchEnd = useCallback(() => {
               <div className="border-t border-gray-200 my-1" />
               <button
                 onClick={() => {
-                  const allProds = JSON.parse(localStorage.getItem("products") || "[]");
+                  const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
                   );
                   setProducts(updated);
-                  localStorage.setItem("products", JSON.stringify(updated));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -1247,12 +1246,11 @@ const handleTouchEnd = useCallback(() => {
 
               <button
                 onClick={() => {
-                  const allProds = JSON.parse(localStorage.getItem("products") || "[]");
+                  const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
                   );
                   setProducts(updated);
-                  localStorage.setItem("products", JSON.stringify(updated));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -1465,9 +1463,6 @@ const handleTouchEnd = useCallback(() => {
                     items,
                   });
 
-                  // Open the order form in a new tab
-                  window.open(url, '_blank');
-
                   // Also try to share the link if available
                   if (navigator.share) {
                     try {
@@ -1482,9 +1477,9 @@ const handleTouchEnd = useCallback(() => {
                     // If no share API, copy to clipboard as fallback
                     try {
                       await navigator.clipboard.writeText(url);
-                      alert('Order form opened! Link also copied to clipboard for sharing.');
+                      alert('Order link copied to clipboard for sharing.');
                     } catch {
-                      // Clipboard copy failed, but link is already open so just continue
+                      // Clipboard copy failed; silently continue.
                     }
                   }
                 } catch (err: any) {

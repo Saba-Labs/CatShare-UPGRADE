@@ -704,12 +704,11 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
               <div className="border-t border-gray-200 my-1" />
               <button
                 onClick={() => {
-                  const allProds = JSON.parse(localStorage.getItem("products") || "[]");
+                  const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
                   );
                   setProducts(updated);
-                  localStorage.setItem("products", JSON.stringify(updated));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -723,12 +722,11 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
 
               <button
                 onClick={() => {
-                  const allProds = JSON.parse(localStorage.getItem("products") || "[]");
+                  const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
                   );
                   setProducts(updated);
-                  localStorage.setItem("products", JSON.stringify(updated));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

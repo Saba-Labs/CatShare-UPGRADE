@@ -12,6 +12,7 @@ import { FiX, FiPlus, FiEdit2, FiTrash2, FiImage, FiCheck, FiLoader } from "reac
 import { logCatalogueCreated, logCatalogueDeleted } from "./config/analyticsEvents";
 import { useAuth } from "./context/AuthContext";
 import { syncCataloguesDefinition } from "./services/supabaseSync";
+import { getStorageKey, safeSetInStorage } from "./utils/safeStorage";
 
 interface ManageCataloguesProps {
   onClose: () => void;
@@ -104,10 +105,17 @@ export default React.memo(function ManageCatalogues({
         }));
 
         try {
-          // Attempt to save to localStorage
-          localStorage.setItem("products", JSON.stringify(updatedProducts));
+          // Save products back to the current user's keyed storage.
+          // This prevents cross-user mixing via the legacy unkeyed "products" key.
+          const productsKey = user?.uid
+            ? getStorageKey("products", user.uid)
+            : "products";
+          const ok = safeSetInStorage(productsKey, updatedProducts);
+          if (!ok) {
+            throw new Error("Storage quota exceeded while updating products for new catalogue");
+          }
 
-          // Only update state if localStorage save succeeded
+          // Update state only after storage succeeds
           setProducts(updatedProducts);
 
           const updated = getAllCatalogues();
@@ -133,7 +141,7 @@ export default React.memo(function ManageCatalogues({
             setFormError("Failed to save products: " + (storageErr as Error).message);
           }
           // Rollback the catalogue addition since we couldn't save products
-          deleteCatalogue(newCatalogue.id);
+          deleteCatalogue(newCatalogue.id, user?.uid);
         }
       }
     } catch (err) {

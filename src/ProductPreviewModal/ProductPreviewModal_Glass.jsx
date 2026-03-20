@@ -200,11 +200,20 @@ export default function ProductPreviewModal_Glass({
       // 2. Try local filesystem image
       if (product?.imagePath) {
         try {
-          const result = await Filesystem.readFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          setImageUrl(`data:image/png;base64,${result.data}`);
+          // Prefer External (visible user-* folder), fallback to Data for legacy.
+          try {
+            const result = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.External,
+            });
+            setImageUrl(`data:image/png;base64,${result.data}`);
+          } catch (externalErr) {
+            const result = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.Data,
+            });
+            setImageUrl(`data:image/png;base64,${result.data}`);
+          }
         } catch (err) {
           console.warn("Failed to load image from filesystem:", err);
           setImageUrl(product.image || "");

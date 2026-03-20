@@ -14,7 +14,12 @@ import { useTheme } from "../context/ThemeContext";
 import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
 import { migrateProductToNewFormat } from "../config/fieldMigration";
 import { getProductFieldValue, getProductUnitValue } from "../config/fieldMigration";
-import { safeGetFromStorage } from "../utils/safeStorage";
+import {
+  safeGetFromStorage,
+  safeSetInStorage,
+  getStorageKey,
+  getUserImagePath,
+} from "../utils/safeStorage";
 import {
   initializeCatalogueData,
   getCatalogueData,
@@ -313,6 +318,14 @@ export default function CreateProduct() {
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
 
+  // When logged in, product/offline state should be stored per-user.
+  // This prevents localStorage quota errors from the legacy unkeyed "products".
+  const firebaseUserId = localStorage.getItem("firebaseUserId");
+  const productsStorageKey = firebaseUserId
+    ? getStorageKey("products", firebaseUserId)
+    : "products";
+  const useUserImages = Boolean(firebaseUserId);
+
   const categories = JSON.parse(localStorage.getItem("categories") || "[]");
 
   // Bottom sheet state using Framer Motion for buttery smooth performance
@@ -581,7 +594,7 @@ export default function CreateProduct() {
 
   useEffect(() => {
     if (editingId) {
-      const products = JSON.parse(localStorage.getItem("products") || "[]");
+      const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);
       if (product) {
         const migratedProduct = migrateProductToNewFormat(product) as ProductWithCatalogueData;
@@ -620,17 +633,28 @@ if (migratedProduct.suggestedColors?.length > 0) {
           setImagePreview(migratedProduct.imageUrl);
         } else if (migratedProduct.imagePath) {
           setImageFilePath(migratedProduct.imagePath);
+          // Try External first (visible storage), then Data (private app storage)
           Filesystem.readFile({
             path: migratedProduct.imagePath,
-            directory: Directory.Data,
-          }).then((res) => {
-            setImagePreview(`data:image/png;base64,${res.data}`);
-          }).catch(() => {
-            // ✅ Local file missing — fall back to R2
-            if (migratedProduct.imageUrl) {
-              setImagePreview(migratedProduct.imageUrl);
-            }
-          });
+            directory: Directory.External,
+          })
+            .then((res) => {
+              setImagePreview(`data:image/png;base64,${res.data}`);
+            })
+            .catch(async () => {
+              try {
+                const res = await Filesystem.readFile({
+                  path: migratedProduct.imagePath,
+                  directory: Directory.Data,
+                });
+                setImagePreview(`data:image/png;base64,${res.data}`);
+              } catch {
+                // ✅ Local file missing — fall back to R2
+                if (migratedProduct.imageUrl) {
+                  setImagePreview(migratedProduct.imageUrl);
+                }
+              }
+            });
         }
       }
     } else {
@@ -935,7 +959,22 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     setIsSaving(true);
     const id = editingId || Date.now().toString();
-    const imagePath = `catalogue/product-${id}.png`;
+    // Re-read user id at the time of saving to avoid timing issues
+    // when the auth/localStorage value is still being populated.
+    const firebaseUserIdNow =
+      localStorage.getItem("firebaseUserId") || localStorage.getItem("supabase_user_id");
+    const productsStorageKeyNow = firebaseUserIdNow
+      ? getStorageKey("products", firebaseUserIdNow)
+      : "products";
+    const useUserImagesNow = Boolean(firebaseUserIdNow);
+
+    const selectedCat = catalogues.find((c) => c.id === selectedCatalogue);
+    const selectedCatalogueFolder =
+      selectedCat?.folder || selectedCat?.label || selectedCatalogue || 'catalogue';
+
+    const imagePath = useUserImagesNow
+      ? getUserImagePath(id, firebaseUserIdNow || undefined, selectedCatalogueFolder)
+      : `catalogue/product-${id}.png`;
 
     try {
       if (imagePreview?.startsWith("data:image")) {
@@ -943,9 +982,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
         await Filesystem.writeFile({
           path: imagePath,
           data: base64,
-          directory: Directory.Data,
+          // Save to External so user-* folders are visible under android/data/.../files
+          directory: Directory.External,
           recursive: true,
         });
+        console.log("📂 Saved product source image to:", imagePath);
       }
     } catch (err) {
       setIsSaving(false);
@@ -955,7 +996,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     // ✅ Preserve existing imageUrl when editing, upload new one when image changed
     const existingImageUrl = editingId
-      ? JSON.parse(localStorage.getItem("products") || "[]").find((p: any) => p.id === editingId)?.imageUrl
+      ? safeGetFromStorage(productsStorageKeyNow, [])
+          .find((p: any) => p.id === editingId)?.imageUrl
       : undefined;
 
     // Determine imageUrl for local storage immediately (without waiting for R2 upload)
@@ -1021,13 +1063,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
     }
 
     try {
-      const all = JSON.parse(localStorage.getItem("products") || "[]");
+      const all = safeGetFromStorage(productsStorageKeyNow, []);
       const isNewProduct = !editingId;
       const updated = editingId
         ? all.map((p) => (p.id === editingId ? newItem : p))
         : [...all, newItem];
 
-      localStorage.setItem("products", JSON.stringify(updated));
+      const ok = safeSetInStorage(productsStorageKeyNow, updated);
+      if (!ok) {
+        setIsSaving(false);
+        showToast(
+          "Product save failed: local storage quota exceeded. Please sync or clear old offline products.",
+          "error"
+        );
+        return;
+      }
 
       // Fire custom analytics event when a new product is created
       if (isNewProduct) {
@@ -1069,11 +1119,11 @@ if (imagePreview?.startsWith("data:image") && uploadingProductId.current !== id)
   try {
     const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
     if (uploaded.url) {
-      const allProducts = JSON.parse(localStorage.getItem("products") || "[]");
+      const allProducts = safeGetFromStorage(productsStorageKeyNow, []);
       const updated = allProducts.map((p: any) =>
         p.id === id ? { ...p, imageUrl: uploaded.url } : p
       );
-      localStorage.setItem("products", JSON.stringify(updated));
+      safeSetInStorage(productsStorageKeyNow, updated);
       window.dispatchEvent(new CustomEvent("product-added"));
     }
   } catch (err: any) {

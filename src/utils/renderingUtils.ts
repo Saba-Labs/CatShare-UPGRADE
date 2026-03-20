@@ -14,8 +14,13 @@ export async function getRenderedImage(
   productId: string,
   catalogueLabel: string
 ): Promise<string | null> {
+  const firebaseUserId = localStorage.getItem("firebaseUserId");
+  const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+
   // First try localStorage
-  const storageKey = `rendered::${catalogueLabel}::${productId}`;
+  const storageKey = userFolder
+    ? `rendered::${userFolder}::${catalogueLabel}::${productId}`
+    : `rendered::${catalogueLabel}::${productId}`;
   try {
     const stored = localStorage.getItem(storageKey);
     if (stored) {
@@ -31,17 +36,48 @@ export async function getRenderedImage(
 
   // Try filesystem as fallback
   const filename = `product_${productId}_${catalogueLabel}.png`;
-  const filePath = `${catalogueLabel}/${filename}`;
+  const legacyFilePath = `${catalogueLabel}/${filename}`;
+  const userFilePathNew = userFolder
+    ? `${userFolder}/${catalogueLabel}/${filename}`
+    : null;
+  const userFilePathOld =
+    userFolder ? `${userFolder}/${catalogueLabel}/products/${filename}` : null;
 
   try {
+    if (userFilePathNew) {
+      const fileData = await Filesystem.readFile({
+        path: userFilePathNew,
+        directory: Directory.External,
+      });
+      console.log(`✅ Retrieved rendered image from filesystem: ${userFilePathNew}`);
+      return `data:image/png;base64,${fileData.data}`;
+    }
+    if (userFilePathOld) {
+      const fileData = await Filesystem.readFile({
+        path: userFilePathOld,
+        directory: Directory.External,
+      });
+      console.log(`✅ Retrieved rendered image from legacy user layout: ${userFilePathOld}`);
+      return `data:image/png;base64,${fileData.data}`;
+    }
     const fileData = await Filesystem.readFile({
-      path: filePath,
+      path: legacyFilePath,
       directory: Directory.External,
     });
-    console.log(`✅ Retrieved rendered image from filesystem: ${filePath}`);
+    console.log(`✅ Retrieved rendered image from filesystem: ${legacyFilePath}`);
     return `data:image/png;base64,${fileData.data}`;
   } catch (err) {
-    console.log(`⚠️ Rendered image not found in filesystem: ${filePath}`);
+    // Try legacy as fallback even if userFilePath was set
+    try {
+      if (userFilePathNew) {
+        const fileData = await Filesystem.readFile({
+          path: legacyFilePath,
+          directory: Directory.External,
+        });
+        return `data:image/png;base64,${fileData.data}`;
+      }
+    } catch {}
+    console.log(`⚠️ Rendered image not found in filesystem.`);
     return null;
   }
 }
@@ -67,11 +103,20 @@ export async function renderProductImageOnTheFly(
     if (!product.image && product.imagePath) {
       try {
         console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
-        const res = await Filesystem.readFile({
-          path: product.imagePath,
-          directory: Directory.Data,
-        });
-        product.image = `data:image/png;base64,${res.data}`;
+        try {
+          const res = await Filesystem.readFile({
+            path: product.imagePath,
+            directory: Directory.Data,
+          });
+          product.image = `data:image/png;base64,${res.data}`;
+        } catch (dataErr) {
+          // Fallback when image was saved to External storage
+          const res = await Filesystem.readFile({
+            path: product.imagePath,
+            directory: Directory.External,
+          });
+          product.image = `data:image/png;base64,${res.data}`;
+        }
       } catch (err) {
         console.warn("⚠️ Failed to load image from filesystem, will render with placeholder:", err.message);
         // Continue rendering even if image load fails - canvas renderer will show placeholder

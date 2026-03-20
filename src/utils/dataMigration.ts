@@ -398,26 +398,80 @@ export async function migrateProductImagePaths(products: any[], userId: string):
     for (const product of products) {
       if (!product.imagePath) continue;
 
-      // Check if image path is already in user-specific format
+      // If already in user-specific format but still uses legacy "/products/" segment, fix it.
       if (product.imagePath.startsWith(`user-${userId}/`)) {
-        continue; // Already migrated
+        if (product.imagePath.includes("/products/")) {
+          const oldPath = product.imagePath;
+          const newImagePath = product.imagePath.replace("/products/", "/");
+
+          try {
+            let result: any;
+            try {
+              result = await Filesystem.readFile({
+                path: oldPath,
+                directory: Directory.External,
+              });
+            } catch {
+              result = await Filesystem.readFile({
+                path: oldPath,
+                directory: Directory.Data,
+              });
+            }
+
+            await Filesystem.writeFile({
+              path: newImagePath,
+              data: result.data,
+              directory: Directory.External,
+              recursive: true,
+            });
+
+            // best-effort cleanup
+            try {
+              await Filesystem.deleteFile({ path: oldPath, directory: Directory.External });
+            } catch {
+              try {
+                await Filesystem.deleteFile({ path: oldPath, directory: Directory.Data });
+              } catch {}
+            }
+
+            product.imagePath = newImagePath;
+          } catch {
+            // Keep existing path if migration fails
+          }
+        }
+
+        continue; // Already migrated (or attempted fix)
       }
 
+      // Old format was typically "<folder>/product-<id>.png" (e.g. "catalogue/product-123.png")
+      // We'll keep that <folder> name as the "catalogue folder" when migrating.
+      const oldCatalogueFolder = product.imagePath.split("/")[0] || "catalogue";
+
       // Generate new user-specific path
-      const newImagePath = getUserImagePath(product.id, userId);
+      const newImagePath = getUserImagePath(product.id, userId, oldCatalogueFolder);
 
       try {
-        // Try to read from old path
-        const result = await Filesystem.readFile({
-          path: product.imagePath,
-          directory: Directory.Data,
-        });
+        const oldPath = product.imagePath;
 
-        // Write to new user-specific path
+        // Old unkeyed images might exist in Directory.Data (legacy) or Directory.External (newer).
+        let result: any | null = null;
+        try {
+          result = await Filesystem.readFile({
+            path: oldPath,
+            directory: Directory.Data,
+          });
+        } catch {
+          result = await Filesystem.readFile({
+            path: oldPath,
+            directory: Directory.External,
+          });
+        }
+
+        // Write to the new user-specific path (External so user folders are visible)
         await Filesystem.writeFile({
           path: newImagePath,
           data: result.data,
-          directory: Directory.Data,
+          directory: Directory.External,
           recursive: true,
         });
 
@@ -428,10 +482,18 @@ export async function migrateProductImagePaths(products: any[], userId: string):
 
         // Try to delete old file (non-critical, so catch errors)
         try {
-          await Filesystem.deleteFile({
-            path: product.imagePath.split('/').slice(1).join('/'), // Remove user prefix to get old path
-            directory: Directory.Data,
-          });
+          // Try to delete from both directories (whichever succeeds first will clean up)
+          try {
+            await Filesystem.deleteFile({
+              path: oldPath,
+              directory: Directory.Data,
+            });
+          } catch {
+            await Filesystem.deleteFile({
+              path: oldPath,
+              directory: Directory.External,
+            });
+          }
         } catch (delErr) {
           // Old file might not exist, that's ok
         }
@@ -446,6 +508,87 @@ export async function migrateProductImagePaths(products: any[], userId: string):
 }
 
 /**
+ * Best-effort migration for rendered PNGs:
+ * Move legacy rendered files from:
+ *   <catalogue-folder>/product_<id>_<catalogue-folder>.png
+ * to:
+ *   user-<userId>/<catalogue-folder>/products/product_<id>_<catalogue-folder>.png
+ */
+export async function migrateLegacyRenderedImagesToUserFolder(
+  products: any[],
+  userId: string
+): Promise<void> {
+  try {
+    const migrationKey = `renderedImagesMigrationDone::${userId}`;
+    if (localStorage.getItem(migrationKey) === "done") return;
+
+    const definition = getCataloguesDefinition(userId);
+    const catalogues = definition?.catalogues || [];
+    const userFolder = `user-${userId}`;
+
+    let movedCount = 0;
+
+    for (const product of products) {
+      if (!product?.id) continue;
+
+      for (const cat of catalogues) {
+        const folder = cat.folder || cat.label;
+        const filename = `product_${product.id}_${folder}.png`;
+
+        const legacyPath = `${folder}/${filename}`;
+        // New simple user-scoped rendered layout:
+        // user-<uid>/<catalogue-folder>/<filename>
+        const userPath = `${userFolder}/${folder}/${filename}`;
+
+        // If already migrated, skip
+        try {
+          await Filesystem.stat({
+            path: userPath,
+            directory: Directory.External,
+          });
+          continue;
+        } catch {
+          // Continue to attempt legacy->user migration
+        }
+
+        try {
+        const legacyFile = await Filesystem.readFile({
+            path: legacyPath,
+            directory: Directory.External,
+          });
+
+          await Filesystem.writeFile({
+            path: userPath,
+            data: legacyFile.data,
+            directory: Directory.External,
+            recursive: true,
+          });
+
+          movedCount++;
+
+          // Cleanup legacy file (best-effort)
+          try {
+            await Filesystem.deleteFile({
+              path: legacyPath,
+              directory: Directory.External,
+            });
+          } catch {
+            // Non-critical
+          }
+        } catch {
+          // Legacy file might not exist - ignore
+        }
+      }
+    }
+
+    localStorage.setItem(migrationKey, "done");
+    console.log(`✅ Migrated ${movedCount} legacy rendered images into user folder for user ${userId}`);
+  } catch (err) {
+    console.warn("⚠️ migrateLegacyRenderedImagesToUserFolder failed:", err);
+  }
+}
+
+/**
  * Migrate unkeyed localStorage data to per-user keyed data
  * This runs once per user on first login to convert old data format
  * @param userId - The user ID to migrate data for
@@ -456,6 +599,11 @@ export function migrateUnkeyedDataToUserKeyed(userId: string): void {
 
     // Check if migration has already been done for this user
     const migrationKey = `dataKeyedMigration::${userId}`;
+    const globalMigrationKey = `unkeyedToUserKeyed::done`;
+    if (localStorage.getItem(globalMigrationKey) === "done") {
+      console.log(`⏭️ Unkeyed data already migrated on this device (global)`);
+      return;
+    }
     if (localStorage.getItem(migrationKey) === 'done') {
       console.log(`⏭️  Data migration already completed for user ${userId}`);
       return;
@@ -541,17 +689,26 @@ export function migrateUnkeyedDataToUserKeyed(userId: string): void {
       }
     }
 
-    // If we migrated data, don't delete the unkeyed data yet - it will be deleted after sync
-    // This allows the app to still access it if needed before sync
+    // After migrating once globally, clear unkeyed data so other users on the same device
+    // won't receive the same offline dataset.
     if (hasMigratedData) {
       // Mark this user as having completed the migration
-      localStorage.setItem(migrationKey, 'done');
+      localStorage.setItem(migrationKey, "done");
       console.log(`✅ Per-user data migration completed for ${userId}`);
     } else {
       console.log(`ℹ️  No unkeyed data found to migrate for user ${userId}`);
-      // Still mark as done so we don't try again
-      localStorage.setItem(migrationKey, 'done');
+      localStorage.setItem(migrationKey, "done");
     }
+
+    if (hasMigratedData) {
+      localStorage.removeItem("products");
+      localStorage.removeItem("deletedProducts");
+      localStorage.removeItem("categories");
+      localStorage.removeItem("cataloguesDefinition");
+      localStorage.removeItem("fieldsDefinition");
+    }
+
+    localStorage.setItem(globalMigrationKey, "done");
   } catch (err) {
     console.error(`❌ Error during per-user data migration:`, err);
   }

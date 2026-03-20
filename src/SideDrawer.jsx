@@ -20,7 +20,7 @@ import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES, g
 import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
 import { applyBackupFieldAnalysis } from "./config/fieldConfig";
-import { safeGetFromStorage, safeSetInStorage } from "./utils/safeStorage";
+import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 import { getCurrentCurrency } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBackupCreated, logBackupRestored, logBackupSharedFileSharer, logBackupDownloaded, logCsvExported, logFileSharerError, logCategoryManaged } from "./config/analyticsEvents";
@@ -74,16 +74,8 @@ const navigate = useNavigate();
 
   // Load all products asynchronously (avoid blocking render)
   useEffect(() => {
-    setTimeout(() => {
-      try {
-        const prods = JSON.parse(localStorage.getItem("products") || "[]");
-        setAllProductsCached(prods);
-      } catch (err) {
-        console.error("Error loading products from localStorage:", err);
-        setAllProductsCached([]);
-      }
-    }, 0);
-  }, []);
+    setAllProductsCached(products || []);
+  }, [products]);
 
   // Load detected backups when backup popup is opened
   useEffect(() => {
@@ -143,6 +135,9 @@ const navigate = useNavigate();
       "Resell"     // Legacy support
     ];
 
+    const firebaseUserId = localStorage.getItem("firebaseUserId");
+    const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+
     // Try to read each catalogue folder
     for (const folderName of foldersToCheck) {
       try {
@@ -170,6 +165,49 @@ const navigate = useNavigate();
       } catch (err) {
         console.warn(`Could not read ${folderName} folder:`, err.message);
         // Continue to next folder if this one doesn't exist
+      }
+
+      // New user-scoped location:
+      // user-<uid>/<catalogue-folder>/products/*.png
+      if (userFolder) {
+        try {
+          const productsDir = `${userFolder}/${folderName}`;
+          let files2;
+          try {
+            files2 = await Filesystem.readdir({
+              path: productsDir,
+              directory: Directory.External,
+            });
+          } catch {
+            // Fallback to old layout: user/<uid>/<folderName>/products/
+            const oldProductsDir = `${userFolder}/${folderName}/products`;
+            files2 = await Filesystem.readdir({
+              path: oldProductsDir,
+              directory: Directory.External,
+            });
+            files2.__baseDir = oldProductsDir;
+          }
+          const baseDir = files2.__baseDir || productsDir;
+
+          for (const file of files2.files) {
+            if (file.name.endsWith(".png")) {
+              try {
+                const fileData = await Filesystem.readFile({
+                  path: `${baseDir}/${file.name}`,
+                  directory: Directory.External,
+                });
+                // Keep zip structure readable: user/<catalogue>/...
+                zip.file(`${userFolder}/${folderName}/${file.name}`, fileData.data, { base64: true });
+                totalSize += fileData.data.length;
+                hasImages = true;
+              } catch (readErr) {
+                console.warn(`Could not read ${baseDir}/${file.name}:`, readErr.message);
+              }
+            }
+          }
+        } catch (err2) {
+          // It's fine if the user hasn't rendered anything yet
+        }
       }
     }
 
@@ -957,7 +995,10 @@ const exportProductsToCSV = (products) => {
       let productsToUse = cleanedProducts;
 
       try {
-        localStorage.setItem("products", JSON.stringify(cleanedProducts));
+        localStorage.setItem(
+          user?.uid ? getStorageKey("products", user.uid) : "products",
+          JSON.stringify(cleanedProducts)
+        );
         console.log("✅ Products saved successfully");
       } catch (err) {
         console.error("❌ Failed to save products:", err.message);
@@ -965,7 +1006,10 @@ const exportProductsToCSV = (products) => {
         if (err.name === "QuotaExceededError") {
           console.warn("⚠️ Data still too large, limiting to 50 products...");
           productsToUse = cleanedProducts.slice(0, 50);
-          localStorage.setItem("products", JSON.stringify(productsToUse));
+          localStorage.setItem(
+            user?.uid ? getStorageKey("products", user.uid) : "products",
+            JSON.stringify(productsToUse)
+          );
           alert("⚠️ Restore limited to first 50 products due to storage quota. You can restore more products later by importing additional backups.");
         } else {
           throw err;
@@ -1029,7 +1073,10 @@ const exportProductsToCSV = (products) => {
 
         // Save deleted products to localStorage
         try {
-          localStorage.setItem("deletedProducts", JSON.stringify(restoredDeleted));
+          localStorage.setItem(
+            user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
+            JSON.stringify(restoredDeleted)
+          );
           setDeletedProducts(restoredDeleted);
           console.log(`✅ Restored ${restoredDeleted.length} shelf items successfully`);
         } catch (err) {
@@ -1159,7 +1206,10 @@ const exportProductsToCSV = (products) => {
       );
 
       // Save updated products with new imageUrls to localStorage
-      localStorage.setItem("products", JSON.stringify(updatedProducts));
+      localStorage.setItem(
+        user?.uid ? getStorageKey("products", user.uid) : "products",
+        JSON.stringify(updatedProducts)
+      );
       setProducts(updatedProducts);
       console.log('✅ Products updated with R2 image URLs');
             const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
@@ -1419,14 +1469,20 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
         let productsToUse = cleanedProducts;
 
         try {
-          localStorage.setItem("products", JSON.stringify(cleanedProducts));
+          localStorage.setItem(
+            user?.uid ? getStorageKey("products", user.uid) : "products",
+            JSON.stringify(cleanedProducts)
+          );
           console.log("✅ Products saved successfully");
         } catch (err) {
           console.error("❌ Failed to save products:", err.message);
           if (err.name === "QuotaExceededError") {
             console.warn("⚠️ Data still too large, limiting to 50 products...");
             productsToUse = cleanedProducts.slice(0, 50);
-            localStorage.setItem("products", JSON.stringify(productsToUse));
+            localStorage.setItem(
+              user?.uid ? getStorageKey("products", user.uid) : "products",
+              JSON.stringify(productsToUse)
+            );
             alert("⚠️ Restore limited to first 50 products due to storage quota. You can restore more products later by importing additional backups.");
           } else {
             throw err;
@@ -1484,7 +1540,10 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
           );
 
           try {
-            localStorage.setItem("deletedProducts", JSON.stringify(restoredDeleted));
+            localStorage.setItem(
+              user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
+              JSON.stringify(restoredDeleted)
+            );
             setDeletedProducts(restoredDeleted);
             console.log(`✅ Restored ${restoredDeleted.length} shelf items successfully`);
           } catch (err) {
@@ -1562,7 +1621,10 @@ if (user && user.uid) {
         })
       );
 
-      localStorage.setItem("products", JSON.stringify(updatedProducts));
+      localStorage.setItem(
+        user?.uid ? getStorageKey("products", user.uid) : "products",
+        JSON.stringify(updatedProducts)
+      );
       setProducts(updatedProducts);
       console.log('✅ Products updated with R2 image URLs');
 

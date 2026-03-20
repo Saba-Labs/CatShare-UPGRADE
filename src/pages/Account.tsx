@@ -6,6 +6,40 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { syncUserSettings } from '../services/supabaseSync';
 
+const WHATSAPP_COUNTRIES: Array<{ label: string; dial: string }> = [
+  { label: 'India (+91)', dial: '+91' },
+  { label: 'United States (+1)', dial: '+1' },
+  { label: 'United Kingdom (+44)', dial: '+44' },
+  { label: 'United Arab Emirates (+971)', dial: '+971' },
+  { label: 'Saudi Arabia (+966)', dial: '+966' },
+  { label: 'Qatar (+974)', dial: '+974' },
+  { label: 'Oman (+968)', dial: '+968' },
+  { label: 'Singapore (+65)', dial: '+65' },
+  { label: 'Australia (+61)', dial: '+61' },
+  { label: 'Canada (+1)', dial: '+1' },
+  { label: 'Germany (+49)', dial: '+49' },
+  { label: 'France (+33)', dial: '+33' },
+  { label: 'Spain (+34)', dial: '+34' },
+  { label: 'Italy (+39)', dial: '+39' },
+];
+
+function parseWhatsAppNumber(saved: string): { dial: string; local: string } {
+  const cleaned = (saved || '').replace(/\s+/g, '').trim();
+  if (!cleaned) return { dial: '', local: '' };
+
+  const candidates = [...WHATSAPP_COUNTRIES.map((c) => c.dial)].sort((a, b) => b.length - a.length);
+  const match = candidates.find((d) => cleaned.startsWith(d));
+
+  if (match) {
+    const local = cleaned.slice(match.length).replace(/\D/g, '');
+    return { dial: match, local };
+  }
+
+  // Dial code not recognized => force the user to pick it again.
+  const local = cleaned.replace(/\D/g, '');
+  return { dial: '', local };
+}
+
 export default function Account() {
   const navigate = useNavigate();
   const { user, logout, supabaseData } = useAuth();
@@ -13,13 +47,17 @@ export default function Account() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState('');
+  const [whatsappLocalNumber, setWhatsappLocalNumber] = useState('');
 
   useEffect(() => {
     // Try supabaseData first, fallback to localStorage
     const fromSupabase = supabaseData?.userSettings?.whatsapp_number || '';
     const fromLocal = localStorage.getItem('whatsappNumber') || '';
-    setWhatsappNumber(fromSupabase || fromLocal);
+    const saved = fromSupabase || fromLocal;
+    const parsed = parseWhatsAppNumber(saved);
+    setWhatsappCountryCode(parsed.dial);
+    setWhatsappLocalNumber(parsed.local);
   }, [supabaseData?.userSettings]);
 
   const saveWhatsApp = async () => {
@@ -27,7 +65,22 @@ export default function Account() {
     setIsLoading(true);
     setError('');
     try {
-      const clean = whatsappNumber.trim();
+      if (!whatsappCountryCode) {
+        const msg = 'Please select your WhatsApp country code.';
+        setError(msg);
+        showToast(msg, 'error');
+        return;
+      }
+
+      const local = (whatsappLocalNumber || '').replace(/\D/g, '');
+      if (!local) {
+        const msg = 'Please enter your WhatsApp number.';
+        setError(msg);
+        showToast(msg, 'error');
+        return;
+      }
+
+      const clean = `${whatsappCountryCode}${local}`;
       await syncUserSettings(user.uid, {
         whatsapp_number: clean,  // save as top-level column, not nested in data
       });
@@ -159,10 +212,23 @@ export default function Account() {
                 Used for “Share as link” order confirmations (customers will message you on WhatsApp).
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
+                <select
+                  value={whatsappCountryCode}
+                  onChange={(e) => setWhatsappCountryCode(e.target.value)}
+                  className="sm:w-40 px-3 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
+                >
+                  <option value="">Select country</option>
+                  {WHATSAPP_COUNTRIES.map((c) => (
+                    <option key={c.dial} value={c.dial}>
+                      {c.dial}
+                    </option>
+                  ))}
+                </select>
                 <input
-                  value={whatsappNumber}
-                  onChange={(e) => setWhatsappNumber(e.target.value)}
-                  placeholder="e.g. +91XXXXXXXXXX"
+                  value={whatsappLocalNumber}
+                  onChange={(e) => setWhatsappLocalNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 9876543210"
+                  inputMode="tel"
                   className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
                 />
                 <button
@@ -173,6 +239,9 @@ export default function Account() {
                   {isLoading ? 'Saving...' : 'Save'}
                 </button>
               </div>
+              <p className="text-[11px] text-gray-500 mt-2">
+                Country code is required (example: +91, +1, +44).
+              </p>
             </div>
 
             <div className="border-t border-gray-200 pt-6">

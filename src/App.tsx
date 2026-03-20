@@ -13,7 +13,12 @@ import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { initializeFieldSystem } from "./config/initializeFields";
 import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
-import { runMigrations, migrateUnkeyedDataToUserKeyed, migrateProductImagePaths } from "./utils/dataMigration";
+import {
+  runMigrations,
+  migrateUnkeyedDataToUserKeyed,
+  migrateProductImagePaths,
+  migrateLegacyRenderedImagesToUserFolder,
+} from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -74,10 +79,9 @@ function AppWithBackHandler() {
   const renderResultTimeoutRef = useRef(null);
   const previousUserIdRef = useRef<string | null>(null);
   const [showFirstSyncBanner, setShowFirstSyncBanner] = useState(false);
-  const [offlineSyncChoice, setOfflineSyncChoice] = useState<'sync' | 'local_only' | 'cleared' | null>(null);
+  const [offlineSyncChoice, setOfflineSyncChoice] = useState<'sync' | 'cleared' | null>(null);
   const [offlineSyncDecisionLoaded, setOfflineSyncDecisionLoaded] = useState(false);
   const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
-  const [localOnlyBannerDismissed, setLocalOnlyBannerDismissed] = useState(false);
   const [syncNowLoading, setSyncNowLoading] = useState(false);
 
   const isNative = Capacitor.getPlatform() !== "web";
@@ -85,6 +89,32 @@ function AppWithBackHandler() {
   const getOfflineChoiceKey = (uid: string) => `offlineSyncChoice::${uid}`;
   const getProductsKey = (uid: string) => getStorageKey('products', uid);
   const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
+
+  const clearAllOfflineCaches = useCallback(() => {
+    // Device-wide cleanup: remove offline data so no other account can reuse it.
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.startsWith('products::') || k.startsWith('deletedProducts::')) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    // Also remove legacy unkeyed caches. These are device-wide and can leak across accounts
+    // if other screens still read them as a fallback.
+    localStorage.removeItem('products');
+    localStorage.removeItem('deletedProducts');
+    localStorage.removeItem('retailProducts');
+  }, []);
+
+  const clearLegacyUnkeyedProductCaches = useCallback(() => {
+    // Remove only legacy unkeyed keys (device-wide). Do not wipe user-keyed caches here.
+    localStorage.removeItem('products');
+    localStorage.removeItem('deletedProducts');
+    localStorage.removeItem('retailProducts');
+  }, []);
 
   const syncOfflineDataNow = useCallback(async () => {
     if (!user?.uid) return;
@@ -150,12 +180,16 @@ function AppWithBackHandler() {
       localStorage.removeItem('cataloguesDefinition');
       localStorage.removeItem('fieldsDefinition');
       setShowFirstSyncBanner(false);
-      setLocalOnlyBannerDismissed(true);
+
+      // Mark legacy/offline-first dataset as resolved for this device,
+      // and remove offline caches so other accounts can't reuse them.
+      localStorage.setItem('offlineLegacyResolved::device', 'true');
+      clearAllOfflineCaches();
       console.log('✅ Offline data synced to account');
     } finally {
       setSyncNowLoading(false);
     }
-  }, [user]);
+  }, [user, clearAllOfflineCaches]);
 
   // Reset local product data when the authenticated user changes
   useEffect(() => {
@@ -163,6 +197,12 @@ function AppWithBackHandler() {
     const previous = previousUserIdRef.current;
 
     if (currentUserId && currentUserId !== previous) {
+      // If switching between authenticated accounts, wipe legacy unkeyed device caches
+      // before loading/migrating data for the new user.
+      if (previous) {
+        clearLegacyUnkeyedProductCaches();
+      }
+
       // Run per-user data migration (converts unkeyed data to keyed format)
       migrateUnkeyedDataToUserKeyed(currentUserId);
 
@@ -188,30 +228,44 @@ function AppWithBackHandler() {
         });
       }
 
+      // Organize legacy rendered images (if any) into the new user-scoped layout.
+      // This is best-effort and won't block UI.
+      const allForRendered = [...userProducts, ...userDeleted];
+      if (allForRendered.length > 0) {
+        migrateLegacyRenderedImagesToUserFolder(allForRendered, currentUserId).catch((err) => {
+          console.warn('⚠️ Legacy rendered image migration encountered errors:', err);
+        });
+      }
+
       setProducts(userProducts);
       setDeletedProducts(userDeleted);
       console.log('🔄 Loaded data for user:', currentUserId, '| products:', userProducts.length, '| deleted:', userDeleted.length);
     }
 
     previousUserIdRef.current = currentUserId;
-  }, [user?.uid]);
+  }, [user?.uid, clearLegacyUnkeyedProductCaches]);
 
   // Load per-user offline sync choice on login
   useEffect(() => {
     if (!user?.uid) {
       setOfflineSyncChoice(null);
       setShowOfflineSyncModal(false);
-      setLocalOnlyBannerDismissed(false);
       setOfflineSyncDecisionLoaded(false);
       return;
     }
 
     const key = getOfflineChoiceKey(user.uid);
     const raw = localStorage.getItem(key);
-    const choice =
-      raw === 'sync' || raw === 'local_only' || raw === 'cleared' ? raw : null;
-    setOfflineSyncChoice(choice as 'sync' | 'local_only' | 'cleared' | null);
-    setLocalOnlyBannerDismissed(false);
+    let choice: 'sync' | 'cleared' | null =
+      raw === 'sync' || raw === 'cleared' ? raw : null;
+
+    // Legacy: devices that previously picked "local_only" shouldn't be prompted again.
+    if (raw === 'local_only') {
+      localStorage.setItem('offlineLegacyResolved::device', 'true');
+      choice = 'cleared';
+    }
+
+    setOfflineSyncChoice(choice);
     setOfflineSyncDecisionLoaded(true);
   }, [user?.uid]);
 
@@ -220,6 +274,9 @@ function AppWithBackHandler() {
     if (!user?.uid) return;
     if (!offlineSyncDecisionLoaded) return;
     if (offlineSyncChoice) return;
+
+    const legacyResolved = localStorage.getItem('offlineLegacyResolved::device') === 'true';
+    if (legacyResolved) return;
 
     const localProducts = safeGetFromStorage(getProductsKey(user.uid), []);
     const hasLocalProducts = Array.isArray(localProducts) && localProducts.length > 0;
@@ -234,25 +291,31 @@ function AppWithBackHandler() {
 
     try {
       setSupabaseSyncStatus('syncing');
+      const userId = user.uid;
+
+      // Always read fresh keyed storage to avoid accidentally merging
+      // stale React state from the previously logged-in account.
+      const localProducts = safeGetFromStorage(getProductsKey(userId), []);
+      const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
 
       // Merge products: Supabase data takes precedence if it's newer
       if (supabaseData.products && supabaseData.products.length > 0) {
         // ✅ Build set of shelved product IDs so they never come back from Supabase
         const currentDeletedIds = new Set([
-          ...deletedProducts.map((p: any) => p.id),
+          ...localDeleted.map((p: any) => p.id),
           ...(supabaseData.deletedProducts || []).map((p: any) => p.id),
         ]);
-        const merged = mergeProductsData(products, supabaseData.products, currentDeletedIds);
+        const merged = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
         setProducts(merged);
-        safeSetInStorage(getProductsKey(user.uid), merged);
+        safeSetInStorage(getProductsKey(userId), merged);
         console.log('✅ Merged products from Supabase');
       }
 
       // Merge deleted products
       if (supabaseData.deletedProducts && supabaseData.deletedProducts.length > 0) {
-        const merged = mergeProductsData(deletedProducts, supabaseData.deletedProducts);
+        const merged = mergeProductsData(localDeleted, supabaseData.deletedProducts);
         setDeletedProducts(merged);
-        safeSetInStorage(getDeletedProductsKey(user.uid), merged);
+        safeSetInStorage(getDeletedProductsKey(userId), merged);
         console.log('✅ Merged deleted products from Supabase');
       }
 
@@ -376,7 +439,9 @@ return result;
   // Handle rendering images with chunked processing to prevent UI freeze
   // Processes in small batches with UI yielding between chunks
   const handleRenderPNGs = useCallback(async (customProducts?: any[], showOverlay: boolean = true) => {
-    const all = customProducts || safeGetFromStorage("products", []);
+    // Rendering must use the currently logged-in user's products (keyed storage / state),
+    // otherwise images may render with missing file paths.
+    const all = customProducts || products || [];
     if (all.length === 0) return;
 
     // Prevent screen from sleeping during rendering
@@ -520,7 +585,7 @@ return result;
         console.warn("Could not release keep awake lock:", e);
       }
     }
-  }, [isNative]);
+  }, [isNative, products]);
 
   useEffect(() => {
     if (!isNative) return;
@@ -961,19 +1026,6 @@ return result;
               >
                 {syncNowLoading ? 'Syncing...' : 'Sync to my account'}
               </button>
-              <button
-                disabled={syncNowLoading}
-                onClick={() => {
-                  const key = getOfflineChoiceKey(user.uid);
-                  localStorage.setItem(key, 'local_only');
-                  setOfflineSyncChoice('local_only');
-                  setShowOfflineSyncModal(false);
-                  setShowFirstSyncBanner(false);
-                }}
-                className="w-full px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:bg-gray-200 text-gray-900 font-semibold text-sm sm:text-base transition-colors"
-              >
-                Keep on this device
-              </button>
             </div>
 
             {/* Divider */}
@@ -983,6 +1035,10 @@ return result;
             <button
               disabled={syncNowLoading}
               onClick={() => {
+                const ok = window.confirm(
+                  "Delete offline products from this device permanently? This cannot be undone."
+                );
+                if (!ok) return;
                 const key = getOfflineChoiceKey(user.uid);
                 // Clear local offline products and remember this decision
                 setProducts([]);
@@ -993,6 +1049,12 @@ return result;
                 setOfflineSyncChoice('cleared');
                 setShowOfflineSyncModal(false);
                 setShowFirstSyncBanner(false);
+
+                // Device-wide legacy/offline dataset cleanup.
+                localStorage.setItem('offlineLegacyResolved::device', 'true');
+                clearAllOfflineCaches();
+              // Extra safety: clear legacy unkeyed caches too.
+              clearLegacyUnkeyedProductCaches();
               }}
               className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
             >
@@ -1033,48 +1095,6 @@ return result;
         </div>
       )}
 
-      {/* Persistent banner when user chose local-only */}
-      {user?.uid && offlineSyncChoice === 'local_only' && !localOnlyBannerDismissed && (
-        <div className="fixed top-[40px] inset-x-0 z-[60] px-4 py-3">
-          <div className="mx-auto max-w-2xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl px-4 py-3 sm:px-5 sm:py-4 flex items-start sm:items-center justify-between gap-4 shadow-md">
-            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
-              <div className="flex-shrink-0 mt-0.5 sm:mt-0">
-                <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M13.828 10.172a4 4 0 00-5.656 0l-4.242-4.242a6 6 0 018.485 0l-4.242 4.242zM9.172 16.172a4 4 0 015.656 0l4.242 4.242a6 6 0 01-8.485 0l4.242-4.242zm6.364-1.414a2 2 0 010 2.828L15.5 17.5a2 2 0 11-2.828-2.828l1.414-1.414zM5 10.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="text-xs sm:text-sm font-medium text-amber-900">
-                Offline data is staying on this device only. Sync to your account?
-              </span>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                disabled={syncNowLoading}
-                onClick={async () => {
-                  if (!user?.uid) return;
-                  localStorage.setItem(getOfflineChoiceKey(user.uid), 'sync');
-                  setOfflineSyncChoice('sync');
-                  setShowFirstSyncBanner(true);
-                  try {
-                    await syncOfflineDataNow();
-                  } catch (e: any) {
-                    console.warn('Sync now failed:', e?.message || e);
-                  }
-                }}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white text-xs sm:text-sm font-semibold transition-colors"
-              >
-                {syncNowLoading ? 'Syncing...' : 'Sync now'}
-              </button>
-              <button
-                onClick={() => setLocalOnlyBannerDismissed(true)}
-                className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-gray-600 hover:bg-white/60 text-xs sm:text-sm font-semibold transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <RenderingOverlay
         visible={isRendering}
         current={renderProgress}

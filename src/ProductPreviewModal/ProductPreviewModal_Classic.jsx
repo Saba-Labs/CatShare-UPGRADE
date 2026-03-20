@@ -243,9 +243,9 @@ const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWat
             return;
           }
 
-          // If file sharing is not supported, fallback to sharing the page URL (still user gesture)
-          await navigator.share({ title: productName, text: productName, url: window.location.href });
-          return;
+          // If file sharing is not supported, continue to the native fallback
+          // (sharing the page URL is not what we want for "image-only" sharing).
+          throw new Error('File sharing not supported');
         } catch (webShareErr) {
           console.warn('navigator.share failed or not supported for files:', webShareErr);
           // continue to native fallback
@@ -498,11 +498,20 @@ export default function ProductPreviewModal_Classic({
       // 2. Try local filesystem image
       if (product?.imagePath) {
         try {
-          const result = await Filesystem.readFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          setImageUrl(`data:image/png;base64,${result.data}`);
+          // Prefer External so user-* folders are found first
+          try {
+            const result = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.External,
+            });
+            setImageUrl(`data:image/png;base64,${result.data}`);
+          } catch (externalErr) {
+            const result = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.Data,
+            });
+            setImageUrl(`data:image/png;base64,${result.data}`);
+          }
         } catch (err) {
           console.warn("Failed to load image from filesystem:", err);
           setImageUrl(product.image || "");

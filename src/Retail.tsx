@@ -15,12 +15,19 @@ import { getFieldConfig } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logProductAdded, logProductEdited, logProductDeleted } from "./config/analyticsEvents";
+import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 
 export default function Retail({ products = [] }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
+
+  const firebaseUserId = localStorage.getItem("firebaseUserId");
+  const retailProductsStorageKey = firebaseUserId
+    ? getStorageKey("retailProducts", firebaseUserId)
+    : "retailProducts";
+
   const [retailProducts, setRetailProducts] = useState(() =>
-    JSON.parse(localStorage.getItem("retailProducts") || "[]")
+    safeGetFromStorage(retailProductsStorageKey, [])
   );
   const [markupPercent, setMarkupPercent] = useState(() =>
     parseFloat(localStorage.getItem("retailMarkupPercent") || "30")
@@ -259,10 +266,16 @@ export default function Retail({ products = [] }) {
     return color;
   };
 
-  // Sync a retail product into the global products list stored under localStorage 'products'
+  // Sync a retail product into the active products list.
+  // For authenticated users, this must be user-scoped to prevent cross-account leakage.
   const syncUpsertProductToGlobal = (prod) => {
     try {
-      const all = JSON.parse(localStorage.getItem("products") || "[]");
+      const firebaseUserId = localStorage.getItem("firebaseUserId");
+      const keyedKey = firebaseUserId ? getStorageKey("products", firebaseUserId) : null;
+
+      const all = keyedKey
+        ? safeGetFromStorage(keyedKey, [])
+        : JSON.parse(localStorage.getItem("products") || "[]");
       const idx = all.findIndex((p) => p.id === prod.id);
       const entry = {
         id: prod.id,
@@ -281,7 +294,11 @@ export default function Retail({ products = [] }) {
       } else {
         all.unshift(entry);
       }
-      localStorage.setItem("products", JSON.stringify(all));
+      if (keyedKey) {
+        safeSetInStorage(keyedKey, all);
+      } else {
+        localStorage.setItem("products", JSON.stringify(all));
+      }
       window.dispatchEvent(new CustomEvent("product-added"));
     } catch (err) {
       console.warn("Failed to sync product to global products", err);
@@ -290,7 +307,7 @@ export default function Retail({ products = [] }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem("retailProducts", JSON.stringify(retailProducts));
+      localStorage.setItem(retailProductsStorageKey, JSON.stringify(retailProducts));
     } catch (err) {
       console.warn("localStorage quota exceeded while saving retailProducts, stripping large data URLs and retrying", err);
       try {
@@ -302,7 +319,7 @@ export default function Retail({ products = [] }) {
           }
           return copy;
         });
-        localStorage.setItem("retailProducts", JSON.stringify(sanitized));
+        localStorage.setItem(retailProductsStorageKey, JSON.stringify(sanitized));
       } catch (err2) {
         console.warn("Failed to save sanitized retailProducts to localStorage", err2);
       }

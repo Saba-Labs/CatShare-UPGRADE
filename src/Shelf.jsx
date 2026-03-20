@@ -25,11 +25,19 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       for (const p of deletedProducts) {
         if (p.imagePath) {
           try {
-            const result = await Filesystem.readFile({
-              path: p.imagePath,
-              directory: Directory.Data,
-            });
-            map[p.id] = `data:image/png;base64,${result.data}`;
+            try {
+              const result = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.Data,
+              });
+              map[p.id] = `data:image/png;base64,${result.data}`;
+            } catch {
+              const result = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.External,
+              });
+              map[p.id] = `data:image/png;base64,${result.data}`;
+            }
           } catch {
             map[p.id] = p.image || "";
           }
@@ -101,10 +109,17 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
         try {
           await deleteRenderedImageForProduct(toDelete.id);
           if (toDelete.imagePath) {
-            await Filesystem.deleteFile({
-              path: toDelete.imagePath,
-              directory: Directory.Data,
-            });
+            try {
+              await Filesystem.deleteFile({
+                path: toDelete.imagePath,
+                directory: Directory.Data,
+              });
+            } catch {
+              await Filesystem.deleteFile({
+                path: toDelete.imagePath,
+                directory: Directory.External,
+              });
+            }
             console.log(`🗑️ Deleted source image: ${toDelete.imagePath}`);
           }
         } catch (err) {
@@ -134,10 +149,17 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
             try {
               await deleteRenderedImageForProduct(product.id);
               if (product.imagePath) {
-                await Filesystem.deleteFile({
-                  path: product.imagePath,
-                  directory: Directory.Data,
-                });
+                try {
+                  await Filesystem.deleteFile({
+                    path: product.imagePath,
+                    directory: Directory.Data,
+                  });
+                } catch {
+                  await Filesystem.deleteFile({
+                    path: product.imagePath,
+                    directory: Directory.External,
+                  });
+                }
                 console.log(`🗑️ Deleted source image: ${product.imagePath}`);
               }
             } catch (err) {

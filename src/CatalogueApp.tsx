@@ -19,6 +19,7 @@ import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import RatingModal from "./components/RatingModal";
 import { useAuth } from "./context/AuthContext";
+import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
 
 declare global {
   interface Window {
@@ -210,12 +211,25 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           // 2. Try local filesystem image
           if (p.imagePath) {
             try {
-              const result = await Filesystem.readFile({ path: p.imagePath, directory: Directory.Data });
-              map[p.id] = `data:image/png;base64,${result.data}`;
-              } catch (err) {
-    console.warn(`❌ Failed to load image for "${p.name}" from path: ${p.imagePath}`, err.message);
-    map[p.id] = p.image || "";
-  }
+              // Old: Directory.Data
+              // New: Directory.External (user-* folders)
+              try {
+                const result = await Filesystem.readFile({
+                  path: p.imagePath,
+                  directory: Directory.Data,
+                });
+                map[p.id] = `data:image/png;base64,${result.data}`;
+              } catch (dataErr) {
+                const result = await Filesystem.readFile({
+                  path: p.imagePath,
+                  directory: Directory.External,
+                });
+                map[p.id] = `data:image/png;base64,${result.data}`;
+              }
+            } catch (err: any) {
+              console.warn(`❌ Failed to load image for "${p.name}" from path: ${p.imagePath}`, err?.message);
+              map[p.id] = p.image || "";
+            }
           } else {
             // 3. Fallback to base64 in-memory image
             map[p.id] = p.image || "";
@@ -281,7 +295,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   useEffect(() => {
     const handleNewProduct = async () => {
-      const updated = JSON.parse(localStorage.getItem("products") || "[]");
+      const uid = user?.uid;
+      const updated = uid
+        ? safeGetFromStorage(getStorageKey("products", uid), [])
+        : JSON.parse(localStorage.getItem("products") || "[]");
       setProducts(updated);
   
       // Force reload thumbnails from local filesystem immediately
@@ -289,10 +306,18 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       for (const p of updated) {
         if (p.imagePath) {
           try {
-            const result = await Filesystem.readFile({
-              path: p.imagePath,
-              directory: Directory.Data,
-            });
+            let result: any;
+            try {
+              result = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.Data,
+              });
+            } catch {
+              result = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.External,
+              });
+            }
             const base64 = `data:image/png;base64,${result.data}`;
             setImageMap(prev => ({ ...prev, [p.id]: base64 }));
           } catch (err) {
@@ -465,7 +490,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const handleRenderAllImages = async (forceRerender: boolean = true) => {
-    const all = JSON.parse(localStorage.getItem("products") || "[]");
+    const all = products;
     if (all.length === 0) return;
 
     const cats = getAllCatalogues();

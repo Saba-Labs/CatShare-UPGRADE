@@ -154,6 +154,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUser(null);
       setSupabaseData(null);
+
+      // Security: remove legacy/unkeyed local product caches so another account
+      // on the same device cannot read previous user's local data during login.
+      localStorage.removeItem("products");
+      localStorage.removeItem("deletedProducts");
+      localStorage.removeItem("retailProducts");
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);

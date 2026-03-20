@@ -1,7 +1,7 @@
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { getRenderedImage } from "./utils/renderingUtils";
-import { safeGetFromStorage } from "./utils/safeStorage";
+import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
 import { logRenderStarted, logRenderCompleted, logShareInitiated, logShareCompleted } from "./config/analyticsEvents";
 
 interface HandleShareParams {
@@ -38,10 +38,25 @@ export async function handleShare({
   // Extract catalogue label from folder (folder is the catalogue name/label)
   const catalogueLabel = targetFolder;
 
+  const firebaseUserId = localStorage.getItem("firebaseUserId");
+  const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+  const renderedRoot = userFolder ? `${userFolder}/${targetFolder}` : targetFolder;
+
   // Get all products to support selective rendering
-  let allProducts = products || JSON.parse(localStorage.getItem("products") || "[]");
+  let allProducts = products;
+  if (!allProducts) {
+    if (firebaseUserId) {
+      allProducts = safeGetFromStorage(getStorageKey("products", firebaseUserId), []);
+    } else {
+      // Offline guest fallback (no authenticated user)
+      allProducts = JSON.parse(localStorage.getItem("products") || "[]");
+    }
+  }
   if (!products && (mode === "retail" || mode === "cat2")) {
-    const retailProducts = JSON.parse(localStorage.getItem("retailProducts") || "[]");
+    const retailStorageKey = firebaseUserId
+      ? getStorageKey("retailProducts", firebaseUserId)
+      : "retailProducts";
+    const retailProducts = safeGetFromStorage(retailStorageKey, []);
     if (retailProducts.length > 0) {
       allProducts = [...retailProducts, ...allProducts];
     }
@@ -61,11 +76,19 @@ export async function handleShare({
       if (product.imagePath) {
         try {
           console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
-          const res = await Filesystem.readFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          product.image = `data:image/png;base64,${res.data}`;
+          try {
+            const res = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.Data,
+            });
+            product.image = `data:image/png;base64,${res.data}`;
+          } catch {
+            const res = await Filesystem.readFile({
+              path: product.imagePath,
+              directory: Directory.External,
+            });
+            product.image = `data:image/png;base64,${res.data}`;
+          }
           console.log(`✅ Image loaded for product ${product.id}`);
         } catch (err) {
           console.warn(`⚠️ Failed to load image for product ${product.id}: ${err.message}`);
@@ -89,11 +112,23 @@ export async function handleShare({
 
     try {
       const cachedFileName = `product_${id}_${catalogueLabel}.png`;
-      const cachedFilePath = `${targetFolder}/${cachedFileName}`;
-      await Filesystem.stat({
-        path: cachedFilePath,
-        directory: Directory.External,
-      });
+      const cachedFilePathNew = `${renderedRoot}/${cachedFileName}`;
+      const cachedFilePathOld = userFolder ? `${renderedRoot}/products/${cachedFileName}` : null;
+      try {
+        await Filesystem.stat({
+          path: cachedFilePathNew,
+          directory: Directory.External,
+        });
+      } catch {
+        if (cachedFilePathOld) {
+          await Filesystem.stat({
+            path: cachedFilePathOld,
+            directory: Directory.External,
+          });
+        } else {
+          throw new Error("Not found");
+        }
+      }
       // Rendered image exists, all good - no rendering needed
       console.log(`✅ Rendered image already exists for ${product.name}`);
     } catch (err) {
@@ -200,13 +235,26 @@ export async function handleShare({
   const processingPromises = selected.map(async (id) => {
     try {
       const cachedFileName = `product_${id}_${catalogueLabel}.png`;
-      const cachedFilePath = `${targetFolder}/${cachedFileName}`;
+      const cachedFilePathNew = `${renderedRoot}/${cachedFileName}`;
+      const cachedFilePathOld = userFolder ? `${renderedRoot}/products/${cachedFileName}` : null;
 
       // Get the rendered image file URI
-      const fileResult = await Filesystem.getUri({
-        path: cachedFilePath,
-        directory: Directory.External,
-      });
+      let fileResult;
+      try {
+        fileResult = await Filesystem.getUri({
+          path: cachedFilePathNew,
+          directory: Directory.External,
+        });
+      } catch {
+        if (cachedFilePathOld) {
+          fileResult = await Filesystem.getUri({
+            path: cachedFilePathOld,
+            directory: Directory.External,
+          });
+        } else {
+          throw new Error("Rendered image not found");
+        }
+      }
 
       if (fileResult.uri) {
         updateProgress();

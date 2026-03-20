@@ -19,9 +19,15 @@ export function getStorageKey(baseKey: string, userId: string): string {
  * @param userId - User ID (optional, will use localStorage fallback if not provided)
  * @returns File path (e.g., "user-uid123/catalogue/product-xyz.png")
  */
-export function getUserImagePath(productId: string, userId?: string): string {
+export function getUserImagePath(
+  productId: string,
+  userId?: string,
+  catalogueFolder: string = 'catalogue'
+): string {
   const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || 'anonymous';
-  return `user-${effectiveUserId}/catalogue/product-${productId}.png`;
+  // Expected on-disk layout (user-scoped, simple):
+  //   user-<uid>/<catalogue-folder>/product-<id>.png
+  return `user-${effectiveUserId}/${catalogueFolder}/product-${productId}.png`;
 }
 
 /**

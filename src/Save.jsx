@@ -10,6 +10,31 @@ import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
 import { uploadProductImageToR2 } from "./services/r2Upload";
 
+async function fetchImageAsDataUrl(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+  }
+  const blob = await response.blob();
+  // FileReader works in Capacitor webview and returns a data:image/... URL
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function getUserFolderForRenderedImages(product) {
+  // Always use the currently logged-in user to avoid cross-user mixing.
+  try {
+    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
+    return `user-${firebaseUserId}`;
+  } catch {
+    return "user-anonymous";
+  }
+}
+
 /**
  * Delete all rendered images for a specific product
  * across all catalogues
@@ -19,24 +44,47 @@ export async function deleteRenderedImageForProduct(productId) {
 
   try {
     const catalogues = getAllCatalogues();
+    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
+    const userFolder = `user-${firebaseUserId}`;
     for (const cat of catalogues) {
       const folder = cat.folder || cat.label;
       const filename = `product_${productId}_${folder}.png`;
-      const filePath = `${folder}/${filename}`;
+      const legacyFilePath = `${folder}/${filename}`;
+      const userFilePath = `${userFolder}/${folder}/${filename}`;
+      const userFilePathOld = `${userFolder}/${folder}/products/${filename}`;
 
       try {
         await Filesystem.deleteFile({
-          path: filePath,
+          path: legacyFilePath,
           directory: Directory.External,
         });
-        console.log(`  ✓ Deleted rendered image: ${filePath}`);
+        console.log(`  ✓ Deleted rendered image: ${legacyFilePath}`);
       } catch (err) {
         // Ignore errors if file doesn't exist
       }
 
+      try {
+        await Filesystem.deleteFile({
+          path: userFilePath,
+          directory: Directory.External,
+        });
+        console.log(`  ✓ Deleted rendered image: ${userFilePath}`);
+      } catch (err) {
+        // Ignore errors if file doesn't exist
+      }
+
+      try {
+        await Filesystem.deleteFile({
+          path: userFilePathOld,
+          directory: Directory.External,
+        });
+      } catch (err) {
+        // Ignore errors
+      }
+
       // Also remove from localStorage cache
       try {
-        const storageKey = `rendered::${folder}::${productId}`;
+        const storageKey = `rendered::${userFolder}::${folder}::${productId}`;
         localStorage.removeItem(storageKey);
       } catch (err) {
         // Ignore errors
@@ -57,88 +105,74 @@ export async function renameRenderedImagesForCatalogue(oldFolder, newFolder, old
   try {
     console.log(`📁 Renaming rendered images from folder "${oldFolder}" (label: "${oldLabel}") to folder "${newFolder}" (label: "${newLabel}")`);
 
-    // List all files in the old folder
-    let oldFiles = [];
-    try {
-      const result = await Filesystem.readdir({
-        path: oldFolder,
-        directory: Directory.External,
-      });
-      oldFiles = result.files || [];
-    } catch (err) {
-      // Old folder might not exist (no images rendered yet)
-      if (err.code !== 'NotFound') {
-        console.warn(`⚠️  Could not read old folder ${oldFolder}:`, err.message);
-      }
-      return;
-    }
+    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
+    const userFolder = `user-${firebaseUserId}`;
 
-    if (oldFiles.length === 0) {
-      console.log(`✅ No files found in old folder: ${oldFolder}`);
-      return;
-    }
-
-    // Process each file
-    for (const file of oldFiles) {
+    const renameInDir = async (baseDirOld, baseDirNew) => {
+      let oldFiles = [];
       try {
-        const oldPath = `${oldFolder}/${file.name}`;
-
-        // Extract product ID from filename pattern: product_<id>_<label>.png
-        const fileMatch = file.name.match(/^product_([^_]+)_.*\.png$/);
-        if (!fileMatch) {
-          console.warn(`  ⚠️  Skipping file with unexpected format: ${file.name}`);
-          continue;
+        const result = await Filesystem.readdir({
+          path: baseDirOld,
+          directory: Directory.External,
+        });
+        oldFiles = result.files || [];
+      } catch (err) {
+        if (err.code !== "NotFound") {
+          console.warn(`⚠️ Could not read old directory ${baseDirOld}:`, err.message);
         }
+        return;
+      }
 
-        const productId = fileMatch[1];
-        const newFileName = `product_${productId}_${newLabel}.png`;
-        const newPath = `${newFolder}/${newFileName}`;
+      if (oldFiles.length === 0) return;
 
-        // Read the file from old location
-        const fileData = await Filesystem.readFile({
-          path: oldPath,
-          directory: Directory.External,
-        });
-
-        // Write to new location with new filename
-        await Filesystem.writeFile({
-          path: newPath,
-          data: fileData.data,
-          directory: Directory.External,
-          recursive: true,
-        });
-
-        console.log(`  ✓ Renamed: ${file.name} → ${newFileName}`);
-
-        // Delete the old file
+      for (const file of oldFiles) {
         try {
+          const oldPath = `${baseDirOld}/${file.name}`;
+          const fileMatch = file.name.match(/^product_([^_]+)_.*\.png$/);
+          if (!fileMatch) continue;
+
+          const productId = fileMatch[1];
+          // Filenames use catalogue folder name as suffix in this app
+          const newFileName = `product_${productId}_${newFolder}.png`;
+          const newPath = `${baseDirNew}/${newFileName}`;
+
+          const fileData = await Filesystem.readFile({
+            path: oldPath,
+            directory: Directory.External,
+          });
+
+          await Filesystem.writeFile({
+            path: newPath,
+            data: fileData.data,
+            directory: Directory.External,
+            recursive: true,
+          });
+
           await Filesystem.deleteFile({
             path: oldPath,
             directory: Directory.External,
           });
-          console.log(`    ✓ Cleaned up old file: ${file.name}`);
-        } catch (delErr) {
-          console.warn(`    ⚠️  Could not delete old file ${file.name}:`, delErr.message);
+        } catch {
+          // best-effort rename
         }
-      } catch (err) {
-        console.warn(`  ⚠️  Could not process file ${file.name}:`, err.message);
       }
-    }
 
-    // Delete the now-empty old folder
-    try {
-      await Filesystem.rmdir({
-        path: oldFolder,
-        directory: Directory.External,
-        recursive: false, // Only delete if folder is empty
-      });
-      console.log(`✅ Deleted empty old folder: ${oldFolder}`);
-    } catch (rmErr) {
-      // Folder might not be empty or other issues, but this is not critical
-      console.warn(`⚠️  Could not delete old folder ${oldFolder}:`, rmErr.message);
-    }
+      // best-effort directory removal
+      try {
+        await Filesystem.rmdir({ path: baseDirOld, directory: Directory.External, recursive: false });
+      } catch {}
+    };
 
-    console.log(`✅ Renaming completed for catalogue images`);
+    // Legacy root rename: <oldFolder>/* -> <newFolder>/*
+    await renameInDir(oldFolder, newFolder);
+
+    // User-scoped rename (new layout):
+    await renameInDir(`${userFolder}/${oldFolder}`, `${userFolder}/${newFolder}`);
+
+    // User-scoped rename (old layout with extra products/ folder):
+    await renameInDir(`${userFolder}/${oldFolder}/products`, `${userFolder}/${newFolder}/products`);
+
+    console.log(`✅ Renaming completed for catalogue images (legacy + user-scoped)`);
   } catch (err) {
     console.warn(`⚠️  Could not rename catalogue images:`, err.message);
   }
@@ -154,29 +188,65 @@ export async function deleteRenderedImagesFromFolder(folderName) {
   try {
     console.log(`🗑️  Cleaning up rendered images from folder: ${folderName}`);
 
-    // List all files in the folder
-    const result = await Filesystem.readdir({
-      path: folderName,
-      directory: Directory.External,
-    });
-
-    if (!result.files || result.files.length === 0) {
-      console.log(`✅ Folder is empty or doesn't exist: ${folderName}`);
-      return;
-    }
-
-    // Delete each file
-    for (const file of result.files) {
-      try {
-        await Filesystem.deleteFile({
-          path: `${folderName}/${file.name}`,
-          directory: Directory.External,
-        });
-        console.log(`  ✓ Deleted: ${file.name}`);
-      } catch (err) {
-        console.warn(`  ⚠️  Could not delete ${file.name}:`, err.message);
+    // 1) Legacy root folder: <folderName>/
+    try {
+      const result = await Filesystem.readdir({
+        path: folderName,
+        directory: Directory.External,
+      });
+      if (result.files?.length) {
+        for (const file of result.files) {
+          try {
+            await Filesystem.deleteFile({
+              path: `${folderName}/${file.name}`,
+              directory: Directory.External,
+            });
+          } catch (err) {}
+        }
       }
-    }
+    } catch (err) {}
+
+    // 2) User folder: user-<uid>/<folderName>/
+    try {
+      const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
+      const userFolder = `user-${firebaseUserId}`;
+      const productsDir = `${userFolder}/${folderName}`;
+      const result2 = await Filesystem.readdir({
+        path: productsDir,
+        directory: Directory.External,
+      });
+      if (result2.files?.length) {
+        for (const file of result2.files) {
+          try {
+            await Filesystem.deleteFile({
+              path: `${productsDir}/${file.name}`,
+              directory: Directory.External,
+            });
+          } catch (err) {}
+        }
+      }
+    } catch (err) {}
+
+    // 3) Old user layout: user-<uid>/<folderName>/products/
+    try {
+      const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
+      const userFolder = `user-${firebaseUserId}`;
+      const oldDir = `${userFolder}/${folderName}/products`;
+      const result3 = await Filesystem.readdir({
+        path: oldDir,
+        directory: Directory.External,
+      });
+      if (result3.files?.length) {
+        for (const file of result3.files) {
+          try {
+            await Filesystem.deleteFile({
+              path: `${oldDir}/${file.name}`,
+              directory: Directory.External,
+            });
+          } catch (err) {}
+        }
+      }
+    } catch (err) {}
 
     console.log(`✅ Cleanup completed for folder: ${folderName}`);
   } catch (err) {
@@ -218,7 +288,7 @@ export async function saveRenderedImage(product, type, units = {}) {
     return color;
   };
 
-  // ✅ Load image from Filesystem if not present
+  // Prefer filesystem imagePath to avoid CORS issues during canvas rendering.
   console.log(`🖼️ Product image status:`, {
     hasImage: !!product.image,
     hasImagePath: !!product.imagePath,
@@ -227,18 +297,28 @@ export async function saveRenderedImage(product, type, units = {}) {
     imageLength: product.image?.length,
   });
 
-  if (!product.image && product.imagePath) {
+  if (product.imagePath) {
     try {
       console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
-      const res = await Filesystem.readFile({
-        path: product.imagePath,
-        directory: Directory.Data,
-      });
-      product.image = `data:image/png;base64,${res.data}`;
-      console.log(`✅ Image loaded from filesystem. Base64 length: ${product.image.length}`);
+      try {
+        const res = await Filesystem.readFile({
+          path: product.imagePath,
+          directory: Directory.Data,
+        });
+        product.image = `data:image/png;base64,${res.data}`;
+        console.log(`✅ Image loaded from filesystem (Data). Base64 length: ${product.image.length}`);
+      } catch (dataErr) {
+        // Fallback for when the source image was saved to External storage.
+        const res = await Filesystem.readFile({
+          path: product.imagePath,
+          directory: Directory.External,
+        });
+        product.image = `data:image/png;base64,${res.data}`;
+        console.log(`✅ Image loaded from filesystem (External). Base64 length: ${product.image.length}`);
+      }
     } catch (err) {
-      console.error("❌ Failed to load image for rendering:", err.message);
-      return;
+      // If filesystem read fails, fall back to whatever was available (imageUrl).
+      console.warn("⚠️ Failed to load image from filesystem for rendering:", err?.message || err);
     }
   }
 
@@ -246,6 +326,19 @@ export async function saveRenderedImage(product, type, units = {}) {
   // `loadImage()` in canvas renderer supports HTTP(S) URLs (requires CORS on the bucket).
   if (!product.image && product.imageUrl) {
     product.image = product.imageUrl;
+  }
+
+  // If product.image is a remote URL, convert to base64 data URL first.
+  // This avoids canvas "Image not found" / CORS issues when drawing remote images.
+  if (
+    typeof product.image === "string" &&
+    product.image.startsWith("http")
+  ) {
+    try {
+      product.image = await fetchImageAsDataUrl(product.image);
+    } catch (e) {
+      // If fetching fails, we'll try to render with the URL as a last resort.
+    }
   }
 
   // ✅ Ensure product.image exists before rendering
@@ -398,7 +491,10 @@ export async function saveRenderedImage(product, type, units = {}) {
     // Filename includes catalogue label for proper identification and organization
     const filename = `product_${id}_${catalogueLabel}.png`;
 
-    const filePath = `${folder}/${filename}`;
+    const userFolder = getUserFolderForRenderedImages(product);
+    // Expected on-disk layout (simple):
+    //   user-<uid>/<catalogue-folder>/<filename>
+    const filePath = `${userFolder}/${folder}/${filename}`;
 
     try {
       console.log(`📝 Writing file to: ${filePath}`);
@@ -429,7 +525,7 @@ export async function saveRenderedImage(product, type, units = {}) {
       // Try to store rendered image in localStorage for quick access during sharing
       // This is optional and won't block if quota is exceeded
       try {
-        const storageKey = `rendered::${catalogueLabel}::${id}`;
+        const storageKey = `rendered::${userFolder}::${catalogueLabel}::${id}`;
         const dataToStore = JSON.stringify({
           base64,
           timestamp: Date.now(),
