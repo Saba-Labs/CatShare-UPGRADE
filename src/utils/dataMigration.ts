@@ -689,23 +689,15 @@ export function migrateUnkeyedDataToUserKeyed(userId: string): void {
       }
     }
 
-    // After migrating once globally, clear unkeyed data so other users on the same device
-    // won't receive the same offline dataset.
+    // Mark migration as done but keep unkeyed originals intact.
+    // They will only be deleted after the user completes cloud sync or
+    // chooses "Delete offline data" in the popup. This prevents data loss
+    // if the cloud sync fails.
+    localStorage.setItem(migrationKey, "done");
     if (hasMigratedData) {
-      // Mark this user as having completed the migration
-      localStorage.setItem(migrationKey, "done");
-      console.log(`✅ Per-user data migration completed for ${userId}`);
+      console.log(`✅ Per-user data migration completed for ${userId} (unkeyed originals preserved until cloud sync)`);
     } else {
       console.log(`ℹ️  No unkeyed data found to migrate for user ${userId}`);
-      localStorage.setItem(migrationKey, "done");
-    }
-
-    if (hasMigratedData) {
-      localStorage.removeItem("products");
-      localStorage.removeItem("deletedProducts");
-      localStorage.removeItem("categories");
-      localStorage.removeItem("cataloguesDefinition");
-      localStorage.removeItem("fieldsDefinition");
     }
 
     localStorage.setItem(globalMigrationKey, "done");

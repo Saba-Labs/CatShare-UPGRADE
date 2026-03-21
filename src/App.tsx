@@ -175,7 +175,9 @@ function AppWithBackHandler() {
       setDeletedProducts(cloudDeleted);
       safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
 
-      localStorage.setItem('categories', JSON.stringify(supabaseData?.categories || []));
+      const rawCats = supabaseData?.categories || [];
+      const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+      localStorage.setItem('categories', JSON.stringify(normalizedCats));
       if (supabaseData?.fieldsDefinition) {
         setFieldsDefinition(supabaseData.fieldsDefinition, userId);
         window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
@@ -205,7 +207,12 @@ function AppWithBackHandler() {
       return Array.isArray(kd) && kd.length > 0;
     })();
     const hasLegacyCategories = (() => {
-      try { const c = JSON.parse(localStorage.getItem('categories') || '[]'); return Array.isArray(c) && c.length > 0; } catch { return false; }
+      try {
+        const keyed = localStorage.getItem(getStorageKey('categories', userId));
+        const unkeyed = localStorage.getItem('categories');
+        const c = JSON.parse(keyed || unkeyed || '[]');
+        return Array.isArray(c) && c.length > 0;
+      } catch { return false; }
     })();
     const hasLegacyFields = !!getFieldsDefinition(userId);
     const hasLegacyCatalogues = !!getCataloguesDefinition(userId);
@@ -334,7 +341,13 @@ function AppWithBackHandler() {
 
       setSyncProgress('Syncing categories...');
       let localCategories: any[] = [];
-      try { localCategories = JSON.parse(localStorage.getItem('categories') || '[]'); } catch { localCategories = []; }
+      try {
+        // Try keyed storage first, fall back to unkeyed for legacy data.
+        const keyed = localStorage.getItem(getStorageKey('categories', userId));
+        const unkeyed = localStorage.getItem('categories');
+        const raw = JSON.parse(keyed || unkeyed || '[]');
+        localCategories = Array.isArray(raw) ? raw : [];
+      } catch { localCategories = []; }
       const localCataloguesDefinition = getCataloguesDefinition(userId);
       const localFieldsDefinition = getFieldsDefinition(userId);
       const localShowWatermark = safeGetFromStorage('showWatermark', true);
@@ -345,7 +358,11 @@ function AppWithBackHandler() {
       const localCustomCurrencies = safeGetFromStorage('customCurrencies', {});
 
       {
-        const res = await syncCategories(userId, Array.isArray(localCategories) ? localCategories : []);
+        // syncCategories expects objects {id, name}; local categories may be plain strings.
+        const categoriesForSync = localCategories.map((cat: any) =>
+          typeof cat === 'string' ? { id: cat, name: cat } : cat
+        );
+        const res = await syncCategories(userId, categoriesForSync);
         if (!res.success) throw new Error(res.error || 'Categories sync failed');
       }
 
@@ -406,11 +423,14 @@ function AppWithBackHandler() {
       }
 
       localStorage.setItem(`cloudSyncDone::${userId}`, 'true');
+      // Clean up unkeyed legacy originals now that cloud sync succeeded.
       localStorage.removeItem('products');
       localStorage.removeItem('deletedProducts');
       localStorage.removeItem('categories');
       localStorage.removeItem('cataloguesDefinition');
       localStorage.removeItem('fieldsDefinition');
+      // Also clean up keyed categories (keyed products/deleted handled by clearAllOfflineCaches).
+      localStorage.removeItem(getStorageKey('categories', userId));
       localStorage.setItem('offlineLegacyResolved::device', 'true');
       localStorage.setItem('strictOnlineMode::device', 'true');
       clearAllOfflineCaches();
@@ -1021,6 +1041,7 @@ function AppWithBackHandler() {
                 localStorage.removeItem('categories');
                 localStorage.removeItem('cataloguesDefinition');
                 localStorage.removeItem('fieldsDefinition');
+                localStorage.removeItem(getStorageKey('categories', user.uid));
                 localStorage.removeItem(getStorageKey('cataloguesDefinition', user.uid));
                 localStorage.removeItem(getStorageKey('fieldsDefinition', user.uid));
                 localStorage.removeItem('showTutorialOnInit');

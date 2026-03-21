@@ -89,7 +89,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     safeSetInStorage(getProductsKey(userId), filteredProducts);
     safeSetInStorage(getDeletedProductsKey(userId), nextDeleted);
 
-    localStorage.setItem('categories', JSON.stringify(snapshot.categories || []));
+    const rawCats = snapshot.categories || [];
+    const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+    localStorage.setItem('categories', JSON.stringify(normalizedCats));
 
     if (snapshot.fieldsDefinition) {
       setFieldsDefinition(snapshot.fieldsDefinition, userId);
