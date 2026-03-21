@@ -405,8 +405,14 @@ function AppWithBackHandler() {
       const mergedProducts = mergeProductsData(localProductsFiltered, remoteProducts, deletedIds);
       const mergedDeleted = mergeProductsData(localDeleted || [], remoteDeleted || []);
 
+      // Sync ALL products to the products table (active + deleted) so shelf items
+      // retain their full product data in Supabase for retrieval later.
+      const allProductsForSync = [
+        ...mergedProducts,
+        ...mergedDeleted.filter((dp: any) => !mergedProducts.some((mp: any) => mp.id === dp.id)),
+      ];
       {
-        const res = await syncProducts(userId, mergedProducts);
+        const res = await syncProducts(userId, allProductsForSync);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
       {
@@ -447,6 +453,16 @@ function AppWithBackHandler() {
       setSyncNowLoading(false);
     }
   }, [user, clearAllOfflineCaches, refreshFromCloud]);
+
+  // ──────────────────────────────────────────────────────
+  // R2 CLEANUP QUEUE (process orphaned images on startup)
+  // ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (startupPhase !== 'done' || !user?.uid) return;
+    import('./services/supabaseSync').then(({ processR2CleanupQueue }) => {
+      processR2CleanupQueue(user.uid).catch(() => {});
+    });
+  }, [startupPhase, user?.uid]);
 
   // ──────────────────────────────────────────────────────
   // ONBOARDING REDIRECT (only after startup pipeline is done)
@@ -1024,7 +1040,7 @@ function AppWithBackHandler() {
 
             <button
               disabled={syncNowLoading}
-              onClick={() => {
+              onClick={async () => {
                 const ok = window.confirm("Delete offline data permanently? This cannot be undone.");
                 if (!ok) return;
 
@@ -1045,11 +1061,47 @@ function AppWithBackHandler() {
                 localStorage.removeItem(getStorageKey('cataloguesDefinition', user.uid));
                 localStorage.removeItem(getStorageKey('fieldsDefinition', user.uid));
                 localStorage.removeItem('showTutorialOnInit');
-                safeSetInStorage('hasCompletedOnboarding', false);
+
+                // Check if user already has data in the cloud before sending to welcome.
+                const hasCloudData = !!(
+                  supabaseData?.fieldsDefinition ||
+                  (supabaseData?.products && supabaseData.products.length > 0) ||
+                  supabaseData?.cataloguesDefinition
+                );
+
+                if (hasCloudData) {
+                  // User already set up on another device — load from cloud, skip welcome.
+                  const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
+                  const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
+                  const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
+                  const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
+                  setProducts(filteredProducts);
+                  setDeletedProducts(cloudDeleted);
+                  safeSetInStorage(getProductsKey(user.uid), filteredProducts);
+                  safeSetInStorage(getDeletedProductsKey(user.uid), cloudDeleted);
+
+                  const rawCats = supabaseData?.categories || [];
+                  const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+                  localStorage.setItem('categories', JSON.stringify(normalizedCats));
+
+                  if (supabaseData?.fieldsDefinition) {
+                    setFieldsDefinition(supabaseData.fieldsDefinition, user.uid);
+                  }
+                  if (supabaseData?.cataloguesDefinition) {
+                    setCataloguesDefinition(supabaseData.cataloguesDefinition, user.uid);
+                  }
+                  applyUserSettingsFromCloud(supabaseData?.userSettings);
+                  safeSetInStorage('hasCompletedOnboarding', true);
+                } else {
+                  safeSetInStorage('hasCompletedOnboarding', false);
+                }
 
                 setShowOfflineSyncModal(false);
                 setStartupPhase('done');
-                navigate('/welcome');
+
+                if (!hasCloudData) {
+                  navigate('/welcome');
+                }
               }}
               className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
             >

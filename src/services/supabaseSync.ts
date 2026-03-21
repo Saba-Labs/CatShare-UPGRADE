@@ -541,18 +541,19 @@ export async function deleteProductFromSupabase(
       // Continue anyway - image cleanup is secondary to DB deletion
     }
 
-    // Step 2: Delete image from Cloudflare R2 if it exists
+    // Step 2: Delete image from Cloudflare R2 if it exists.
+    // If R2 delete fails, queue it for later cleanup instead of blocking the user.
     if (product?.data?.imageUrl) {
       console.log(`🗑️ Attempting to delete R2 image for product ${normalizedProductId}`);
       const deleteResult = await deleteImageFromR2(product.data.imageUrl);
 
       if (!deleteResult.success) {
-        console.error('❌ Failed to delete R2 image:', deleteResult.error);
-        // Per requirement: fail the entire deletion if R2 deletion fails
-        return {
-          success: false,
-          error: `Cannot delete product: ${deleteResult.error}. Please try again or contact support.`,
-        };
+        console.warn('⚠️ R2 delete failed, queuing for later cleanup:', deleteResult.error);
+        try {
+          await queueR2Cleanup(userId, product.data.imageUrl);
+        } catch (queueErr) {
+          console.warn('⚠️ Could not queue R2 cleanup:', queueErr);
+        }
       }
     }
 
@@ -670,5 +671,54 @@ export async function isSyncNeeded(
   } catch (err) {
     console.error('❌ Error checking sync status:', err);
     return true;
+  }
+}
+
+/**
+ * Queue a failed R2 image deletion for later retry.
+ */
+export async function queueR2Cleanup(userId: string, imageUrl: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from('r2_cleanup_queue')
+    .insert({ user_id: userId, image_url: imageUrl });
+
+  if (error) {
+    console.error('❌ Failed to queue R2 cleanup:', error.message);
+  } else {
+    console.log('📋 Queued R2 cleanup for:', imageUrl);
+  }
+}
+
+/**
+ * Process pending R2 cleanup queue items.
+ * Retries deleting orphaned images and removes successful entries.
+ */
+export async function processR2CleanupQueue(userId: string): Promise<void> {
+  try {
+    const client = getSupabaseClient();
+    const { data: pending, error } = await client
+      .from('r2_cleanup_queue')
+      .select('id, image_url')
+      .eq('user_id', userId)
+      .limit(20);
+
+    if (error || !pending || pending.length === 0) return;
+
+    console.log(`🧹 Processing ${pending.length} R2 cleanup queue items`);
+
+    for (const item of pending) {
+      const result = await deleteImageFromR2(item.image_url);
+      if (result.success) {
+        await client
+          .from('r2_cleanup_queue')
+          .delete()
+          .eq('id', item.id);
+        console.log(`✅ Cleaned up R2 image: ${item.image_url}`);
+      } else {
+        console.warn(`⚠️ R2 cleanup retry failed for ${item.image_url}: ${result.error}`);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ processR2CleanupQueue error:', err);
   }
 }

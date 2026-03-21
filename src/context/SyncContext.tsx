@@ -161,8 +161,16 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const { syncProducts, syncDeletedProducts } = await import('../services/supabaseSync');
 
-      if (productsForSync.length > 0) {
-        const res = await syncProducts(userId, productsForSync);
+      // Sync ALL products (active + deleted) to the products table so shelf
+      // items retain their full data in Supabase for display.
+      const allProductsForSync = [
+        ...productsForSync,
+        ...(Array.isArray(deletedProducts) ? deletedProducts : [])
+          .filter((dp: any) => !productsForSync.some((p: any) => p.id === dp.id)),
+      ];
+
+      if (allProductsForSync.length > 0) {
+        const res = await syncProducts(userId, allProductsForSync);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
 

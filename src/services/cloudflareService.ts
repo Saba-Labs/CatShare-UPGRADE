@@ -2,8 +2,41 @@
 // Handles image uploads to Cloudflare R2 via presigned URLs from the Vercel API
 
 import { getAuth } from "firebase/auth";
+import { Capacitor } from "@capacitor/core";
+import { CapacitorHttp } from "@capacitor/core";
 
 const API_BASE = import.meta.env.VITE_APP_URL || "";
+
+async function nativeFetch(
+  url: string,
+  options: { method: string; headers: Record<string, string>; body?: string }
+): Promise<{ ok: boolean; status: number; statusText: string; json: () => Promise<any> }> {
+  if (Capacitor.isNativePlatform()) {
+    const response = await CapacitorHttp.request({
+      url,
+      method: options.method,
+      headers: options.headers,
+      data: options.body ? JSON.parse(options.body) : undefined,
+    });
+    return {
+      ok: response.status >= 200 && response.status < 300,
+      status: response.status,
+      statusText: String(response.status),
+      json: async () => response.data,
+    };
+  }
+  const res = await fetch(url, {
+    method: options.method,
+    headers: options.headers,
+    body: options.body,
+  });
+  return {
+    ok: res.ok,
+    status: res.status,
+    statusText: res.statusText,
+    json: () => res.json(),
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -186,7 +219,7 @@ export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult>
 
     const idToken = await user.getIdToken();
     for (const k of candidateKeys) {
-      const response = await fetch(`${API_BASE}/api/delete-image`, {
+      const response = await nativeFetch(`${API_BASE}/api/delete-image`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

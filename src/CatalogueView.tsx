@@ -1465,20 +1465,47 @@ const handleTouchEnd = useCallback(() => {
                     items,
                   });
 
-                  // Also try to share the link if available
-                  if (navigator.share) {
+                  const shareMessage = `Order using the link ${url}`;
+
+                  // Try Capacitor native share first (most reliable on mobile)
+                  let shared = false;
+                  try {
+                    const { Capacitor } = await import('@capacitor/core');
+                    if (Capacitor.isNativePlatform()) {
+                      const { Share } = await import('@capacitor/share');
+                      await Share.share({
+                        title: 'Order Link',
+                        text: shareMessage,
+                        dialogTitle: 'Share order link',
+                      });
+                      shared = true;
+                    }
+                  } catch (shareErr: any) {
+                    if (shareErr?.name !== 'AbortError') {
+                      console.warn('Capacitor share failed, trying web share:', shareErr);
+                    } else {
+                      shared = true;
+                    }
+                  }
+
+                  // Fallback: Web Share API
+                  if (!shared && navigator.share) {
                     try {
-                      await navigator.share({ title: 'Order link', text: 'Order form link', url });
+                      await navigator.share({ title: 'Order Link', text: shareMessage });
+                      shared = true;
                     } catch (shareErr: any) {
-                      // If user cancels or permissions denied, silently fail (link is already open)
                       if (!(shareErr.name === 'AbortError' || shareErr.name === 'NotAllowedError')) {
-                        console.error('Share failed:', shareErr);
+                        console.error('Web share failed:', shareErr);
+                      } else {
+                        shared = true;
                       }
                     }
-                  } else {
-                    // If no share API, copy to clipboard as fallback
+                  }
+
+                  // Final fallback: copy to clipboard
+                  if (!shared) {
                     try {
-                      await navigator.clipboard.writeText(url);
+                      await navigator.clipboard.writeText(shareMessage);
                       alert('Order link copied to clipboard for sharing.');
                     } catch {
                       // Clipboard copy failed; silently continue.
