@@ -313,43 +313,74 @@ function AppWithBackHandler() {
         syncUserSettings,
       } = await import('./services/supabaseSync');
 
-      setSyncProgress('Uploading images...');
-      if (Array.isArray(localProducts) && localProducts.length > 0) {
+      // Helper: upload missing R2 images for any product array
+      const uploadMissingImages = async (items: any[], label: string): Promise<any[]> => {
+        const missing = items.filter((p: any) => !p.imageUrl && p.imagePath);
+        if (missing.length === 0) return items;
+
         const { uploadProductImageToR2 } = await import('./services/r2Upload');
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
-        const updated = await Promise.all(
-          localProducts.map(async (p: any) => {
-            if (p.imageUrl) return p;
-            if (!p.imagePath) return p;
+        const uploadedPairs = await Promise.all(
+          missing.map(async (p: any) => {
             try {
               const fileData = await Filesystem.readFile({ path: p.imagePath, directory: Directory.Data });
               const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
               const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg') ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
               const uploaded = await uploadProductImageToR2({ productId: String(p.id), dataUrl: `${dataUrlPrefix}${fileData.data}` });
-              if (!uploaded?.url) throw new Error(`R2 upload failed for product ${p.id}`);
-              return { ...p, imageUrl: uploaded.url };
+              if (!uploaded?.url) return null;
+              return { productId: p.id, imageUrl: uploaded.url };
             } catch (err: any) {
-              console.warn(`⚠️ Image upload failed for product ${p.id}:`, err?.message);
-              return p;
+              console.warn(`⚠️ Image upload failed for ${label} product ${p.id}:`, err?.message);
+              return null;
             }
           })
         );
-        localProducts = updated;
-        safeSetInStorage(getProductsKey(userId), updated);
-      }
+        const urlMap = new Map(
+          uploadedPairs.filter(Boolean).map((x: any) => [String(x.productId), x.imageUrl])
+        );
+        return items.map((p: any) => {
+          const url = urlMap.get(String(p.id));
+          return url ? { ...p, imageUrl: url } : p;
+        });
+      };
+
+      setSyncProgress('Uploading images...');
+      localProducts = await uploadMissingImages(
+        Array.isArray(localProducts) ? localProducts : [], 'active'
+      );
+      safeSetInStorage(getProductsKey(userId), localProducts);
+
+      // Also upload images for shelf (deleted) products
+      let localDeletedUpdated = await uploadMissingImages(
+        Array.isArray(localDeleted) ? localDeleted : [], 'shelf'
+      );
 
       setSyncProgress('Syncing categories...');
       let localCategories: any[] = [];
       try {
-        // Try keyed storage first, fall back to unkeyed for legacy data.
         const keyed = localStorage.getItem(getStorageKey('categories', userId));
         const unkeyed = localStorage.getItem('categories');
         const raw = JSON.parse(keyed || unkeyed || '[]');
         localCategories = Array.isArray(raw) ? raw : [];
       } catch { localCategories = []; }
-      const localCataloguesDefinition = getCataloguesDefinition(userId);
-      const localFieldsDefinition = getFieldsDefinition(userId);
+
+      // Read catalogues/fields from keyed storage, fall back to unkeyed for legacy
+      let localCataloguesDefinition = getCataloguesDefinition(userId);
+      if (!localCataloguesDefinition || !localCataloguesDefinition.catalogues?.length) {
+        const unkeyedCat = localStorage.getItem('cataloguesDefinition');
+        if (unkeyedCat) {
+          try { localCataloguesDefinition = JSON.parse(unkeyedCat); } catch { /* keep default */ }
+        }
+      }
+      let localFieldsDefinition = getFieldsDefinition(userId);
+      if (!localFieldsDefinition) {
+        const unkeyedFields = localStorage.getItem('fieldsDefinition');
+        if (unkeyedFields) {
+          try { localFieldsDefinition = JSON.parse(unkeyedFields); } catch { /* keep null */ }
+        }
+      }
+
       const localShowWatermark = safeGetFromStorage('showWatermark', true);
       const localWatermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
       const localWatermarkPosition = safeGetFromStorage('watermarkPosition', 'bottom-left');
@@ -358,7 +389,6 @@ function AppWithBackHandler() {
       const localCustomCurrencies = safeGetFromStorage('customCurrencies', {});
 
       {
-        // syncCategories expects objects {id, name}; local categories may be plain strings.
         const categoriesForSync = localCategories.map((cat: any) =>
           typeof cat === 'string' ? { id: cat, name: cat } : cat
         );
@@ -367,13 +397,13 @@ function AppWithBackHandler() {
       }
 
       setSyncProgress('Syncing catalogues...');
-      {
+      if (localCataloguesDefinition) {
         const res = await syncCataloguesDefinition(userId, localCataloguesDefinition);
         if (!res.success) throw new Error(res.error || 'Catalogues definition sync failed');
       }
 
       setSyncProgress('Syncing fields...');
-      {
+      if (localFieldsDefinition) {
         const res = await syncFieldsDefinition(userId, localFieldsDefinition);
         if (!res.success) throw new Error(res.error || 'Fields definition sync failed');
       }
@@ -398,23 +428,19 @@ function AppWithBackHandler() {
       const remoteProducts = Array.isArray(remoteSnapshot.data.products) ? remoteSnapshot.data.products : [];
       const remoteDeleted = Array.isArray(remoteSnapshot.data.deletedProducts) ? remoteSnapshot.data.deletedProducts : [];
       const deletedIds = new Set([
-        ...(Array.isArray(localDeleted) ? localDeleted : []).map((p: any) => p.id),
+        ...localDeletedUpdated.map((p: any) => p.id),
         ...remoteDeleted.map((p: any) => p.id),
       ]);
-      const localProductsFiltered = (Array.isArray(localProducts) ? localProducts : []).filter((p: any) => !deletedIds.has(p.id));
+      const localProductsFiltered = localProducts.filter((p: any) => !deletedIds.has(p.id));
       const mergedProducts = mergeProductsData(localProductsFiltered, remoteProducts, deletedIds);
-      const mergedDeleted = mergeProductsData(localDeleted || [], remoteDeleted || []);
+      const mergedDeleted = mergeProductsData(localDeletedUpdated, remoteDeleted);
 
-      // Sync ALL products to the products table (active + deleted) so shelf items
-      // retain their full product data in Supabase for retrieval later.
-      const allProductsForSync = [
-        ...mergedProducts,
-        ...mergedDeleted.filter((dp: any) => !mergedProducts.some((mp: any) => mp.id === dp.id)),
-      ];
+      // Active products -> products table
       {
-        const res = await syncProducts(userId, allProductsForSync);
+        const res = await syncProducts(userId, mergedProducts);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
+      // Deleted products -> deleted_products table (with full data)
       {
         const res = await syncDeletedProducts(userId, mergedDeleted);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');

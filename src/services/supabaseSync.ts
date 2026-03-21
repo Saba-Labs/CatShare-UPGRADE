@@ -86,7 +86,9 @@ export async function syncProducts(
 }
 
 /**
- * Sync deleted products to Supabase
+ * Sync deleted products to Supabase with full product data.
+ * The deleted_products table stores the complete product in its `data` column
+ * so shelf items are self-contained and don't need cross-referencing.
  */
 export async function syncDeletedProducts(
   userId: string,
@@ -100,7 +102,8 @@ export async function syncDeletedProducts(
     const upsertData = deletedProducts.map(product => ({
       user_id: userId,
       product_id: product.id,
-      deleted_at: new Date().toISOString(),
+      data: product,
+      deleted_at: product.deletedAt || new Date().toISOString(),
     }));
 
     if (upsertData.length === 0) {
@@ -117,7 +120,7 @@ export async function syncDeletedProducts(
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Synced ${deletedProducts.length} deleted products to Supabase`);
+    console.log(`✅ Synced ${deletedProducts.length} deleted products (with full data) to Supabase`);
     return { success: true, data };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -127,8 +130,8 @@ export async function syncDeletedProducts(
 }
 
 /**
- * Delete all deleted products from Supabase (permanent shelf cleanup)
- * This deletes both from deleted_products table AND the actual products from products table
+ * Delete all shelf products from Supabase permanently.
+ * Reads image URLs from deleted_products.data, cleans R2, then deletes rows.
  */
 export async function deleteAllDeletedProducts(userId: string): Promise<SyncResult> {
   try {
@@ -138,62 +141,38 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
 
     const client = getSupabaseClient();
 
-    // Step 1: Fetch all deleted products with their imageUrls for R2 cleanup
-    const { data: deletedProducts, error: fetchDeletedError } = await client
+    // Step 1: Fetch all shelf products with their full data for R2 cleanup
+    const { data: shelfRows, error: fetchError } = await client
       .from('deleted_products')
-      .select('product_id')
+      .select('product_id, data')
       .eq('user_id', userId);
 
-    if (fetchDeletedError && fetchDeletedError.code !== 'PGRST116') {
-      console.error('❌ Error fetching deleted products:', fetchDeletedError);
-      return { success: false, error: fetchDeletedError.message };
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('❌ Error fetching shelf products:', fetchError);
+      return { success: false, error: fetchError.message };
     }
 
-    // Extract product IDs
-    const productIds = deletedProducts?.map(dp => dp.product_id) || [];
+    const rows = shelfRows || [];
 
-    // If there are products to delete, fetch their imageUrls for R2 cleanup
-    let productsWithImages: any[] = [];
-    if (productIds.length > 0) {
-      const { data: products, error: fetchProductsError } = await client
-        .from('products')
-        .select('product_id, data')
-        .eq('user_id', userId)
-        .in('product_id', productIds);
-
-      if (fetchProductsError && fetchProductsError.code !== 'PGRST116') {
-        console.warn('⚠️ Warning fetching products for R2 cleanup:', fetchProductsError.message);
-        // Continue anyway - image cleanup is secondary
-      } else {
-        productsWithImages = products || [];
+    // Step 2: Delete images from R2. Queue failures instead of blocking.
+    const imageRows = rows.filter((r: any) => r.data?.imageUrl);
+    if (imageRows.length > 0) {
+      console.log(`🗑️ Deleting ${imageRows.length} images from R2`);
+      const results = await Promise.all(
+        imageRows.map((r: any) => deleteImageFromR2(r.data.imageUrl))
+      );
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        console.warn(`⚠️ ${failed.length} R2 deletions failed, queuing for later cleanup`);
+        for (let i = 0; i < failed.length; i++) {
+          try {
+            await queueR2Cleanup(userId, imageRows[i].data.imageUrl);
+          } catch { /* best effort */ }
+        }
       }
     }
 
-    // Step 2: Delete all images from Cloudflare R2 in parallel
-    if (productsWithImages.length > 0) {
-      console.log(`🗑️ Deleting ${productsWithImages.length} images from R2`);
-
-      const deletePromises = productsWithImages
-      .filter(p => p.data?.imageUrl)
-      .map(p => deleteImageFromR2(p.data.imageUrl));
-
-      const results = await Promise.all(deletePromises);
-
-      // Check if any R2 deletion failed
-      const failedDeletions = results.filter(r => !r.success);
-      if (failedDeletions.length > 0) {
-        console.error(`❌ Failed to delete ${failedDeletions.length} images from R2:`, failedDeletions);
-        // Per requirement: fail the entire deletion if any R2 deletion fails
-        return {
-          success: false,
-          error: `Failed to delete ${failedDeletions.length} images from cloud storage. Please try again.`,
-        };
-      }
-
-      console.log(`✅ Successfully deleted all ${productsWithImages.length} images from R2`);
-    }
-
-    // Step 3: Delete from deleted_products table
+    // Step 3: Delete all rows from deleted_products table
     const { error: deleteShelfError } = await client
       .from('deleted_products')
       .delete()
@@ -204,25 +183,8 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
       return { success: false, error: deleteShelfError.message };
     }
 
-    // Step 4: Delete the actual products from products table if there are any
-    if (productIds.length > 0) {
-      const { error: deleteProductsError } = await client
-        .from('products')
-        .delete()
-        .eq('user_id', userId)
-        .in('product_id', productIds);
-
-      if (deleteProductsError) {
-        console.error('❌ Error deleting products from database:', deleteProductsError);
-        return { success: false, error: deleteProductsError.message };
-      }
-
-      console.log(`✅ Permanently deleted all ${productIds.length} shelf products and their images from Supabase`);
-    } else {
-      console.log('✅ Shelf is already empty - no products to delete');
-    }
-
-    return { success: true, data: { deletedCount: productIds.length } };
+    console.log(`✅ Permanently deleted all ${rows.length} shelf products from Supabase`);
+    return { success: true, data: { deletedCount: rows.length } };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in deleteAllDeletedProducts:', errorMessage);
@@ -468,42 +430,34 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
     if (fieldsError && fieldsError.code !== 'PGRST116') console.error('❌ Error fetching fields definition:', fieldsError);
     if (settingsError && settingsError.code !== 'PGRST116') console.error('❌ Error fetching user settings:', settingsError);
 
-    // Enrich deleted products with their product data from the products table
-    let enrichedDeletedProducts = [];
-    if (deletedProducts && deletedProducts.length > 0 && products && products.length > 0) {
-      // Create a map of product_id -> product data for quick lookup
-      const productMap = new Map();
-      products.forEach(p => {
-        productMap.set(p.product_id, p.data);
-      });
+    // deleted_products now stores full product data in the `data` column.
+    // No cross-referencing with the products table needed.
+    const deletedProductsList = (deletedProducts || [])
+      .map((dp: any) => {
+        if (dp.data) {
+          return { ...dp.data, id: dp.product_id };
+        }
+        return null;
+      })
+      .filter((p: any) => p !== null);
 
-      // Map deleted products to include their full product data
-      enrichedDeletedProducts = deletedProducts
-        .map(dp => {
-          const productData = productMap.get(dp.product_id);
-          if (productData) {
-            return { ...productData, id: dp.product_id };
-          }
-          return null;
-        })
-        .filter(p => p !== null);
-    }
+    // Filter active products: exclude any that are in deleted_products
+    const deletedIds = new Set(deletedProductsList.map((p: any) => p.id));
+    const activeProducts = (products?.map((p: any) => p.data) || [])
+      .filter((p: any) => !deletedIds.has(p?.id));
 
     const userData = {
-      products: products?.map(p => p.data) || [],
-      deletedProducts: enrichedDeletedProducts,
-      categories: categories?.map(c => c.data) || [],
+      products: activeProducts,
+      deletedProducts: deletedProductsList,
+      categories: categories?.map((c: any) => c.data) || [],
       cataloguesDefinition: cataloguesDef?.[0]?.data || null,
       fieldsDefinition: fieldsDef?.[0]?.data || null,
-      // `settings` is already the row object from Supabase (not wrapped in { data: ... }).
-      // Keeping this correct is required for strict "cloud snapshot" sync.
       userSettings: settings || null,
     };
 
     console.log('✅ Fetched all user data from Supabase', {
       productsCount: userData.products.length,
       deletedProductsCount: userData.deletedProducts.length,
-      enrichedDeletedProducts: enrichedDeletedProducts.length
     });
     return { success: true, data: userData };
   } catch (err) {
@@ -514,7 +468,8 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
 }
 
 /**
- * Permanently delete a product from Supabase (hard delete from products table)
+ * Permanently delete a product from Supabase.
+ * Product lives in deleted_products (shelf) — delete from there and clean up R2 image.
  */
 export async function deleteProductFromSupabase(
   userId: string,
@@ -528,76 +483,54 @@ export async function deleteProductFromSupabase(
 
     const client = getSupabaseClient();
 
-    // Step 1: Fetch the product to get the imageUrl before deleting
-    const { data: product, error: fetchError } = await client
-      .from('products')
+    // Step 1: Fetch the shelf product to get the imageUrl before deleting
+    const { data: shelfRow, error: fetchError } = await client
+      .from('deleted_products')
       .select('data')
       .eq('user_id', userId)
       .eq('product_id', normalizedProductId)
       .maybeSingle();
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      console.warn('⚠️ Warning fetching product for R2 cleanup:', fetchError.message);
-      // Continue anyway - image cleanup is secondary to DB deletion
+      console.warn('⚠️ Warning fetching shelf product for R2 cleanup:', fetchError.message);
     }
 
     // Step 2: Delete image from Cloudflare R2 if it exists.
-    // If R2 delete fails, queue it for later cleanup instead of blocking the user.
-    if (product?.data?.imageUrl) {
+    const imageUrl = shelfRow?.data?.imageUrl;
+    if (imageUrl) {
       console.log(`🗑️ Attempting to delete R2 image for product ${normalizedProductId}`);
-      const deleteResult = await deleteImageFromR2(product.data.imageUrl);
+      const deleteResult = await deleteImageFromR2(imageUrl);
 
       if (!deleteResult.success) {
         console.warn('⚠️ R2 delete failed, queuing for later cleanup:', deleteResult.error);
         try {
-          await queueR2Cleanup(userId, product.data.imageUrl);
+          await queueR2Cleanup(userId, imageUrl);
         } catch (queueErr) {
           console.warn('⚠️ Could not queue R2 cleanup:', queueErr);
         }
       }
     }
 
-    // Step 3: Delete from deleted_products table to remove from shelf
-    const { data: shelfDeleted, error: deleteFromShelfError } = await client
+    // Step 3: Delete from deleted_products table
+    const { error: deleteFromShelfError } = await client
       .from('deleted_products')
       .delete()
       .eq('user_id', userId)
-      .eq('product_id', normalizedProductId)
-      .select('product_id');
+      .eq('product_id', normalizedProductId);
 
     if (deleteFromShelfError) {
       console.error('❌ Error removing from shelf:', deleteFromShelfError);
       return { success: false, error: deleteFromShelfError.message };
     }
 
-    if (!shelfDeleted || shelfDeleted.length === 0) {
-      return {
-        success: false,
-        error: `Shelf item not found in Supabase for product_id=${normalizedProductId} (nothing deleted).`,
-      };
-    }
-
-    // Step 4: Permanently delete the product from products table
-    const { data: productsDeleted, error: deleteError } = await client
+    // Step 4: Also clean up from products table (in case it still exists from old sync)
+    await client
       .from('products')
       .delete()
       .eq('user_id', userId)
-      .eq('product_id', normalizedProductId)
-      .select('product_id');
+      .eq('product_id', normalizedProductId);
 
-    if (deleteError) {
-      console.error('❌ Error permanently deleting product:', deleteError);
-      return { success: false, error: deleteError.message };
-    }
-
-    if (!productsDeleted || productsDeleted.length === 0) {
-      return {
-        success: false,
-        error: `Product not found in Supabase for product_id=${normalizedProductId} (nothing deleted).`,
-      };
-    }
-
-    console.log(`✅ Permanently deleted product ${normalizedProductId} and its R2 image from Supabase`);
+    console.log(`✅ Permanently deleted product ${normalizedProductId} from Supabase`);
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';

@@ -125,57 +125,68 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       const userId = user.uid;
-      let productsForSync = Array.isArray(products) ? [...products] : [];
 
-      const missingImages = productsForSync.filter((p: any) => !p.imageUrl && p.imagePath);
-      if (missingImages.length > 0) {
+      // Helper: upload missing R2 images for any product array
+      const uploadMissingImages = async (items: any[]): Promise<any[]> => {
+        const missing = items.filter((p: any) => !p.imageUrl && p.imagePath);
+        if (missing.length === 0) return items;
+
         const { uploadProductImageToR2 } = await import('../services/r2Upload');
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
         const uploadedPairs = await Promise.all(
-          missingImages.map(async (p: any) => {
-            const fileData = await Filesystem.readFile({
-              path: p.imagePath,
-              directory: Directory.Data,
-            });
-            const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
-            const dataUrlPrefix =
-              filename.endsWith('.jpg') || filename.endsWith('.jpeg')
-                ? 'data:image/jpeg;base64,'
-                : 'data:image/png;base64,';
-            const uploaded = await uploadProductImageToR2({
-              productId: String(p.id),
-              dataUrl: `${dataUrlPrefix}${fileData.data}`,
-            });
-            if (!uploaded?.url) throw new Error(`R2 upload failed for product ${p.id}`);
-            return { productId: p.id, imageUrl: uploaded.url };
+          missing.map(async (p: any) => {
+            try {
+              const fileData = await Filesystem.readFile({
+                path: p.imagePath,
+                directory: Directory.Data,
+              });
+              const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
+              const dataUrlPrefix =
+                filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+                  ? 'data:image/jpeg;base64,'
+                  : 'data:image/png;base64,';
+              const uploaded = await uploadProductImageToR2({
+                productId: String(p.id),
+                dataUrl: `${dataUrlPrefix}${fileData.data}`,
+              });
+              if (!uploaded?.url) return null;
+              return { productId: p.id, imageUrl: uploaded.url };
+            } catch (err) {
+              console.warn(`⚠️ Image upload failed for product ${p.id}:`, err);
+              return null;
+            }
           })
         );
 
-        const urlMap = new Map(uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl]));
-        productsForSync = productsForSync.map((p: any) => {
+        const urlMap = new Map(
+          uploadedPairs.filter(Boolean).map((x: any) => [String(x.productId), x.imageUrl])
+        );
+        return items.map((p: any) => {
           const url = urlMap.get(String(p.id));
           return url ? { ...p, imageUrl: url } : p;
         });
-      }
+      };
+
+      // Upload images for both active and deleted products
+      let productsForSync = await uploadMissingImages(
+        Array.isArray(products) ? [...products] : []
+      );
+      let deletedForSync = await uploadMissingImages(
+        Array.isArray(deletedProducts) ? [...deletedProducts] : []
+      );
 
       const { syncProducts, syncDeletedProducts } = await import('../services/supabaseSync');
 
-      // Sync ALL products (active + deleted) to the products table so shelf
-      // items retain their full data in Supabase for display.
-      const allProductsForSync = [
-        ...productsForSync,
-        ...(Array.isArray(deletedProducts) ? deletedProducts : [])
-          .filter((dp: any) => !productsForSync.some((p: any) => p.id === dp.id)),
-      ];
-
-      if (allProductsForSync.length > 0) {
-        const res = await syncProducts(userId, allProductsForSync);
+      // Active products -> products table
+      if (productsForSync.length > 0) {
+        const res = await syncProducts(userId, productsForSync);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
 
-      if (Array.isArray(deletedProducts) && deletedProducts.length > 0) {
-        const res = await syncDeletedProducts(userId, deletedProducts);
+      // Deleted products -> deleted_products table (with full data)
+      if (deletedForSync.length > 0) {
+        const res = await syncDeletedProducts(userId, deletedForSync);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');
       }
 
