@@ -367,6 +367,7 @@ useEffect(() => {
     // Save products (this will sync to Supabase and localStorage)
     saveProducts(mergedData);
     setProducts(mergedData);
+    window.dispatchEvent(new CustomEvent("product-added"));
     logBulkEdit(cleanData.length, selectedFields.length);
     setShowRenderPopup(true);
   } catch (err) {

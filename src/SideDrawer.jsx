@@ -1017,6 +1017,7 @@ const exportProductsToCSV = (products) => {
       }
 
       setProducts(productsToUse);
+      window.dispatchEvent(new CustomEvent("product-added"));
 
       // Restore categories from backup if available, otherwise extract from products
       try {
@@ -1211,6 +1212,7 @@ const exportProductsToCSV = (products) => {
         JSON.stringify(updatedProducts)
       );
       setProducts(updatedProducts);
+      window.dispatchEvent(new CustomEvent("product-added"));
       console.log('✅ Products updated with R2 image URLs');
             const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
 
@@ -1490,6 +1492,7 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
         }
 
         setProducts(productsToUse);
+        window.dispatchEvent(new CustomEvent("product-added"));
 
         try {
           if (parsed.categories && Array.isArray(parsed.categories)) {
@@ -1626,6 +1629,7 @@ if (user && user.uid) {
         JSON.stringify(updatedProducts)
       );
       setProducts(updatedProducts);
+      window.dispatchEvent(new CustomEvent("product-added"));
       console.log('✅ Products updated with R2 image URLs');
 
       const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');

@@ -117,6 +117,7 @@ export default React.memo(function ManageCatalogues({
 
           // Update state only after storage succeeds
           setProducts(updatedProducts);
+          window.dispatchEvent(new CustomEvent("product-added"));
 
           const updated = getAllCatalogues();
           setCatalogues(updated);

@@ -709,6 +709,7 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
                   );
                   setProducts(updated);
+                  window.dispatchEvent(new CustomEvent("product-added"));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -727,6 +728,7 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
                   );
                   setProducts(updated);
+                  window.dispatchEvent(new CustomEvent("product-added"));
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

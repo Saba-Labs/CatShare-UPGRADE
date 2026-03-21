@@ -101,7 +101,7 @@ export async function createShareLink(options: {
 
   const baseUrl =
     (import.meta as any).env?.VITE_PUBLIC_WEB_BASE_URL ||
-    window.location.origin;
+    'https://catshare.vercel.app';
 
   const { error } = await getSupabaseClient()
     .from('share_links')

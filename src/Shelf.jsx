@@ -53,7 +53,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const handleRestore = async (product) => {
     setProducts((prev) => [product, ...prev]);
     setDeletedProducts((prev) => prev.filter((p) => p.id !== product.id));
-    window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+    window.dispatchEvent(new CustomEvent("product-added"));
 
     // Sync restoration to Supabase by removing from deleted_products
     if (user?.uid) {
@@ -104,6 +104,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
         setDeletedProducts((prev) => prev.filter((p) => p.id !== deleteTargetId));
         setDeleteTargetId(null);
         setShowDeleteConfirm(false);
+        window.dispatchEvent(new CustomEvent("product-added"));
 
         // 3) Local cleanup (best-effort)
         try {
@@ -143,6 +144,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
           // Only clear locally after cloud success
           const snapshot = [...deletedProducts];
           setDeletedProducts([]);
+          window.dispatchEvent(new CustomEvent("product-added"));
 
           // Local cleanup (best-effort)
           for (const product of snapshot) {

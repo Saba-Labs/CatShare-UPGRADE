@@ -306,21 +306,20 @@ export function saveProducts(products: Product[], userId?: string): void {
  */
 function triggerSupabaseSync(products: Product[], userId?: string): void {
   try {
-    // Get current user ID from parameter or localStorage
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
-    console.log('🔄 Attempting to sync products. userId:', effectiveUserId, 'productsCount:', products.length);
+    // In strict mode, sync is handled centrally by the product-added event in App.tsx.
+    if (localStorage.getItem('strictOnlineMode::device') === 'true') return;
 
+    const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
     if (!effectiveUserId) {
       console.warn('⚠️ No Firebase user ID found. Skipping Supabase sync.');
       return;
     }
 
-    // Import and call sync function
     import('../services/supabaseSync').then(({ syncProducts }) => {
-      console.log('📤 Syncing', products.length, 'products to Supabase for user:', effectiveUserId);
       syncProducts(effectiveUserId, products)
         .then(result => {
-          console.log('✅ Products synced to Supabase successfully:', result);
+          if (result.success) console.log('✅ Products synced to Supabase');
+          else console.warn('⚠️ Supabase sync failed:', result.error);
         })
         .catch(err => {
           console.error('❌ Failed to sync products to Supabase:', err);

@@ -19,6 +19,7 @@ import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import RatingModal from "./components/RatingModal";
 import { useAuth } from "./context/AuthContext";
+import { useSync } from "./context/SyncContext";
 import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
 
 declare global {
@@ -38,6 +39,7 @@ export function openPreviewHtml(id, tab = null) {
 
 export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>> }) {
   const { user } = useAuth();
+  const { syncProductsToCloud, isStrictMode } = useSync();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const scrollRef = useRef(null);
@@ -439,6 +441,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p))
     );
+
+    if (isStrictMode() && user?.uid) {
+      const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+      const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+      syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+        setProducts(cloudData.products);
+        setDeletedProducts(cloudData.deletedProducts);
+      }).catch(err => console.error('Strict sync failed:', err));
+    }
   };
 
   const handleStockToggleRequest = (id, field) => {
@@ -451,6 +462,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p))
       );
+
+      if (isStrictMode() && user?.uid) {
+        const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+        const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        }).catch(err => console.error('Strict sync failed:', err));
+      }
     } else {
       // Show confirmation
       setConfirmToggleStock({ id, field });
@@ -479,6 +499,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           return p;
         })
       );
+
+      if (isStrictMode() && user?.uid) {
+        const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+        const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        }).catch(err => console.error('Strict sync failed:', err));
+      }
     } else {
       // Show confirmation with special flag for master toggle
       setConfirmToggleStock({ id, field: "MASTER" });
@@ -487,6 +516,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const updateProduct = (item) => {
     setProducts((prev) => prev.map((p) => (p.id === item.id ? item : p)));
+
+    if (isStrictMode() && user?.uid) {
+      const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+      const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+      syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+        setProducts(cloudData.products);
+        setDeletedProducts(cloudData.deletedProducts);
+      }).catch(err => console.error('Strict sync failed:', err));
+    }
   };
 
   const handleRenderAllImages = async (forceRerender: boolean = true) => {
@@ -632,6 +670,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts((prev) => prev.filter((p) => p.id !== id));
       setDeletedProducts((prev) => [toDelete, ...prev]);
 
+      if (isStrictMode() && user?.uid) {
+        const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+        const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        }).catch(err => console.error('Strict sync failed:', err));
+      }
+
       // 🧹 Clean up rendered images for this product to save space
       // They can be re-rendered if the product is restored
       try {
@@ -686,6 +733,15 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   
       // Remove from local state
       setDeletedProducts((prev) => prev.filter((p) => p.id !== id));
+
+      if (isStrictMode() && user?.uid) {
+        const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+        const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        }).catch(err => console.error('Strict sync failed:', err));
+      }
     }
   };
 
@@ -892,6 +948,15 @@ const adjustedTargetIndex = movedProductIndex < targetProductIndex ? targetProdu
 copy.splice(adjustedTargetIndex, 0, removed);
 setProducts(copy);
 window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
+
+if (isStrictMode() && user?.uid) {
+  const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+  const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+  syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+    setProducts(cloudData.products);
+    setDeletedProducts(cloudData.deletedProducts);
+  }).catch(err => console.error('Strict sync failed:', err));
+}
           }}>
             <Droppable droppableId="product-list">
               {(provided) => (
@@ -1023,6 +1088,15 @@ window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
 
                       window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
+                      if (isStrictMode() && user?.uid) {
+                        const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+                        const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+                        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                          setProducts(cloudData.products);
+                          setDeletedProducts(cloudData.deletedProducts);
+                        }).catch(err => console.error('Strict sync failed:', err));
+                      }
+
                       // If currently previewing this item, move to next
                       if (previewProduct && previewProduct.id === productToShelf.id) {
                         const idx = previewList.findIndex(p => p.id === productToShelf.id);
@@ -1060,6 +1134,15 @@ window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
                     setPreviewList([]);
 
                     window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+
+                    if (isStrictMode() && user?.uid) {
+                      const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+                      const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+                      syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                        setProducts(cloudData.products);
+                        setDeletedProducts(cloudData.deletedProducts);
+                      }).catch(err => console.error('Strict sync failed:', err));
+                    }
 
                     setShowShelfConfirm(false);
                     setShelfTarget(null);
@@ -1141,6 +1224,15 @@ window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
                       setProducts((prev) =>
                         prev.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p))
                       );
+                    }
+
+                    if (isStrictMode() && user?.uid) {
+                      const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+                      const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+                      syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                        setProducts(cloudData.products);
+                        setDeletedProducts(cloudData.deletedProducts);
+                      }).catch(err => console.error('Strict sync failed:', err));
                     }
 
                     setConfirmToggleStock(null);
@@ -1248,6 +1340,15 @@ window.dispatchEvent(new CustomEvent("sync-to-supabase")); // ✅ sync new order
               setDeletedProducts((prev) => [productToShelf, ...prev]);
 
               window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+
+              if (isStrictMode() && user?.uid) {
+                const freshProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+                const freshDeleted = safeGetFromStorage(getStorageKey('deletedProducts', user.uid), []);
+                syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                  setProducts(cloudData.products);
+                  setDeletedProducts(cloudData.deletedProducts);
+                }).catch(err => console.error('Strict sync failed:', err));
+              }
 
               // Move to next item in preview
               const idx = previewList.findIndex(p => p.id === productToShelf.id);
