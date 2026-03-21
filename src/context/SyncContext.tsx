@@ -176,7 +176,10 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         Array.isArray(deletedProducts) ? [...deletedProducts] : []
       );
 
-      const { syncProducts, syncDeletedProducts } = await import('../services/supabaseSync');
+      const {
+        syncProducts, syncDeletedProducts,
+        removeFromProductsTable, removeFromDeletedProductsTable,
+      } = await import('../services/supabaseSync');
 
       // Active products -> products table
       if (productsForSync.length > 0) {
@@ -189,6 +192,23 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const res = await syncDeletedProducts(userId, deletedForSync);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');
       }
+
+      // Cleanup: remove shelved products from products table,
+      // and restored products from deleted_products table.
+      const activeIds = new Set(productsForSync.map((p: any) => String(p.id)));
+      const deletedIds = new Set(deletedForSync.map((p: any) => String(p.id)));
+
+      const idsToRemoveFromProducts = deletedForSync
+        .map((p: any) => String(p.id))
+        .filter((id: string) => !activeIds.has(id));
+      const idsToRemoveFromDeleted = productsForSync
+        .map((p: any) => String(p.id))
+        .filter((id: string) => !deletedIds.has(id));
+
+      await Promise.all([
+        removeFromProductsTable(userId, idsToRemoveFromProducts),
+        removeFromDeletedProductsTable(userId, idsToRemoveFromDeleted),
+      ]);
 
       const cloudData = await refreshFromCloud();
       if (!cloudData) throw new Error('Cloud refresh returned null');

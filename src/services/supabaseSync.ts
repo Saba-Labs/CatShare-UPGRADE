@@ -86,6 +86,42 @@ export async function syncProducts(
 }
 
 /**
+ * Remove specific products from the products table (used when products move to shelf).
+ */
+export async function removeFromProductsTable(
+  userId: string,
+  productIds: string[]
+): Promise<void> {
+  if (!userId || productIds.length === 0) return;
+  const { error } = await getSupabaseClient()
+    .from('products')
+    .delete()
+    .eq('user_id', userId)
+    .in('product_id', productIds);
+  if (error) {
+    console.warn('⚠️ removeFromProductsTable error:', error.message);
+  }
+}
+
+/**
+ * Remove specific products from the deleted_products table (used when products are restored).
+ */
+export async function removeFromDeletedProductsTable(
+  userId: string,
+  productIds: string[]
+): Promise<void> {
+  if (!userId || productIds.length === 0) return;
+  const { error } = await getSupabaseClient()
+    .from('deleted_products')
+    .delete()
+    .eq('user_id', userId)
+    .in('product_id', productIds);
+  if (error) {
+    console.warn('⚠️ removeFromDeletedProductsTable error:', error.message);
+  }
+}
+
+/**
  * Sync deleted products to Supabase with full product data.
  * The deleted_products table stores the complete product in its `data` column
  * so shelf items are self-contained and don't need cross-referencing.

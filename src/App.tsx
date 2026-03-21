@@ -311,6 +311,8 @@ function AppWithBackHandler() {
         syncCataloguesDefinition,
         syncFieldsDefinition,
         syncUserSettings,
+        removeFromProductsTable,
+        removeFromDeletedProductsTable,
       } = await import('./services/supabaseSync');
 
       // Helper: upload missing R2 images for any product array
@@ -445,6 +447,21 @@ function AppWithBackHandler() {
         const res = await syncDeletedProducts(userId, mergedDeleted);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');
       }
+
+      // Cleanup: remove shelved products from products table,
+      // and active products from deleted_products table.
+      const activeIds = new Set(mergedProducts.map((p: any) => String(p.id)));
+      const deletedIdsSet = new Set(mergedDeleted.map((p: any) => String(p.id)));
+      const idsToRemoveFromProducts = mergedDeleted
+        .map((p: any) => String(p.id))
+        .filter((id: string) => !activeIds.has(id));
+      const idsToRemoveFromDeleted = mergedProducts
+        .map((p: any) => String(p.id))
+        .filter((id: string) => !deletedIdsSet.has(id));
+      await Promise.all([
+        removeFromProductsTable(userId, idsToRemoveFromProducts),
+        removeFromDeletedProductsTable(userId, idsToRemoveFromDeleted),
+      ]);
 
       setSyncProgress('Refreshing from cloud...');
       // Fetch fresh snapshot from cloud as the single source of truth.
