@@ -13,6 +13,29 @@ import { logCatalogueCreated, logCatalogueDeleted } from "./config/analyticsEven
 import { useAuth } from "./context/AuthContext";
 import { syncCataloguesDefinition } from "./services/supabaseSync";
 import { getStorageKey, safeSetInStorage } from "./utils/safeStorage";
+import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "./services/cloudflareService";
+
+function isR2Url(value: string | undefined): boolean {
+  if (!value) return false;
+  return value.startsWith('http://') || value.startsWith('https://');
+}
+
+function isBase64(value: string | undefined): boolean {
+  if (!value) return false;
+  return value.startsWith('data:');
+}
+
+async function uploadHeroImageToR2(base64: string, catalogueId: string): Promise<string> {
+  const raw = stripDataUriPrefix(base64);
+  const mimeType = base64.includes('image/jpeg') || base64.includes('image/jpg') ? 'image/jpeg' : 'image/png';
+  const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  const filename = `catalogue_hero_${catalogueId}.${ext}`;
+  const result = await uploadImageToR2(raw, filename, 'catalogue-heroes', mimeType as any);
+  if (!result.success || !result.publicUrl) {
+    throw new Error(result.error || 'Failed to upload catalogue image to R2');
+  }
+  return result.publicUrl;
+}
 
 interface ManageCataloguesProps {
   onClose: () => void;
@@ -50,9 +73,8 @@ export default React.memo(function ManageCatalogues({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Use a smaller limit for hero images to preserve localStorage quota
-    if (file.size > 500 * 1024) {
-      setFormError("Catalogue cover image must be less than 500KB to save space.");
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Catalogue cover image must be less than 5MB.");
       return;
     }
 
@@ -86,17 +108,23 @@ export default React.memo(function ManageCatalogues({
       return;
     }
 
+    setIsSaving(true);
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
 
+      let heroImageValue = formHeroImage;
+      const tempId = `new_${Date.now()}`;
+      if (isBase64(heroImageValue) && user?.uid) {
+        heroImageValue = await uploadHeroImageToR2(heroImageValue, tempId);
+      }
+
       const newCatalogue = addCatalogue(formLabel.trim(), {
         folder: formLabel.trim(),
-        heroImage: formHeroImage,
+        heroImage: heroImageValue,
         description: formDescription.trim(),
       });
 
       if (newCatalogue) {
-        // Prepare updated products list
         const updatedProducts = products.map((p) => ({
           ...p,
           [newCatalogue.stockField]: true,
@@ -105,8 +133,6 @@ export default React.memo(function ManageCatalogues({
         }));
 
         try {
-          // Save products back to the current user's keyed storage.
-          // This prevents cross-user mixing via the legacy unkeyed "products" key.
           const productsKey = user?.uid
             ? getStorageKey("products", user.uid)
             : "products";
@@ -115,7 +141,6 @@ export default React.memo(function ManageCatalogues({
             throw new Error("Storage quota exceeded while updating products for new catalogue");
           }
 
-          // Update state only after storage succeeds
           setProducts(updatedProducts);
           window.dispatchEvent(new CustomEvent("product-added"));
 
@@ -123,7 +148,6 @@ export default React.memo(function ManageCatalogues({
           setCatalogues(updated);
           onCataloguesChanged(updated);
 
-          // Sync catalogues to Supabase
           if (user?.uid) {
             const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
             if (strictOnline) {
@@ -139,7 +163,6 @@ export default React.memo(function ManageCatalogues({
             }
           }
 
-          // Log catalogue creation event with the new catalogue name
           logCatalogueCreated(newCatalogue.label);
 
           setShowAddForm(false);
@@ -150,12 +173,13 @@ export default React.memo(function ManageCatalogues({
           } else {
             setFormError("Failed to save products: " + (storageErr as Error).message);
           }
-          // Rollback the catalogue addition since we couldn't save products
           deleteCatalogue(newCatalogue.id, user?.uid);
         }
       }
     } catch (err) {
       setFormError("Failed to add catalogue: " + (err as Error).message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -181,6 +205,7 @@ export default React.memo(function ManageCatalogues({
       return;
     }
 
+    setIsSaving(true);
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
 
@@ -189,14 +214,9 @@ export default React.memo(function ManageCatalogues({
       const oldLabel = showEditForm.label;
       const newFolder = newLabel;
 
-      // Handle folder/label change - start rename in background if needed
       if (oldFolder !== newFolder || oldLabel !== newLabel) {
         console.log(`📁 Catalogue changed from "${oldLabel}" to "${newLabel}" - starting background rename`);
-
-        // Notify start of rename
         window.dispatchEvent(new CustomEvent("catalogue-rename-start", { detail: { id: showEditForm.id } }));
-
-        // Fire and forget (don't await)
         renameRenderedImagesForCatalogue(oldFolder, newFolder, oldLabel, newLabel)
           .then(() => {
             console.log(`✅ Background rename complete for: ${newLabel}`);
@@ -208,10 +228,26 @@ export default React.memo(function ManageCatalogues({
           });
       }
 
+      let heroImageValue = formHeroImage;
+      const oldHeroImage = showEditForm.heroImage || "";
+
+      if (isBase64(heroImageValue) && user?.uid) {
+        heroImageValue = await uploadHeroImageToR2(heroImageValue, showEditForm.id);
+        if (isR2Url(oldHeroImage)) {
+          deleteImageFromR2(oldHeroImage).catch(err => {
+            console.warn('⚠️ Failed to delete old catalogue hero image from R2:', err);
+          });
+        }
+      } else if (!heroImageValue && isR2Url(oldHeroImage)) {
+        deleteImageFromR2(oldHeroImage).catch(err => {
+          console.warn('⚠️ Failed to delete removed catalogue hero image from R2:', err);
+        });
+      }
+
       const updates = {
         label: newLabel,
         folder: newFolder,
-        heroImage: formHeroImage,
+        heroImage: heroImageValue,
         description: formDescription.trim(),
       };
       updateCatalogue(showEditForm.id, updates);
@@ -220,7 +256,6 @@ export default React.memo(function ManageCatalogues({
       setCatalogues(updated);
       onCataloguesChanged(updated);
 
-      // Sync catalogues to Supabase
       if (user?.uid) {
         const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
         if (strictOnline) {
@@ -242,6 +277,8 @@ export default React.memo(function ManageCatalogues({
       resetFormFields();
     } catch (err) {
       setFormError("Failed to update catalogue: " + (err as Error).message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -251,11 +288,16 @@ export default React.memo(function ManageCatalogues({
     try {
       await Haptics.impact({ style: ImpactStyle.Heavy });
 
-      // 🧹 Clean up rendered images for this catalogue before deleting definition
       try {
         await deleteRenderedImagesFromFolder(catalogue.folder || catalogue.label);
       } catch (err) {
         console.warn(`⚠️ Failed to clean up folder for catalogue ${catalogue.label}:`, err);
+      }
+
+      if (isR2Url(catalogue.heroImage)) {
+        deleteImageFromR2(catalogue.heroImage!).catch(err => {
+          console.warn('⚠️ Failed to delete catalogue hero image from R2:', err);
+        });
       }
 
       const success = deleteCatalogue(catalogue.id);
@@ -264,7 +306,6 @@ export default React.memo(function ManageCatalogues({
         setCatalogues(updated);
         onCataloguesChanged(updated);
 
-        // Sync catalogues to Supabase
         if (user?.uid) {
           const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
           if (strictOnline) {

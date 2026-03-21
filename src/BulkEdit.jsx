@@ -645,11 +645,16 @@ useEffect(() => {
           >
             <div>{index + 1}</div>
             <div className="w-14 h-14 flex items-center justify-center">
-              {imageMap[item.id] ? (
+              {(imageMap[item.id] || item.imageUrl) ? (
   <img
-    src={imageMap[item.id]}
+    src={imageMap[item.id] || item.imageUrl}
     alt=""
     className="object-contain w-14 h-14 border rounded"
+    onError={(e) => {
+      e.currentTarget.style.display = "none";
+      e.currentTarget.parentElement.innerHTML =
+        '<div class="text-gray-400 text-xs">No Image</div>';
+    }}
   />
 ) : (
   <div className="text-gray-400 text-xs">No Image</div>

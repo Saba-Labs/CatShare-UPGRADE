@@ -23,11 +23,9 @@ const config: CapacitorConfig = {
     },
     SplashScreen: {
       launchShowDuration: 0,
-      launchAutoHide: true,
+      launchAutoHide: false,
       showSpinner: false,
-      iosSpinnerStyle: 'small',
-      androidSpinnerStyle: 'large',
-      spinnerColor: '#3b82f6',
+      backgroundColor: '#ffffff',
     },
     FirebaseAnalytics: {
       // No extra config needed here, it reads from google-services.json

@@ -25,6 +25,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     const loadShelfImages = async () => {
       const map = {};
       for (const p of deletedProducts) {
+        let resolved = "";
         if (p.imagePath) {
           try {
             try {
@@ -32,20 +33,22 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
                 path: p.imagePath,
                 directory: Directory.Data,
               });
-              map[p.id] = `data:image/png;base64,${result.data}`;
+              resolved = `data:image/png;base64,${result.data}`;
             } catch {
               const result = await Filesystem.readFile({
                 path: p.imagePath,
                 directory: Directory.External,
               });
-              map[p.id] = `data:image/png;base64,${result.data}`;
+              resolved = `data:image/png;base64,${result.data}`;
             }
           } catch {
-            map[p.id] = p.image || "";
+            // Local file not found, fall through
           }
-        } else {
-          map[p.id] = p.image || "";
         }
+        if (!resolved) {
+          resolved = p.imageUrl || p.image || "";
+        }
+        map[p.id] = resolved;
       }
       setImageMap(map);
     };
@@ -227,9 +230,11 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                           e.currentTarget.parentElement.innerHTML =
-                            '<span class="text-[10px] text-gray-400 text-xs">Image broken</span>';
+                            '<span class="text-[10px] text-gray-400 text-xs">No image</span>';
                         }}
                       />
+                    ) : p.id in imageMap ? (
+                      <span className="text-[10px] text-gray-400">No image</span>
                     ) : (
                       <span className="text-[10px] text-gray-400">Loading...</span>
                     )}

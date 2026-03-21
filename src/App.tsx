@@ -11,6 +11,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { initializeFieldSystem } from "./config/initializeFields";
 import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
 import {
@@ -61,6 +62,12 @@ import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
+import Lottie from "lottie-react";
+import syncAnimationData from "./loading.json";
+
+const SyncLottie = () => (
+  <Lottie animationData={syncAnimationData} loop autoplay style={{ width: '100%', height: '100%' }} />
+);
 
 function AppWithBackHandler() {
   const navigate = useNavigate();
@@ -92,6 +99,10 @@ function AppWithBackHandler() {
   const startupRanForUserRef = useRef<string | null>(null);
 
   const isNative = Capacitor.getPlatform() !== "web";
+
+  useEffect(() => {
+    SplashScreen.hide().catch(() => {});
+  }, []);
 
   const getProductsKey = (uid: string) => getStorageKey('products', uid);
   const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
@@ -1159,16 +1170,12 @@ function AppWithBackHandler() {
       <OfflineStatusIndicator />
 
       {isSyncContextSyncing && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-5 max-w-sm w-full text-center">
-            <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <div className="text-gray-800 font-semibold text-sm sm:text-base mb-2">
-              Syncing to cloud...
-            </div>
-            <div className="text-gray-600 text-xs">
-              Please wait. Changes will appear after sync completes.
-            </div>
+        <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-black/50">
+          <div className="w-52 h-52">
+            <SyncLottie />
           </div>
+          <p className="text-white font-semibold text-lg mt-2">Syncing to cloud</p>
+          <p className="text-white/60 text-sm mt-1">Please wait...</p>
         </div>
       )}
 
