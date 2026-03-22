@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
+import { applyApiCors } from "../lib/apiCors.js";
 
 export const config = {
   api: {
@@ -50,6 +51,8 @@ async function readRequestBody(req: VercelRequest): Promise<Buffer> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (applyApiCors(req, res)) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }

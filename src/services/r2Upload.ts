@@ -1,4 +1,11 @@
+import { Capacitor } from '@capacitor/core';
 import { supabase, getSupabaseAccessToken } from '../supabaseClient';
+
+const MAX_UPLOAD_ATTEMPTS = 4;
+const BASE_BACKOFF_MS = 400;
+
+/** Coalesce concurrent uploads for the same product (avoids duplicate work / races). */
+const inFlightProductUploads = new Map<string, Promise<{ url: string; key: string }>>();
 
 async function dataUrlToJpegBlob(dataUrl: string, quality = 0.88): Promise<Blob> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -28,6 +35,114 @@ async function dataUrlToJpegBlob(dataUrl: string, quality = 0.88): Promise<Blob>
   return jpegBlob;
 }
 
+function isLocalDevOrigin(origin: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+}
+
+function resolveUploadApiBase(): string {
+  const env = import.meta.env;
+  const backend = String(env.VITE_BACKEND_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (backend) return backend;
+
+  const appUrl = String(env.VITE_APP_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (appUrl) return appUrl;
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const origin = window.location.origin;
+    if (!Capacitor.isNativePlatform() && !isLocalDevOrigin(origin)) {
+      return origin;
+    }
+  }
+
+  return '';
+}
+
+function buildFormData(productId: string, blob: Blob): FormData {
+  const form = new FormData();
+  form.append('productId', productId);
+  form.append('ext', 'jpg');
+  form.append('file', blob, `product-${productId}.jpg`);
+  return form;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Upload with retries: cold starts, transient 5xx/429, expired tokens, flaky networks.
+ * FormData is rebuilt each attempt (body is consumed by fetch).
+ */
+async function postUploadWithRetries(
+  endpoint: string,
+  productId: string,
+  blob: Blob
+): Promise<{ url: string; key: string }> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await sleep(Math.round(BASE_BACKOFF_MS * Math.pow(1.6, attempt - 1)));
+    }
+
+    let token = await getSupabaseAccessToken();
+    if (!token) {
+      lastError = new Error('Could not get session token');
+      continue;
+    }
+
+    const form = buildFormData(productId, blob);
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: form,
+      });
+
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json?.url && json?.key) {
+          return { url: json.url, key: json.key };
+        }
+        lastError = new Error('Upload response missing url/key');
+        continue;
+      }
+
+      const text = await resp.text().catch(() => '');
+
+      if (resp.status === 401) {
+        await supabase.auth.refreshSession();
+        lastError = new Error(`Upload unauthorized (401), refreshed session — retrying`);
+        continue;
+      }
+
+      if (resp.status >= 500 || resp.status === 429) {
+        lastError = new Error(`Upload failed (${resp.status}): ${text || resp.statusText}`);
+        continue;
+      }
+
+      throw new Error(`Upload failed (${resp.status}): ${text || resp.statusText}`);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      if (err.name === 'TypeError' && /fetch|network|failed/i.test(err.message)) {
+        lastError = err;
+        continue;
+      }
+      if (attempt === MAX_UPLOAD_ATTEMPTS - 1) throw err;
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('Upload failed after retries');
+}
+
 export async function uploadProductImageToR2(options: {
   productId: string;
   dataUrl: string;
@@ -41,33 +156,28 @@ export async function uploadProductImageToR2(options: {
     throw new Error('Cloud sync is disabled (local-only mode).');
   }
 
-  const idToken = await getSupabaseAccessToken();
-  if (!idToken) throw new Error('Could not get session token');
+  const base = resolveUploadApiBase();
+  if (!base) {
+    throw new Error(
+      'Missing VITE_BACKEND_URL (or VITE_APP_URL). Set it to your deployed API origin (e.g. https://your-app.vercel.app), rebuild, then run npx cap sync for Android.'
+    );
+  }
+  const endpoint = `${base}/api/upload-product-image`;
 
-  const baseUrl = (import.meta as any).env?.VITE_BACKEND_URL || '';
-  const endpoint = baseUrl ? `${baseUrl}/api/upload-product-image` : '/api/upload-product-image';
+  const existing = inFlightProductUploads.get(options.productId);
+  if (existing) return existing;
 
-  const blob = await dataUrlToJpegBlob(options.dataUrl, 0.88);
+  const promise = (async () => {
+    const blob = await dataUrlToJpegBlob(options.dataUrl, 0.88);
+    return postUploadWithRetries(endpoint, options.productId, blob);
+  })();
 
-  const form = new FormData();
-  form.append('productId', options.productId);
-  form.append('ext', 'jpg');
-  form.append('file', blob, `product-${options.productId}.jpg`);
-
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: form,
+  inFlightProductUploads.set(options.productId, promise);
+  promise.finally(() => {
+    if (inFlightProductUploads.get(options.productId) === promise) {
+      inFlightProductUploads.delete(options.productId);
+    }
   });
 
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`Upload failed (${resp.status}): ${text || resp.statusText}`);
-  }
-
-  const json = await resp.json();
-  if (!json?.url || !json?.key) throw new Error('Upload response missing url/key');
-  return { url: json.url, key: json.key };
+  return promise;
 }

@@ -12,8 +12,8 @@ The app uses **Supabase Auth** for email, password reset, and Google. Firebase m
 |----------|-------------|
 | `VITE_SUPABASE_URL` | Project URL from Supabase → Settings → API |
 | `VITE_SUPABASE_ANON_KEY` | `anon` `public` key |
-| `VITE_BACKEND_URL` | Your API origin (e.g. `https://your-app.vercel.app`) for `/api/subscription` and any hosted IAP routes |
-| `VITE_APP_URL` | Optional; base URL for `/api/get-upload-url` and `/api/delete-image` if not same-origin |
+| `VITE_BACKEND_URL` | **Required for Capacitor builds:** same as your Vercel URL (e.g. `https://your-app.vercel.app`). Native apps load from `https://localhost`; without this, `/api/upload-product-image` and subscription calls fail. |
+| `VITE_APP_URL` | Optional fallback for API base (R2 helpers); prefer `VITE_BACKEND_URL` for clarity |
 
 **Vercel (or Node server) — server-only, never expose to the client:**
 

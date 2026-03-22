@@ -6,6 +6,7 @@ import { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
+import { applyApiCors } from "../lib/apiCors.js";
 
 // ─── R2 S3-compatible client ──────────────────────────────────────────────────
 const r2 = new S3Client({
@@ -23,22 +24,7 @@ const URL_EXPIRY_SECONDS = 120; // presigned URL valid for 2 minutes
 const MAX_FILENAME_LENGTH = 200;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ── CORS ──────────────────────────────────────────────────────────────
-  const allowedOrigins = [
-    "https://catshare.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ];
-  const origin = req.headers.origin || "";
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (applyApiCors(req, res)) return;
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
