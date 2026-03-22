@@ -5,16 +5,7 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-
-// ─── Firebase Admin init (runs once per cold start) ──────────────────────────
-if (!getApps().length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!);
-  initializeApp({
-    credential: cert(serviceAccount),
-  });
-}
+import { getSupabaseUserFromRequest } from "./_supabaseAuth";
 
 // ─── R2 S3-compatible client ──────────────────────────────────────────────────
 const r2 = new S3Client({
@@ -53,21 +44,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // ── 1. Verify Firebase ID token ──────────────────────────────────────────
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or malformed Authorization header" });
+  // ── 1. Verify Supabase access token ───────────────────────────────────────
+  const authResult = await getSupabaseUserFromRequest(req.headers.authorization);
+  if (!authResult.ok) {
+    return res.status(401).json({ error: authResult.error });
   }
-
-  let uid: string;
-  try {
-    const idToken = authHeader.split("Bearer ")[1];
-    const decoded = await getAuth().verifyIdToken(idToken);
-    uid = decoded.uid;
-  } catch (err) {
-    console.error("Token verification failed:", err);
-    return res.status(401).json({ error: "Invalid or expired token" });
-  }
+  const uid = authResult.userId;
 
   // ── 2. Validate request body ─────────────────────────────────────────────
   const { filename, folder, contentType } = req.body as {

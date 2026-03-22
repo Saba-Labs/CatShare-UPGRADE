@@ -1,8 +1,8 @@
 // src/services/cloudflareService.ts
 // Handles image uploads to Cloudflare R2 via presigned URLs from the Vercel API
 
-import { getAuth } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
+import { supabase, getSupabaseAccessToken } from "../supabaseClient";
 import { CapacitorHttp } from "@capacitor/core";
 
 const API_BASE = import.meta.env.VITE_APP_URL || "";
@@ -53,7 +53,7 @@ export interface UploadResult {
  * Upload a base64 image to Cloudflare R2.
  *
  * Steps:
- *  1. Get a Firebase ID token for the current user
+ *  1. Get a Supabase access token for the current session
  *  2. POST to /api/get-upload-url to get a presigned PUT URL
  *  3. PUT the image blob directly to R2
  *  4. Return the public URL to store in Supabase
@@ -70,22 +70,23 @@ export async function uploadImageToR2(
   mimeType: "image/png" | "image/jpeg" = "image/png"
 ): Promise<UploadResult> {
   try {
-    // ── Step 1: Get Firebase ID token ──────────────────────────────────────
-    const auth = getAuth();
-    const user = auth.currentUser;
-
-    if (!user) {
+    // ── Step 1: Supabase session ───────────────────────────────────────────
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
       console.error("❌ R2 upload aborted: no authenticated user");
       return { success: false, error: "User not authenticated" };
     }
 
-    // If user chose local-only, block cloud uploads until they opt in.
-    const choice = localStorage.getItem(`offlineSyncChoice::${user.uid}`);
+    const uid = session.user.id;
+    const choice = localStorage.getItem(`offlineSyncChoice::${uid}`);
     if (choice && choice !== 'sync') {
       return { success: false, error: "Cloud sync is disabled (local-only mode)." };
     }
 
-    const idToken = await user.getIdToken();
+    const idToken = await getSupabaseAccessToken();
+    if (!idToken) {
+      return { success: false, error: "Could not get session token" };
+    }
 
     // ── Step 2: Request presigned URL from Vercel API ──────────────────────
     console.log(`☁️  Requesting presigned URL for: ${folder}/${filename}`);
@@ -179,10 +180,8 @@ function base64ToBlob(base64: string, mimeType: string): Blob {
  */
 export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult> {
   try {
-    const auth = getAuth();
-    const user = auth.currentUser;
-
-    if (!user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
       return { success: false, error: "User not authenticated" };
     }
 
@@ -217,7 +216,10 @@ export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult>
       ].filter(Boolean))
     );
 
-    const idToken = await user.getIdToken();
+    const idToken = await getSupabaseAccessToken();
+    if (!idToken) {
+      return { success: false, error: "Could not get session token" };
+    }
     for (const k of candidateKeys) {
       const response = await nativeFetch(`${API_BASE}/api/delete-image`, {
         method: "POST",

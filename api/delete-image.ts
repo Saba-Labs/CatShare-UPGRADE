@@ -1,13 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!)),
-  });
-}
+import { getSupabaseUserFromRequest } from "./_supabaseAuth";
 
 const r2 = new S3Client({
   region: "auto",
@@ -42,27 +35,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== "POST") return res.status(405).end();
 
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized" });
+  const authResult = await getSupabaseUserFromRequest(req.headers.authorization);
+  if (!authResult.ok) {
+    return res.status(401).json({ error: authResult.error });
   }
-
-  try {
-    const idToken = authHeader.split("Bearer ")[1];
-    await getAuth().verifyIdToken(idToken);
-  } catch {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+  const userId = authResult.userId;
 
   const { key } = req.body;
   if (!key) return res.status(400).json({ error: "key is required" });
 
+  const safeKey = String(key).replace(/^\/+/, "");
+  if (safeKey.includes("..")) {
+    return res.status(400).json({ error: "Invalid key" });
+  }
+  const allowed =
+    safeKey.startsWith(`${userId}/`) ||
+    safeKey.startsWith(`products/${userId}/`) ||
+    safeKey.startsWith(`users/${userId}/`);
+  if (!allowed) {
+    return res.status(403).json({ error: "Not allowed to delete this object" });
+  }
+
   try {
-    await r2.send(new DeleteObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: key,
-    }));
-    console.log(`🗑️ Deleted R2 object: ${key}`);
+    await r2.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: safeKey,
+      })
+    );
+    console.log(`🗑️ Deleted R2 object: ${safeKey}`);
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("Failed to delete R2 object:", err);

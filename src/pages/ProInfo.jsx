@@ -4,7 +4,7 @@ import { MdArrowBack, MdStar, MdOutlineHome } from "react-icons/md";
 import { Capacitor } from "@capacitor/core";
 import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
-import { auth } from "../config/firebaseConfig";
+import { getSupabaseAccessToken } from "../supabaseClient";
 import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
@@ -68,14 +68,13 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
   async function verifyWithBackend(path, body) {
     if (!BACKEND_URL) throw new Error("Missing VITE_BACKEND_URL");
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not logged in");
-    const idToken = await user.getIdToken();
+    const accessToken = await getSupabaseAccessToken();
+    if (!accessToken) throw new Error("Not logged in");
     const resp = await fetch(`${BACKEND_URL}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(body),
     });

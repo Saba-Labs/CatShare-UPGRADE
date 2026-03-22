@@ -4,7 +4,6 @@ import fetch from "node-fetch";
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
-import admin from "firebase-admin";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSupabaseAdmin } from "./supabaseAdmin.js";
 import { google } from "googleapis";
@@ -21,27 +20,6 @@ app.use(express.json());
 const PRO_SUBSCRIPTION_IDS = new Set(["catshare_pro_monthly", "catshare_pro_yearly"]);
 const PRO_INAPP_IDS = new Set(["catshare_pro_lifetime"]);
 
-// ---------- Firebase Admin (verify ID tokens) ----------
-function initFirebaseAdmin() {
-  if (admin.apps.length > 0) return;
-
-  // Preferred: provide a full service account JSON string in env
-  // FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
-  const svcJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (svcJson) {
-    const serviceAccount = JSON.parse(svcJson);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    return;
-  }
-
-  // Fallback: use GOOGLE_APPLICATION_CREDENTIALS or default credentials
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
-}
-
 function computeIsPro(row) {
   if (!row) return false;
   if (row.status !== "active") return false;
@@ -49,21 +27,26 @@ function computeIsPro(row) {
   return new Date(row.expires_at).getTime() > Date.now();
 }
 
-async function requireFirebaseUser(req, res, next) {
+/** Supabase Auth JWT (same token the app sends to Vercel APIs) */
+async function requireSupabaseUser(req, res, next) {
   try {
-    initFirebaseAdmin();
     const authHeader = req.headers.authorization || "";
     const match = authHeader.match(/^Bearer\s+(.+)$/i);
     if (!match) {
-      return res.status(401).json({ error: "Missing Authorization: Bearer <FirebaseIdToken>" });
+      return res.status(401).json({ error: "Missing Authorization: Bearer <access_token>" });
     }
 
-    const decoded = await admin.auth().verifyIdToken(match[1]);
-    req.firebaseUser = decoded; // { uid, ... }
+    const sb = getSupabaseAdmin();
+    const { data, error } = await sb.auth.getUser(match[1]);
+    if (error || !data.user) {
+      console.error("❌ Supabase token verify failed:", error?.message || error);
+      return res.status(401).json({ error: "Invalid or expired session token" });
+    }
+    req.authUserId = data.user.id;
     return next();
   } catch (err) {
-    console.error("❌ Firebase token verify failed:", err?.message || err);
-    return res.status(401).json({ error: "Invalid Firebase ID token" });
+    console.error("❌ Supabase token verify failed:", err?.message || err);
+    return res.status(401).json({ error: "Invalid session token" });
   }
 }
 
@@ -127,7 +110,7 @@ app.post("/remove-bg", upload.single("image_file"), async (req, res) => {
 
 /**
  * Upload a product image to Cloudflare R2.
- * - Auth: Firebase ID token (Authorization: Bearer <token>)
+ * - Auth: Supabase access token (Authorization: Bearer <token>)
  * - Body: multipart/form-data with:
  *   - file: image binary (png/jpg/webp)
  *   - productId: string
@@ -135,14 +118,14 @@ app.post("/remove-bg", upload.single("image_file"), async (req, res) => {
  *
  * Returns: { url, key }
  */
-app.post("/upload-product-image", requireFirebaseUser, upload.single("file"), async (req, res) => {
+app.post("/upload-product-image", requireSupabaseUser, upload.single("file"), async (req, res) => {
   try {
     if (!req.file?.buffer) {
       return res.status(400).json({ error: "Missing file" });
     }
 
-    const uid = req.firebaseUser?.uid;
-    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+    const uid = req.authUserId;
+    if (!uid) return res.status(401).json({ error: "No user id" });
 
     const bucket = process.env.R2_BUCKET_NAME;
     if (!bucket) {
@@ -183,13 +166,13 @@ app.post("/upload-product-image", requireFirebaseUser, upload.single("file"), as
 });
 
 /**
- * Get current subscription entitlement for the logged-in Firebase user.
+ * Get current subscription entitlement for the logged-in Supabase user.
  * Returns: { isPro, subscription }
  */
-app.get("/subscription", requireFirebaseUser, async (req, res) => {
+app.get("/subscription", requireSupabaseUser, async (req, res) => {
   try {
-    const uid = req.firebaseUser?.uid;
-    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+    const uid = req.authUserId;
+    if (!uid) return res.status(401).json({ error: "No user id" });
 
     const sb = getSupabaseAdmin();
     const { data, error } = await sb
@@ -217,10 +200,10 @@ app.get("/subscription", requireFirebaseUser, async (req, res) => {
  * Requires backend env:
  * - GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
  */
-app.post("/iap/android/receipt", requireFirebaseUser, async (req, res) => {
+app.post("/iap/android/receipt", requireSupabaseUser, async (req, res) => {
   try {
-    const uid = req.firebaseUser?.uid;
-    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+    const uid = req.authUserId;
+    if (!uid) return res.status(401).json({ error: "No user id" });
 
     const { packageName, subscriptionId, purchaseToken } = req.body || {};
     if (!packageName || !subscriptionId || !purchaseToken) {
@@ -278,10 +261,10 @@ app.post("/iap/android/receipt", requireFirebaseUser, async (req, res) => {
  * Verify Android one-time (managed) product purchase (lifetime).
  * Body: { packageName, productId, purchaseToken }
  */
-app.post("/iap/android/product", requireFirebaseUser, async (req, res) => {
+app.post("/iap/android/product", requireSupabaseUser, async (req, res) => {
   try {
-    const uid = req.firebaseUser?.uid;
-    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+    const uid = req.authUserId;
+    if (!uid) return res.status(401).json({ error: "No user id" });
 
     const { packageName, productId, purchaseToken } = req.body || {};
     if (!packageName || !productId || !purchaseToken) {
@@ -340,10 +323,10 @@ app.post("/iap/android/product", requireFirebaseUser, async (req, res) => {
  * Requires backend env:
  * - APPLE_SHARED_SECRET
  */
-app.post("/iap/ios/receipt", requireFirebaseUser, async (req, res) => {
+app.post("/iap/ios/receipt", requireSupabaseUser, async (req, res) => {
   try {
-    const uid = req.firebaseUser?.uid;
-    if (!uid) return res.status(401).json({ error: "No Firebase UID" });
+    const uid = req.authUserId;
+    if (!uid) return res.status(401).json({ error: "No user id" });
 
     const { receiptDataBase64 } = req.body || {};
     if (!receiptDataBase64) return res.status(400).json({ error: "Missing receiptDataBase64" });

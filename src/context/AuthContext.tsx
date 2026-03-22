@@ -1,9 +1,36 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase, persistAuthUserIdsForStorage, clearAuthUserIdsFromStorage } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
-import { setSupabaseUser } from '../supabaseClient';
 import { authService } from '../services/authService';
+
+/** Shape compatible with previous Firebase `user` (components use .uid, .email, .displayName). */
+export type AppAuthUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  isAnonymous?: boolean;
+  /** Supabase: derived from user.email_confirmed_at */
+  emailVerified?: boolean;
+};
+
+function mapSupabaseUserToApp(u: SupabaseUser): AppAuthUser {
+  const meta = u.user_metadata || {};
+  const displayName =
+    (meta.display_name as string) ||
+    (meta.full_name as string) ||
+    (meta.name as string) ||
+    u.email?.split('@')[0] ||
+    null;
+  return {
+    uid: u.id,
+    email: u.email ?? null,
+    displayName,
+    photoURL: (meta.avatar_url as string) || (meta.picture as string) || null,
+    emailVerified: !!u.email_confirmed_at,
+  };
+}
 
 interface SupabaseUserData {
   products: any[];
@@ -15,7 +42,7 @@ interface SupabaseUserData {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AppAuthUser | null;
   loading: boolean;
   error: string | null;
   supabaseData: SupabaseUserData | null;
@@ -36,42 +63,39 @@ const defaultSupabaseData: SupabaseUserData = {
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppAuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supabaseData, setSupabaseData] = useState<SupabaseUserData | null>(null);
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
   useEffect(() => {
-    // Check if user is in offline guest mode
     const checkGuestMode = () => {
       const isOfflineGuest = authService.isOfflineGuest();
 
       if (isOfflineGuest) {
-        // Offline guest mode - set up guest user without Firebase
         const guestId = localStorage.getItem('guestUserId');
-        const guestUser = {
+        const guestUser: AppAuthUser = {
           uid: guestId || `guest-${Date.now()}`,
           email: null,
           displayName: 'Guest User',
           isAnonymous: true,
-        } as any;
+          emailVerified: false,
+        };
 
         setUser(guestUser);
         console.log('👤 Offline guest mode activated');
         setLoading(false);
-        setSupabaseData(defaultSupabaseData); // No cloud data for guests
+        setSupabaseData(defaultSupabaseData);
         return true;
       }
       return false;
     };
 
-    // Check guest mode on mount
     if (checkGuestMode()) {
       return;
     }
 
-    // Listen for guest mode activation (can happen after initial mount)
     const handleGuestModeActivated = () => {
       console.log('🎯 Guest mode activation detected');
       checkGuestMode();
@@ -79,62 +103,70 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     window.addEventListener('guestModeActivated', handleGuestModeActivated);
 
-    // Normal Firebase authentication flow
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+    let cancelled = false;
 
-      // Store user UID in localStorage for sync operations
-      if (currentUser && currentUser.uid) {
-        try {
-          localStorage.setItem('firebaseUserId', currentUser.uid);
-          console.log('✅ Stored Firebase user ID in localStorage:', currentUser.uid);
-          // Also set Supabase user header source for RLS
-          setSupabaseUser(currentUser.uid);
-        } catch (err) {
-          console.warn('⚠️ Could not store user ID in localStorage:', err);
+    const loadUserData = async (uid: string) => {
+      setSupabaseDataLoading(true);
+      try {
+        const result = await fetchAllUserData(uid);
+        if (cancelled) return;
+        if (result.success && result.data) {
+          setSupabaseData(result.data as SupabaseUserData);
+          console.log('✅ Fetched Supabase data for user:', uid);
+        } else {
+          console.warn('⚠️ Failed to fetch Supabase data:', result.error);
+          setSupabaseData(defaultSupabaseData);
         }
-      } else {
-        try {
-          localStorage.removeItem('firebaseUserId');
-          localStorage.removeItem('supabase_user_id');
-          console.log('🔄 Cleared Firebase user ID from localStorage');
-        } catch (err) {
-          console.warn('⚠️ Could not remove user ID from localStorage:', err);
-        }
-      }
-
-      // Fetch Supabase data if user is logged in
-      if (currentUser && currentUser.uid) {
-        setSupabaseDataLoading(true);
-        try {
-          const result = await fetchAllUserData(currentUser.uid);
-          if (result.success && result.data) {
-            setSupabaseData(result.data as SupabaseUserData);
-            console.log('✅ Fetched Supabase data for user:', currentUser.uid);
-          } else {
-            console.warn('⚠️ Failed to fetch Supabase data:', result.error);
-            // Initialize with empty data if fetch fails
-            setSupabaseData(defaultSupabaseData);
-          }
-        } catch (err) {
+      } catch (err) {
+        if (!cancelled) {
           console.error('❌ Error fetching Supabase data:', err);
           setSupabaseData(defaultSupabaseData);
-        } finally {
-          setSupabaseDataLoading(false);
         }
+      } finally {
+        if (!cancelled) setSupabaseDataLoading(false);
+      }
+    };
+
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (session?.user) {
+        const appUser = mapSupabaseUserToApp(session.user);
+        setUser(appUser);
+        persistAuthUserIdsForStorage(session.user.id);
+        await loadUserData(session.user.id);
       } else {
-        // Clear data when user logs out
+        setUser(null);
+        clearAuthUserIdsFromStorage();
         setSupabaseData(null);
       }
+      setLoading(false);
+    };
 
-      setLoading(false);
-    }, (error) => {
-      setError(error.message);
-      setLoading(false);
+    void initSession();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (authService.isOfflineGuest()) return;
+
+      if (session?.user) {
+        const appUser = mapSupabaseUserToApp(session.user);
+        setUser(appUser);
+        persistAuthUserIdsForStorage(session.user.id);
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          await loadUserData(session.user.id);
+        }
+      } else {
+        setUser(null);
+        clearAuthUserIdsFromStorage();
+        setSupabaseData(null);
+        setSupabaseDataLoading(false);
+      }
     });
 
     return () => {
-      unsubscribe();
+      cancelled = true;
+      sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
     };
   }, []);
@@ -143,23 +175,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setError(null);
 
-      // Handle offline guest logout
       if (authService.isOfflineGuest()) {
         authService.logoutOfflineGuest();
         console.log('👤 Guest user logged out');
       } else {
-        // Normal Firebase logout
-        await signOut(auth);
+        await supabase.auth.signOut();
       }
 
       setUser(null);
       setSupabaseData(null);
+      clearAuthUserIdsFromStorage();
 
-      // Security: remove legacy/unkeyed local product caches so another account
-      // on the same device cannot read previous user's local data during login.
-      localStorage.removeItem("products");
-      localStorage.removeItem("deletedProducts");
-      localStorage.removeItem("retailProducts");
+      localStorage.removeItem('products');
+      localStorage.removeItem('deletedProducts');
+      localStorage.removeItem('retailProducts');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
@@ -178,7 +207,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         supabaseData,
         supabaseDataLoading,
         logout,
-        clearError
+        clearError,
       }}
     >
       {children}

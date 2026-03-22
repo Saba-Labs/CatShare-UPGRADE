@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, onMessage, getToken } from "firebase/messaging";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getAnalytics, logEvent } from "firebase/analytics";
@@ -18,8 +17,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Get Firebase services
-export const auth = getAuth(app);
+// Firebase services (Auth is Supabase — see supabaseClient.ts)
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 

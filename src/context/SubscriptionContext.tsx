@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { auth } from '../config/firebaseConfig';
+import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 
 type SubscriptionContextValue = {
   isPro: boolean;
@@ -16,8 +16,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [loading, setLoading] = useState<boolean>(true);
 
   const refresh = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
       setIsPro(false);
       localStorage.setItem('isPro', 'false');
       setLoading(false);
@@ -31,12 +31,16 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setLoading(false);
         return;
       }
-      const idToken = await user.getIdToken();
+      const accessToken = await getSupabaseAccessToken();
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
       const resp = await fetch(`${baseUrl}/api/subscription`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       if (!resp.ok) throw new Error(`Subscription fetch failed (${resp.status})`);
@@ -62,10 +66,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
-    const unsub = auth.onAuthStateChanged(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       refresh().catch(() => setLoading(false));
     });
-    return () => unsub();
+    refresh().catch(() => setLoading(false));
+    return () => subscription.unsubscribe();
   }, [refresh]);
 
   const value = useMemo(() => ({ isPro, loading, refresh }), [isPro, loading, refresh]);
