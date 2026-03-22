@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, persistAuthUserIdsForStorage, clearAuthUserIdsFromStorage } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
@@ -69,6 +69,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseData, setSupabaseData] = useState<SupabaseUserData | null>(null);
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
+  /** Coalesce concurrent profile fetches for the same uid (initSession + SIGNED_IN, etc.). */
+  const inFlightProfileByUid = useRef<Map<string, Promise<void>>>(new Map());
+  /** Ref-count in-flight profile loads (avoids clearing loading while another uid still fetches). */
+  const activeProfileLoadsRef = useRef(0);
+
   useEffect(() => {
     const checkGuestMode = () => {
       const isOfflineGuest = authService.isOfflineGuest();
@@ -106,25 +111,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let cancelled = false;
 
     const loadUserData = async (uid: string) => {
-      setSupabaseDataLoading(true);
-      try {
-        const result = await fetchAllUserData(uid);
-        if (cancelled) return;
-        if (result.success && result.data) {
-          setSupabaseData(result.data as SupabaseUserData);
-          console.log('✅ Fetched Supabase data for user:', uid);
-        } else {
-          console.warn('⚠️ Failed to fetch Supabase data:', result.error);
-          setSupabaseData(defaultSupabaseData);
+      const existing = inFlightProfileByUid.current.get(uid);
+      if (existing) return existing;
+
+      const run = (async () => {
+        activeProfileLoadsRef.current += 1;
+        if (activeProfileLoadsRef.current === 1) setSupabaseDataLoading(true);
+        try {
+          const result = await fetchAllUserData(uid);
+          if (cancelled) return;
+          const { data: { session: latest } } = await supabase.auth.getSession();
+          if (!latest?.user || latest.user.id !== uid) return;
+
+          if (result.success && result.data) {
+            setSupabaseData(result.data as SupabaseUserData);
+            console.log('✅ Fetched Supabase data for user:', uid);
+          } else {
+            console.warn('⚠️ Failed to fetch Supabase data:', result.error);
+            setSupabaseData(defaultSupabaseData);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error('❌ Error fetching Supabase data:', err);
+            const { data: { session: latest } } = await supabase.auth.getSession();
+            if (latest?.user?.id === uid) {
+              setSupabaseData(defaultSupabaseData);
+            }
+          }
+        } finally {
+          inFlightProfileByUid.current.delete(uid);
+          activeProfileLoadsRef.current = Math.max(0, activeProfileLoadsRef.current - 1);
+          if (!cancelled && activeProfileLoadsRef.current === 0) {
+            setSupabaseDataLoading(false);
+          }
         }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('❌ Error fetching Supabase data:', err);
-          setSupabaseData(defaultSupabaseData);
-        }
-      } finally {
-        if (!cancelled) setSupabaseDataLoading(false);
-      }
+      })();
+
+      inFlightProfileByUid.current.set(uid, run);
+      return run;
     };
 
     const initSession = async () => {
@@ -135,13 +159,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
-        await loadUserData(session.user.id);
+        // Unblock UI immediately; profile loads in background (startup still gates on supabaseDataLoading)
+        setLoading(false);
+        void loadUserData(session.user.id);
       } else {
         setUser(null);
         clearAuthUserIdsFromStorage();
         setSupabaseData(null);
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     void initSession();
@@ -153,21 +179,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
-        // Include INITIAL_SESSION so OAuth redirect + full page load still fetches profile
-        // (initSession also loads; duplicate fetch is harmless vs missing load on some races).
-        if (
-          event === 'SIGNED_IN' ||
-          event === 'TOKEN_REFRESHED' ||
-          event === 'USER_UPDATED' ||
-          event === 'INITIAL_SESSION'
-        ) {
-          await loadUserData(session.user.id);
+        // Avoid duplicate full sync: initSession already loads on cold start.
+        // TOKEN_REFRESHED fires often — refetching all tables every ~hour is unnecessary.
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          void loadUserData(session.user.id);
         }
       } else {
         setUser(null);
         clearAuthUserIdsFromStorage();
         setSupabaseData(null);
         setSupabaseDataLoading(false);
+        inFlightProfileByUid.current.clear();
+        activeProfileLoadsRef.current = 0;
       }
     });
 

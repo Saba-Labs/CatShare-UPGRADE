@@ -66,7 +66,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      // Token refresh does not change subscription; INITIAL_SESSION duplicates the mount refresh().
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
       refresh().catch(() => setLoading(false));
     });
     refresh().catch(() => setLoading(false));
