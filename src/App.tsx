@@ -250,10 +250,13 @@ function AppWithBackHandler() {
     const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
 
     if (supabaseData?.products && supabaseData.products.length > 0) {
-      const currentDeletedIds = new Set([
-        ...localDeleted.map((p: any) => p.id),
-        ...(supabaseData.deletedProducts || []).map((p: any) => p.id),
-      ]);
+      const currentDeletedIds = new Set<string>();
+      for (const p of localDeleted) {
+        if (p?.id != null) currentDeletedIds.add(String(p.id));
+      }
+      for (const p of supabaseData.deletedProducts || []) {
+        if (p?.id != null) currentDeletedIds.add(String(p.id));
+      }
       const merged = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
       setProducts(merged);
       safeSetInStorage(getProductsKey(userId), merged);
@@ -311,8 +314,26 @@ function AppWithBackHandler() {
     setSyncNowLoading(true);
     try {
       const userId = user.uid;
+      const parseStoredJsonArray = (raw: string | null): any[] => {
+        if (!raw) return [];
+        try {
+          const p = JSON.parse(raw);
+          return Array.isArray(p) ? p : [];
+        } catch {
+          return [];
+        }
+      };
+
       let localProducts = safeGetFromStorage(getProductsKey(userId), []);
-      const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      let localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      const unkeyedProducts = parseStoredJsonArray(localStorage.getItem('products'));
+      const unkeyedDeleted = parseStoredJsonArray(localStorage.getItem('deletedProducts'));
+      if (unkeyedProducts.length > 0) {
+        localProducts = mergeProductsData(localProducts, unkeyedProducts, new Set());
+      }
+      if (unkeyedDeleted.length > 0) {
+        localDeleted = mergeProductsData(localDeleted, unkeyedDeleted, new Set());
+      }
 
       const {
         fetchAllUserData,
@@ -440,11 +461,16 @@ function AppWithBackHandler() {
       }
       const remoteProducts = Array.isArray(remoteSnapshot.data.products) ? remoteSnapshot.data.products : [];
       const remoteDeleted = Array.isArray(remoteSnapshot.data.deletedProducts) ? remoteSnapshot.data.deletedProducts : [];
-      const deletedIds = new Set([
-        ...localDeletedUpdated.map((p: any) => p.id),
-        ...remoteDeleted.map((p: any) => p.id),
-      ]);
-      const localProductsFiltered = localProducts.filter((p: any) => !deletedIds.has(p.id));
+      const deletedIds = new Set<string>();
+      for (const p of localDeletedUpdated) {
+        if (p?.id != null) deletedIds.add(String(p.id));
+      }
+      for (const p of remoteDeleted) {
+        if (p?.id != null) deletedIds.add(String(p.id));
+      }
+      const localProductsFiltered = localProducts.filter(
+        (p: any) => p?.id != null && !deletedIds.has(String(p.id))
+      );
       const mergedProducts = mergeProductsData(localProductsFiltered, remoteProducts, deletedIds);
       const mergedDeleted = mergeProductsData(localDeletedUpdated, remoteDeleted);
 
@@ -486,11 +512,9 @@ function AppWithBackHandler() {
       // Clean up unkeyed legacy originals now that cloud sync succeeded.
       localStorage.removeItem('products');
       localStorage.removeItem('deletedProducts');
-      localStorage.removeItem('categories');
+      // Do NOT remove `categories` here — refreshFromCloud() just wrote it; removing caused empty UI / slow repopulate.
       localStorage.removeItem('cataloguesDefinition');
       localStorage.removeItem('fieldsDefinition');
-      // Also clean up keyed categories (keyed products/deleted handled by clearAllOfflineCaches).
-      localStorage.removeItem(getStorageKey('categories', userId));
       localStorage.setItem('offlineLegacyResolved::device', 'true');
       localStorage.setItem('strictOnlineMode::device', 'true');
       clearAllOfflineCaches();
@@ -624,17 +648,22 @@ function AppWithBackHandler() {
   }, [deletedProducts, user?.uid]);
 
   const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
-    const merged = new Map();
-    local.forEach(product => { merged.set(product.id, product); });
-    remote.forEach(remoteProduct => {
-      if (deletedIds.has(remoteProduct.id)) return;
-      const localProduct = merged.get(remoteProduct.id);
+    const merged = new Map<string, any>();
+    local.forEach((product) => {
+      if (product?.id == null) return;
+      merged.set(String(product.id), product);
+    });
+    remote.forEach((remoteProduct) => {
+      if (remoteProduct?.id == null) return;
+      if (deletedIds.size > 0 && deletedIds.has(String(remoteProduct.id))) return;
+      const id = String(remoteProduct.id);
+      const localProduct = merged.get(id);
       if (!localProduct) {
-        merged.set(remoteProduct.id, remoteProduct);
+        merged.set(id, remoteProduct);
       } else {
         const localTime = new Date(localProduct.updatedAt || 0).getTime();
         const remoteTime = new Date(remoteProduct.updatedAt || 0).getTime();
-        if (remoteTime > localTime) merged.set(remoteProduct.id, remoteProduct);
+        if (remoteTime > localTime) merged.set(id, remoteProduct);
       }
     });
     return Array.from(merged.values());

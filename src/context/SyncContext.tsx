@@ -83,15 +83,21 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const nextProducts = Array.isArray(snapshot.products) ? snapshot.products : [];
     const nextDeleted = Array.isArray(snapshot.deletedProducts) ? snapshot.deletedProducts : [];
 
-    const deletedIds = new Set(nextDeleted.map((p: any) => p.id));
-    const filteredProducts = nextProducts.filter((p: any) => !deletedIds.has(p.id));
+    const deletedIds = new Set<string>(
+      nextDeleted.map((p: any) => p?.id).filter((id: any) => id != null).map((id: any) => String(id))
+    );
+    const filteredProducts = nextProducts.filter(
+      (p: any) => p?.id != null && !deletedIds.has(String(p.id))
+    );
 
     safeSetInStorage(getProductsKey(userId), filteredProducts);
     safeSetInStorage(getDeletedProductsKey(userId), nextDeleted);
 
     const rawCats = snapshot.categories || [];
     const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
-    localStorage.setItem('categories', JSON.stringify(normalizedCats));
+    const categoriesJson = JSON.stringify(normalizedCats);
+    localStorage.setItem('categories', categoriesJson);
+    localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
 
     if (snapshot.fieldsDefinition) {
       setFieldsDefinition(snapshot.fieldsDefinition, userId);
