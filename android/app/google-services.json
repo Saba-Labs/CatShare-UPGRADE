@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:787555935594:android:215af34babe7272daab113",
+        "mobilesdk_app_id": "1:787555935594:android:bb8a18d0ad7f017caab113",
         "android_client_info": {
           "package_name": "com.catshare.official"
         }
@@ -19,14 +19,6 @@
           "android_info": {
             "package_name": "com.catshare.official",
             "certificate_hash": "d990c3d504014a5fd93f3c0c08219d846d872313"
-          }
-        },
-        {
-          "client_id": "787555935594-pq8j5st11muhcl7ab11bo1khsosdvl0m.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.catshare.official",
-            "certificate_hash": "a9cbb1a662db17a39035c95a40f167df7d903faa"
           }
         },
         {
