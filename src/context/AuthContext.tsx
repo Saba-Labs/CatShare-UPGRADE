@@ -153,7 +153,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        // Include INITIAL_SESSION so OAuth redirect + full page load still fetches profile
+        // (initSession also loads; duplicate fetch is harmless vs missing load on some races).
+        if (
+          event === 'SIGNED_IN' ||
+          event === 'TOKEN_REFRESHED' ||
+          event === 'USER_UPDATED' ||
+          event === 'INITIAL_SESSION'
+        ) {
           await loadUserData(session.user.id);
         }
       } else {

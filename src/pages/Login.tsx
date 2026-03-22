@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
@@ -11,7 +11,7 @@ import { safeGetFromStorage } from '../utils/safeStorage';
 export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { user, supabaseData, supabaseDataLoading } = useAuth();
+  const { user, supabaseData, supabaseDataLoading, loading: authBootstrapLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,61 +20,86 @@ export default function Login() {
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
 
-  // After user logs in and supabaseData loads, check if they need onboarding
+  /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
+  const postAuthRedirectDoneRef = useRef(false);
+
   useEffect(() => {
-    if (hasJustLoggedIn && !supabaseDataLoading && supabaseData) {
-      console.log('🔍 Login check - supabaseData:', supabaseData);
-      console.log('🔍 fieldsDefinition from Supabase:', supabaseData.fieldsDefinition);
+    postAuthRedirectDoneRef.current = false;
+  }, [user?.uid]);
 
+  /**
+   * Redirect off /login when we have a real Supabase session and profile load finished.
+   * - Email / native Google: hasJustLoggedIn is set.
+   * - Web Google OAuth: redirect returns with session but hasJustLoggedIn stays false — still redirect.
+   * - supabaseData may be null in edge cases; treat as empty and still navigate.
+   */
+  useEffect(() => {
+    if (authService.isOfflineGuest()) return;
+    if (authBootstrapLoading) return;
+    if (!user?.uid || user.isAnonymous) return;
+    if (supabaseDataLoading) return;
+    if (postAuthRedirectDoneRef.current) return;
+
+    postAuthRedirectDoneRef.current = true;
+
+    const data = supabaseData ?? { fieldsDefinition: null };
+    console.log('🔍 Login check - supabaseData:', data);
+    console.log('🔍 fieldsDefinition from Supabase:', data.fieldsDefinition);
+
+    if (hasJustLoggedIn) {
       showToast('Login successful!', 'success');
-
-      // Check if user has already configured their fields
-      // First check Supabase, then fallback to localStorage for old users
-      const hasSupabaseFields = supabaseData.fieldsDefinition &&
-                               supabaseData.fieldsDefinition.fields &&
-                               Array.isArray(supabaseData.fieldsDefinition.fields) &&
-                               supabaseData.fieldsDefinition.fields.length > 0;
-
-      const localStorageFields = safeGetFromStorage('fieldsDefinition', null);
-      const hasLocalFields = localStorageFields &&
-                            localStorageFields.fields &&
-                            Array.isArray(localStorageFields.fields) &&
-                            localStorageFields.fields.length > 0;
-
-      const hasFieldsDefinition = hasSupabaseFields || hasLocalFields;
-
-      console.log('🔍 hasSupabaseFields:', hasSupabaseFields);
-      console.log('🔍 hasLocalFields:', hasLocalFields);
-      console.log('🔍 hasFieldsDefinition (combined):', hasFieldsDefinition);
-
-      // If user has local fields but no Supabase fields, sync them to cloud (for old users)
-      if (hasLocalFields && !hasSupabaseFields && user?.uid) {
-        console.log('🔄 Syncing local fields to Supabase for old user...');
-        import('../services/supabaseSync').then(({ syncFieldsDefinition }) => {
-          syncFieldsDefinition(user.uid, localStorageFields)
-            .then(result => {
-              if (result.success) {
-                console.log('✅ Successfully synced local fields to Supabase');
-              } else {
-                console.warn('⚠️ Failed to sync local fields:', result.error);
-              }
-            });
-        });
-      }
-
-      if (hasFieldsDefinition) {
-        // Returning user - go to main app
-        console.log('✅ User has fields definition (Supabase or localStorage) - redirecting to home');
-        navigate('/');
-      } else {
-        // New user - go to onboarding
-        console.log('🆕 No fields definition found - redirecting to welcome');
-        navigate('/welcome');
-      }
-
-      setHasJustLoggedIn(false);
     }
-  }, [hasJustLoggedIn, supabaseDataLoading, supabaseData, user, navigate, showToast]);
+
+    const hasSupabaseFields =
+      data.fieldsDefinition &&
+      data.fieldsDefinition.fields &&
+      Array.isArray(data.fieldsDefinition.fields) &&
+      data.fieldsDefinition.fields.length > 0;
+
+    const localStorageFields = safeGetFromStorage('fieldsDefinition', null);
+    const hasLocalFields =
+      localStorageFields &&
+      localStorageFields.fields &&
+      Array.isArray(localStorageFields.fields) &&
+      localStorageFields.fields.length > 0;
+
+    const hasFieldsDefinition = hasSupabaseFields || hasLocalFields;
+
+    console.log('🔍 hasSupabaseFields:', hasSupabaseFields);
+    console.log('🔍 hasLocalFields:', hasLocalFields);
+    console.log('🔍 hasFieldsDefinition (combined):', hasFieldsDefinition);
+
+    if (hasLocalFields && !hasSupabaseFields && user?.uid) {
+      console.log('🔄 Syncing local fields to Supabase for old user...');
+      import('../services/supabaseSync').then(({ syncFieldsDefinition }) => {
+        syncFieldsDefinition(user.uid, localStorageFields).then((result) => {
+          if (result.success) {
+            console.log('✅ Successfully synced local fields to Supabase');
+          } else {
+            console.warn('⚠️ Failed to sync local fields:', result.error);
+          }
+        });
+      });
+    }
+
+    setHasJustLoggedIn(false);
+
+    if (hasFieldsDefinition) {
+      console.log('✅ User has fields definition (Supabase or localStorage) - redirecting to home');
+      navigate('/', { replace: true });
+    } else {
+      console.log('🆕 No fields definition found - redirecting to welcome');
+      navigate('/welcome', { replace: true });
+    }
+  }, [
+    authBootstrapLoading,
+    user,
+    supabaseDataLoading,
+    supabaseData,
+    hasJustLoggedIn,
+    navigate,
+    showToast,
+  ]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
