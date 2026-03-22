@@ -5,7 +5,7 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getSupabaseUserFromRequest } from "./_supabaseAuth";
+import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 
 // ─── R2 S3-compatible client ──────────────────────────────────────────────────
 const r2 = new S3Client({

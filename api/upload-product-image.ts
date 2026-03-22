@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSupabaseUserFromRequest } from "./_supabaseAuth";
+import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 
 export const config = {
   api: {

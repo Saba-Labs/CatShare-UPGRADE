@@ -1,7 +1,7 @@
 // api/subscription.ts — Pro entitlement from Supabase (user id = Supabase auth UUID)
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
-import { getSupabaseUserFromRequest } from "./_supabaseAuth";
+import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

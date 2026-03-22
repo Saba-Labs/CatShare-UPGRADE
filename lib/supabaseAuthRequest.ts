@@ -1,6 +1,6 @@
 /**
  * Verify Supabase JWT from Authorization: Bearer <access_token>
- * Uses the service role client — safe only on the server.
+ * Server-only — used by Vercel /api routes. Lives outside /api so the bundler inlines it.
  */
 import { createClient, User } from "@supabase/supabase-js";
 

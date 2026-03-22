@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { getSupabaseUserFromRequest } from "./_supabaseAuth";
+import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 
 const r2 = new S3Client({
   region: "auto",
