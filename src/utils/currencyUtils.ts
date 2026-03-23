@@ -38,30 +38,32 @@ export function getCurrentCurrency(): string {
 }
 
 /**
+ * Resolve display symbol for a currency code (standard + custom in localStorage).
+ */
+export function getSymbolForCurrencyCode(code: string): string {
+  const c = (code || 'INR').trim() || 'INR';
+  if (CURRENCIES[c]) {
+    return CURRENCIES[c].symbol;
+  }
+  try {
+    const raw = localStorage.getItem('customCurrencies');
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      if (parsed[c]) {
+        return parsed[c];
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return '₹';
+}
+
+/**
  * Get current currency symbol
  */
 export function getCurrentCurrencySymbol(): string {
-  const code = getCurrentCurrency();
-
-  // Check standard currencies first
-  if (CURRENCIES[code]) {
-    return CURRENCIES[code].symbol;
-  }
-
-  // Check custom currencies
-  try {
-    const customCurrencies = localStorage.getItem('customCurrencies');
-    if (customCurrencies) {
-      const parsed = JSON.parse(customCurrencies);
-      if (parsed[code]) {
-        return parsed[code];
-      }
-    }
-  } catch (e) {
-    // Silently fail
-  }
-
-  return '₹'; // Default fallback
+  return getSymbolForCurrencyCode(getCurrentCurrency());
 }
 
 /**
@@ -106,7 +108,7 @@ export function getAllCurrencies(): CurrencyData[] {
 export function onCurrencyChange(callback: (currency: string, symbol: string) => void): () => void {
   const handleCurrencyChanged = (event: any) => {
     const currency = event.detail?.currency || 'INR';
-    const symbol = CURRENCIES[currency]?.symbol || '₹';
+    const symbol = getSymbolForCurrencyCode(currency);
     callback(currency, symbol);
   };
 

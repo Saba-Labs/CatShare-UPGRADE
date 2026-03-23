@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
-import { getCurrencyData } from '../utils/currencyUtils';
+import { CURRENCIES, getCurrencyData } from '../utils/currencyUtils';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -86,9 +86,16 @@ export default function OrderForm() {
         if (!data) { setError('This link is invalid or expired.'); return; }
         setSellerWhatsapp(data.sellerWhatsapp);
         setSellerBusinessName((data.sellerBusinessName || '').trim());
-        const sym = (data.sellerCurrencySymbol || '').trim();
         const code = (data.sellerCurrencyCode || 'INR').trim() || 'INR';
-        setCurrencySymbol(sym || getCurrencyData(code).symbol);
+        const apiSym = (data.sellerCurrencySymbol || '').trim();
+        // Prefer symbol from link. If DB had DEFAULT ₹ but code is e.g. BRL, fix display (legacy rows / fallback inserts).
+        let displaySym = apiSym;
+        if (!displaySym) {
+          displaySym = getCurrencyData(code).symbol;
+        } else if (code !== 'INR' && apiSym === '₹' && CURRENCIES[code]) {
+          displaySym = CURRENCIES[code].symbol;
+        }
+        setCurrencySymbol(displaySym);
         setItems(data.items || []);
         const initial: QtyMap = {};
         (data.items || []).forEach((i) => { initial[i.productId] = 0; });

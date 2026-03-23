@@ -1,6 +1,7 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields } from '../config/fieldConfig';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import { getCurrencyData } from '../utils/currencyUtils';
 
 /** PostgREST / Supabase when a column is not in the live schema cache. */
 function isLikelyMissingCurrencyColumnsError(err: { message?: string; code?: string }): boolean {
@@ -135,7 +136,8 @@ export async function createShareLink(options: {
 
   const trimmedName = options.sellerBusinessName?.trim();
   const code = (options.sellerCurrencyCode || 'INR').trim() || 'INR';
-  const sym = (options.sellerCurrencySymbol || '₹').trim() || '₹';
+  const sym =
+    (options.sellerCurrencySymbol || '').trim() || getCurrencyData(code).symbol;
 
   const baseRow: Record<string, unknown> = {
     token,
@@ -152,15 +154,29 @@ export async function createShareLink(options: {
     seller_currency_symbol: sym,
   };
 
-  let { error } = await getSupabaseClient().from('share_links').insert(rowWithCurrency);
+  const client = getSupabaseClient();
+  let { error } = await client.from('share_links').insert(rowWithCurrency);
 
   // Older DBs may not have currency columns yet — retry without them so link creation still works.
+  // If columns exist with DEFAULT INR/₹, omitting them would store wrong currency; fix with UPDATE below.
+  let usedFallbackInsertWithoutCurrency = false;
   if (error && isLikelyMissingCurrencyColumnsError(error)) {
-    ({ error } = await getSupabaseClient().from('share_links').insert(baseRow));
+    ({ error } = await client.from('share_links').insert(baseRow));
+    usedFallbackInsertWithoutCurrency = !error;
   }
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (usedFallbackInsertWithoutCurrency) {
+    const { error: updErr } = await client
+      .from('share_links')
+      .update({ seller_currency_code: code, seller_currency_symbol: sym })
+      .eq('token', token);
+    if (updErr && !isLikelyMissingCurrencyColumnsError(updErr)) {
+      console.warn('[share_links] Could not persist seller currency after fallback insert:', updErr.message);
+    }
   }
 
   return { token, url: `${baseUrl.replace(/\/+$/, '')}/o/${token}` };
