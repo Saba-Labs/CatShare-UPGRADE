@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, persistAuthUserIdsForStorage, clearAuthUserIdsFromStorage } from '../supabaseClient';
+import {
+  supabase,
+  persistAuthUserIdsForStorage,
+  clearAuthUserIdsFromStorage,
+  setSupabaseRlsUserId,
+} from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
 import { authService } from '../services/authService';
 
@@ -188,12 +193,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
+        setSupabaseRlsUserId(session.user.id);
         // Unblock UI immediately; profile loads in background (startup still gates on supabaseDataLoading)
         setLoading(false);
         void loadUserData(session.user.id);
       } else {
         setUser(null);
         clearAuthUserIdsFromStorage();
+        setSupabaseRlsUserId(null);
         setSupabaseData(null);
         setLoading(false);
       }
@@ -208,6 +215,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
+        setSupabaseRlsUserId(session.user.id);
         // Avoid duplicate full sync: initSession already loads on cold start.
         // TOKEN_REFRESHED fires often — refetching all tables every ~hour is unnecessary.
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
@@ -216,6 +224,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         setUser(null);
         clearAuthUserIdsFromStorage();
+        setSupabaseRlsUserId(null);
         setSupabaseData(null);
         setSupabaseDataLoading(false);
         inFlightProfileByUid.current.clear();
@@ -244,6 +253,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(null);
       setSupabaseData(null);
       clearAuthUserIdsFromStorage();
+      setSupabaseRlsUserId(null);
 
       localStorage.removeItem('products');
       localStorage.removeItem('deletedProducts');

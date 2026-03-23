@@ -120,3 +120,11 @@ revoke all on function public.get_share_link(text) from public;
 grant execute on function public.get_share_link(text) to anon, authenticated;
 ```
 
+### Troubleshooting: “Failed to create link”
+
+1. **Currency columns** — If the app was deployed before `seller_currency_code` / `seller_currency_symbol` existed, inserts used to fail. The app now **retries without those columns** so links still work; run **§1b** so currency is stored correctly.
+
+2. **`x-user-id` and RLS** — The policies above expect the browser to send `x-user-id` matching `seller_user_id`. The CatShare web app sets this header on every Supabase request when you’re signed in. If you use **different** policies (e.g. `auth.uid()::text = seller_user_id`), you don’t need the header.
+
+3. **Customer order form** — After adding columns, **replace `get_share_link`** with the version above so `get_share_link` selects the new fields; otherwise the RPC may error when buyers open `/o/:token`.
+

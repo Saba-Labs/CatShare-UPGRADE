@@ -2,6 +2,20 @@ import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields } from '../config/fieldConfig';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 
+/** PostgREST / Supabase when a column is not in the live schema cache. */
+function isLikelyMissingCurrencyColumnsError(err: { message?: string; code?: string }): boolean {
+  const m = (err.message || '').toLowerCase();
+  const code = err.code || '';
+  if (code === 'PGRST204') return true;
+  if (
+    m.includes('seller_currency') &&
+    (m.includes('column') || m.includes('schema cache') || m.includes('could not find'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function randomToken(length = 32): string {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
@@ -122,18 +136,28 @@ export async function createShareLink(options: {
   const trimmedName = options.sellerBusinessName?.trim();
   const code = (options.sellerCurrencyCode || 'INR').trim() || 'INR';
   const sym = (options.sellerCurrencySymbol || '₹').trim() || '₹';
-  const { error } = await getSupabaseClient()
-    .from('share_links')
-    .insert({
-      token,
-      seller_user_id: options.sellerUserId,
-      seller_whatsapp: options.sellerWhatsapp,
-      items: options.items,
-      expires_at: expiresAt,
-      ...(trimmedName ? { seller_business_name: trimmedName } : {}),
-      seller_currency_code: code,
-      seller_currency_symbol: sym,
-    });
+
+  const baseRow: Record<string, unknown> = {
+    token,
+    seller_user_id: options.sellerUserId,
+    seller_whatsapp: options.sellerWhatsapp,
+    items: options.items,
+    expires_at: expiresAt,
+    ...(trimmedName ? { seller_business_name: trimmedName } : {}),
+  };
+
+  const rowWithCurrency = {
+    ...baseRow,
+    seller_currency_code: code,
+    seller_currency_symbol: sym,
+  };
+
+  let { error } = await getSupabaseClient().from('share_links').insert(rowWithCurrency);
+
+  // Older DBs may not have currency columns yet — retry without them so link creation still works.
+  if (error && isLikelyMissingCurrencyColumnsError(error)) {
+    ({ error } = await getSupabaseClient().from('share_links').insert(baseRow));
+  }
 
   if (error) {
     throw new Error(error.message);

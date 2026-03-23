@@ -13,6 +13,25 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+/**
+ * Some RLS policies (see SUPABASE_SHARE_LINKS_SQL.md) compare `seller_user_id` to the
+ * `x-user-id` request header. The anon JWT alone does not set that header — we attach it
+ * from the signed-in Supabase user id (AuthContext keeps this in sync).
+ */
+let rlsUserIdForRequestHeaders: string | null = null;
+
+export function setSupabaseRlsUserId(userId: string | null | undefined): void {
+  rlsUserIdForRequestHeaders = userId || null;
+}
+
+const supabaseFetch: typeof fetch = (input, init) => {
+  const headers = new Headers(init?.headers ?? undefined);
+  if (rlsUserIdForRequestHeaders) {
+    headers.set('x-user-id', rlsUserIdForRequestHeaders);
+  }
+  return fetch(input, { ...init, headers });
+};
+
 export const supabase: SupabaseClient = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder',
@@ -22,6 +41,9 @@ export const supabase: SupabaseClient = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    },
+    global: {
+      fetch: supabaseFetch,
     },
   }
 );

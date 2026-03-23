@@ -1520,7 +1520,18 @@ const handleTouchEnd = useCallback(() => {
                   }
                 } catch (err: any) {
                   console.error('Failed to create order form link:', err);
-                  alert('Failed to create link. Please try again.');
+                  const msg = typeof err?.message === 'string' ? err.message : String(err);
+                  const hint =
+                    /row-level security|rls|permission denied|42501/i.test(msg)
+                      ? ' Sign in again, or ask an admin to check Supabase policies on share_links.'
+                      : /column|schema cache|pgrst/i.test(msg)
+                        ? ' Run the latest SQL in SUPABASE_SHARE_LINKS_SQL.md (currency columns + get_share_link).'
+                        : '';
+                  alert(
+                    msg && msg.length < 200
+                      ? `Could not create link: ${msg}${hint ? `\n\n${hint}` : ''}`
+                      : `Could not create link.${hint ? ` ${hint}` : ' Please try again.'}`
+                  );
                 }
               }}
               className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
