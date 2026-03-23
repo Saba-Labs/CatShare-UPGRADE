@@ -9,6 +9,8 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { getCataloguesDefinition } from '../config/catalogueConfig';
 import { getUserImagePath } from './safeStorage';
 import { safeWriteFile } from './platformFilesystem';
+import { webCacheGet, webCachePut } from './productImageWebCache';
+import { fetchUrlAsDataUrl } from './fetchImageCrossPlatform';
 
 const HTTP_URL = /^https?:\/\//i;
 
@@ -54,31 +56,64 @@ function stripDataUrlToBase64(dataUrl: string): string {
   return dataUrl.slice(i + 1);
 }
 
-async function fetchImageAsDataUrl(url: string): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  const blob = await response.blob();
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 function resolveTargetImagePath(product: any, userId: string): string {
   const folder = resolveCatalogueFolder(product, userId);
   return getUserImagePath(String(product.id), userId, folder);
 }
 
+/** Web: fetch imageUrl once and store data URL in IndexedDB for Save.jsx / canvas. */
+async function cacheCloudProductImagesWeb(userId: string, products: any[]): Promise<any[]> {
+  const out: any[] = [];
+  for (const p of products) {
+    if (!p || p.id == null) {
+      out.push(p);
+      continue;
+    }
+
+    const url = p.imageUrl;
+    if (typeof url !== 'string' || !HTTP_URL.test(url.trim())) {
+      out.push(p);
+      continue;
+    }
+
+    try {
+      const existing = await webCacheGet(userId, String(p.id));
+      if (existing) {
+        out.push(p);
+        continue;
+      }
+
+      const dataUrl = await fetchUrlAsDataUrl(url.trim());
+      await webCachePut(userId, String(p.id), dataUrl);
+      out.push(p);
+    } catch (e) {
+      console.warn(`⚠️ cacheCloudProductImages (web): could not cache image for product ${p.id}:`, e);
+      out.push(p);
+    }
+  }
+
+  return out;
+}
+
 /**
- * For native apps: ensure each product with imageUrl has a local file at imagePath
- * so rendering/PDF can read from disk (same as the device that created the product).
+ * After cloud sync or startup: for each product with imageUrl, ensure this device has the image
+ * locally (native: Filesystem) or in IndexedDB (web) so canvas/PDF rendering works.
  */
 export async function cacheCloudProductImages(userId: string, products: any[]): Promise<any[]> {
-  if (!Capacitor.isNativePlatform() || !userId || !Array.isArray(products) || products.length === 0) {
+  if (!userId || !Array.isArray(products) || products.length === 0) {
+    return products;
+  }
+
+  if (Capacitor.getPlatform() === 'web') {
+    try {
+      return await cacheCloudProductImagesWeb(userId, products);
+    } catch (e) {
+      console.warn('⚠️ cacheCloudProductImages (web):', e);
+      return products;
+    }
+  }
+
+  if (!Capacitor.isNativePlatform()) {
     return products;
   }
 
@@ -103,7 +138,7 @@ export async function cacheCloudProductImages(userId: string, products: any[]): 
         continue;
       }
 
-      const dataUrl = await fetchImageAsDataUrl(url.trim());
+      const dataUrl = await fetchUrlAsDataUrl(url.trim());
       const base64 = stripDataUrlToBase64(dataUrl);
       const ok = await safeWriteFile({ path: targetPath, data: base64 });
       if (!ok) {

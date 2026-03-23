@@ -10,6 +10,7 @@ android {
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':byteowls-capacitor-filesharer')
+    implementation project(':capacitor-community-http')
     implementation project(':capacitor-community-keep-awake')
     implementation project(':capacitor-firebase-analytics')
     implementation project(':capacitor-app')

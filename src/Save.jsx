@@ -1,4 +1,6 @@
+import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { webCacheGet } from "./utils/productImageWebCache";
 import { getCatalogueData } from "./config/catalogueProductUtils";
 import { safeGetFromStorage } from "./utils/safeStorage";
 import { renderProductToCanvas, canvasToBase64 } from "./utils/canvasRenderer";
@@ -9,21 +11,7 @@ import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
 import { uploadProductImageToR2 } from "./services/r2Upload";
-
-async function fetchImageAsDataUrl(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
-  }
-  const blob = await response.blob();
-  // FileReader works in Capacitor webview and returns a data:image/... URL
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+import { fetchUrlAsDataUrl } from "./utils/fetchImageCrossPlatform";
 
 function getUserFolderForRenderedImages(product) {
   // Always use the currently logged-in user to avoid cross-user mixing.
@@ -288,6 +276,16 @@ export async function saveRenderedImage(product, type, units = {}) {
     return color;
   };
 
+  const dataUrlMimeForPath = (path) => {
+    if (typeof path !== "string") return "image/png";
+    const p = path.toLowerCase();
+    if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+    if (p.endsWith(".webp")) return "image/webp";
+    if (p.endsWith(".gif")) return "image/gif";
+    if (p.endsWith(".svg")) return "image/svg+xml";
+    return "image/png";
+  };
+
   // Prefer filesystem imagePath to avoid CORS issues during canvas rendering.
   console.log(`🖼️ Product image status:`, {
     hasImage: !!product.image,
@@ -300,12 +298,13 @@ export async function saveRenderedImage(product, type, units = {}) {
   if (product.imagePath) {
     try {
       console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
+      const mime = dataUrlMimeForPath(product.imagePath);
       try {
         const res = await Filesystem.readFile({
           path: product.imagePath,
           directory: Directory.Data,
         });
-        product.image = `data:image/png;base64,${res.data}`;
+        product.image = `data:${mime};base64,${res.data}`;
         console.log(`✅ Image loaded from filesystem (Data). Base64 length: ${product.image.length}`);
       } catch (dataErr) {
         // Fallback for when the source image was saved to External storage.
@@ -313,31 +312,56 @@ export async function saveRenderedImage(product, type, units = {}) {
           path: product.imagePath,
           directory: Directory.External,
         });
-        product.image = `data:image/png;base64,${res.data}`;
+        product.image = `data:${mime};base64,${res.data}`;
         console.log(`✅ Image loaded from filesystem (External). Base64 length: ${product.image.length}`);
       }
     } catch (err) {
-      // If filesystem read fails, fall back to whatever was available (imageUrl).
+      // Stale/missing file on this device — fall through to imageUrl download below (do not mutate imagePath).
       console.warn("⚠️ Failed to load image from filesystem for rendering:", err?.message || err);
     }
   }
 
-  // If we still don't have an image but we do have a cloud URL, use it directly.
-  // `loadImage()` in canvas renderer supports HTTP(S) URLs (requires CORS on the bucket).
-  if (!product.image && product.imageUrl) {
-    product.image = product.imageUrl;
+  // Web: use IndexedDB cache populated by cacheCloudProductImages (startup / cloud refresh).
+  if (!product.image && Capacitor.getPlatform() === "web") {
+    try {
+      const uid =
+        localStorage.getItem("firebaseUserId") || localStorage.getItem("supabase_user_id");
+      if (uid && product.id != null) {
+        const cached = await webCacheGet(uid, String(product.id));
+        if (cached) {
+          product.image = cached;
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Web product image cache read failed:", e?.message || e);
+    }
   }
 
-  // If product.image is a remote URL, convert to base64 data URL first.
-  // This avoids canvas "Image not found" / CORS issues when drawing remote images.
+  // Cloud URL: always turn into a data URL before canvas (never pass raw https:// to loadImage on Capacitor — CORS).
   if (
-    typeof product.image === "string" &&
-    product.image.startsWith("http")
+    !product.image &&
+    product.imageUrl &&
+    typeof product.imageUrl === "string" &&
+    /^https?:\/\//i.test(product.imageUrl.trim())
   ) {
     try {
-      product.image = await fetchImageAsDataUrl(product.image);
+      product.image = await fetchUrlAsDataUrl(product.imageUrl.trim());
     } catch (e) {
-      // If fetching fails, we'll try to render with the URL as a last resort.
+      console.warn(
+        "⚠️ Could not download product image for rendering:",
+        product.id,
+        e?.message || e
+      );
+      product.image = undefined;
+    }
+  }
+
+  if (typeof product.image === "string" && /^https?:\/\//i.test(product.image.trim())) {
+    try {
+      product.image = await fetchUrlAsDataUrl(product.image.trim());
+    } catch (e) {
+      console.warn("⚠️ Could not convert remote image URL to data URL:", e?.message || e);
+      product.image = undefined;
     }
   }
 

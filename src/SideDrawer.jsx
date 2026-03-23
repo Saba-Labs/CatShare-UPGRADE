@@ -16,6 +16,7 @@ import { APP_VERSION } from "./config/version";
 import { useToast } from "./context/ToastContext";
 import { useTheme } from "./context/ThemeContext";
 import { useAuth } from "./context/AuthContext";
+import { useSubscription } from "./context/SubscriptionContext";
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES, getAllCatalogues, createLegacyResellCatalogueIfNeeded } from "./config/catalogueConfig";
 import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
@@ -66,7 +67,31 @@ const navigate = useNavigate();
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
   const { user } = useAuth();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
+
+  const trialDaysLeft = (() => {
+    if (!trialEndsAt) return null;
+    try {
+      const end = new Date(trialEndsAt);
+      const now = new Date();
+      return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
+    } catch {
+      return null;
+    }
+  })();
+
+  const accountStatusLabel = (() => {
+    if (isPaidPro) return { text: "Pro", className: "bg-emerald-100 text-emerald-800" };
+    if (isTrialActive) {
+      const days = trialDaysLeft;
+      const daysPart =
+        days != null ? `${days} day${days === 1 ? "" : "s"} left` : "active";
+      return { text: `Trial · ${daysPart}`, className: "bg-amber-100 text-amber-900" };
+    }
+    if (!isPro) return { text: "Free", className: "bg-slate-200 text-slate-700" };
+    return { text: "Pro", className: "bg-emerald-100 text-emerald-800" };
+  })();
 
   const totalProducts = products.length;
   // Estimated rendering time: ~2s for standard, ~4s for glass theme per product
@@ -1698,6 +1723,18 @@ setShowBrowseForBackup(false);
                     {user.displayName || user.email}
                   </p>
                   <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accountStatusLabel.className}`}
+                      title={
+                        isTrialActive && trialEndsAt
+                          ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}`
+                          : undefined
+                      }
+                    >
+                      {accountStatusLabel.text}
+                    </span>
+                  </div>
                 </div>
               </div>
               <button
