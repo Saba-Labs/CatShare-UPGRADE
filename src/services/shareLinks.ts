@@ -17,6 +17,19 @@ function isLikelyMissingCurrencyColumnsError(err: { message?: string; code?: str
   return false;
 }
 
+function isLikelyMissingSellerLogoColumnError(err: { message?: string; code?: string }): boolean {
+  const m = (err.message || '').toLowerCase();
+  const code = err.code || '';
+  if (code === 'PGRST204' && m.includes('seller_logo')) return true;
+  if (
+    m.includes('seller_logo') &&
+    (m.includes('column') || m.includes('schema cache') || m.includes('could not find'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function randomToken(length = 32): string {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
@@ -83,9 +96,16 @@ export function productToShareLinkItem(
 
   const step = normalizeOrderQuantityStep(catData.orderQuantityStep);
 
+  const subtitleRaw = catData.subtitle ?? product.subtitle;
+  const subtitle =
+    subtitleRaw !== undefined && subtitleRaw !== null && String(subtitleRaw).trim() !== ''
+      ? String(subtitleRaw).trim()
+      : undefined;
+
   const item: ShareLinkItem = {
     productId: product.id,
     name: product.name || '',
+    ...(subtitle ? { subtitle } : {}),
     imageUrl: product.imageUrl || undefined,
     price: price !== undefined && price !== '' ? String(price) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
@@ -122,6 +142,8 @@ export async function createShareLink(options: {
   sellerCurrencyCode?: string;
   /** Display symbol (e.g. ₹) — includes custom currency symbols from settings. */
   sellerCurrencySymbol?: string;
+  /** Business logo URL (Account → business details). */
+  sellerLogoUrl?: string;
   expiresInDays?: number;
 }): Promise<{ token: string; url: string }> {
   const token = randomToken(24);
@@ -138,6 +160,7 @@ export async function createShareLink(options: {
   const code = (options.sellerCurrencyCode || 'INR').trim() || 'INR';
   const sym =
     (options.sellerCurrencySymbol || '').trim() || getCurrencyData(code).symbol;
+  const trimmedLogo = (options.sellerLogoUrl || '').trim();
 
   const baseRow: Record<string, unknown> = {
     token,
@@ -154,8 +177,27 @@ export async function createShareLink(options: {
     seller_currency_symbol: sym,
   };
 
+  const rowWithMeta =
+    trimmedLogo.length > 0
+      ? { ...rowWithCurrency, seller_logo_url: trimmedLogo }
+      : rowWithCurrency;
+
   const client = getSupabaseClient();
-  let { error } = await client.from('share_links').insert(rowWithCurrency);
+  let { error } = await client.from('share_links').insert(rowWithMeta);
+
+  // DB without seller_logo_url column
+  if (error && trimmedLogo.length > 0 && isLikelyMissingSellerLogoColumnError(error)) {
+    ({ error } = await client.from('share_links').insert(rowWithCurrency));
+    if (!error && trimmedLogo.length > 0) {
+      const { error: logoUpdErr } = await client
+        .from('share_links')
+        .update({ seller_logo_url: trimmedLogo })
+        .eq('token', token);
+      if (logoUpdErr && !isLikelyMissingSellerLogoColumnError(logoUpdErr)) {
+        console.warn('[share_links] Could not persist seller logo:', logoUpdErr.message);
+      }
+    }
+  }
 
   // Older DBs may not have currency columns yet — retry without them so link creation still works.
   // If columns exist with DEFAULT INR/₹, omitting them would store wrong currency; fix with UPDATE below.
@@ -172,33 +214,46 @@ export async function createShareLink(options: {
   if (usedFallbackInsertWithoutCurrency) {
     const { error: updErr } = await client
       .from('share_links')
-      .update({ seller_currency_code: code, seller_currency_symbol: sym })
+      .update({
+        seller_currency_code: code,
+        seller_currency_symbol: sym,
+        ...(trimmedLogo.length > 0 ? { seller_logo_url: trimmedLogo } : {}),
+      })
       .eq('token', token);
     if (updErr && !isLikelyMissingCurrencyColumnsError(updErr)) {
-      console.warn('[share_links] Could not persist seller currency after fallback insert:', updErr.message);
+      console.warn('[share_links] Could not persist seller currency/logo after fallback insert:', updErr.message);
     }
   }
 
   return { token, url: `${baseUrl.replace(/\/+$/, '')}/o/${token}` };
 }
 
-export async function fetchShareLinkForCustomer(token: string): Promise<{
+export type ShareLinkForCustomer = {
   sellerWhatsapp: string;
   items: ShareLinkItem[];
   sellerBusinessName?: string;
   sellerCurrencyCode?: string;
   sellerCurrencySymbol?: string;
-} | null> {
+  /** Present when RPC merges `user_settings.data.customCurrencies` (see SUPABASE_SHARE_LINKS_SQL.md). */
+  sellerCustomCurrencies?: Record<string, string> | null;
+  /** Business logo URL (Account); RPC merges `user_settings.data.businessProfile.logoUrl`. */
+  sellerLogoUrl?: string;
+};
+
+export async function fetchShareLinkForCustomer(token: string): Promise<ShareLinkForCustomer | null> {
   const { data, error } = await supabase.rpc('get_share_link', {
     p_token: token,
   });
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return data as {
-    sellerWhatsapp: string;
-    items: ShareLinkItem[];
-    sellerBusinessName?: string;
-    sellerCurrencyCode?: string;
-    sellerCurrencySymbol?: string;
+  const row = data as Record<string, unknown>;
+  const rawCustom = row.sellerCustomCurrencies;
+  let sellerCustomCurrencies: Record<string, string> | undefined;
+  if (rawCustom != null && typeof rawCustom === 'object' && !Array.isArray(rawCustom)) {
+    sellerCustomCurrencies = rawCustom as Record<string, string>;
+  }
+  return {
+    ...(data as ShareLinkForCustomer),
+    sellerCustomCurrencies,
   };
 }

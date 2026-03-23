@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
-import { CURRENCIES, getCurrencyData } from '../utils/currencyUtils';
+import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -14,7 +14,6 @@ function getQuantityStep(item: ShareLinkItem): number {
   return normalizeOrderQuantityStep(item.quantityStep);
 }
 
-/** Same numeric extraction as WhatsApp order message (handles "₹1,234", etc.). */
 function parseItemPriceNumeric(price: ShareLinkItem['price']): number {
   if (price === undefined || price === null || price === '') return NaN;
   const n = parseFloat(String(price).replace(/[^\d.]/g, ''));
@@ -25,17 +24,51 @@ function formatOrderMoney(amount: number, symbol: string): string {
   return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-/** Unit price with seller’s currency symbol (numeric part only; price field may omit symbol). */
 function formatUnitPrice(price: ShareLinkItem['price'], symbol: string): string {
   const n = parseItemPriceNumeric(price);
   if (!Number.isFinite(n)) return String(price ?? '');
   return `${symbol}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-/**
- * Left: field name only. Right: value + unit (e.g. "12 pcs / dozen").
- * New share links store `fieldNLabel` + `fieldNUnit`; legacy links used "Name (unit)" in one label.
- */
+/** Short label from price unit (e.g. "/ piece" → "pcs"). */
+function getOrderUnitLabel(priceUnit: string | undefined): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return 'units';
+  }
+  const cleaned = String(priceUnit)
+    .replace(/^\s*\/\s*/i, '')
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return 'units';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  return cleaned;
+}
+
+/** e.g. "24 pcs × ₹48" above subtotal */
+function formatLineCalculationDetail(
+  q: number,
+  item: ShareLinkItem,
+  currencySymbol: string
+): string | null {
+  if (q <= 0) return null;
+  const unit = parseItemPriceNumeric(item.price);
+  if (!Number.isFinite(unit)) return null;
+  const label = getOrderUnitLabel(item.priceUnit);
+  const priceStr = formatUnitPrice(item.price, currencySymbol);
+  return `${q} ${label} × ${priceStr}`;
+}
+
+function isPublicHttpUrl(url: string): boolean {
+  const u = url.trim();
+  if (!u || !/^https?:\/\//i.test(u)) return false;
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function getFieldLabelAndUnitSuffix(
   item: ShareLinkItem,
   n: number
@@ -43,36 +76,703 @@ function getFieldLabelAndUnitSuffix(
   const row = item as unknown as Record<string, string | undefined>;
   const explicitUnit = row[`field${n}Unit`];
   const rawLabel = row[`field${n}Label`];
-
   if (explicitUnit != null && String(explicitUnit).trim() !== '') {
-    return {
-      label: (rawLabel || `Field ${n}`).trim(),
-      unitSuffix: String(explicitUnit).trim(),
-    };
+    return { label: (rawLabel || `Field ${n}`).trim(), unitSuffix: String(explicitUnit).trim() };
   }
-
   if (rawLabel) {
     const m = rawLabel.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-    if (m) {
-      return { label: m[1].trim(), unitSuffix: m[2].trim() };
-    }
+    if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() };
     return { label: rawLabel.trim(), unitSuffix: '' };
   }
-
   return { label: `Field ${n}`, unitSuffix: '' };
 }
 
+// ─── CSS injected once ────────────────────────────────────────────────────────
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --green-dark: #14532d;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --surface: #ffffff;
+    --bg: #f8fafc;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    --hover-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 12px 32px rgba(0,0,0,0.06);
+    --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  body { font-family: var(--font); background: var(--bg); }
+
+  .of-bg {
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: var(--font);
+  }
+
+  .of-page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 0 0 120px;
+  }
+
+  /* ── Header ── */
+  .of-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(248,250,252,0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+  }
+
+  .of-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .of-store-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .of-store-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .of-store-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .of-store-meta { }
+
+  .of-store-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+  }
+
+  .of-store-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  .of-confirm-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+    transition: background 0.18s, transform 0.1s;
+    white-space: nowrap;
+    letter-spacing: 0.1px;
+    box-shadow: 0 2px 8px rgba(22,163,74,0.35);
+  }
+  .of-confirm-btn:hover { background: #15803d; transform: translateY(-1px); }
+  .of-confirm-btn:active { transform: translateY(0); }
+  .of-confirm-btn:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; transform: none; }
+
+  /* ── Section heading ── */
+  .of-section-head {
+    padding: 20px 20px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Items list ── */
+  .of-items { display: flex; flex-direction: column; gap: 2px; padding: 0 12px; }
+
+  .of-item-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+    transition: box-shadow 0.2s, border-color 0.2s;
+    margin-bottom: 8px;
+  }
+  .of-item-card:hover { box-shadow: var(--hover-shadow); border-color: #cbd5e1; }
+  .of-item-card.is-selected {
+    border-color: var(--green);
+    box-shadow: 0 0 0 2px rgba(22,163,74,0.12), var(--card-shadow);
+  }
+
+  /* Image column */
+  .of-img-wrap {
+    width: 100px;
+    flex-shrink: 0;
+    cursor: pointer;
+    background: #f1f5f9;
+    overflow: hidden;
+    position: relative;
+  }
+  .of-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .of-img-ph {
+    width: 100%; height: 100%; min-height: 100px;
+    display: flex; align-items: center; justify-content: center;
+    background: #f1f5f9;
+  }
+
+  .of-selected-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: var(--green);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: 100px;
+  }
+
+  /* Body */
+  .of-item-body {
+    flex: 1;
+    padding: 12px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .of-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .of-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+
+  /* Name + subtitle in one flow (max 2 lines) — less vertical stack */
+  .of-item-title-line {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+  .of-item-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  /* Clearly smaller than product name (14px) */
+  .of-item-subtitle-inline {
+    font-size: 12px;
+    font-weight: 400;
+    color: #64748b;
+  }
+
+  .of-item-price-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+
+  .of-price-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin: 0;
+    background: var(--green-light);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--green-dark);
+  }
+
+  .of-step-hint {
+    font-size: 9.5px;
+    color: #d97706;
+    margin: 0;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  /* − 0 + Pack of XX — one continuous row */
+  .of-item-qty-cluster {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1;
+  }
+  .of-qty-inline-row {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+  }
+  .of-step-hint--next-to-qty {
+    font-size: 10px;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .of-step-hint--next-to-qty svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+  }
+
+  .of-line-total {
+    text-align: right;
+    flex-shrink: 0;
+    max-width: 52%;
+  }
+  .of-line-calc {
+    font-size: 9px;
+    font-weight: 400;
+    color: #94a3b8;
+    line-height: 1.3;
+    margin-bottom: 3px;
+    word-break: break-word;
+    letter-spacing: 0.01em;
+  }
+  .of-line-total-val {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--green-dark);
+    display: block;
+    white-space: nowrap;
+  }
+  .of-line-total-na {
+    font-size: 14px;
+    color: #cbd5e1;
+    font-weight: 600;
+  }
+  .of-subtotal-label {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 2px;
+    text-align: right;
+  }
+
+  .of-item-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* ── Qty control ── */
+  .of-qty {
+    display: flex;
+    align-items: center;
+    background: #f1f5f9;
+    border-radius: 100px;
+    border: 1.5px solid var(--border);
+    overflow: hidden;
+  }
+  .of-qty-btn {
+    width: 30px; height: 30px;
+    border: none; background: transparent;
+    cursor: pointer; font-size: 18px; color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font); line-height: 1;
+    transition: background 0.12s;
+    flex-shrink: 0;
+  }
+  .of-qty-btn:hover { background: rgba(0,0,0,0.06); }
+  .of-qty-val {
+    min-width: 30px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    user-select: none;
+    padding: 0 2px;
+  }
+
+  .of-view-btn {
+    font-size: 12px;
+    color: var(--green);
+    cursor: pointer;
+    font-weight: 600;
+    border: none; background: none;
+    font-family: var(--font);
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .of-view-btn:hover { background: var(--green-light); }
+
+  /* ── Empty state ── */
+  .of-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* ── Summary bar ── */
+  .of-summary {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    padding: 12px 16px 20px;
+    background: linear-gradient(to top, rgba(248,250,252,1) 60%, rgba(248,250,252,0));
+    pointer-events: none;
+  }
+
+  .of-summary-card {
+    width: 100%;
+    max-width: 652px;
+    background: var(--text);
+    border-radius: 16px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+    pointer-events: all;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .of-summary-card:hover { transform: translateY(-2px); }
+
+  .of-summary-left { display: flex; flex-direction: column; gap: 2px; }
+  .of-summary-count { font-size: 12px; color: #94a3b8; font-weight: 600; }
+  .of-summary-total { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+  .of-summary-no-price { font-size: 11px; color: #94a3b8; margin-top: 2px; line-height: 1.3; }
+
+  .of-summary-cta {
+    display: flex; align-items: center; gap: 7px;
+    background: #25d366;
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: 100px;
+    font-size: 13px; font-weight: 700;
+    font-family: var(--font);
+    white-space: nowrap;
+    border: none; cursor: pointer;
+    box-shadow: 0 2px 12px rgba(37,211,102,0.4);
+    transition: background 0.15s;
+  }
+  .of-summary-cta:hover { background: #1fb859; }
+
+  /* ── Drawer overlay ── */
+  .of-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,0.6);
+    z-index: 100;
+    display: flex; align-items: flex-end; justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .of-drawer {
+    background: var(--surface);
+    border-radius: 24px 24px 0 0;
+    width: 100%; max-width: 680px;
+    max-height: 92vh;
+    overflow-y: auto;
+    animation: slideUp 0.25s cubic-bezier(0.34,1.2,0.64,1);
+  }
+
+  .of-drawer-handle {
+    width: 36px; height: 4px;
+    background: #e2e8f0; border-radius: 2px;
+    margin: 12px auto 0;
+  }
+
+  .of-drawer-img-wrap { position: relative; }
+  .of-drawer-img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #f1f5f9; display: block; }
+  .of-drawer-img-ph {
+    width: 100%; aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: #f1f5f9;
+  }
+
+  .of-drawer-close {
+    position: absolute; top: 14px; right: 14px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(15,23,42,0.5); border: none;
+    cursor: pointer; color: #fff; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font);
+    backdrop-filter: blur(4px);
+    transition: background 0.15s;
+  }
+  .of-drawer-close:hover { background: rgba(15,23,42,0.75); }
+
+  .of-drawer-body { padding: 20px 20px 40px; }
+
+  .of-drawer-name {
+    font-size: 22px; font-weight: 800; color: var(--text);
+    letter-spacing: -0.5px; line-height: 1.2; margin-bottom: 4px;
+  }
+  .of-drawer-sub {
+    font-size: 10px;
+    font-weight: 400;
+    color: #64748b;
+    margin-bottom: 10px;
+    line-height: 1.35;
+  }
+
+  .of-drawer-price-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .of-drawer-price {
+    font-size: 20px; font-weight: 800; color: var(--green-dark);
+    background: var(--green-light); padding: 4px 12px; border-radius: 8px;
+  }
+  .of-detail-table {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .of-detail-row {
+    display: flex; justify-content: space-between;
+    padding: 11px 14px; font-size: 13.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .of-detail-row:last-child { border-bottom: none; }
+  .of-detail-row:nth-child(even) { background: #f8fafc; }
+  .of-detail-label { color: var(--muted); font-weight: 500; }
+  .of-detail-val { color: var(--text); font-weight: 600; text-align: right; }
+
+  .of-drawer-qty-section {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f8fafc;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+  }
+  .of-drawer-qty-label { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .of-drawer-qty-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .of-drawer-line-total-wrap { text-align: right; flex-shrink: 0; }
+  .of-drawer-line-calc {
+    font-size: 9px;
+    font-weight: 400;
+    color: #94a3b8;
+    margin-bottom: 3px;
+    line-height: 1.3;
+    max-width: 200px;
+    word-break: break-word;
+    letter-spacing: 0.01em;
+  }
+  .of-drawer-line-total { font-size: 18px; font-weight: 800; color: var(--green-dark); display: block; }
+
+  .of-drawer-done {
+    width: 100%; background: var(--green); color: #fff;
+    border: none; border-radius: 100px; padding: 14px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    margin-top: 16px; font-family: var(--font);
+    letter-spacing: 0.2px;
+    box-shadow: 0 4px 12px rgba(22,163,74,0.3);
+    transition: background 0.15s;
+  }
+  .of-drawer-done:hover { background: #15803d; }
+
+  /* ── Footer ── */
+  .of-footer {
+    margin: 20px 20px 0;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1.5px solid var(--border);
+    text-align: center;
+  }
+  .of-footer-app-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px; }
+  .of-footer-link { font-size: 13px; font-weight: 700; color: var(--green); text-decoration: none; }
+  .of-footer-link:hover { text-decoration: underline; }
+  .of-footer-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ── State screens ── */
+  .of-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+    gap: 12px;
+  }
+  .of-state-icon { font-size: 40px; }
+  .of-state-title { font-size: 17px; font-weight: 700; color: var(--text); }
+  .of-state-sub { font-size: 14px; color: var(--muted); text-align: center; }
+  .of-state-error { color: #dc2626; }
+
+  /* Loading skeleton */
+  .of-skeleton-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .of-skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 12px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+
+  @media (max-width: 400px) {
+    .of-item-name { font-size: 13px; }
+    .of-item-subtitle-inline { font-size: 9px; }
+    .of-confirm-btn span.btn-label { display: none; }
+  }
+`;
+
+function injectCSS() {
+  if (document.getElementById('of-styles')) return;
+  const el = document.createElement('style');
+  el.id = 'of-styles';
+  el.textContent = CSS;
+  document.head.appendChild(el);
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+function ImgIcon({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+
+function StoreIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <path d="M16 10a4 4 0 01-8 0" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
+
+function ChevronRight() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function QtyControl({
+  value,
+  step,
+  onChange,
+}: {
+  value: number;
+  step: number;
+  onChange: (delta: number) => void;
+}) {
+  const s = Math.max(1, Math.floor(step) || 1);
+  const inc = s > 1 ? s : 1;
+  return (
+    <div className="of-qty">
+      <button type="button" className="of-qty-btn" onClick={() => onChange(-inc)}>−</button>
+      <span className="of-qty-val">{value}</span>
+      <button type="button" className="of-qty-btn" onClick={() => onChange(inc)}>+</button>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 16, border: '1.5px solid #e2e8f0',
+      display: 'flex', overflow: 'hidden', marginBottom: 8
+    }}>
+      <div className="of-skeleton" style={{ width: 100, minHeight: 100, flexShrink: 0 }} />
+      <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="of-skeleton" style={{ height: 14, width: '65%', borderRadius: 6 }} />
+        <div className="of-skeleton" style={{ height: 11, width: '45%', borderRadius: 6 }} />
+        <div className="of-skeleton" style={{ height: 22, width: '30%', borderRadius: 6, marginTop: 4 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+          <div className="of-skeleton" style={{ height: 32, width: 100, borderRadius: 100 }} />
+          <div className="of-skeleton" style={{ height: 22, width: 60, borderRadius: 6 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function OrderForm() {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sellerWhatsapp, setSellerWhatsapp] = useState<string>('');
-  const [sellerBusinessName, setSellerBusinessName] = useState<string>('');
-  const [currencySymbol, setCurrencySymbol] = useState<string>('₹');
+  const [sellerWhatsapp, setSellerWhatsapp] = useState('');
+  const [sellerBusinessName, setSellerBusinessName] = useState('');
+  const [sellerLogoUrl, setSellerLogoUrl] = useState('');
+  const [headerLogoFailed, setHeaderLogoFailed] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [qty, setQty] = useState<QtyMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { injectCSS(); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,16 +786,15 @@ export default function OrderForm() {
         if (!data) { setError('This link is invalid or expired.'); return; }
         setSellerWhatsapp(data.sellerWhatsapp);
         setSellerBusinessName((data.sellerBusinessName || '').trim());
-        const code = (data.sellerCurrencyCode || 'INR').trim() || 'INR';
-        const apiSym = (data.sellerCurrencySymbol || '').trim();
-        // Prefer symbol from link. If DB had DEFAULT ₹ but code is e.g. BRL, fix display (legacy rows / fallback inserts).
-        let displaySym = apiSym;
-        if (!displaySym) {
-          displaySym = getCurrencyData(code).symbol;
-        } else if (code !== 'INR' && apiSym === '₹' && CURRENCIES[code]) {
-          displaySym = CURRENCIES[code].symbol;
-        }
-        setCurrencySymbol(displaySym);
+        setSellerLogoUrl((data.sellerLogoUrl || '').trim());
+        setHeaderLogoFailed(false);
+        setCurrencySymbol(
+          resolveShareLinkCurrencyDisplay({
+            sellerCurrencyCode: data.sellerCurrencyCode,
+            sellerCurrencySymbol: data.sellerCurrencySymbol,
+            sellerCustomCurrencies: data.sellerCustomCurrencies,
+          })
+        );
         setItems(data.items || []);
         const initial: QtyMap = {};
         (data.items || []).forEach((i) => { initial[i.productId] = 0; });
@@ -109,16 +808,20 @@ export default function OrderForm() {
     return () => { cancelled = true; };
   }, [token]);
 
+  useEffect(() => {
+    setHeaderLogoFailed(false);
+  }, [sellerLogoUrl]);
+
   const changeQty = (id: string, delta: number) => {
     setQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
   };
 
-  const totalItems = useMemo(
-    () => Object.values(qty).reduce((a, b) => a + (b || 0), 0),
-    [qty]
+  /** Number of distinct products with qty > 0 (not sum of quantities). */
+  const selectedProductCount = useMemo(
+    () => items.filter((i) => (qty[i.productId] ?? 0) > 0).length,
+    [items, qty]
   );
 
-  /** Per product line amount (qty × unit price) when both are valid. */
   const lineAmounts = useMemo(() => {
     const map: Record<string, number> = {};
     items.forEach((i) => {
@@ -134,494 +837,399 @@ export default function OrderForm() {
     [lineAmounts]
   );
 
-  /** Selected lines where unit price can’t be parsed (no order total from those lines). */
   const selectionIncludesUnpricedLines = useMemo(
-    () =>
-      items.some((i) => {
-        const q = qty[i.productId] ?? 0;
-        return q > 0 && !Number.isFinite(parseItemPriceNumeric(i.price));
-      }),
+    () => items.some((i) => {
+      const q = qty[i.productId] ?? 0;
+      return q > 0 && !Number.isFinite(parseItemPriceNumeric(i.price));
+    }),
     [items, qty]
   );
 
   const message = useMemo(() => {
     const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
-    
     if (selectedItems.length === 0) return 'No items selected.';
-  
+
     const date = new Date().toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric'
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
     });
-  
+
     const lines: string[] = [];
     lines.push(`🛍️ *New Order — ${date}*`);
     lines.push(`_via CatShare Order Form_`);
     lines.push('');
     lines.push('*Items Ordered:*');
-  
+
     let total = 0;
     selectedItems.forEach((i, idx) => {
       const q = qty[i.productId] ?? 0;
       const unit = parseItemPriceNumeric(i.price);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
       total += itemTotal;
-  
-      lines.push(`${idx + 1}. *${i.name}*`);
-      lines.push(`   Qty: ${q}${i.price ? ` | Price: ${i.price}${i.priceUnit ? ' ' + i.priceUnit : ''}` : ''}`);
-      if (itemTotal > 0) lines.push(`   Subtotal: ${currencySymbol}${itemTotal.toLocaleString('en-IN')}`);
-    });
-  
-    if (total > 0) {
+
+      const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
+      lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
+
+      if (Number.isFinite(unit)) {
+        const unitLabel = getOrderUnitLabel(i.priceUnit);
+        const unitLabelDisplay = q === 1 && unitLabel === 'pcs' ? 'piece' : unitLabel;
+        const unitPrice = `${currencySymbol}${unit.toLocaleString('en-IN', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}`;
+        const rowTotal = `${currencySymbol}${itemTotal.toLocaleString('en-IN', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}`;
+        lines.push(`   ${q} ${unitLabelDisplay} x ${unitPrice} = ${rowTotal}`);
+      } else {
+        lines.push(`   Qty: ${q}`);
+      }
+
       lines.push('');
+    });
+
+    if (total > 0) {
       lines.push(`💰 *Total: ${currencySymbol}${total.toLocaleString('en-IN')}*`);
+      lines.push('');
     }
-  
-    lines.push('');
-    lines.push('Please confirm availability and share payment details. Thank you! 🙏');
-  
+
+    lines.push('Please confirm availability and share payment details. Thank you!');
     return lines.join('\n');
   }, [items, qty, currencySymbol]);
 
   const openWhatsApp = () => {
     const to = (sellerWhatsapp || '').replace(/[^\d]/g, '');
     if (!to) { alert('Seller WhatsApp number is not configured.'); return; }
-    const url = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
-    window.location.href = url;
+    window.location.href = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
   };
 
+  // ── Loading ──
   if (loading) return (
-    <div style={styles.page}>
-      <div style={styles.stateCard}>
-        <div style={styles.stateTitle}>Loading order form…</div>
-        <div style={styles.stateSub}>Please wait.</div>
+    <div className="of-bg">
+      <div className="of-page">
+        <div className="of-header">
+          <div className="of-header-inner">
+            <div className="of-store-row">
+              <div className="of-store-icon">
+                <StoreIcon />
+              </div>
+              <div>
+                <div className="of-skeleton" style={{ height: 14, width: 120, borderRadius: 6 }} />
+                <div className="of-skeleton" style={{ height: 10, width: 80, borderRadius: 6, marginTop: 5 }} />
+              </div>
+            </div>
+            <div className="of-skeleton" style={{ height: 38, width: 130, borderRadius: 100 }} />
+          </div>
+        </div>
+        <div style={{ padding: '12px 12px 0' }}>
+          <div className="of-skeleton" style={{ height: 11, width: 80, borderRadius: 6, margin: '16px 8px 10px' }} />
+        </div>
+        <div className="of-skeleton-wrap">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </div>
     </div>
   );
 
+  // ── Error ──
   if (error) return (
-    <div style={styles.page}>
-      <div style={styles.stateCard}>
-        <div style={styles.stateTitle}>Order form</div>
-        <div style={{ ...styles.stateSub, color: '#c0392b' }}>{error}</div>
+    <div className="of-bg">
+      <div className="of-state">
+        <div className="of-state-icon">⚠️</div>
+        <div className="of-state-title">Couldn't load order form</div>
+        <div className="of-state-sub of-state-error">{error}</div>
       </div>
     </div>
   );
 
+  // ── Main ──
   return (
-    <div style={styles.bg}>
-      <div style={styles.page}>
-        {/* Header */}
-        <div style={styles.header}>
-          <div style={styles.headerTop}>
-            <div>
-              <div style={styles.brand}>
-                {sellerBusinessName ? (
-                  <>
-                    <span style={{ color: '#1a1a18' }}>{sellerBusinessName}</span>{' '}
-                    Order<span style={{ color: '#1a5c38' }}>Form</span>
-                  </>
+    <div className="of-bg">
+      <div className="of-page">
+
+        {/* Sticky header */}
+        <div className="of-header">
+          <div className="of-header-inner">
+            <div className="of-store-row">
+              <div className="of-store-icon">
+                {sellerLogoUrl && !headerLogoFailed && isPublicHttpUrl(sellerLogoUrl) ? (
+                  <img
+                    src={sellerLogoUrl}
+                    alt=""
+                    className="of-store-logo-img"
+                    onError={() => setHeaderLogoFailed(true)}
+                  />
                 ) : (
-                  <>
-                    Order<span style={{ color: '#1a5c38' }}>Form</span>
-                  </>
+                  <StoreIcon />
                 )}
               </div>
-              <div style={styles.subtitle}>Select quantities and confirm via WhatsApp</div>
+              <div className="of-store-meta">
+                <div className="of-store-name">
+                  {sellerBusinessName || 'Order Form'}
+                </div>
+                <div className="of-store-sub">
+                  {sellerBusinessName ? 'Order Form' : 'Pick items & confirm via WhatsApp'}
+                </div>
+              </div>
             </div>
-            <button style={styles.confirmBtn} onClick={openWhatsApp}>
-              Confirm order
+            <button
+              className="of-confirm-btn"
+              onClick={openWhatsApp}
+              disabled={selectedProductCount === 0}
+            >
+              <WhatsAppIcon size={14} />
+              <span className="btn-label">Order on WhatsApp</span>
             </button>
           </div>
         </div>
 
-        {/* Items */}
-        <div style={styles.itemsList}>
-          {items.length === 0 && (
-            <div style={styles.emptyState}>No items in this order link.</div>
-          )}
-          {items.map((item) => (
-            <div key={item.productId} style={styles.itemCard}>
-              {/* Image */}
-              <div style={styles.imgWrap} onClick={() => setDrawerItem(item)}>
-                {item.imageUrl ? (
-                  <img src={item.imageUrl} alt={item.name} style={styles.img} />
-                ) : (
-                  <div style={styles.imgPlaceholder}>
-                    <ImgIcon />
-                  </div>
-                )}
-              </div>
-
-              {/* Body */}
-              <div style={styles.itemBody}>
-                <div style={styles.itemMainRow}>
-                  <div style={styles.itemTextCol}>
-                    <div style={styles.itemName}>{item.name}</div>
-                    {item.subtitle ? (
-                      <div style={styles.itemSubtitle}>{item.subtitle}</div>
-                    ) : null}
-                    {item.price !== undefined && item.price !== null && item.price !== '' && (
-                      <div style={styles.itemPrice}>
-                        {formatUnitPrice(item.price, currencySymbol)}
-                        {item.priceUnit ? ` ${item.priceUnit}` : ''}
-                      </div>
-                    )}
-                    {getQuantityStep(item) > 1 && (
-                      <div style={styles.stepHint}>
-                        Sold in multiples of {getQuantityStep(item)}
-                      </div>
-                    )}
-                  </div>
-                  {(qty[item.productId] ?? 0) > 0 && (
-                    <div style={styles.itemLineTotalCol}>
-                      {Number.isFinite(parseItemPriceNumeric(item.price)) ? (
-                        <span style={styles.itemLineTotalVal}>
-                          {formatOrderMoney(lineAmounts[item.productId] ?? 0, currencySymbol)}
-                        </span>
-                      ) : (
-                        <span style={styles.itemSubtotalNa}>—</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div style={styles.itemBottom}>
-                  <QtyControl
-                    value={qty[item.productId] ?? 0}
-                    step={getQuantityStep(item)}
-                    onChange={(delta) => changeQty(item.productId, delta)}
-                  />
-                  <button type="button" style={styles.viewBtn} onClick={() => setDrawerItem(item)}>
-                    View details
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        {/* Section label */}
+        <div className="of-section-head">
+          {items.length} item{items.length === 1 ? '' : 's'} available
         </div>
 
-        {/* Summary bar */}
-        {totalItems > 0 && (
-          <div style={styles.summaryBar}>
-            <div style={styles.summaryRow}>
-              <span style={styles.summaryLabel}>Total items</span>
-              <span style={styles.summaryTotal}>
-                {totalItems} item{totalItems === 1 ? '' : 's'}
-              </span>
-            </div>
-            {orderTotalAmount > 0 && (
-              <div style={{ ...styles.summaryRow, marginTop: 10, paddingTop: 10, borderTop: '1px solid #e4e2d8' }}>
-                <span style={styles.summaryLabel}>Order total</span>
-                <span style={styles.summaryMoney}>{formatOrderMoney(orderTotalAmount, currencySymbol)}</span>
-              </div>
-            )}
-            {orderTotalAmount === 0 && totalItems > 0 && selectionIncludesUnpricedLines && (
-              <div style={styles.summaryNoPriceNote}>
-                Some selected items don’t have a unit price on this link — line totals use prices from the catalogue when available.
-              </div>
-            )}
-          </div>
-        )}
+        {/* Product list */}
+        <div className="of-items">
+          {items.length === 0 && (
+            <div className="of-empty">No items in this order link.</div>
+          )}
 
-        <footer style={styles.orderFooter}>
-          <a
-            href={CATSHARE_PLAY_STORE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.orderFooterLink}
-          >
-            Get CatShare on Google Play
-          </a>
-          <p style={styles.orderFooterDesc}>
-            Create catalogues, share products with customers, and take orders — built for small businesses.
+          {items.map((item) => {
+            const q = qty[item.productId] ?? 0;
+            const isSelected = q > 0;
+            const lineAmt = lineAmounts[item.productId] ?? 0;
+            const hasParsedPrice = Number.isFinite(parseItemPriceNumeric(item.price));
+            const lineCalcDetail =
+              hasParsedPrice && q > 0
+                ? formatLineCalculationDetail(q, item, currencySymbol)
+                : null;
+
+            return (
+              <div
+                key={item.productId}
+                className={`of-item-card${isSelected ? ' is-selected' : ''}`}
+              >
+                {/* Image */}
+                <div className="of-img-wrap" onClick={() => setDrawerItem(item)}>
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="of-img" />
+                  ) : (
+                    <div className="of-img-ph"><ImgIcon /></div>
+                  )}
+                  {isSelected && <div className="of-selected-badge">✓ Added</div>}
+                </div>
+
+                {/* Body */}
+                <div className="of-item-body">
+                  <div className="of-item-top">
+                    <div className="of-item-text">
+                      <div className="of-item-title-line">
+                        <span className="of-item-name">{item.name}</span>
+                        {item.subtitle && (
+                          <span className="of-item-subtitle-inline"> ({item.subtitle})</span>
+                        )}
+                      </div>
+                      <div className="of-item-price-row">
+                        {item.price !== undefined && item.price !== null && item.price !== '' && (
+                          <div className="of-price-tag">
+                            {formatUnitPrice(item.price, currencySymbol)}
+                            {item.priceUnit ? ` ${item.priceUnit}` : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <div className="of-line-total">
+                        {lineCalcDetail && (
+                          <div className="of-line-calc">{lineCalcDetail}</div>
+                        )}
+                        {hasParsedPrice ? (
+                          <span className="of-line-total-val">
+                            {formatOrderMoney(lineAmt, currencySymbol)}
+                          </span>
+                        ) : (
+                          <span className="of-line-total-na">—</span>
+                        )}
+                        <div className="of-subtotal-label">subtotal</div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="of-item-bottom">
+                    <div className="of-item-qty-cluster">
+                      <div className="of-qty-inline-row">
+                        <QtyControl
+                          value={q}
+                          step={getQuantityStep(item)}
+                          onChange={(delta) => changeQty(item.productId, delta)}
+                        />
+                        {getQuantityStep(item) > 1 && (
+                          <div className="of-step-hint of-step-hint--next-to-qty">
+                            <AlertIcon />
+                            Pack of {getQuantityStep(item)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="of-view-btn"
+                      onClick={() => setDrawerItem(item)}
+                    >
+                      Details ›
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="of-footer">
+          <div className="of-footer-app-row">
+            <a
+              href={CATSHARE_PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="of-footer-link"
+            >
+              📲 Get CatShare on Google Play
+            </a>
+          </div>
+          <p className="of-footer-desc">
+            Create catalogues, share products & take orders — built for small businesses.
           </p>
-        </footer>
+        </div>
       </div>
 
-      {/* Drawer */}
-      {drawerItem && (
-        <div
-          ref={overlayRef}
-          style={styles.overlay}
-          onClick={(e) => { if (e.target === overlayRef.current) setDrawerItem(null); }}
-        >
-          <div style={styles.drawer}>
-            {/* Image */}
-            <div style={{ position: 'relative' }}>
-              {drawerItem.imageUrl ? (
-                <img src={drawerItem.imageUrl} alt={drawerItem.name} style={styles.drawerImg} />
+      {/* Floating summary bar */}
+      {selectedProductCount > 0 && (
+        <div className="of-summary">
+          <div className="of-summary-card" onClick={openWhatsApp}>
+            <div className="of-summary-left">
+              <span className="of-summary-count">
+                {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
+              </span>
+              {orderTotalAmount > 0 ? (
+                <span className="of-summary-total">
+                  {formatOrderMoney(orderTotalAmount, currencySymbol)}
+                </span>
               ) : (
-                <div style={styles.drawerImgPlaceholder}><ImgIcon size={48} /></div>
+                <span className="of-summary-total">Review order</span>
               )}
-              <button style={styles.drawerClose} onClick={() => setDrawerItem(null)}>✕</button>
+              {selectionIncludesUnpricedLines && (
+                <span className="of-summary-no-price">
+                  Some items don't have a price
+                </span>
+              )}
             </div>
-
-            {/* Content */}
-            <div style={styles.drawerContent}>
-              <div style={styles.drawerName}>{drawerItem.name}</div>
-              {drawerItem.subtitle ? (
-                <div style={styles.drawerSubtitle}>{drawerItem.subtitle}</div>
-              ) : null}
-              {drawerItem.price !== undefined && drawerItem.price !== '' && (
-                <div style={styles.drawerPrice}>
-                  {formatUnitPrice(drawerItem.price, currencySymbol)}
-                  {drawerItem.priceUnit ? ` ${drawerItem.priceUnit}` : ''}
-                </div>
-              )}
-              {getQuantityStep(drawerItem) > 1 && (
-                <div style={styles.drawerStepHint}>
-                  Sold in multiples of {getQuantityStep(drawerItem)}
-                </div>
-              )}
-
-              {/* Detail rows from fields */}
-              <div style={styles.detailsBlock}>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-                  const val = (drawerItem as Record<string, unknown>)[`field${n}`];
-                  if (val === undefined || val === null || String(val).trim() === '') return null;
-                  const { label, unitSuffix } = getFieldLabelAndUnitSuffix(drawerItem, n);
-                  const valueText = unitSuffix
-                    ? `${String(val)} ${unitSuffix}`
-                    : String(val);
-                  return (
-                    <div key={n} style={styles.detailRow}>
-                      <span style={styles.detailLabel}>{label}</span>
-                      <span style={styles.detailVal}>{valueText}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Quantity controls left, line total right */}
-              <div style={styles.drawerQtyRow}>
-                <div style={styles.drawerQtyLeft}>
-                  <span style={styles.drawerQtyLabel}>Quantity</span>
-                  <QtyControl
-                    value={qty[drawerItem.productId] ?? 0}
-                    step={getQuantityStep(drawerItem)}
-                    onChange={(delta) => changeQty(drawerItem.productId, delta)}
-                  />
-                </div>
-                {(qty[drawerItem.productId] ?? 0) > 0 && (
-                  <span style={styles.drawerLineTotalInline}>
-                    {Number.isFinite(parseItemPriceNumeric(drawerItem.price)) ? (
-                      formatOrderMoney(lineAmounts[drawerItem.productId] ?? 0, currencySymbol)
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                )}
-              </div>
-
-              <button style={styles.drawerDoneBtn} onClick={() => setDrawerItem(null)}>
-                Done
-              </button>
-            </div>
+            <button className="of-summary-cta">
+              <WhatsAppIcon size={16} />
+              Place Order
+            </button>
           </div>
         </div>
       )}
+
+      {/* Detail drawer */}
+      {drawerItem && (() => {
+        const dQ = qty[drawerItem.productId] ?? 0;
+        const dAmt = lineAmounts[drawerItem.productId] ?? 0;
+        const dHasPrice = Number.isFinite(parseItemPriceNumeric(drawerItem.price));
+        const drawerCalcDetail =
+          dHasPrice && dQ > 0
+            ? formatLineCalculationDetail(dQ, drawerItem, currencySymbol)
+            : null;
+        const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+          const val = (drawerItem as Record<string, unknown>)[`field${n}`];
+          if (val === undefined || val === null || String(val).trim() === '') return null;
+          const { label, unitSuffix } = getFieldLabelAndUnitSuffix(drawerItem, n);
+          return { label, value: unitSuffix ? `${String(val)} ${unitSuffix}` : String(val) };
+        }).filter(Boolean);
+
+        return (
+          <div
+            ref={overlayRef}
+            className="of-overlay"
+            onClick={(e) => { if (e.target === overlayRef.current) setDrawerItem(null); }}
+          >
+            <div className="of-drawer">
+              <div className="of-drawer-handle" />
+
+              {/* Image */}
+              <div className="of-drawer-img-wrap">
+                {drawerItem.imageUrl ? (
+                  <img src={drawerItem.imageUrl} alt={drawerItem.name} className="of-drawer-img" />
+                ) : (
+                  <div className="of-drawer-img-ph"><ImgIcon size={48} /></div>
+                )}
+                <button className="of-drawer-close" onClick={() => setDrawerItem(null)}>✕</button>
+              </div>
+
+              {/* Content */}
+              <div className="of-drawer-body">
+                <div className="of-drawer-name">{drawerItem.name}</div>
+                {drawerItem.subtitle && (
+                  <div className="of-drawer-sub">({drawerItem.subtitle})</div>
+                )}
+
+                {drawerItem.price !== undefined && drawerItem.price !== '' && (
+                  <div className="of-drawer-price-row">
+                    <div className="of-drawer-price">
+                      {formatUnitPrice(drawerItem.price, currencySymbol)}
+                      {drawerItem.priceUnit ? ` ${drawerItem.priceUnit}` : ''}
+                    </div>
+                  </div>
+                )}
+
+                {/* Detail fields table */}
+                {fields.length > 0 && (
+                  <div className="of-detail-table">
+                    {fields.map((f, i) => (
+                      <div key={i} className="of-detail-row">
+                        <span className="of-detail-label">{f!.label}</span>
+                        <span className="of-detail-val">{f!.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quantity section */}
+                <div className="of-drawer-qty-section">
+                  <div className="of-drawer-qty-label">Select quantity</div>
+                  <div className="of-drawer-qty-row">
+                    <QtyControl
+                      value={dQ}
+                      step={getQuantityStep(drawerItem)}
+                      onChange={(delta) => changeQty(drawerItem.productId, delta)}
+                    />
+                    {dQ > 0 && (
+                      <div className="of-drawer-line-total-wrap">
+                        {drawerCalcDetail && (
+                          <div className="of-drawer-line-calc">{drawerCalcDetail}</div>
+                        )}
+                        <span className="of-drawer-line-total">
+                          {dHasPrice ? formatOrderMoney(dAmt, currencySymbol) : '—'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button className="of-drawer-done" onClick={() => setDrawerItem(null)}>
+                  Done — {dQ > 0 ? `${dQ} added` : 'close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
-
-function QtyControl({
-  value,
-  step,
-  onChange,
-}: {
-  value: number;
-  step: number;
-  onChange: (delta: number) => void;
-}) {
-  const s = Math.max(1, Math.floor(step) || 1);
-  const inc = s > 1 ? s : 1;
-  return (
-    <div style={styles.qtyControl}>
-      <button type="button" style={styles.qtyBtn} onClick={() => onChange(-inc)}>−</button>
-      <span style={styles.qtyVal}>{value}</span>
-      <button type="button" style={styles.qtyBtn} onClick={() => onChange(inc)}>+</button>
-    </div>
-  );
-}
-
-function ImgIcon({ size = 32 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="1.2">
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  );
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  bg: { minHeight: '100vh', background: '#f7f6f2', fontFamily: "'DM Sans', system-ui, sans-serif" },
-  page: { maxWidth: 640, margin: '0 auto', padding: '16px 12px 24px' },
-  stateCard: { background: '#fff', border: '1px solid #e4e2d8', borderRadius: 16, padding: 24, marginTop: 40 },
-  stateTitle: { fontWeight: 600, fontSize: 16, color: '#1a1a18' },
-  stateSub: { fontSize: 13, color: '#6b6b63', marginTop: 6 },
-  header: { paddingBottom: 16, borderBottom: '1px solid #e4e2d8', marginBottom: 20 },
-  headerTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  brand: { fontSize: 26, fontWeight: 700, color: '#1a1a18', letterSpacing: '-0.5px', lineHeight: 1 },
-  subtitle: { fontSize: 13, color: '#6b6b63', marginTop: 5 },
-  confirmBtn: {
-    background: '#1a5c38', color: '#fff', border: 'none',
-    padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', whiteSpace: 'nowrap', letterSpacing: '0.2px',
-    fontFamily: 'inherit',
-  },
-  itemsList: { display: 'flex', flexDirection: 'column', gap: 12 },
-  emptyState: { textAlign: 'center', padding: '40px 20px', color: '#6b6b63', fontSize: 14 },
-  itemCard: {
-    background: '#fff', border: '1px solid #e4e2d8',
-    borderRadius: 16, overflow: 'hidden',
-    display: 'flex', alignItems: 'stretch',
-  },
-  imgWrap: { width: 90, flexShrink: 0, cursor: 'pointer', background: '#f0ede4', overflow: 'hidden' },
-  img: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  imgPlaceholder: { width: '100%', height: '100%', minHeight: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  itemBody: { flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 },
-  itemMainRow: {
-    display: 'flex',
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    width: '100%',
-  },
-  itemTextCol: { flex: 1, minWidth: 0 },
-  itemName: { fontWeight: 600, fontSize: 15, color: '#1a1a18', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  itemSubtitle: {
-    fontSize: 12,
-    color: '#6b6b63',
-    marginTop: 4,
-    lineHeight: 1.35,
-    wordBreak: 'break-word' as const,
-  },
-  itemPrice: { fontSize: 13, color: '#4a9468', marginTop: 4, fontWeight: 500 },
-  itemLineTotalCol: {
-    flexShrink: 0,
-    textAlign: 'right' as const,
-    paddingTop: 2,
-    maxWidth: '42%',
-  },
-  itemLineTotalVal: { fontSize: 16, fontWeight: 700, color: '#1a5c38', display: 'block' },
-  stepHint: { fontSize: 11, color: '#6b6b63', marginTop: 4 },
-  itemBottom: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    gap: 10,
-  },
-  qtyControl: {
-    display: 'flex', alignItems: 'center',
-    background: '#f0ede4', borderRadius: 100,
-    border: '1px solid #e4e2d8', overflow: 'hidden',
-  },
-  qtyBtn: {
-    width: 32, height: 32, border: 'none', background: 'transparent',
-    cursor: 'pointer', fontSize: 18, color: '#1a1a18',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'inherit', lineHeight: 1,
-  },
-  qtyVal: { minWidth: 32, textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#1a1a18', userSelect: 'none' },
-  viewBtn: {
-    fontSize: 12, color: '#4a9468', cursor: 'pointer',
-    fontWeight: 500, border: 'none', background: 'none',
-    textDecoration: 'underline', textUnderlineOffset: 3,
-    fontFamily: 'inherit', padding: 0,
-  },
-  itemSubtotalNa: { fontSize: 14, color: '#9b9b93', fontWeight: 600 },
-  summaryBar: {
-    background: '#fff', border: '1px solid #e4e2d8',
-    borderRadius: 16, padding: '14px 18px',
-    display: 'flex', flexDirection: 'column',
-    marginTop: 20,
-  },
-  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
-  summaryLabel: { fontSize: 13, color: '#6b6b63' },
-  summaryTotal: { fontSize: 18, fontWeight: 600, color: '#1a1a18' },
-  summaryMoney: { fontSize: 20, fontWeight: 700, color: '#1a5c38' },
-  summaryNoPriceNote: { fontSize: 12, color: '#8b8b82', marginTop: 10, lineHeight: 1.45 },
-  orderFooter: {
-    marginTop: 28,
-    paddingTop: 20,
-    borderTop: '1px solid #e4e2d8',
-    textAlign: 'center' as const,
-  },
-  orderFooterLink: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#1a5c38',
-    textDecoration: 'underline',
-    textUnderlineOffset: 3,
-  },
-  orderFooterDesc: {
-    fontSize: 12,
-    color: '#6b6b63',
-    marginTop: 8,
-    lineHeight: 1.45,
-    maxWidth: 420,
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  },
-  overlay: {
-    position: 'fixed', inset: 0,
-    background: 'rgba(15,15,12,0.55)', zIndex: 100,
-    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-  },
-  drawer: {
-    background: '#fff', borderRadius: '22px 22px 0 0',
-    width: '100%', maxWidth: 640, maxHeight: '92vh',
-    overflowY: 'auto',
-  },
-  drawerImg: { width: '100%', aspectRatio: '1', objectFit: 'contain', background: '#f0ede4', display: 'block' },
-  drawerImgPlaceholder: { width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0ede4' },
-  drawerClose: {
-    position: 'absolute', top: 14, right: 14,
-    width: 32, height: 32, borderRadius: '50%',
-    background: 'rgba(0,0,0,0.35)', border: 'none',
-    cursor: 'pointer', color: '#fff', fontSize: 14,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'inherit',
-  },
-  drawerContent: { padding: '20px 20px 32px' },
-  drawerName: { fontSize: 22, fontWeight: 700, color: '#1a1a18', letterSpacing: '-0.3px', marginBottom: 4 },
-  drawerSubtitle: { fontSize: 13, color: '#6b6b63', marginBottom: 8, lineHeight: 1.4 },
-  drawerPrice: { fontSize: 15, fontWeight: 600, color: '#4a9468', marginBottom: 8 },
-  drawerStepHint: { fontSize: 12, color: '#6b6b63', marginBottom: 16 },
-  detailsBlock: { borderTop: '1px solid #e4e2d8', marginBottom: 4 },
-  detailRow: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e4e2d8', fontSize: 14 },
-  detailLabel: { color: '#6b6b63' },
-  detailVal: { color: '#1a1a18', fontWeight: 500, textAlign: 'right' },
-  drawerQtyRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 20,
-    width: '100%',
-  },
-  drawerQtyLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap' as const,
-    minWidth: 0,
-  },
-  drawerQtyLabel: { fontSize: 14, color: '#6b6b63', flexShrink: 0 },
-  drawerLineTotalInline: {
-    fontSize: 17,
-    fontWeight: 700,
-    color: '#1a5c38',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-    marginLeft: 'auto',
-  },
-   drawerDoneBtn: {
-    width: '100%', background: '#1a5c38', color: '#fff',
-    border: 'none', borderRadius: 100, padding: 13,
-    fontSize: 14, fontWeight: 600, cursor: 'pointer',
-    marginTop: 20, fontFamily: 'inherit',
-  },
-};

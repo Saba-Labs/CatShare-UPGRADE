@@ -284,50 +284,50 @@ function AppWithBackHandler() {
         if (p?.id != null) currentDeletedIds.add(String(p.id));
       }
       const merged = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
-      setProducts(merged);
+        setProducts(merged);
       safeSetInStorage(getProductsKey(userId), merged);
     } else {
       setProducts(localProducts);
-    }
+      }
 
     if (supabaseData?.deletedProducts && supabaseData.deletedProducts.length > 0) {
       const merged = mergeProductsData(localDeleted, supabaseData.deletedProducts);
-      setDeletedProducts(merged);
+        setDeletedProducts(merged);
       safeSetInStorage(getDeletedProductsKey(userId), merged);
     } else {
       setDeletedProducts(localDeleted);
-    }
+      }
 
     if (supabaseData?.fieldsDefinition && Array.isArray(supabaseData.fieldsDefinition?.fields)) {
-      const localFieldsDef = getFieldsDefinition();
-      const remoteFieldsDef = supabaseData.fieldsDefinition;
-      const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
-      const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
-      if (remoteLastUpdated > localLastUpdated) {
-        setFieldsDefinition(remoteFieldsDef);
-        window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+        const localFieldsDef = getFieldsDefinition();
+        const remoteFieldsDef = supabaseData.fieldsDefinition;
+        const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
+        if (remoteLastUpdated > localLastUpdated) {
+          setFieldsDefinition(remoteFieldsDef);
+          window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
           detail: { newDefinition: remoteFieldsDef, template: remoteFieldsDef?.industry || 'Custom', isBackupRestore: false }
-        }));
+          }));
+        }
       }
-    }
 
     if (supabaseData?.cataloguesDefinition) {
-      const localCataloguesDef = getCataloguesDefinition();
-      const remoteCataloguesDef = supabaseData.cataloguesDefinition;
-      const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
-      const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
-      if (remoteLastUpdated > localLastUpdated) {
-        setCataloguesDefinition(remoteCataloguesDef);
-        window.dispatchEvent(new CustomEvent('catalogues-changed', {
+        const localCataloguesDef = getCataloguesDefinition();
+        const remoteCataloguesDef = supabaseData.cataloguesDefinition;
+        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
+        if (remoteLastUpdated > localLastUpdated) {
+          setCataloguesDefinition(remoteCataloguesDef);
+          window.dispatchEvent(new CustomEvent('catalogues-changed', {
           detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
-        }));
+          }));
+        }
       }
-    }
 
     // Enable strict mode for all authenticated users going forward.
     localStorage.setItem('strictOnlineMode::device', 'true');
     localStorage.setItem('offlineLegacyResolved::device', 'true');
-    setSupabaseSyncStatus('synced');
+      setSupabaseSyncStatus('synced');
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
   }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches]);
@@ -1147,8 +1147,8 @@ function AppWithBackHandler() {
 
             <div className="border-t border-gray-200 my-4"></div>
 
-            <button
-              disabled={syncNowLoading}
+              <button
+                disabled={syncNowLoading}
               onClick={async () => {
                 const ok = window.confirm("Delete offline data permanently? This cannot be undone.");
                 if (!ok) return;
@@ -1205,7 +1205,7 @@ function AppWithBackHandler() {
                   safeSetInStorage('hasCompletedOnboarding', false);
                 }
 
-                setShowOfflineSyncModal(false);
+                  setShowOfflineSyncModal(false);
                 setStartupPhase('done');
 
                 if (!hasCloudData) {
@@ -1215,7 +1215,7 @@ function AppWithBackHandler() {
               className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
             >
               Delete offline data
-            </button>
+              </button>
           </div>
         </div>
       )}
@@ -1452,11 +1452,11 @@ export default function App() {
         <ToastProvider>
           <AuthProvider>
             <SyncProvider>
-              <SubscriptionProvider>
-                <Router>
-                  <AppWithBackHandler />
-                </Router>
-              </SubscriptionProvider>
+            <SubscriptionProvider>
+              <Router>
+                <AppWithBackHandler />
+              </Router>
+            </SubscriptionProvider>
             </SyncProvider>
           </AuthProvider>
         </ToastProvider>

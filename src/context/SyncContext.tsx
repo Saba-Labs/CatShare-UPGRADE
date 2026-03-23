@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useState, useRef, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import { cacheCloudProductImages } from '../utils/productImageLocalCache';
 import { getFieldsDefinition, setFieldsDefinition } from '../config/fieldConfig';
 import { getCataloguesDefinition, setCataloguesDefinition } from '../config/catalogueConfig';
 
@@ -98,8 +99,11 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       (p: any) => p?.id != null && !deletedIds.has(String(p.id))
     );
 
-    safeSetInStorage(getProductsKey(userId), filteredProducts);
-    safeSetInStorage(getDeletedProductsKey(userId), nextDeleted);
+    const cachedProducts = await cacheCloudProductImages(userId, filteredProducts);
+    const cachedDeleted = await cacheCloudProductImages(userId, nextDeleted);
+
+    safeSetInStorage(getProductsKey(userId), cachedProducts);
+    safeSetInStorage(getDeletedProductsKey(userId), cachedDeleted);
 
     const rawCats = snapshot.categories || [];
     const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
@@ -116,7 +120,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     applyUserSettingsFromCloud(snapshot.userSettings);
 
-    return { products: filteredProducts, deletedProducts: nextDeleted };
+    return { products: cachedProducts, deletedProducts: cachedDeleted };
   }, [user?.uid]);
 
   const syncProductsToCloud = useCallback(async (

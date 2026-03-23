@@ -66,6 +66,72 @@ export function getCurrentCurrencySymbol(): string {
   return getSymbolForCurrencyCode(getCurrentCurrency());
 }
 
+/** Payload from `get_share_link` RPC (optional fields for older RPC versions). */
+export type ShareLinkCurrencyPayload = {
+  sellerCurrencyCode?: string;
+  sellerCurrencySymbol?: string;
+  /** From `user_settings.data.customCurrencies` — lets buyers resolve custom codes. */
+  sellerCustomCurrencies?: Record<string, string> | null;
+};
+
+/**
+ * Currency code + symbol to store on a new share link — prefers Supabase `user_settings`
+ * (cloud) over localStorage so strict-online / multi-device stays correct.
+ */
+export function getSellerCurrencyForShareLink(userSettings: any | null | undefined): {
+  code: string;
+  symbol: string;
+} {
+  const raw =
+    (typeof userSettings?.currency === 'string' && userSettings.currency.trim()) ||
+    (typeof userSettings?.defaultCurrency === 'string' && userSettings.defaultCurrency.trim()) ||
+    getCurrentCurrency();
+  const code = (raw || 'INR').trim().toUpperCase() || 'INR';
+
+  const cloudCustom =
+    userSettings?.data?.customCurrencies != null &&
+    typeof userSettings.data.customCurrencies === 'object' &&
+    !Array.isArray(userSettings.data.customCurrencies)
+      ? (userSettings.data.customCurrencies as Record<string, string>)
+      : null;
+
+  const fromCloud = cloudCustom?.[code]?.trim();
+  if (fromCloud) {
+    return { code, symbol: fromCloud };
+  }
+  if (CURRENCIES[code]) {
+    return { code, symbol: CURRENCIES[code].symbol };
+  }
+  return { code, symbol: getSymbolForCurrencyCode(code) };
+}
+
+/**
+ * Display symbol on the public order form from RPC data (+ optional custom map).
+ */
+export function resolveShareLinkCurrencyDisplay(payload: ShareLinkCurrencyPayload): string {
+  const code = (payload.sellerCurrencyCode || 'INR').trim().toUpperCase() || 'INR';
+  const apiSym = (payload.sellerCurrencySymbol || '').trim();
+  const custom =
+    payload.sellerCustomCurrencies != null &&
+    typeof payload.sellerCustomCurrencies === 'object' &&
+    !Array.isArray(payload.sellerCustomCurrencies)
+      ? payload.sellerCustomCurrencies
+      : null;
+
+  const customSym = custom?.[code]?.trim();
+  if (customSym) return customSym;
+
+  if (CURRENCIES[code]) {
+    if (!apiSym || (code !== 'INR' && apiSym === '₹')) {
+      return CURRENCIES[code].symbol;
+    }
+    return apiSym;
+  }
+
+  if (apiSym) return apiSym;
+  return '₹';
+}
+
 /**
  * Get currency data by code
  */
