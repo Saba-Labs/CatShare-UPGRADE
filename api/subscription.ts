@@ -1,7 +1,14 @@
-// api/subscription.ts — Pro entitlement from Supabase (user id = Supabase auth UUID)
+// api/subscription.ts — Pro entitlement: paid subscription OR 30-day trial from account creation
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
+import {
+  computePaidPro,
+  computeTrialEndsAtIso,
+  computeHasProAccess,
+  isTrialPeriodActive,
+  TRIAL_DAYS,
+} from "../lib/subscriptionEntitlement.mjs";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -23,17 +30,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = authResult.userId;
 
   try {
-    const { data, error } = await supabase
+    const { data: authData, error: authErr } = await supabase.auth.admin.getUserById(userId);
+    if (authErr || !authData?.user) {
+      console.error("subscription: getUserById failed", authErr);
+      return res.status(500).json({ error: "Could not load user" });
+    }
+
+    const trialEndsAt = computeTrialEndsAtIso(authData.user.created_at);
+
+    const { data: subRow, error: subErr } = await supabase
       .from("user_subscriptions")
-      .select("status, expires_at")
+      .select("*")
       .eq("user_id", userId)
-      .eq("status", "active")
       .maybeSingle();
 
-    if (error) throw error;
+    if (subErr) throw subErr;
 
-    const isPro = !!data && new Date(data.expires_at) > new Date();
-    return res.status(200).json({ isPro });
+    const paidPro = computePaidPro(subRow);
+    const isPro = computeHasProAccess({ paidPro, trialEndsAtIso: trialEndsAt });
+    const isTrialActive = !paidPro && isTrialPeriodActive(trialEndsAt);
+
+    return res.status(200).json({
+      isPro,
+      isPaidPro: paidPro,
+      isTrialActive,
+      trialEndsAt,
+      trialDays: TRIAL_DAYS,
+    });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "Failed to load subscription" });

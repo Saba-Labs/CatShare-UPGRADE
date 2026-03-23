@@ -7,6 +7,13 @@
 
 import { getAllCatalogues } from './catalogueConfig';
 
+/** Clamp order step for catalogue data (1 = no restriction). */
+export function normalizeOrderQuantityStep(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? '').replace(/\D/g, ''), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(Math.floor(n), 999999);
+}
+
 export interface CatalogueData {
   enabled: boolean;
   field1?: string;
@@ -33,6 +40,8 @@ export interface CatalogueData {
   field9Unit?: string;
   field10Unit?: string;
   badge?: string;
+  /** Order quantity must be 0 or a multiple of this (e.g. 12 = 12, 24, 36…). Default 1 = any quantity. */
+  orderQuantityStep?: number;
   stock?: boolean;
   wholesaleStock?: boolean;
   resellStock?: boolean;
@@ -100,6 +109,7 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
       field9Unit: product?.field9Unit || "None",
       field10Unit: product?.field10Unit || "None",
       badge: product?.badge || "",
+      orderQuantityStep: 1,
       stock: product?.stock !== false,
       wholesaleStock: product?.wholesaleStock !== false,
       resellStock: product?.resellStock !== false,
@@ -162,6 +172,7 @@ export function getDefaultCatalogueData(catalogueId: string): CatalogueData {
     field9Unit: "None",
     field10Unit: "None",
     badge: "",
+    orderQuantityStep: 1,
     stock: true,
     wholesaleStock: true,
     resellStock: true,

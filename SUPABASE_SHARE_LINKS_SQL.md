@@ -10,6 +10,9 @@ create table if not exists public.share_links (
   seller_user_id text not null,
   seller_whatsapp text not null,
   items jsonb not null,
+  seller_business_name text,
+  seller_currency_code text default 'INR',
+  seller_currency_symbol text default '₹',
   created_at timestamptz not null default now(),
   expires_at timestamptz not null default (now() + interval '1 day')
 );
@@ -19,6 +22,21 @@ create index if not exists share_links_seller_user_id_idx
 
 create index if not exists share_links_expires_at_idx
   on public.share_links (expires_at);
+```
+
+### 1b) Business name in order form header (optional column)
+
+Run once if the table already exists without this column:
+
+```sql
+alter table public.share_links
+  add column if not exists seller_business_name text;
+
+alter table public.share_links
+  add column if not exists seller_currency_code text default 'INR';
+
+alter table public.share_links
+  add column if not exists seller_currency_symbol text default '₹';
 ```
 
 ### 2) RLS (seller can manage their own links)
@@ -73,7 +91,8 @@ as $$
 declare
   rec record;
 begin
-  select seller_whatsapp, items, expires_at
+  select seller_whatsapp, items, expires_at, seller_business_name,
+         seller_currency_code, seller_currency_symbol
     into rec
   from public.share_links
   where token = p_token
@@ -89,7 +108,10 @@ begin
 
   return jsonb_build_object(
     'sellerWhatsapp', rec.seller_whatsapp,
-    'items', rec.items
+    'items', rec.items,
+    'sellerBusinessName', coalesce(nullif(trim(rec.seller_business_name), ''), ''),
+    'sellerCurrencyCode', coalesce(nullif(trim(rec.seller_currency_code), ''), 'INR'),
+    'sellerCurrencySymbol', coalesce(nullif(trim(rec.seller_currency_symbol), ''), '₹')
   );
 end;
 $$;

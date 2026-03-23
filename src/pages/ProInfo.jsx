@@ -10,9 +10,20 @@ import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 const ANDROID_PACKAGE_NAME = "com.catshare.official";
 
+/** Matches server `lib/subscriptionEntitlement.mjs` TRIAL_DAYS (for display copy). */
+const TRIAL_DAYS = 30;
+
+function formatTrialEndDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { dateStyle: "long" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function ProInfo() {
   const navigate = useNavigate();
-  const { isPro, refresh } = useSubscription();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt, refresh } = useSubscription();
   const [loading, setLoading] = useState(false);
   const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
@@ -281,15 +292,27 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
             <p className="text-gray-600 text-lg max-w-2xl mx-auto">
               Select the plan that fits your needs. Upgrade anytime to unlock unlimited features.
             </p>
-            {isPro && (
+            {isTrialActive && trialEndsAt && (
+              <div className="inline-block mt-4 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl max-w-xl mx-auto text-left">
+                <p className="text-sm font-semibold text-amber-900">
+                  ✨ {TRIAL_DAYS}-day Pro trial — full access
+                </p>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  Your trial includes every Pro feature. It ends on{" "}
+                  <span className="font-semibold">{formatTrialEndDate(trialEndsAt)}</span>. Subscribe
+                  anytime to keep Pro after your trial.
+                </p>
+              </div>
+            )}
+            {isPaidPro && (
               <div className="inline-block mt-4 px-4 py-2 bg-green-100 border border-green-300 rounded-full">
                 <p className="text-sm font-semibold text-green-700">✓ You are on Pro Plan</p>
               </div>
             )}
           </div>
 
-          {/* BILLING FREQUENCY SELECTOR */}
-          {!isPro && isAndroid && (
+          {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) */}
+          {!isPaidPro && isAndroid && (
             <div className="flex gap-3 justify-center mb-8">
               <button
                 onClick={() => setBillingFrequency("monthly")}
@@ -425,7 +448,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Price */}
                 <div className="relative z-10 mb-6">
-                  {!isPro ? (
+                  {!isPaidPro ? (
                     isAndroid ? (
                       billingFrequency === "monthly" && prices?.[SUBSCRIPTION_SKUS.monthly] ? (
                         <>
@@ -465,7 +488,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 </p>
 
                 {/* Button */}
-                {!isPro ? (
+                {!isPaidPro ? (
                   isAndroid ? (
                     <button
                       onClick={() => {
@@ -720,14 +743,21 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Current Plan</p>
                 <p className={`text-2xl font-bold ${isPro ? "text-blue-600" : "text-gray-900"}`}>
-                  {isPro ? "Pro" : "Free"}
+                  {isPaidPro ? "Pro" : isTrialActive ? "Pro (trial)" : isPro ? "Pro" : "Free"}
                 </p>
+                {isTrialActive && trialEndsAt && (
+                  <p className="text-xs text-gray-500">
+                    Trial ends {formatTrialEndDate(trialEndsAt)} · {TRIAL_DAYS} days from account creation
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Status</p>
                 <div className="flex items-center gap-2">
                   <span className={`w-3 h-3 rounded-full ${isPro ? "bg-green-500" : "bg-gray-400"}`}></span>
-                  <p className="text-gray-700">{isPro ? "Active" : "Inactive"}</p>
+                  <p className="text-gray-700">
+                    {isPaidPro ? "Subscribed" : isTrialActive ? "Trial active" : isPro ? "Active" : "Inactive"}
+                  </p>
                 </div>
               </div>
             </div>

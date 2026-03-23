@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase, persistAuthUserIdsForStorage, clearAuthUserIdsFromStorage } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
@@ -47,6 +47,8 @@ interface AuthContextType {
   error: string | null;
   supabaseData: SupabaseUserData | null;
   supabaseDataLoading: boolean;
+  /** Refetch cloud snapshot (e.g. after saving Account / business details). */
+  refreshSupabaseData: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -68,6 +70,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
   const [supabaseData, setSupabaseData] = useState<SupabaseUserData | null>(null);
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
+
+  const refreshSupabaseData = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid || authService.isOfflineGuest()) return;
+
+    setSupabaseDataLoading(true);
+    try {
+      const result = await fetchAllUserData(uid);
+      const {
+        data: { session: latest },
+      } = await supabase.auth.getSession();
+      if (!latest?.user || latest.user.id !== uid) return;
+
+      if (result.success && result.data) {
+        setSupabaseData(result.data as SupabaseUserData);
+      } else {
+        console.warn('⚠️ refreshSupabaseData failed:', result.error);
+      }
+    } catch (e) {
+      console.error('❌ refreshSupabaseData:', e);
+    } finally {
+      setSupabaseDataLoading(false);
+    }
+  }, []);
 
   /** Coalesce concurrent profile fetches for the same uid (initSession + SIGNED_IN, etc.). */
   const inFlightProfileByUid = useRef<Map<string, Promise<void>>>(new Map());
@@ -236,6 +265,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         error,
         supabaseData,
         supabaseDataLoading,
+        refreshSupabaseData,
         logout,
         clearError,
       }}

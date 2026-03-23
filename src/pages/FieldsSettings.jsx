@@ -15,6 +15,13 @@ import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
+function parseUnitOptionsString(unitsString) {
+  return String(unitsString ?? "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter((u) => u !== "");
+}
+
 export default function FieldsSettings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +49,10 @@ export default function FieldsSettings() {
   const [editingUnitValue, setEditingUnitValue] = useState("");
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const scrollContainerRef = useRef(null);
+  /** Raw unit-options text while typing (comma split only on blur — avoids stripping "," mid-edit). */
+  const [unitsTextDraft, setUnitsTextDraft] = useState({});
+  const unitsTextDraftRef = useRef({});
+  const prevExpandedKeyRef = useRef(null);
 
   useEffect(() => {
     let def = getFieldsDefinition();
@@ -94,6 +105,31 @@ export default function FieldsSettings() {
     return () => window.removeEventListener("fieldDefinitionsChanged", handleBackupRestore);
   }, [showToast]);
 
+  // When switching expanded field, save unit-options draft for the previous field (same as blur)
+  useEffect(() => {
+    const prev = prevExpandedKeyRef.current;
+    if (prev && prev !== expandedKey) {
+      const raw = unitsTextDraftRef.current[prev];
+      if (raw !== undefined) {
+        const unitOptions = parseUnitOptionsString(raw);
+        setDefinition((def) => {
+          if (!def) return def;
+          const newFields = def.fields.map((f) =>
+            f.key === prev ? { ...f, unitOptions } : f
+          );
+          return { ...def, fields: newFields };
+        });
+        delete unitsTextDraftRef.current[prev];
+        setUnitsTextDraft((u) => {
+          const next = { ...u };
+          delete next[prev];
+          return next;
+        });
+      }
+    }
+    prevExpandedKeyRef.current = expandedKey;
+  }, [expandedKey]);
+
   const onDragEnd = (result) => {
     if (!result.destination || !definition) return;
 
@@ -145,6 +181,33 @@ export default function FieldsSettings() {
     return "e.g. option1, option2, option3";
   };
 
+  const updateFieldUnits = (key, unitsString) => {
+    const unitOptions = parseUnitOptionsString(unitsString);
+    setDefinition((prev) => {
+      if (!prev) return prev;
+      const newFields = prev.fields.map((f) =>
+        f.key === key ? { ...f, unitOptions } : f
+      );
+      return { ...prev, fields: newFields };
+    });
+  };
+
+  /** Apply pending unit-option drafts into a definition object (used before save). */
+  const mergeUnitDraftsIntoDefinition = (def) => {
+    if (!def) return def;
+    const keys = Object.keys(unitsTextDraftRef.current);
+    if (keys.length === 0) return def;
+    let fields = def.fields;
+    for (const key of keys) {
+      const raw = unitsTextDraftRef.current[key];
+      const unitOptions = parseUnitOptionsString(raw);
+      fields = fields.map((f) =>
+        f.key === key ? { ...f, unitOptions } : f
+      );
+    }
+    return { ...def, fields };
+  };
+
   const handleSave = () => {
     // Show confirmation modal instead of saving immediately
     setShowSaveConfirmation(true);
@@ -152,8 +215,13 @@ export default function FieldsSettings() {
 
   const confirmSave = async () => {
     if (definition) {
-      setFieldsDefinition(definition);
-      setSavedDefinition(definition);
+      const mergedDefinition = mergeUnitDraftsIntoDefinition(definition);
+      setDefinition(mergedDefinition);
+      setUnitsTextDraft({});
+      unitsTextDraftRef.current = {};
+
+      setFieldsDefinition(mergedDefinition);
+      setSavedDefinition(mergedDefinition);
       window.dispatchEvent(new Event('storage'));
       try {
         await Haptics.impact({ style: ImpactStyle.Medium });
@@ -163,7 +231,7 @@ export default function FieldsSettings() {
       if (user && user.uid) {
         try {
           const { syncFieldsDefinition } = await import('../services/supabaseSync');
-          const syncResult = await syncFieldsDefinition(user.uid, definition);
+          const syncResult = await syncFieldsDefinition(user.uid, mergedDefinition);
           if (syncResult.success) {
             console.log('✅ Fields definition synced to Supabase');
             const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
@@ -201,15 +269,6 @@ export default function FieldsSettings() {
     if (!definition) return;
     const newFields = definition.fields.map(f =>
       f.key === key ? { ...f, label } : f
-    );
-    setDefinition({ ...definition, fields: newFields });
-  };
-
-  const updateFieldUnits = (key, unitsString) => {
-    if (!definition) return;
-    const unitOptions = unitsString.split(',').map(u => u.trim()).filter(u => u !== "");
-    const newFields = definition.fields.map(f =>
-      f.key === key ? { ...f, unitOptions } : f
     );
     setDefinition({ ...definition, fields: newFields });
   };
@@ -863,11 +922,37 @@ export default function FieldsSettings() {
                                                         <div className="relative pt-2">
                                                           <input
                                                             type="text"
-                                                            value={field.unitOptions?.join(", ") || ""}
-                                                            onChange={(e) => updateFieldUnits(field.key, e.target.value)}
+                                                            value={
+                                                              unitsTextDraft[field.key] !== undefined
+                                                                ? unitsTextDraft[field.key]
+                                                                : field.unitOptions?.join(", ") || ""
+                                                            }
+                                                            onChange={(e) => {
+                                                              const v = e.target.value;
+                                                              unitsTextDraftRef.current = {
+                                                                ...unitsTextDraftRef.current,
+                                                                [field.key]: v,
+                                                              };
+                                                              setUnitsTextDraft((prev) => ({
+                                                                ...prev,
+                                                                [field.key]: v,
+                                                              }));
+                                                            }}
+                                                            onBlur={(e) => {
+                                                              updateFieldUnits(field.key, e.target.value);
+                                                              delete unitsTextDraftRef.current[field.key];
+                                                              setUnitsTextDraft((prev) => {
+                                                                const next = { ...prev };
+                                                                delete next[field.key];
+                                                                return next;
+                                                              });
+                                                            }}
                                                             placeholder={getUnitPlaceholder(field.label)}
                                                             className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg text-sm outline-none transition-all dark:text-white"
                                                           />
+                                                          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1.5">
+                                                            Separate options with commas. Saved when you leave this field.
+                                                          </p>
                                                         </div>
                                                       </motion.div>
                                                     )}

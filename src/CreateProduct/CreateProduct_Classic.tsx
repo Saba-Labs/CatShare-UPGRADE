@@ -883,9 +883,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     if (commonFields.includes(name)) {
       setFormData((prev) => ({ ...prev, [name]: value }));
-    } else {
-      updateCatalogueData({ [name]: value });
+      return;
     }
+    if (name === 'orderQuantityStep') {
+      const digits = String(value).replace(/\D/g, '');
+      const n = parseInt(digits, 10);
+      updateCatalogueData({
+        orderQuantityStep: !digits || !Number.isFinite(n) || n < 1 ? 1 : Math.min(n, 999999),
+      });
+      return;
+    }
+    updateCatalogueData({ [name]: value });
   };
 
   const saveAndNavigate = async () => {
@@ -1771,6 +1779,25 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         </select>
                       </div>
                     )}
+                  </div>
+
+                  <div className="flex gap-3 items-start">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                      Qty step
+                    </label>
+                    <div className="flex-1 min-w-0">
+                      <input
+                        name="orderQuantityStep"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={String(getCatalogueFormData().orderQuantityStep ?? 1)}
+                        onChange={handleChange}
+                        className="border border-gray-300 dark:border-gray-700 p-2 w-full max-w-[120px] rounded text-xs bg-white dark:bg-gray-800"
+                      />
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                        1 = any quantity. E.g. 12 → only 12, 24, 36… on the order form (per catalogue).
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex gap-3 items-center">

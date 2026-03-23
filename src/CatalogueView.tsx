@@ -17,10 +17,11 @@ import { getCatalogueData, isProductEnabledForCatalogue } from "./config/catalog
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
-import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
+import { getCurrentCurrency, getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
 import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
+import { businessProfileFromUserSettings } from "./config/businessProfile";
 import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 
@@ -1459,10 +1460,16 @@ const handleTouchEnd = useCallback(() => {
                     productToShareLinkItem(p, catalogueId)
                   );
 
+                  const biz = businessProfileFromUserSettings(supabaseData?.userSettings);
+                  const sellerBusinessName = biz.businessName?.trim() || undefined;
+
                   const { url } = await createShareLink({
                     sellerUserId: user.uid,
                     sellerWhatsapp,
                     items,
+                    sellerBusinessName,
+                    sellerCurrencyCode: getCurrentCurrency(),
+                    sellerCurrencySymbol: getCurrentCurrencySymbol(),
                   });
 
                   const shareMessage = `Order using the link ${url}`;

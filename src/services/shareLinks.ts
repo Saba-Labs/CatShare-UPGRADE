@@ -1,5 +1,6 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields } from '../config/fieldConfig';
+import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 
 function randomToken(length = 32): string {
   const bytes = new Uint8Array(length);
@@ -10,19 +11,23 @@ function randomToken(length = 32): string {
 export type ShareLinkItem = {
   productId: string;
   name: string;
+  /** Model / secondary line under the name (from product subtitle). */
+  subtitle?: string;
   price?: string | number;
   priceUnit?: string;
   imageUrl?: string;
-  field1?: string;  field1Label?: string;
-  field2?: string;  field2Label?: string;
-  field3?: string;  field3Label?: string;
-  field4?: string;  field4Label?: string;
-  field5?: string;  field5Label?: string;
-  field6?: string;  field6Label?: string;
-  field7?: string;  field7Label?: string;
-  field8?: string;  field8Label?: string;
-  field9?: string;  field9Label?: string;
-  field10?: string; field10Label?: string;
+  field1?: string;  field1Label?: string;  field1Unit?: string;
+  field2?: string;  field2Label?: string;  field2Unit?: string;
+  field3?: string;  field3Label?: string;  field3Unit?: string;
+  field4?: string;  field4Label?: string;  field4Unit?: string;
+  field5?: string;  field5Label?: string;  field5Unit?: string;
+  field6?: string;  field6Label?: string;  field6Unit?: string;
+  field7?: string;  field7Label?: string;  field7Unit?: string;
+  field8?: string;  field8Label?: string;  field8Unit?: string;
+  field9?: string;  field9Label?: string;  field9Unit?: string;
+  field10?: string; field10Label?: string; field10Unit?: string;
+  /** When >1, order qty must be multiples (e.g. 12 for dozens). Omitted = 1 (any qty). */
+  quantityStep?: number;
 };
 
 // Converts a raw product object into a ShareLinkItem, pulling all enabled fields
@@ -61,12 +66,15 @@ export function productToShareLinkItem(
     product['price1Unit'] ??
     undefined;
 
+  const step = normalizeOrderQuantityStep(catData.orderQuantityStep);
+
   const item: ShareLinkItem = {
     productId: product.id,
     name: product.name || '',
     imageUrl: product.imageUrl || undefined,
     price: price !== undefined && price !== '' ? String(price) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
+    ...(step > 1 ? { quantityStep: step } : {}),
   };
 
   // Map all enabled fields with their labels
@@ -78,9 +86,11 @@ export function productToShareLinkItem(
 
     if (val !== undefined && val !== null && val !== '') {
       (item as any)[`field${n}`] = String(val);
-      // Use field label; append unit if present and not "None"
-      const unit = unitVal && unitVal !== 'None' ? ` (${unitVal})` : '';
-      (item as any)[`field${n}Label`] = `${field.label}${unit}`;
+      // Label = field name only; unit stored separately for order form (value + unit on the right)
+      (item as any)[`field${n}Label`] = field.label;
+      if (unitVal && unitVal !== 'None') {
+        (item as any)[`field${n}Unit`] = String(unitVal);
+      }
     }
   });
 
@@ -91,6 +101,12 @@ export async function createShareLink(options: {
   sellerUserId: string;
   sellerWhatsapp: string;
   items: ShareLinkItem[];
+  /** Shown in customer order form header (Account → Business details). */
+  sellerBusinessName?: string;
+  /** ISO currency code (e.g. INR) — from app Currency settings when link is created. */
+  sellerCurrencyCode?: string;
+  /** Display symbol (e.g. ₹) — includes custom currency symbols from settings. */
+  sellerCurrencySymbol?: string;
   expiresInDays?: number;
 }): Promise<{ token: string; url: string }> {
   const token = randomToken(24);
@@ -103,6 +119,9 @@ export async function createShareLink(options: {
     (import.meta as any).env?.VITE_PUBLIC_WEB_BASE_URL ||
     'https://catshare.vercel.app';
 
+  const trimmedName = options.sellerBusinessName?.trim();
+  const code = (options.sellerCurrencyCode || 'INR').trim() || 'INR';
+  const sym = (options.sellerCurrencySymbol || '₹').trim() || '₹';
   const { error } = await getSupabaseClient()
     .from('share_links')
     .insert({
@@ -111,6 +130,9 @@ export async function createShareLink(options: {
       seller_whatsapp: options.sellerWhatsapp,
       items: options.items,
       expires_at: expiresAt,
+      ...(trimmedName ? { seller_business_name: trimmedName } : {}),
+      seller_currency_code: code,
+      seller_currency_symbol: sym,
     });
 
   if (error) {
@@ -123,11 +145,20 @@ export async function createShareLink(options: {
 export async function fetchShareLinkForCustomer(token: string): Promise<{
   sellerWhatsapp: string;
   items: ShareLinkItem[];
+  sellerBusinessName?: string;
+  sellerCurrencyCode?: string;
+  sellerCurrencySymbol?: string;
 } | null> {
   const { data, error } = await supabase.rpc('get_share_link', {
     p_token: token,
   });
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return data as { sellerWhatsapp: string; items: ShareLinkItem[] };
+  return data as {
+    sellerWhatsapp: string;
+    items: ShareLinkItem[];
+    sellerBusinessName?: string;
+    sellerCurrencyCode?: string;
+    sellerCurrencySymbol?: string;
+  };
 }

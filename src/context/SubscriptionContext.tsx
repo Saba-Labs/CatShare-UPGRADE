@@ -1,25 +1,58 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 
+const LS_TRIAL_ENDS = 'subscription_trialEndsAt';
+const LS_TRIAL_ACTIVE = 'subscription_isTrialActive';
+const LS_PAID_PRO = 'subscription_isPaidPro';
+
 type SubscriptionContextValue = {
+  /** Full Pro access (paid subscription or active free trial). */
   isPro: boolean;
+  /** Purchased subscription or lifetime (not trial-only). */
+  isPaidPro: boolean;
+  /** Free trial still active (Pro features via trial, no purchase yet). */
+  isTrialActive: boolean;
+  /** ISO date when the 30-day Pro trial ends (from account creation). */
+  trialEndsAt: string | null;
   loading: boolean;
   refresh: () => Promise<void>;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
+function readCachedTrial(): Pick<SubscriptionContextValue, 'trialEndsAt' | 'isTrialActive' | 'isPaidPro'> {
+  const trialEndsAt = localStorage.getItem(LS_TRIAL_ENDS);
+  return {
+    trialEndsAt: trialEndsAt && trialEndsAt.length > 0 ? trialEndsAt : null,
+    isTrialActive: localStorage.getItem(LS_TRIAL_ACTIVE) === 'true',
+    isPaidPro: localStorage.getItem(LS_PAID_PRO) === 'true',
+  };
+}
+
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPro, setIsPro] = useState<boolean>(() => {
     return localStorage.getItem('isPro') === 'true';
   });
+  const [isPaidPro, setIsPaidPro] = useState<boolean>(() => readCachedTrial().isPaidPro);
+  const [isTrialActive, setIsTrialActive] = useState<boolean>(() => readCachedTrial().isTrialActive);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(() => readCachedTrial().trialEndsAt);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const clearSubscriptionCache = useCallback(() => {
+    setIsPro(false);
+    setIsPaidPro(false);
+    setIsTrialActive(false);
+    setTrialEndsAt(null);
+    localStorage.setItem('isPro', 'false');
+    localStorage.removeItem(LS_TRIAL_ENDS);
+    localStorage.setItem(LS_TRIAL_ACTIVE, 'false');
+    localStorage.setItem(LS_PAID_PRO, 'false');
+  }, []);
 
   const refresh = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
-      setIsPro(false);
-      localStorage.setItem('isPro', 'false');
+      clearSubscriptionCache();
       setLoading(false);
       return;
     }
@@ -46,22 +79,37 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (!resp.ok) throw new Error(`Subscription fetch failed (${resp.status})`);
       const json = await resp.json();
       const next = !!json?.isPro;
+      const nextPaid = !!json?.isPaidPro;
+      const nextTrial = !!json?.isTrialActive;
+      const nextTrialEnd =
+        typeof json?.trialEndsAt === 'string' && json.trialEndsAt.length > 0 ? json.trialEndsAt : null;
+
       setIsPro(next);
+      setIsPaidPro(nextPaid);
+      setIsTrialActive(nextTrial);
+      setTrialEndsAt(nextTrialEnd);
+
       localStorage.setItem('isPro', next ? 'true' : 'false');
+      localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
+      localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
+      if (nextTrialEnd) {
+        localStorage.setItem(LS_TRIAL_ENDS, nextTrialEnd);
+      } else {
+        localStorage.removeItem(LS_TRIAL_ENDS);
+      }
     } catch (error) {
       // Keep cached value if offline/error, log for debugging
       console.warn('⚠️ Failed to fetch subscription status:', error instanceof Error ? error.message : error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearSubscriptionCache]);
 
   useEffect(() => {
     // Skip subscription check for offline guest users
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) {
-      // Guests don't have subscriptions, just use free tier
-      setIsPro(false);
+      clearSubscriptionCache();
       setLoading(false);
       return;
     }
@@ -73,9 +121,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
     refresh().catch(() => setLoading(false));
     return () => subscription.unsubscribe();
-  }, [refresh]);
+  }, [refresh, clearSubscriptionCache]);
 
-  const value = useMemo(() => ({ isPro, loading, refresh }), [isPro, loading, refresh]);
+  const value = useMemo(
+    () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, loading, refresh }),
+    [isPro, isPaidPro, isTrialActive, trialEndsAt, loading, refresh]
+  );
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 };

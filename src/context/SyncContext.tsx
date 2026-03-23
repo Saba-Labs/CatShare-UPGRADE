@@ -56,6 +56,14 @@ function applyUserSettingsFromCloud(us: any) {
   if (typeof us.whatsapp_number === 'string' && us.whatsapp_number.length > 0) {
     localStorage.setItem('whatsappNumber', us.whatsapp_number);
   }
+
+  if (us.data && typeof us.data === 'object' && us.data.businessProfile && typeof us.data.businessProfile === 'object') {
+    try {
+      localStorage.setItem('businessProfile', JSON.stringify(us.data.businessProfile));
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) => {

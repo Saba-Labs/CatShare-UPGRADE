@@ -7,6 +7,13 @@ import crypto from "crypto";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSupabaseAdmin } from "./supabaseAdmin.js";
 import { google } from "googleapis";
+import {
+  computePaidPro,
+  computeTrialEndsAtIso,
+  computeHasProAccess,
+  isTrialPeriodActive,
+  TRIAL_DAYS,
+} from "../lib/subscriptionEntitlement.mjs";
 
 dotenv.config();
 
@@ -19,13 +26,6 @@ app.use(express.json());
 
 const PRO_SUBSCRIPTION_IDS = new Set(["catshare_pro_monthly", "catshare_pro_yearly"]);
 const PRO_INAPP_IDS = new Set(["catshare_pro_lifetime"]);
-
-function computeIsPro(row) {
-  if (!row) return false;
-  if (row.status !== "active") return false;
-  if (!row.expires_at) return true;
-  return new Date(row.expires_at).getTime() > Date.now();
-}
 
 /** Supabase Auth JWT (same token the app sends to Vercel APIs) */
 async function requireSupabaseUser(req, res, next) {
@@ -175,6 +175,15 @@ app.get("/subscription", requireSupabaseUser, async (req, res) => {
     if (!uid) return res.status(401).json({ error: "No user id" });
 
     const sb = getSupabaseAdmin();
+
+    const { data: authData, error: authErr } = await sb.auth.admin.getUserById(uid);
+    if (authErr || !authData?.user) {
+      console.error("❌ getUserById failed:", authErr?.message || authErr);
+      return res.status(500).json({ error: "Could not load user" });
+    }
+
+    const trialEndsAt = computeTrialEndsAtIso(authData.user.created_at);
+
     const { data, error } = await sb
       .from("user_subscriptions")
       .select("*")
@@ -183,8 +192,16 @@ app.get("/subscription", requireSupabaseUser, async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
+    const paidPro = computePaidPro(data);
+    const isPro = computeHasProAccess({ paidPro, trialEndsAtIso: trialEndsAt });
+    const isTrialActive = !paidPro && isTrialPeriodActive(trialEndsAt);
+
     return res.json({
-      isPro: computeIsPro(data),
+      isPro,
+      isPaidPro: paidPro,
+      isTrialActive,
+      trialEndsAt,
+      trialDays: TRIAL_DAYS,
       subscription: data || null,
     });
   } catch (err) {

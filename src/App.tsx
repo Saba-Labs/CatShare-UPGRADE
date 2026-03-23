@@ -55,6 +55,8 @@ import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
 import { SyncProvider } from "./context/SyncContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SplashLoadingLayout } from "./components/SplashLoadingLayout";
+import { authService } from "./services/authService";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
 import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -98,11 +100,35 @@ function AppWithBackHandler() {
   const [startupPhase, setStartupPhase] = useState<'pending' | 'resolving' | 'done'>('pending');
   const startupRanForUserRef = useRef<string | null>(null);
 
+  /** When true, keep the native splash visible (fills the gap instead of an empty products tab). */
+  const isHomeRoute = location.pathname === '/' || location.pathname === '';
+  const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
+  const showCloudBootstrapOverlay =
+    isHomeRoute &&
+    !!user &&
+    !isGuestUser &&
+    !showOfflineSyncModal &&
+    (supabaseDataLoading || startupPhase === 'pending');
+
   const isNative = Capacitor.getPlatform() !== "web";
 
+  // Native: Android 12+ often dismisses the *launch* splash when the WebView paints, before JS runs.
+  // Call SplashScreen.show({ autoHide: false }) whenever we still need cover; hide only when ready.
+  // In-WebView overlay (SplashLoadingLayout) matches the same art so there is no blank gap if native dismisses early.
+  const keepNativeSplash =
+    !isSyncContextSyncing && (loading || showCloudBootstrapOverlay);
+
   useEffect(() => {
-    SplashScreen.hide().catch(() => {});
-  }, []);
+    if (!isNative) {
+      SplashScreen.hide().catch(() => {});
+      return;
+    }
+    if (keepNativeSplash) {
+      SplashScreen.show({ autoHide: false }).catch(() => {});
+    } else {
+      SplashScreen.hide().catch(() => {});
+    }
+  }, [isNative, keepNativeSplash]);
 
   const getProductsKey = (uid: string) => getStorageKey('products', uid);
   const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
@@ -1205,6 +1231,13 @@ function AppWithBackHandler() {
           </div>
           <p className="text-white font-semibold text-lg mt-2">Syncing to cloud</p>
           <p className="text-white/60 text-sm mt-1">Please wait...</p>
+        </div>
+      )}
+
+      {/* Fills gap when native launch splash is gone but catalogue is not ready yet (esp. Android 12+ WebView first paint). */}
+      {showCloudBootstrapOverlay && !isSyncContextSyncing && (
+        <div className="fixed inset-0 z-[115] bg-white overflow-auto">
+          <SplashLoadingLayout />
         </div>
       )}
 

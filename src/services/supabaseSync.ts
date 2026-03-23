@@ -375,6 +375,27 @@ export async function syncFieldsDefinition(
 }
 
 /**
+ * Merge `user_settings.data` JSON so partial updates (e.g. watermark) don't wipe `businessProfile`.
+ */
+function mergeUserSettingsData(existing: any, incoming: any): Record<string, unknown> {
+  const ex = existing && typeof existing === 'object' ? existing : {};
+  const inc = incoming && typeof incoming === 'object' ? incoming : {};
+  const out: Record<string, unknown> = { ...ex, ...inc };
+  const exBp = ex.businessProfile;
+  const inBp = inc.businessProfile;
+  if (
+    (exBp && typeof exBp === 'object') ||
+    (inBp && typeof inBp === 'object')
+  ) {
+    out.businessProfile = {
+      ...(typeof exBp === 'object' && exBp ? exBp : {}),
+      ...(typeof inBp === 'object' && inBp ? inBp : {}),
+    };
+  }
+  return out;
+}
+
+/**
  * Sync user settings to Supabase
  */
 export async function syncUserSettings(
@@ -386,16 +407,30 @@ export async function syncUserSettings(
       return { success: false, error: 'Invalid input: userId missing' };
     }
 
-    const { data: existingSettings } = await getSupabaseClient()
+    const { data: existingRow, error: fetchErr } = await getSupabaseClient()
       .from('user_settings')
-      .select('id')
+      .select('id, data')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (existingSettings) {
+    if (fetchErr) {
+      const errorMsg = fetchErr.message || JSON.stringify(fetchErr) || 'Unknown error';
+      console.error('❌ Error reading user settings:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    if (existingRow) {
+      const payload: Record<string, unknown> = {
+        ...settings,
+        updated_at: new Date().toISOString(),
+      };
+      if (Object.prototype.hasOwnProperty.call(settings, 'data') && settings.data !== undefined) {
+        payload.data = mergeUserSettingsData(existingRow.data, settings.data);
+      }
+
       const { data, error } = await getSupabaseClient()
         .from('user_settings')
-        .update({ ...settings, updated_at: new Date().toISOString() })
+        .update(payload as any)
         .eq('user_id', userId)
         .select();
 
@@ -407,21 +442,30 @@ export async function syncUserSettings(
 
       console.log('✅ Updated user settings in Supabase');
       return { success: true, data };
-    } else {
-      const { data, error } = await getSupabaseClient()
-        .from('user_settings')
-        .insert({ user_id: userId, ...settings, updated_at: new Date().toISOString() })
-        .select();
-
-      if (error) {
-        const errorMsg = error.message || JSON.stringify(error) || 'Unknown error';
-        console.error('❌ Error creating user settings:', errorMsg);
-        return { success: false, error: errorMsg };
-      }
-
-      console.log('✅ Created user settings in Supabase');
-      return { success: true, data };
     }
+
+    const insertPayload: Record<string, unknown> = {
+      user_id: userId,
+      ...settings,
+      updated_at: new Date().toISOString(),
+    };
+    if (Object.prototype.hasOwnProperty.call(settings, 'data') && settings.data !== undefined) {
+      insertPayload.data = mergeUserSettingsData(null, settings.data);
+    }
+
+    const { data, error } = await getSupabaseClient()
+      .from('user_settings')
+      .insert(insertPayload as any)
+      .select();
+
+    if (error) {
+      const errorMsg = error.message || JSON.stringify(error) || 'Unknown error';
+      console.error('❌ Error creating user settings:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    console.log('✅ Created user settings in Supabase');
+    return { success: true, data };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in syncUserSettings:', errorMessage);
