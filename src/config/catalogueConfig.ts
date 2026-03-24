@@ -51,6 +51,43 @@ export const DEFAULT_CATALOGUES: Catalogue[] = [
 ];
 
 /**
+ * Repair shapes that omit `catalogues` (e.g. { "0": cat, "1": cat, lastUpdated }) from bad sync/serialization.
+ */
+function normalizeCataloguesDefinition(raw: unknown): CataloguesDefinition {
+  if (raw == null || typeof raw !== 'object') {
+    return { version: 1, catalogues: [...DEFAULT_CATALOGUES], lastUpdated: Date.now() };
+  }
+  if (Array.isArray(raw)) {
+    const catalogues = raw.length > 0 ? (raw as Catalogue[]) : [...DEFAULT_CATALOGUES];
+    return { version: 1, catalogues, lastUpdated: Date.now() };
+  }
+  const o = raw as Record<string, unknown>;
+  if (Array.isArray(o.catalogues)) {
+    const catalogues =
+      o.catalogues.length > 0 ? (o.catalogues as Catalogue[]) : [...DEFAULT_CATALOGUES];
+    return {
+      version: typeof o.version === 'number' ? o.version : 1,
+      catalogues,
+      lastUpdated: typeof o.lastUpdated === 'number' ? o.lastUpdated : Date.now(),
+    };
+  }
+  const numericKeys = Object.keys(o)
+    .filter((k) => /^\d+$/.test(k))
+    .sort((a, b) => Number(a) - Number(b));
+  const fromNumeric = numericKeys
+    .map((k) => o[k])
+    .filter((x) => x != null && typeof x === 'object');
+  if (fromNumeric.length > 0) {
+    return {
+      version: typeof o.version === 'number' ? o.version : 1,
+      catalogues: fromNumeric as Catalogue[],
+      lastUpdated: typeof o.lastUpdated === 'number' ? o.lastUpdated : Date.now(),
+    };
+  }
+  return { version: 1, catalogues: [...DEFAULT_CATALOGUES], lastUpdated: Date.now() };
+}
+
+/**
  * Get current catalogues definition from localStorage
  * Falls back to defaults if not found (first time setup)
  * @param userId - Optional user ID for keyed storage
@@ -71,7 +108,26 @@ export function getCataloguesDefinition(userId?: string): CataloguesDefinition {
 
     const stored = localStorage.getItem(storageKey);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as CataloguesDefinition;
+      const normalized = normalizeCataloguesDefinition(parsed);
+      const hadValidCataloguesArray =
+        parsed != null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed) &&
+        Array.isArray((parsed as { catalogues?: unknown }).catalogues);
+      if (!hadValidCataloguesArray) {
+        const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+        if (effectiveUserId) {
+          setCataloguesDefinition(normalized, effectiveUserId);
+        } else {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(normalized));
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      return normalized;
     }
   } catch (err) {
     console.warn("Failed to parse cataloguesDefinition:", err);
@@ -120,7 +176,7 @@ export function setCataloguesDefinition(definition: CataloguesDefinition, userId
  */
 export function getAllCatalogues(userId?: string): Catalogue[] {
   const definition = getCataloguesDefinition(userId);
-  return definition.catalogues.sort((a, b) => a.order - b.order);
+  return [...definition.catalogues].sort((a, b) => a.order - b.order);
 }
 
 /**

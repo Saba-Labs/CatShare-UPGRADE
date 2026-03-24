@@ -918,12 +918,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
       : "products";
     const useUserImagesNow = Boolean(firebaseUserIdNow);
 
-    const selectedCat = catalogues.find((c) => c.id === selectedCatalogue);
-    const selectedCatalogueFolder =
-      selectedCat?.folder || selectedCat?.label || selectedCatalogue || 'catalogue';
-
     const imagePath = useUserImagesNow
-      ? getUserImagePath(id, firebaseUserIdNow || undefined, selectedCatalogueFolder)
+      ? getUserImagePath(id, firebaseUserIdNow || undefined)
       : `catalogue/product-${id}.png`;
 
     try {

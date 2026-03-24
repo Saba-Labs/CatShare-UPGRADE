@@ -4,8 +4,8 @@ import { MdOutlineHome } from "react-icons/md";
 import ProductPreviewModal from "./ProductPreviewModal";
 import SideDrawer from "./SideDrawer";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { deleteRenderedImageForProduct } from "./Save";
+import { tryReadProductSourceAsDataUrl, deleteProductSourceImagesBestEffort } from "./utils/productSourceImage";
 import { deleteAllDeletedProducts, deleteProductFromSupabase } from "./services/supabaseSync";
 import { useSync } from "./context/SyncContext";
 
@@ -25,28 +25,9 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     const loadShelfImages = async () => {
       const map = {};
       for (const p of deletedProducts) {
-        let resolved = "";
-        if (p.imagePath) {
-          try {
-            try {
-              const result = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.Data,
-              });
-              resolved = `data:image/png;base64,${result.data}`;
-            } catch {
-              const result = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.External,
-              });
-              resolved = `data:image/png;base64,${result.data}`;
-            }
-          } catch {
-            // Local file not found, fall through
-          }
-        }
+        let resolved = await tryReadProductSourceAsDataUrl(p);
         if (!resolved) {
-          resolved = p.imageUrl || p.image || "";
+          resolved = (typeof p.image === "string" && p.image) || p.imageUrl || "";
         }
         map[p.id] = resolved;
       }
@@ -111,16 +92,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     // 3) Local file cleanup (best-effort)
     try {
       await deleteRenderedImageForProduct(toDelete.id);
-      if (toDelete.imagePath) {
-        try {
-          await Filesystem.deleteFile({ path: toDelete.imagePath, directory: Directory.Data });
-        } catch {
-          try {
-            await Filesystem.deleteFile({ path: toDelete.imagePath, directory: Directory.External });
-          } catch { /* ignore */ }
-        }
-        console.log(`🗑️ Deleted source image: ${toDelete.imagePath}`);
-      }
+      await deleteProductSourceImagesBestEffort(toDelete);
     } catch (err) {
       console.warn(`⚠️ Failed to clean up files for product ${toDelete.id}:`, err);
     }
@@ -151,15 +123,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       for (const product of snapshot) {
         try {
           await deleteRenderedImageForProduct(product.id);
-          if (product.imagePath) {
-            try {
-              await Filesystem.deleteFile({ path: product.imagePath, directory: Directory.Data });
-            } catch {
-              try {
-                await Filesystem.deleteFile({ path: product.imagePath, directory: Directory.External });
-              } catch { /* ignore */ }
-            }
-          }
+          await deleteProductSourceImagesBestEffort(product);
         } catch (err) {
           console.warn(`⚠️ Failed to clean up files for product ${product.id}:`, err);
         }

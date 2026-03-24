@@ -61,7 +61,6 @@ import { SubscriptionProvider } from "./context/SubscriptionContext";
 import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
-import { cacheCloudProductImages } from "./utils/productImageLocalCache";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -177,177 +176,173 @@ function AppWithBackHandler() {
     if (startupRanForUserRef.current === userId) return;
     startupRanForUserRef.current = userId;
 
-    void (async () => {
-      try {
-        const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
-        if (isGuestUser) {
-          // Guest users: load local data, skip everything else.
-          const guestProducts = safeGetFromStorage(getProductsKey(userId), []);
-          const guestDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
-          setProducts(guestProducts);
-          setDeletedProducts(guestDeleted);
-          setStartupPhase('done');
-          return;
-        }
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) {
+      // Guest users: load local data, skip everything else.
+      const guestProducts = safeGetFromStorage(getProductsKey(userId), []);
+      const guestDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      setProducts(guestProducts);
+      setDeletedProducts(guestDeleted);
+      setStartupPhase('done');
+      return;
+    }
 
-        // Wipe legacy unkeyed caches from any previous user on this device.
-        if (previousUserIdRef.current && previousUserIdRef.current !== userId) {
-          clearLegacyUnkeyedProductCaches();
-        }
-        previousUserIdRef.current = userId;
+    // Wipe legacy unkeyed caches from any previous user on this device.
+    if (previousUserIdRef.current && previousUserIdRef.current !== userId) {
+      clearLegacyUnkeyedProductCaches();
+    }
+    previousUserIdRef.current = userId;
 
-        // Step 1: Run data migration (moves unkeyed localStorage to keyed).
-        migrateUnkeyedDataToUserKeyed(userId);
+    // Step 1: Run data migration (moves unkeyed localStorage to keyed).
+    migrateUnkeyedDataToUserKeyed(userId);
 
-        // Step 2: Check if strict online mode is already enabled (returning user).
-        const strictAlreadyEnabled = localStorage.getItem('strictOnlineMode::device') === 'true';
-        const legacyResolved = localStorage.getItem('offlineLegacyResolved::device') === 'true';
+    // Step 2: Check if strict online mode is already enabled (returning user).
+    const strictAlreadyEnabled = localStorage.getItem('strictOnlineMode::device') === 'true';
+    const legacyResolved = localStorage.getItem('offlineLegacyResolved::device') === 'true';
+    // ADD THIS LINE:
+console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlreadyEnabled, 'legacyResolved:', legacyResolved);
 
-        if (strictAlreadyEnabled && legacyResolved) {
-          // Returning strict-mode user: load exclusively from Supabase snapshot.
-          const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
-          const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
-          const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
-          const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
+    if (strictAlreadyEnabled && legacyResolved) {
+      // Returning strict-mode user: load exclusively from Supabase snapshot.
+      const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
+      const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
+      const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
+      const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
 
-          const [cachedProducts, cachedDeleted] = await Promise.all([
-            cacheCloudProductImages(userId, filteredProducts),
-            cacheCloudProductImages(userId, cloudDeleted),
-          ]);
+      setProducts(filteredProducts);
+      safeSetInStorage(getProductsKey(userId), filteredProducts);
+      setDeletedProducts(cloudDeleted);
+      safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
 
-          setProducts(cachedProducts);
-          safeSetInStorage(getProductsKey(userId), cachedProducts);
-          setDeletedProducts(cachedDeleted);
-          safeSetInStorage(getDeletedProductsKey(userId), cachedDeleted);
-
-          const rawCats = supabaseData?.categories || [];
-          const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
-          localStorage.setItem('categories', JSON.stringify(normalizedCats));
-          if (supabaseData?.fieldsDefinition) {
-            setFieldsDefinition(supabaseData.fieldsDefinition, userId);
-            window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
-              detail: { newDefinition: supabaseData.fieldsDefinition, template: supabaseData.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
-            }));
-          }
-          if (supabaseData?.cataloguesDefinition) {
-            setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
-            window.dispatchEvent(new CustomEvent('catalogues-changed', {
-              detail: { action: 'update', catalogues: supabaseData.cataloguesDefinition.catalogues }
-            }));
-          }
-          applyUserSettingsFromCloud(supabaseData?.userSettings);
-          setSupabaseSyncStatus('synced');
-          setStartupPhase('done');
-          console.log('✅ [startup] Strict mode user loaded from cloud:', cachedProducts.length, 'products');
-          return;
-        }
-
-        // Step 3: Check for legacy offline data (ANY type, not just products).
-        const hasLegacyProducts = (() => {
-          const kp = safeGetFromStorage(getProductsKey(userId), []);
-          return Array.isArray(kp) && kp.length > 0;
-        })();
-        const hasLegacyDeleted = (() => {
-          const kd = safeGetFromStorage(getDeletedProductsKey(userId), []);
-          return Array.isArray(kd) && kd.length > 0;
-        })();
-        const hasLegacyCategories = (() => {
-          try {
-            const keyed = localStorage.getItem(getStorageKey('categories', userId));
-            const unkeyed = localStorage.getItem('categories');
-            const c = JSON.parse(keyed || unkeyed || '[]');
-            return Array.isArray(c) && c.length > 0;
-          } catch { return false; }
-        })();
-        const hasLegacyFields = !!getFieldsDefinition(userId);
-        const hasLegacyCatalogues = !!getCataloguesDefinition(userId);
-        const hasAnyOfflineData = hasLegacyProducts || hasLegacyDeleted || hasLegacyCategories || hasLegacyFields || hasLegacyCatalogues;
-
-        if (!legacyResolved && hasAnyOfflineData) {
-          // Step 3a: Offline data found, needs resolution. Show popup and block.
-          setStartupPhase('resolving');
-          setShowOfflineSyncModal(true);
-
-          // Load local data so user can see what they have while deciding.
-          const localP = safeGetFromStorage(getProductsKey(userId), []);
-          const localD = safeGetFromStorage(getDeletedProductsKey(userId), []);
-          setProducts(localP);
-          setDeletedProducts(localD);
-          console.log('⏳ [startup] Offline data detected, awaiting user decision');
-          return;
-        }
-
-        // Step 4: No offline data (or already resolved but strict not enabled yet).
-        // This is a new user or a user whose legacy was already handled.
-        // Apply Supabase data normally (merge for non-strict, or just load).
-        const localProducts = safeGetFromStorage(getProductsKey(userId), []);
-        const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
-
-        let nextProducts = localProducts;
-        let nextDeleted = localDeleted;
-
-        if (supabaseData?.products && supabaseData.products.length > 0) {
-          const currentDeletedIds = new Set<string>();
-          for (const p of localDeleted) {
-            if (p?.id != null) currentDeletedIds.add(String(p.id));
-          }
-          for (const p of supabaseData.deletedProducts || []) {
-            if (p?.id != null) currentDeletedIds.add(String(p.id));
-          }
-          nextProducts = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
-        }
-
-        if (supabaseData?.deletedProducts && supabaseData.deletedProducts.length > 0) {
-          nextDeleted = mergeProductsData(localDeleted, supabaseData.deletedProducts);
-        }
-
-        const [cachedNextProducts, cachedNextDeleted] = await Promise.all([
-          cacheCloudProductImages(userId, nextProducts),
-          cacheCloudProductImages(userId, nextDeleted),
-        ]);
-
-        setProducts(cachedNextProducts);
-        safeSetInStorage(getProductsKey(userId), cachedNextProducts);
-        setDeletedProducts(cachedNextDeleted);
-        safeSetInStorage(getDeletedProductsKey(userId), cachedNextDeleted);
-
-        if (supabaseData?.fieldsDefinition && Array.isArray(supabaseData.fieldsDefinition?.fields)) {
-          const localFieldsDef = getFieldsDefinition();
-          const remoteFieldsDef = supabaseData.fieldsDefinition;
-          const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
-          const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
-          if (remoteLastUpdated > localLastUpdated) {
-            setFieldsDefinition(remoteFieldsDef);
-            window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
-              detail: { newDefinition: remoteFieldsDef, template: remoteFieldsDef?.industry || 'Custom', isBackupRestore: false }
-            }));
-          }
-        }
-
-        if (supabaseData?.cataloguesDefinition) {
-          const localCataloguesDef = getCataloguesDefinition();
-          const remoteCataloguesDef = supabaseData.cataloguesDefinition;
-          const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
-          const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
-          if (remoteLastUpdated > localLastUpdated) {
-            setCataloguesDefinition(remoteCataloguesDef);
-            window.dispatchEvent(new CustomEvent('catalogues-changed', {
-              detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
-            }));
-          }
-        }
-
-        // Enable strict mode for all authenticated users going forward.
-        localStorage.setItem('strictOnlineMode::device', 'true');
-        localStorage.setItem('offlineLegacyResolved::device', 'true');
-        setSupabaseSyncStatus('synced');
-        setStartupPhase('done');
-        console.log('✅ [startup] Normal user startup complete');
-      } catch (err) {
-        console.error('❌ [startup] pipeline failed:', err);
-        setStartupPhase('done');
+      const rawCats = supabaseData?.categories || [];
+      const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+      localStorage.setItem('categories', JSON.stringify(normalizedCats));
+      if (supabaseData?.fieldsDefinition) {
+        setFieldsDefinition(supabaseData.fieldsDefinition, userId);
+        window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+          detail: { newDefinition: supabaseData.fieldsDefinition, template: supabaseData.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
+        }));
       }
+      if (supabaseData?.cataloguesDefinition) {
+        setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
+        window.dispatchEvent(new CustomEvent('catalogues-changed', {
+          detail: { action: 'update', catalogues: supabaseData.cataloguesDefinition.catalogues }
+        }));
+      }
+      applyUserSettingsFromCloud(supabaseData?.userSettings);
+      setSupabaseSyncStatus('synced');
+      (async () => {
+        try {
+          const cloudData = await refreshFromCloud();
+          if (cloudData) {
+            setProducts(cloudData.products);
+            setDeletedProducts(cloudData.deletedProducts);
+          }
+        } catch (e) {
+          console.warn('⚠️ Image cache refresh failed:', e);
+        }
+        setStartupPhase('done');
+        console.log('✅ [startup] Strict mode user loaded from cloud:', filteredProducts.length, 'products');
+      })();
+      return;
+    }
+
+    // Step 3: Check for legacy offline data (ANY type, not just products).
+    const hasLegacyProducts = (() => {
+      const kp = safeGetFromStorage(getProductsKey(userId), []);
+      return Array.isArray(kp) && kp.length > 0;
     })();
+    const hasLegacyDeleted = (() => {
+      const kd = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      return Array.isArray(kd) && kd.length > 0;
+    })();
+    const hasLegacyCategories = (() => {
+      try {
+        const keyed = localStorage.getItem(getStorageKey('categories', userId));
+        const unkeyed = localStorage.getItem('categories');
+        const c = JSON.parse(keyed || unkeyed || '[]');
+        return Array.isArray(c) && c.length > 0;
+      } catch { return false; }
+    })();
+    const hasLegacyFields = !!getFieldsDefinition(userId);
+    const hasLegacyCatalogues = !!getCataloguesDefinition(userId);
+    const hasAnyOfflineData = hasLegacyProducts || hasLegacyDeleted || hasLegacyCategories || hasLegacyFields || hasLegacyCatalogues;
+
+    if (!legacyResolved && hasAnyOfflineData) {
+      // Step 3a: Offline data found, needs resolution. Show popup and block.
+      setStartupPhase('resolving');
+      setShowOfflineSyncModal(true);
+
+      // Load local data so user can see what they have while deciding.
+      const localP = safeGetFromStorage(getProductsKey(userId), []);
+      const localD = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      setProducts(localP);
+      setDeletedProducts(localD);
+      console.log('⏳ [startup] Offline data detected, awaiting user decision');
+      return;
+    }
+
+    // Step 4: No offline data (or already resolved but strict not enabled yet).
+    // This is a new user or a user whose legacy was already handled.
+    // Apply Supabase data normally (merge for non-strict, or just load).
+    const localProducts = safeGetFromStorage(getProductsKey(userId), []);
+    const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+
+    if (supabaseData?.products && supabaseData.products.length > 0) {
+      const currentDeletedIds = new Set<string>();
+      for (const p of localDeleted) {
+        if (p?.id != null) currentDeletedIds.add(String(p.id));
+      }
+      for (const p of supabaseData.deletedProducts || []) {
+        if (p?.id != null) currentDeletedIds.add(String(p.id));
+      }
+      const merged = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
+        setProducts(merged);
+      safeSetInStorage(getProductsKey(userId), merged);
+    } else {
+      setProducts(localProducts);
+      }
+
+    if (supabaseData?.deletedProducts && supabaseData.deletedProducts.length > 0) {
+      const merged = mergeProductsData(localDeleted, supabaseData.deletedProducts);
+        setDeletedProducts(merged);
+      safeSetInStorage(getDeletedProductsKey(userId), merged);
+    } else {
+      setDeletedProducts(localDeleted);
+      }
+
+    if (supabaseData?.fieldsDefinition && Array.isArray(supabaseData.fieldsDefinition?.fields)) {
+        const localFieldsDef = getFieldsDefinition();
+        const remoteFieldsDef = supabaseData.fieldsDefinition;
+        const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
+        if (remoteLastUpdated > localLastUpdated) {
+          setFieldsDefinition(remoteFieldsDef);
+          window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+          detail: { newDefinition: remoteFieldsDef, template: remoteFieldsDef?.industry || 'Custom', isBackupRestore: false }
+          }));
+        }
+      }
+
+    if (supabaseData?.cataloguesDefinition) {
+        const localCataloguesDef = getCataloguesDefinition();
+        const remoteCataloguesDef = supabaseData.cataloguesDefinition;
+        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
+        if (remoteLastUpdated > localLastUpdated) {
+          setCataloguesDefinition(remoteCataloguesDef);
+          window.dispatchEvent(new CustomEvent('catalogues-changed', {
+          detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
+          }));
+        }
+      }
+
+    // Enable strict mode for all authenticated users going forward.
+    localStorage.setItem('strictOnlineMode::device', 'true');
+    localStorage.setItem('offlineLegacyResolved::device', 'true');
+      setSupabaseSyncStatus('synced');
+    setStartupPhase('done');
+    console.log('✅ [startup] Normal user startup complete');
   }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches]);
 
   // ──────────────────────────────────────────────────────
@@ -1202,14 +1197,10 @@ function AppWithBackHandler() {
                   const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
                   const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
                   const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
-                  const [cachedProducts, cachedDeleted] = await Promise.all([
-                    cacheCloudProductImages(user.uid, filteredProducts),
-                    cacheCloudProductImages(user.uid, cloudDeleted),
-                  ]);
-                  setProducts(cachedProducts);
-                  setDeletedProducts(cachedDeleted);
-                  safeSetInStorage(getProductsKey(user.uid), cachedProducts);
-                  safeSetInStorage(getDeletedProductsKey(user.uid), cachedDeleted);
+                  setProducts(filteredProducts);
+                  setDeletedProducts(cloudDeleted);
+                  safeSetInStorage(getProductsKey(user.uid), filteredProducts);
+                  safeSetInStorage(getDeletedProductsKey(user.uid), cloudDeleted);
 
                   const rawCats = supabaseData?.categories || [];
                   const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);

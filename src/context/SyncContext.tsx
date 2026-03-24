@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useCallback, useState, useRef, ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from './AuthContext';
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
 import { cacheCloudProductImages } from '../utils/productImageLocalCache';
@@ -102,8 +103,20 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const cachedProducts = await cacheCloudProductImages(userId, filteredProducts);
     const cachedDeleted = await cacheCloudProductImages(userId, nextDeleted);
 
-    safeSetInStorage(getProductsKey(userId), cachedProducts);
-    safeSetInStorage(getDeletedProductsKey(userId), cachedDeleted);
+    let storedProducts = cachedProducts;
+    let storedDeleted = cachedDeleted;
+    if (Capacitor.isNativePlatform()) {
+      const { migrateProductImagePaths } = await import('../utils/dataMigration');
+      const mp = [...cachedProducts];
+      const md = [...cachedDeleted];
+      await migrateProductImagePaths(mp, userId);
+      await migrateProductImagePaths(md, userId);
+      storedProducts = mp;
+      storedDeleted = md;
+    }
+
+    safeSetInStorage(getProductsKey(userId), storedProducts);
+    safeSetInStorage(getDeletedProductsKey(userId), storedDeleted);
 
     const rawCats = snapshot.categories || [];
     const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
@@ -120,7 +133,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     applyUserSettingsFromCloud(snapshot.userSettings);
 
-    return { products: cachedProducts, deletedProducts: cachedDeleted };
+    return { products: storedProducts, deletedProducts: storedDeleted };
   }, [user?.uid]);
 
   const syncProductsToCloud = useCallback(async (

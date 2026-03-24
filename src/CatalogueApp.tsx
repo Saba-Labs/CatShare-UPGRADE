@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiDownload } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -19,8 +19,14 @@ import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import RatingModal from "./components/RatingModal";
 import { useAuth } from "./context/AuthContext";
+import { useToast } from "./context/ToastContext";
 import { useSync } from "./context/SyncContext";
 import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
+import {
+  tryReadProductSourceAsDataUrl,
+  deleteProductSourceImagesBestEffort,
+} from "./utils/productSourceImage";
+import { cacheCloudProductImages } from "./utils/productImageLocalCache";
 
 declare global {
   interface Window {
@@ -39,6 +45,7 @@ export function openPreviewHtml(id, tab = null) {
 
 export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>> }) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const { syncProductsToCloud, isStrictMode } = useSync();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -152,6 +159,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showShelfConfirm, setShowShelfConfirm] = useState(false);
   const [shelfTarget, setShelfTarget] = useState(null);
+  const [r2DownloadingId, setR2DownloadingId] = useState<string | number | null>(null);
   const [confirmToggleStock, setConfirmToggleStock] = useState(null);
   const [bypassChecked, setBypassChecked] = useState(false);
   const [localIsRendering, setLocalIsRendering] = useState(false);
@@ -203,39 +211,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Load this batch in parallel
         const promises = batch.map(async (p) => {
-          // Priority: cloud URL > local file > base64
-          // 1. Try cloud URL first (Cloudflare R2)
-          if (p.imageUrl) {
-            map[p.id] = p.imageUrl;
+          const resolved = await tryReadProductSourceAsDataUrl(p);
+          if (resolved) {
+            map[p.id] = resolved;
             return;
           }
-
-          // 2. Try local filesystem image
-          if (p.imagePath) {
-            try {
-              // Old: Directory.Data
-              // New: Directory.External (user-* folders)
-              try {
-                const result = await Filesystem.readFile({
-                  path: p.imagePath,
-                  directory: Directory.Data,
-                });
-                map[p.id] = `data:image/png;base64,${result.data}`;
-              } catch (dataErr) {
-                const result = await Filesystem.readFile({
-                  path: p.imagePath,
-                  directory: Directory.External,
-                });
-                map[p.id] = `data:image/png;base64,${result.data}`;
-              }
-            } catch (err: any) {
-              console.warn(`❌ Failed to load image for "${p.name}" from path: ${p.imagePath}`, err?.message);
-              map[p.id] = p.image || "";
-            }
-          } else {
-            // 3. Fallback to base64 in-memory image
-            map[p.id] = p.image || "";
-          }
+          map[p.id] = (typeof p.image === "string" && p.image ? p.image : "") || "";
         });
 
         // Wait for batch to complete before loading next batch
@@ -306,25 +287,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       // Force reload thumbnails from local filesystem immediately
       // so the new image shows without waiting for R2 upload
       for (const p of updated) {
-        if (p.imagePath) {
-          try {
-            let result: any;
-            try {
-              result = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.Data,
-              });
-            } catch {
-              result = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.External,
-              });
-            }
-            const base64 = `data:image/png;base64,${result.data}`;
-            setImageMap(prev => ({ ...prev, [p.id]: base64 }));
-          } catch (err) {
-            // Local file not found, keep existing imageMap entry
-          }
+        const thumb = await tryReadProductSourceAsDataUrl(p);
+        if (thumb) {
+          setImageMap((prev) => ({ ...prev, [p.id]: thumb }));
         }
       }
     };
@@ -500,6 +465,62 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     } else {
       // Show confirmation with special flag for master toggle
       setConfirmToggleStock({ id, field: "MASTER" });
+    }
+  };
+
+  const handleDownloadR2Product = async (e: React.MouseEvent, rowProduct: any) => {
+    e.stopPropagation();
+    const url =
+      typeof rowProduct?.imageUrl === "string" ? rowProduct.imageUrl.trim() : "";
+    if (!url || !/^https?:\/\//i.test(url)) {
+      showToast(
+        "No cloud image URL for this product. Sync from cloud or add an image online.",
+        "info"
+      );
+      return;
+    }
+    const completeProduct = products.find((x) => x.id === rowProduct.id) || rowProduct;
+    const uid = user?.uid || localStorage.getItem("firebaseUserId") || "";
+    setR2DownloadingId(rowProduct.id);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        if (!uid) {
+          showToast("Sign in to save images to your device.", "warning");
+          return;
+        }
+        const [updated] = await cacheCloudProductImages(uid, [completeProduct]);
+        setProducts((prev) =>
+          prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
+        );
+        showToast("Cloud image saved to your Products folder.", "success");
+      } else {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const mime = blob.type || "";
+        const ext = mime.includes("png")
+          ? "png"
+          : mime.includes("webp")
+            ? "webp"
+            : mime.includes("jpeg") || mime.includes("jpg")
+              ? "jpg"
+              : "jpg";
+        const a = document.createElement("a");
+        const objectUrl = URL.createObjectURL(blob);
+        a.href = objectUrl;
+        a.download = `product-${rowProduct.id}.${ext}`;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+        showToast("Download started.", "success");
+      }
+    } catch (err: any) {
+      console.error("R2 download failed:", err);
+      showToast(err?.message || "Could not download image.", "error");
+    } finally {
+      setR2DownloadingId(null);
     }
   };
 
@@ -681,18 +702,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     if (window.confirm("Permanently delete this item?")) {
       const product = deletedProducts.find(p => p.id === id);
   
-      // ✅ Delete local filesystem image
-      if (product?.imagePath) {
-        try {
-          await Filesystem.deleteFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          console.log(`🗑️ Deleted source image: ${product.imagePath}`);
-        } catch (err) {
-          console.warn("⚠️ Could not delete local image file:", err);
-        }
-      }
+      await deleteProductSourceImagesBestEffort(product || { id });
   
       // Delete image from R2 if product has a cloud URL
       if (product?.imageUrl && !product.imageUrl.startsWith('undefined')) {
@@ -998,6 +1008,33 @@ if (isStrictMode() && user?.uid) {
                                 className="text-blue-600 hover:text-blue-800"
                               >
                                 <FiEdit size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDownloadR2Product(e, p)}
+                                disabled={
+                                  r2DownloadingId === p.id ||
+                                  !(
+                                    typeof p.imageUrl === "string" &&
+                                    /^https?:\/\//i.test(p.imageUrl.trim())
+                                  )
+                                }
+                                className={`text-emerald-600 hover:text-emerald-800 disabled:cursor-not-allowed ${
+                                  typeof p.imageUrl === "string" &&
+                                  /^https?:\/\//i.test(p.imageUrl.trim())
+                                    ? r2DownloadingId === p.id
+                                      ? "opacity-100 animate-pulse"
+                                      : ""
+                                    : "opacity-30"
+                                }`}
+                                title={
+                                  typeof p.imageUrl === "string" &&
+                                  /^https?:\/\//i.test(p.imageUrl.trim())
+                                    ? "Download cloud (R2) image"
+                                    : "No cloud image URL — sync from cloud first"
+                                }
+                              >
+                                <FiDownload size={16} />
                               </button>
                               <button
                                 onClick={() => {

@@ -21,7 +21,9 @@ import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES, g
 import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
 import { applyBackupFieldAnalysis } from "./config/fieldConfig";
+import { Capacitor } from "@capacitor/core";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
+import { cacheCloudProductImages } from "./utils/productImageLocalCache";
 import { getCurrentCurrency } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBackupCreated, logBackupRestored, logBackupSharedFileSharer, logBackupDownloaded, logCsvExported, logFileSharerError, logCategoryManaged } from "./config/analyticsEvents";
@@ -63,34 +65,35 @@ const [shareErrorBase64, setShareErrorBase64] = useState(null);
 const [detectedBackups, setDetectedBackups] = useState([]);
 const [showBrowseForBackup, setShowBrowseForBackup] = useState(false);
 const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+const [r2Downloading, setR2Downloading] = useState(false);
 const navigate = useNavigate();
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
   const { user } = useAuth();
-  const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt, loading: subscriptionLoading } =
+    useSubscription();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
 
-  const trialDaysLeft = (() => {
-    if (!trialEndsAt) return null;
-    try {
-      const end = new Date(trialEndsAt);
-      const now = new Date();
-      return Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
-    } catch {
-      return null;
+  const accountPlanLine = (() => {
+    if (subscriptionLoading) {
+      return { text: "Checking plan…", className: "text-xs text-gray-500 mt-1" };
     }
-  })();
-
-  const accountStatusLabel = (() => {
-    if (isPaidPro) return { text: "Pro", className: "bg-emerald-100 text-emerald-800" };
-    if (isTrialActive) {
-      const days = trialDaysLeft;
-      const daysPart =
-        days != null ? `${days} day${days === 1 ? "" : "s"} left` : "active";
-      return { text: `Trial · ${daysPart}`, className: "bg-amber-100 text-amber-900" };
+    if (isPaidPro) {
+      return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
     }
-    if (!isPro) return { text: "Free", className: "bg-slate-200 text-slate-700" };
-    return { text: "Pro", className: "bg-emerald-100 text-emerald-800" };
+    if (isTrialActive && trialEndsAt) {
+      const end = new Date(trialEndsAt).getTime();
+      const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
+      const dayWord = daysLeft === 1 ? "day" : "days";
+      return {
+        text: `Trial · ${daysLeft} ${dayWord} left`,
+        className: "text-xs font-medium text-amber-800 mt-1",
+      };
+    }
+    if (isPro) {
+      return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
+    }
+    return { text: "Free", className: "text-xs text-gray-600 mt-1" };
   })();
 
   const totalProducts = products.length;
@@ -141,6 +144,48 @@ const navigate = useNavigate();
     if (newCount === 7) {
       setShowHiddenFeatures(true);
       setClickCountN(0); // Reset counter
+    }
+  };
+
+  const handleDownloadR2ProductImages = async () => {
+    if (!Capacitor.isNativePlatform()) {
+      showToast("Saving cloud images to the Products folder is only available in the app.", "info");
+      return;
+    }
+    const uid = user?.uid || localStorage.getItem("firebaseUserId");
+    if (!uid) {
+      showToast("Sign in to download images.", "warning");
+      return;
+    }
+    const active = Array.isArray(products) ? products : [];
+    const deleted = safeGetFromStorage(getStorageKey("deletedProducts", uid), []);
+    const toCache = [...active, ...deleted];
+    if (toCache.length === 0) {
+      showToast("No products to sync.", "info");
+      return;
+    }
+    const hasUrl = toCache.some(
+      (p) =>
+        p &&
+        typeof p.imageUrl === "string" &&
+        /^https?:\/\//i.test(p.imageUrl.trim())
+    );
+    if (!hasUrl) {
+      showToast("No cloud image URLs found. Pull from cloud first or add images online.", "info");
+      return;
+    }
+    setR2Downloading(true);
+    try {
+      const cachedMerged = await cacheCloudProductImages(uid, toCache);
+      const n = active.length;
+      setProducts(cachedMerged.slice(0, n));
+      setDeletedProducts(cachedMerged.slice(n));
+      showToast("R2 images saved to your Products folder.", "success");
+    } catch (err) {
+      console.error("R2 download failed:", err);
+      showToast("R2 download failed: " + (err?.message || String(err)), "error");
+    } finally {
+      setR2Downloading(false);
     }
   };
 
@@ -1702,13 +1747,30 @@ setShowBrowseForBackup(false);
         >
           <div className="h-[40px] bg-black flex-shrink-0"></div>
           <div className="overflow-y-auto flex-1 p-4">
-          <h2 className="text-lg font-semibold mb-4">
-            Me<span
-              onClick={handleNClick}
-              className="cursor-pointer"
-              title={showHiddenFeatures ? "Features unlocked! 🎉" : ""}
-            >n</span>u
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-semibold">
+              Me<span
+                onClick={handleNClick}
+                className="cursor-pointer"
+                title={showHiddenFeatures ? "Features unlocked! 🎉" : ""}
+              >n</span>u
+            </h2>
+            {Capacitor.isNativePlatform() && (
+              <button
+                type="button"
+                onClick={handleDownloadR2ProductImages}
+                disabled={r2Downloading}
+                title="Download Cloudflare (R2) source images into the Products folder"
+                className={`shrink-0 px-2 py-0.5 rounded text-[11px] font-semibold border transition ${
+                  r2Downloading
+                    ? "border-gray-300 text-gray-400 cursor-wait"
+                    : "border-slate-400 text-slate-700 hover:bg-slate-100 active:bg-slate-200"
+                }`}
+              >
+                {r2Downloading ? "…" : "R2"}
+              </button>
+            )}
+          </div>
 
           {user ? (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg">
@@ -1723,18 +1785,7 @@ setShowBrowseForBackup(false);
                     {user.displayName || user.email}
                   </p>
                   <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accountStatusLabel.className}`}
-                      title={
-                        isTrialActive && trialEndsAt
-                          ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}`
-                          : undefined
-                      }
-                    >
-                      {accountStatusLabel.text}
-                    </span>
-                  </div>
+                  <p className={accountPlanLine.className}>{accountPlanLine.text}</p>
                 </div>
               </div>
               <button

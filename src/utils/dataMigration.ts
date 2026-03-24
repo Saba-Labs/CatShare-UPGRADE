@@ -7,7 +7,8 @@
 
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } from "../config/catalogueConfig";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import { getStorageKey, getUserImagePath } from "./safeStorage";
+import { Capacitor } from "@capacitor/core";
+import { getStorageKey, getUserImagePath, safeGetFromStorage, safeSetInStorage } from "./safeStorage";
 import { getFieldsDefinition, setFieldsDefinition } from "../config/fieldConfig";
 
 /**
@@ -350,6 +351,24 @@ export async function runMigrations(): Promise<void> {
   // Step 4: Ensure all products have required fields
   ensureProductsHaveStockFields();
 
+  // Step 4b: Move source images to user-<uid>/Products/product-<id>.png (native only)
+  const uid =
+    localStorage.getItem("firebaseUserId") || localStorage.getItem("supabase_user_id");
+  if (uid && Capacitor.isNativePlatform()) {
+    const pk = getStorageKey("products", uid);
+    const dk = getStorageKey("deletedProducts", uid);
+    const prods = safeGetFromStorage(pk, []);
+    const del = safeGetFromStorage(dk, []);
+    if (Array.isArray(prods) && prods.length > 0) {
+      await migrateProductImagePaths(prods, uid);
+      safeSetInStorage(pk, prods);
+    }
+    if (Array.isArray(del) && del.length > 0) {
+      await migrateProductImagePaths(del, uid);
+      safeSetInStorage(dk, del);
+    }
+  }
+
   // Step 5: Validate configuration
   const isValid = validateCatalogueConfig();
 
@@ -397,6 +416,52 @@ export async function migrateProductImagePaths(products: any[], userId: string):
   try {
     for (const product of products) {
       if (!product.imagePath) continue;
+
+      const productsFolderPath = getUserImagePath(product.id, userId);
+      const sourceSuffix = `product-${product.id}.png`;
+
+      // Move user-<uid>/<Catalogue>/product-<id>.png → user-<uid>/Products/product-<id>.png
+      if (
+        product.imagePath.startsWith(`user-${userId}/`) &&
+        !product.imagePath.includes("/Products/") &&
+        product.imagePath.endsWith(sourceSuffix)
+      ) {
+        const oldCatalogueScopedPath = product.imagePath;
+        if (oldCatalogueScopedPath !== productsFolderPath) {
+          try {
+            let result: any;
+            try {
+              result = await Filesystem.readFile({
+                path: oldCatalogueScopedPath,
+                directory: Directory.External,
+              });
+            } catch {
+              result = await Filesystem.readFile({
+                path: oldCatalogueScopedPath,
+                directory: Directory.Data,
+              });
+            }
+            await Filesystem.writeFile({
+              path: productsFolderPath,
+              data: result.data,
+              directory: Directory.External,
+              recursive: true,
+            });
+            product.imagePath = productsFolderPath;
+            try {
+              await Filesystem.deleteFile({ path: oldCatalogueScopedPath, directory: Directory.External });
+            } catch {
+              try {
+                await Filesystem.deleteFile({ path: oldCatalogueScopedPath, directory: Directory.Data });
+              } catch {}
+            }
+            console.log(`✅ Migrated source image for product ${product.id} → Products folder`);
+          } catch (e) {
+            console.warn(`⚠️ Products-folder migration failed for ${product.id}:`, e);
+          }
+        }
+        continue;
+      }
 
       // If already in user-specific format but still uses legacy "/products/" segment, fix it.
       if (product.imagePath.startsWith(`user-${userId}/`)) {

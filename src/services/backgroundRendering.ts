@@ -95,22 +95,48 @@ export async function startBackgroundRendering(
     const watermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
     const watermarkPosition = safeGetFromStorage('watermarkPosition', 'bottom-left');
 
-    // Prepare render data
+    const { hydrateProductSourceForRender, pickRenderableImageForCanvas } = await import(
+      '../utils/productSourceImage'
+    );
+    const { fetchUrlAsDataUrl } = await import('../utils/fetchImageCrossPlatform');
+
+    const renderConfigCatalogues = catalogues.map((cat) => ({
+      id: cat.id,
+      label: cat.label,
+      priceField: cat.priceField,
+      priceUnitField: cat.priceUnitField,
+      stockField: cat.stockField,
+    }));
+
+    const preparedItems: Array<{
+      id: string;
+      name: string;
+      imagePath: string;
+      renderConfig: { catalogues: typeof renderConfigCatalogues };
+    }> = [];
+
+    for (const product of items) {
+      const p = { ...product };
+      await hydrateProductSourceForRender(p);
+      let src = pickRenderableImageForCanvas(p, null);
+      if (src && /^https?:\/\//i.test(src)) {
+        try {
+          src = await fetchUrlAsDataUrl(src.trim());
+        } catch (e) {
+          console.warn('Background rendering: could not inline image URL, passing URL to worker:', e);
+          src = pickRenderableImageForCanvas(p, null);
+        }
+      }
+      preparedItems.push({
+        id: p.id,
+        name: p.name,
+        imagePath: src || '',
+        renderConfig: { catalogues: renderConfigCatalogues },
+      });
+    }
+
     const renderData = {
-      items: items.map((product) => ({
-        id: product.id,
-        name: product.name,
-        imagePath: product.imagePath || product.image || '',
-        renderConfig: {
-          catalogues: catalogues.map((cat) => ({
-            id: cat.id,
-            label: cat.label,
-            priceField: cat.priceField,
-            priceUnitField: cat.priceUnitField,
-            stockField: cat.stockField,
-          })),
-        },
-      })),
+      items: preparedItems,
       format: 'png' as const,
       width: 1080,
       height: 1080,

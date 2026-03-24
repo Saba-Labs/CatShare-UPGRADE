@@ -1,4 +1,6 @@
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { fetchUrlAsDataUrl } from "./fetchImageCrossPlatform";
+import { hydrateProductSourceForRender, pickRenderableImageForCanvas } from "./productSourceImage";
 import { renderProductToCanvas, canvasToBase64 } from "./canvasRenderer";
 import { renderProductToCanvasGlass } from "./canvasRenderer-glass";
 import { getCatalogueData } from "../config/catalogueProductUtils";
@@ -100,34 +102,22 @@ export async function renderProductImageOnTheFly(
   const isGlassTheme = theme.styles.layout === "glass";
 
   try {
-    if (!product.image && product.imagePath) {
-      try {
-        console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
-        try {
-          const res = await Filesystem.readFile({
-            path: product.imagePath,
-            directory: Directory.Data,
-          });
-          product.image = `data:image/png;base64,${res.data}`;
-        } catch (dataErr) {
-          // Fallback when image was saved to External storage
-          const res = await Filesystem.readFile({
-            path: product.imagePath,
-            directory: Directory.External,
-          });
-          product.image = `data:image/png;base64,${res.data}`;
-        }
-      } catch (err) {
-        console.warn("⚠️ Failed to load image from filesystem, will render with placeholder:", err.message);
-        // Continue rendering even if image load fails - canvas renderer will show placeholder
-      }
-    }
+    await hydrateProductSourceForRender(product);
 
     // Get catalogue-specific data if catalogueId is provided
     let catalogueData = product;
     if (catalogueId) {
       const catData = getCatalogueData(product, catalogueId);
       catalogueData = { ...product, ...catData };
+    }
+
+    let image = pickRenderableImageForCanvas(product, catalogueData);
+    if (image && /^https?:\/\//i.test(image)) {
+      try {
+        image = await fetchUrlAsDataUrl(image.trim());
+      } catch (e) {
+        console.warn("renderProductImageOnTheFly: could not inline URL:", e);
+      }
     }
 
     const cropAspectRatio = product.cropAspectRatio || theme.rendering.cropAspectRatio;
@@ -151,7 +141,7 @@ export async function renderProductImageOnTheFly(
     const productData: any = {
       name: catalogueData.name,
       subtitle: catalogueData.subtitle,
-      image: catalogueData.image || product.image,
+      image,
       price: price !== "" && price !== 0 ? price : undefined,
       priceUnit: price ? priceUnit : undefined,
       badge: catalogueData.badge,

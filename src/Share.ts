@@ -1,4 +1,5 @@
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { hydrateProductSourceForRender } from "./utils/productSourceImage";
 import { Share } from "@capacitor/share";
 import { getRenderedImage } from "./utils/renderingUtils";
 import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
@@ -62,39 +63,13 @@ export async function handleShare({
     }
   }
 
-  // Helper function to load image data from filesystem for a product
   const loadProductImages = async (productsToLoad: any[]) => {
     console.log(`📂 Loading images for ${productsToLoad.length} products...`);
     for (const product of productsToLoad) {
-      // Skip if image is already loaded as base64
-      if (product.image) {
-        console.log(`✅ Product ${product.id} already has image loaded`);
+      if (product.image && String(product.image).startsWith("data:")) {
         continue;
       }
-
-      // Try to load from filesystem if imagePath is available
-      if (product.imagePath) {
-        try {
-          console.log(`📂 Loading image from filesystem: ${product.imagePath}`);
-          try {
-            const res = await Filesystem.readFile({
-              path: product.imagePath,
-              directory: Directory.Data,
-            });
-            product.image = `data:image/png;base64,${res.data}`;
-          } catch {
-            const res = await Filesystem.readFile({
-              path: product.imagePath,
-              directory: Directory.External,
-            });
-            product.image = `data:image/png;base64,${res.data}`;
-          }
-          console.log(`✅ Image loaded for product ${product.id}`);
-        } catch (err) {
-          console.warn(`⚠️ Failed to load image for product ${product.id}: ${err.message}`);
-          // Don't fail - the render function will handle missing images
-        }
-      }
+      await hydrateProductSourceForRender(product);
     }
   };
 
@@ -133,7 +108,7 @@ export async function handleShare({
       console.log(`✅ Rendered image already exists for ${product.name}`);
     } catch (err) {
       // Rendered image not found - needs rendering
-      if (product.image || product.imagePath) {
+      if (product.image || product.imagePath || product.imageUrl) {
         // Has image, can render
         needsRendering.push(product);
         console.log(`🎨 Product ${product.name} needs rendering for ${catalogueLabel}`);

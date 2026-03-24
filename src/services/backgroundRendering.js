@@ -194,7 +194,7 @@ export async function startBackgroundRendering(products, catalogues, onProgress,
       renderingState.currentProductIndex = i;
 
       // Skip products without images
-      if (!product.image && !product.imagePath) {
+      if (!product.image && !product.imagePath && !product.imageUrl) {
         console.warn(`⚠️ Skipping ${product.name} - no image available`);
         updateProgress(onProgress);
         continue;
