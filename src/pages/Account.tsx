@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  FiUser,
   FiMail,
   FiLogOut,
   FiArrowLeft,
@@ -11,6 +10,8 @@ import {
   FiImage,
   FiGlobe,
   FiPhone,
+  FiMessageCircle,
+  FiChevronDown,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -26,6 +27,22 @@ import {
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 
+function SectionCard({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border border-gray-200/90 bg-white shadow-sm overflow-hidden ${className}`.trim()}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Account() {
   const navigate = useNavigate();
   const { user, logout, supabaseData, refreshSupabaseData } = useAuth();
@@ -39,6 +56,9 @@ export default function Account() {
   const [whatsappCountryKey, setWhatsappCountryKey] = useState('');
   const [whatsappLocalNumber, setWhatsappLocalNumber] = useState('');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(EMPTY_BUSINESS_PROFILE);
+  const [businessSectionOpen, setBusinessSectionOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true
+  );
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -55,6 +75,14 @@ export default function Account() {
   useEffect(() => {
     setBusinessProfile(businessProfileFromUserSettings(supabaseData?.userSettings));
   }, [supabaseData?.userSettings]);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const apply = () => setBusinessSectionOpen(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   const updateBusiness = (patch: Partial<BusinessProfile>) => {
     setBusinessProfile((prev) => ({ ...prev, ...patch }));
@@ -187,293 +215,89 @@ export default function Account() {
   const busy = isLoading || businessSaving || logoUploading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100">
-      <div className="sticky top-0 h-[40px] bg-black z-50"></div>
+    <div className="min-h-screen bg-gray-50 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="sticky top-0 h-[40px] bg-black z-50 shrink-0" />
 
-      <div className="bg-white border-b border-gray-200 sticky top-[40px] z-40">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-4">
+      <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
             title="Go back"
           >
-            <FiArrowLeft className="text-gray-600" />
+            <FiArrowLeft className="text-gray-700 w-5 h-5" />
           </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Account</h1>
+          <h1 className="text-lg font-semibold text-gray-900 truncate">Account</h1>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8"
-        >
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <FiAlertCircle className="text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs sm:text-sm text-red-700 break-words">{error}</p>
+      <main className="max-w-lg mx-auto px-4 pt-4 space-y-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          {error ? (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-100 flex gap-2 items-start">
+              <FiAlertCircle className="text-red-600 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 break-words">{error}</p>
             </div>
-          )}
+          ) : null}
 
-          {/* Profile Info */}
-          <div className="space-y-4 mb-8">
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Profile Information</h2>
-              <p className="text-xs sm:text-sm text-gray-500">Your login account (sign-in email may differ from business contact below)</p>
-            </div>
-
-            {user?.displayName && (
-              <div className="flex items-center gap-3 sm:gap-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-xl border border-blue-100 hover:border-blue-200 transition-colors">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-500 shadow-lg shadow-blue-500/30">
-                    <FiUser className="text-white text-base sm:text-lg" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm text-gray-600">Full Name</p>
-                  <p className="text-base sm:text-lg font-medium text-gray-900 truncate">{user.displayName}</p>
-                </div>
-              </div>
-            )}
-
-            {user?.email && (
-              <div className="flex items-center gap-3 sm:gap-4 p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 rounded-xl border border-emerald-100 hover:border-emerald-200 transition-colors">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30">
-                    <FiMail className="text-white text-base sm:text-lg" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm text-gray-600">Login email</p>
-                  <p className="text-base sm:text-lg font-medium text-gray-900 truncate">{user.email}</p>
-                </div>
-              </div>
-            )}
-
-            <div
-              className={`p-4 rounded-xl border transition-colors ${
-                user?.emailVerified
-                  ? 'bg-gradient-to-br from-green-50 to-green-100/50 border-green-100 hover:border-green-200'
-                  : 'bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-100 hover:border-yellow-200'
-              }`}
-            >
-              <p className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Email Verification</p>
-              <div className="flex items-center gap-2">
-                <div
-                  className={`h-2.5 w-2.5 rounded-full shadow-lg ${
-                    user?.emailVerified ? 'bg-green-500 shadow-green-500/30' : 'bg-yellow-500 shadow-yellow-500/30'
-                  }`}
-                ></div>
-                <p
-                  className={`text-sm sm:text-base font-semibold ${
-                    user?.emailVerified ? 'text-green-700' : 'text-yellow-700'
-                  }`}
-                >
-                  {user?.emailVerified ? 'Verified' : 'Not Verified'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Business details */}
-          <div className="border-t border-gray-200 pt-8 mb-8 space-y-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 rounded-full bg-amber-100 items-center justify-center flex-shrink-0">
-                <FiBriefcase className="text-amber-700 text-lg" />
-              </div>
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900">Business details</h2>
-                <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                  Shown on PDFs and shared links. You can use different email or phone than your login.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {user?.email && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => updateBusiness({ email: user.email || '' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50"
-                >
-                  Use login email for business
-                </button>
-              )}
-              {user?.displayName && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => updateBusiness({ businessName: user.displayName || '' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50"
-                >
-                  Use profile name as business name
-                </button>
-              )}
-            </div>
-
-            {/* Logo */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                <FiImage className="text-gray-600" />
-                Logo
-              </label>
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {businessProfile.logoUrl ? (
-                    <img src={businessProfile.logoUrl} alt="Business logo" className="w-full h-full object-contain" />
+          {/* Intro: compact profile */}
+          <SectionCard>
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Your account</p>
+              <div className="flex gap-3 items-start">
+                <img
+                  src={
+                    user?.photoURL ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}&background=e5e7eb&color=374151`
+                  }
+                  alt=""
+                  className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  {user?.displayName ? (
+                    <p className="font-semibold text-gray-900 truncate">{user.displayName}</p>
                   ) : (
-                    <span className="text-[10px] text-gray-400 text-center px-1">No logo</span>
+                    <p className="font-semibold text-gray-900 truncate">Signed in</p>
                   )}
-                </div>
-                <div className="flex-1 w-full space-y-2">
-                  <input
-                    ref={logoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoFile}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => logoInputRef.current?.click()}
-                      className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50"
+                  {user?.email ? (
+                    <p className="text-sm text-gray-600 truncate mt-0.5 flex items-center gap-1.5">
+                      <FiMail className="shrink-0 text-gray-400 w-3.5 h-3.5" />
+                      {user.email}
+                    </p>
+                  ) : null}
+                  <div className="mt-2 flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+                        user?.emailVerified
+                          ? 'bg-emerald-50 text-emerald-800'
+                          : 'bg-amber-50 text-amber-800'
+                      }`}
                     >
-                      {logoUploading ? 'Uploading…' : 'Upload image'}
-                    </button>
-                    {businessProfile.logoUrl ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => updateBusiness({ logoUrl: '' })}
-                        className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          user?.emailVerified ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}
+                      />
+                      {user?.emailVerified ? 'Email verified' : 'Email not verified'}
+                    </span>
                   </div>
-                  <p className="text-[11px] text-gray-500">Uploaded to cloud storage. Save business details below to persist.</p>
-                  <input
-                    type="url"
-                    value={businessProfile.logoUrl}
-                    onChange={(e) => updateBusiness({ logoUrl: e.target.value.trim() })}
-                    placeholder="Or paste image URL"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
                 </div>
               </div>
             </div>
+          </SectionCard>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">Business name</label>
-              <input
-                type="text"
-                value={businessProfile.businessName}
-                onChange={(e) => updateBusiness({ businessName: e.target.value })}
-                placeholder="e.g. CatShare Traders"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">Address</label>
-              <textarea
-                value={businessProfile.address}
-                onChange={(e) => updateBusiness({ address: e.target.value })}
-                placeholder="Street, city, postal code, country"
-                rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y min-h-[80px]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                <FiMail className="text-gray-600" />
-                Business email
-              </label>
-              <input
-                type="email"
-                value={businessProfile.email}
-                onChange={(e) => updateBusiness({ email: e.target.value })}
-                placeholder="orders@yourbusiness.com"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                <FiPhone className="text-gray-600" />
-                Business phone
-              </label>
-              <input
-                type="tel"
-                value={businessProfile.phone}
-                onChange={(e) => updateBusiness({ phone: e.target.value })}
-                placeholder="Landline or mobile for customers"
-                inputMode="tel"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                <FiGlobe className="text-gray-600" />
-                Website
-              </label>
-              <input
-                type="url"
-                value={businessProfile.website}
-                onChange={(e) => updateBusiness({ website: e.target.value.trim() })}
-                placeholder="https://"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">About</label>
-              <p className="text-[11px] text-gray-500 mb-1">Short line for headers or cards</p>
-              <textarea
-                value={businessProfile.about}
-                onChange={(e) => updateBusiness({ about: e.target.value })}
-                placeholder="One line about your business"
-                rows={2}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1">Describe</label>
-              <p className="text-[11px] text-gray-500 mb-1">Longer description for catalogues or PDFs</p>
-              <textarea
-                value={businessProfile.description}
-                onChange={(e) => updateBusiness({ description: e.target.value })}
-                placeholder="Tell customers what you offer, policies, etc."
-                rows={4}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y min-h-[100px]"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={saveBusinessDetails}
-              disabled={busy}
-              className="w-full sm:w-auto px-8 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white font-semibold transition-colors"
-            >
-              {businessSaving ? 'Saving…' : 'Save business details'}
-            </button>
-          </div>
-
-          {/* WhatsApp */}
-          <div className="border-t border-gray-200 pt-6 sm:pt-8 space-y-6">
-            <div>
-              <h3 className="text-sm sm:text-base font-bold text-gray-900 mb-1">WhatsApp number</h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Used for “Share as link” order confirmations (customers will message you on WhatsApp).
+          {/* WhatsApp — directly under intro */}
+          <SectionCard>
+            <div className="p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <FiMessageCircle className="text-green-600 w-5 h-5" />
+                <h2 className="text-base font-semibold text-gray-900">WhatsApp</h2>
+              </div>
+              <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+                Used for order links so customers can message you on WhatsApp.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 sm:items-stretch">
+              <div className="space-y-3">
                 <WhatsAppCountryPicker
                   valueDial={whatsappCountryCode}
                   valueKey={whatsappCountryKey}
@@ -486,39 +310,248 @@ export default function Account() {
                 <input
                   value={whatsappLocalNumber}
                   onChange={(e) => setWhatsappLocalNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="e.g. 9876543210"
+                  placeholder="Mobile number (without country code)"
                   inputMode="tel"
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
+                  autoComplete="tel-national"
+                  className="w-full px-3 py-3 rounded-xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 />
                 <button
+                  type="button"
                   onClick={saveWhatsApp}
                   disabled={isLoading}
-                  className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold whitespace-nowrap transition-colors"
+                  className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-300 text-white text-sm font-semibold transition-colors touch-manipulation"
                 >
-                  {isLoading ? 'Saving...' : 'Save'}
+                  {isLoading ? 'Saving…' : 'Save WhatsApp number'}
+                </button>
+                <p className="text-[11px] text-gray-400 leading-snug">
+                  Saved in international format (E.164). Search country by name or dial code.
+                </p>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Business — collapsible on small screens */}
+          <SectionCard>
+            <button
+              type="button"
+              onClick={() => setBusinessSectionOpen((o) => !o)}
+              className="sm:hidden w-full flex items-center justify-between gap-3 p-4 text-left touch-manipulation"
+              aria-expanded={businessSectionOpen}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <FiBriefcase className="text-amber-600 shrink-0 w-5 h-5" />
+                <div className="min-w-0">
+                  <span className="font-semibold text-gray-900 block">Business profile</span>
+                  <span className="text-xs text-gray-500">Logo, contact &amp; about — for PDFs &amp; links</span>
+                </div>
+              </div>
+              <FiChevronDown
+                className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${businessSectionOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            <div className={`${businessSectionOpen ? 'block' : 'hidden'} sm:block`}>
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5 sm:pt-5 space-y-4 border-t border-gray-100 sm:border-t-0">
+                <div className="hidden sm:flex items-start gap-2 mb-1">
+                  <FiBriefcase className="text-amber-600 mt-0.5 w-5 h-5" />
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-900">Business profile</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Shown on PDFs and shared links. Can differ from your login email.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {user?.email ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => updateBusiness({ email: user.email || '' })}
+                      className="text-xs px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50 touch-manipulation"
+                    >
+                      Use login email
+                    </button>
+                  ) : null}
+                  {user?.displayName ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => updateBusiness({ businessName: user.displayName || '' })}
+                      className="text-xs px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50 touch-manipulation"
+                    >
+                      Use profile name as business name
+                    </button>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-2">
+                    <FiImage className="text-gray-500 w-4 h-4" />
+                    Logo
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-3 items-start">
+                    <div className="w-20 h-20 rounded-xl border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                      {businessProfile.logoUrl ? (
+                        <img
+                          src={businessProfile.logoUrl}
+                          alt=""
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-gray-400 px-1 text-center">No logo</span>
+                      )}
+                    </div>
+                    <div className="flex-1 w-full space-y-2">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoFile}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => logoInputRef.current?.click()}
+                          className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 touch-manipulation"
+                        >
+                          {logoUploading ? 'Uploading…' : 'Upload'}
+                        </button>
+                        {businessProfile.logoUrl ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => updateBusiness({ logoUrl: '' })}
+                            className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 touch-manipulation"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] text-gray-400">Save business details below to persist logo.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Business name</label>
+                  <input
+                    type="text"
+                    value={businessProfile.businessName}
+                    onChange={(e) => updateBusiness({ businessName: e.target.value })}
+                    placeholder="e.g. Your store name"
+                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Address</label>
+                  <textarea
+                    value={businessProfile.address}
+                    onChange={(e) => updateBusiness({ address: e.target.value })}
+                    placeholder="Street, city, postal code"
+                    rows={2}
+                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y min-h-[72px]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiMail className="text-gray-500 w-4 h-4" />
+                      Business email
+                    </label>
+                    <input
+                      type="email"
+                      value={businessProfile.email}
+                      onChange={(e) => updateBusiness({ email: e.target.value })}
+                      placeholder="orders@…"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiPhone className="text-gray-500 w-4 h-4" />
+                      Business phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={businessProfile.phone}
+                      onChange={(e) => updateBusiness({ phone: e.target.value })}
+                      placeholder="Customer-facing phone"
+                      inputMode="tel"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiGlobe className="text-gray-500 w-4 h-4" />
+                      Website
+                    </label>
+                    <input
+                      type="url"
+                      value={businessProfile.website}
+                      onChange={(e) => updateBusiness({ website: e.target.value.trim() })}
+                      placeholder="https://"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Short about</label>
+                  <p className="text-[11px] text-gray-400 mb-1">One line for headers</p>
+                  <textarea
+                    value={businessProfile.about}
+                    onChange={(e) => updateBusiness({ about: e.target.value })}
+                    placeholder="Brief tagline"
+                    rows={2}
+                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Full description</label>
+                  <p className="text-[11px] text-gray-400 mb-1">For catalogues or PDFs</p>
+                  <textarea
+                    value={businessProfile.description}
+                    onChange={(e) => updateBusiness({ description: e.target.value })}
+                    placeholder="Policies, what you offer…"
+                    rows={3}
+                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y min-h-[88px]"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveBusinessDetails}
+                  disabled={busy}
+                  className="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:bg-gray-300 text-white text-sm font-semibold transition-colors touch-manipulation"
+                >
+                  {businessSaving ? 'Saving…' : 'Save business details'}
                 </button>
               </div>
-              <p className="text-[11px] text-gray-500 mt-2">
-                Search by country name or dial code. Your full number is saved in international format (E.164).
-              </p>
             </div>
+          </SectionCard>
 
-            <div className="border-t border-gray-200 pt-6">
+          {/* Log out — separate, minimal */}
+          <SectionCard>
+            <div className="p-4 sm:p-5">
               <button
+                type="button"
                 onClick={handleLogout}
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-xl transition-colors text-sm sm:text-base"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 active:bg-red-100/80 disabled:opacity-50 font-semibold text-sm touch-manipulation"
               >
-                <FiLogOut className="text-lg" />
-                <span>{isLoading ? 'Logging out...' : 'Log Out'}</span>
+                <FiLogOut className="w-5 h-5" />
+                {isLoading ? 'Logging out…' : 'Log out'}
               </button>
+              <p className="text-center text-xs text-gray-400 mt-3">Ends your session on this device</p>
             </div>
-            <p className="text-center text-xs sm:text-sm text-gray-500">
-              You'll be logged out from this device
-            </p>
-          </div>
+          </SectionCard>
         </motion.div>
-      </div>
+      </main>
     </div>
   );
 }

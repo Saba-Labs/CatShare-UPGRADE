@@ -1,7 +1,11 @@
-import { Capacitor } from '@capacitor/core';
-import BackgroundRenderer from '../plugins/background-renderer';
+import { BackgroundRendererWeb } from '../plugins/web';
 
 import { safeGetFromStorage } from '../utils/safeStorage';
+
+/** In-app worker renderer (same on web and native). Avoids Android native RenderingService, which mishandles https/file sources. */
+function jsBackgroundRenderer(): BackgroundRendererWeb {
+  return new BackgroundRendererWeb();
+}
 
 interface RenderProgressCallback {
   (progress: { percentage: number; currentItem?: string }): void;
@@ -53,8 +57,8 @@ interface ResumableRenderState {
 let resumableState: ResumableRenderState | null = null;
 
 /**
- * Start background rendering service
- * Sends render data to native Android service or Web Worker
+ * Optional batch rendering via a Web Worker inside the WebView (all platforms).
+ * Does not use the native Android background service; primary user-driven renders are unchanged.
  * @param items Products to render
  * @param catalogues Catalogue configurations
  * @param onProgress Callback for progress updates
@@ -88,8 +92,6 @@ export async function startBackgroundRendering(
   saveResumableState(items, catalogues);
 
   try {
-    const isNative = Capacitor.getPlatform() !== 'web';
-
     // Get watermark settings
     const isWatermarkEnabled = safeGetFromStorage('showWatermark', true);
     const watermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
@@ -147,128 +149,62 @@ export async function startBackgroundRendering(
       },
     };
 
-    if (isNative) {
-      // Use native BackgroundRenderer plugin for Android
-      console.log('📱 [Native] Starting background rendering via BackgroundRenderer plugin');
+    console.log('🌐 Starting optional background rendering via Web Worker');
 
-      try {
-        const result = await BackgroundRenderer.startRendering({
-          renderData: renderData,
+    try {
+      const result = await jsBackgroundRenderer().startRendering({
+        renderData: renderData,
+      });
+
+      console.log('✅ Background rendering started:', result);
+
+      const handleProgress = (event: any) => {
+        const { percentage } = event.detail;
+        renderingProgress = percentage;
+        onProgress({
+          percentage: percentage,
+          currentItem: `Processing item ${Math.floor((percentage / 100) * items.length)} of ${items.length}`,
         });
+      };
 
-        console.log('✅ [Native] Background rendering started:', result);
+      const handleComplete = (event: any) => {
+        window.removeEventListener('renderProgress', handleProgress);
+        window.removeEventListener('renderComplete', handleComplete);
 
-        // Set up event listeners for progress and completion
-        const handleProgress = (event: any) => {
-          const { percentage } = event.detail;
-          renderingProgress = percentage;
-          onProgress({
-            percentage: percentage,
-            currentItem: `Processing item ${Math.floor((percentage / 100) * items.length)} of ${items.length}`,
-          });
-        };
+        if (_progressInterval) {
+          clearInterval(_progressInterval);
+          _progressInterval = null;
+        }
+        if (_completionTimeout) {
+          clearTimeout(_completionTimeout);
+          _completionTimeout = null;
+        }
 
-        const handleComplete = (event: any) => {
-          window.removeEventListener('renderProgress', handleProgress);
-          window.removeEventListener('renderComplete', handleComplete);
-
-          if (_progressInterval) {
-            clearInterval(_progressInterval);
-            _progressInterval = null;
-          }
-          if (_completionTimeout) {
-            clearTimeout(_completionTimeout);
-            _completionTimeout = null;
-          }
-
-          isRendering = false;
-          renderingProgress = 100;
-          onComplete({
-            status: 'success',
-            message: `Successfully queued ${items.length} items for background rendering. Processing will continue even when app is closed.`,
-          });
-        };
-
-        window.addEventListener('renderProgress', handleProgress);
-        window.addEventListener('renderComplete', handleComplete);
-
-        // Timeout fallback (24 seconds max wait)
-        _completionTimeout = setTimeout(() => {
-          window.removeEventListener('renderProgress', handleProgress);
-          window.removeEventListener('renderComplete', handleComplete);
-          isRendering = false;
-          renderingProgress = 100;
-          onComplete({
-            status: 'success',
-            message: `Successfully queued ${items.length} items for background rendering.`,
-          });
-        }, 24000);
-      } catch (error) {
         isRendering = false;
-        console.error('❌ [Native] Failed to start background rendering:', error);
-        throw error;
-      }
-    } else {
-      // Use web-based rendering with Web Workers
-      console.log('🌐 [Web] Starting background rendering via Web Workers');
-
-      try {
-        const result = await BackgroundRenderer.startRendering({
-          renderData: renderData,
+        renderingProgress = 100;
+        onComplete({
+          status: 'success',
+          message: `Successfully rendered ${items.length} items using Web Workers.`,
         });
+      };
 
-        console.log('✅ [Web] Background rendering started:', result);
+      window.addEventListener('renderProgress', handleProgress);
+      window.addEventListener('renderComplete', handleComplete);
 
-        // Set up event listeners for progress and completion from worker
-        const handleProgress = (event: any) => {
-          const { percentage } = event.detail;
-          renderingProgress = percentage;
-          onProgress({
-            percentage: percentage,
-            currentItem: `Processing item ${Math.floor((percentage / 100) * items.length)} of ${items.length}`,
-          });
-        };
-
-        const handleComplete = (event: any) => {
-          window.removeEventListener('renderProgress', handleProgress);
-          window.removeEventListener('renderComplete', handleComplete);
-
-          if (_progressInterval) {
-            clearInterval(_progressInterval);
-            _progressInterval = null;
-          }
-          if (_completionTimeout) {
-            clearTimeout(_completionTimeout);
-            _completionTimeout = null;
-          }
-
-          isRendering = false;
-          renderingProgress = 100;
-          onComplete({
-            status: 'success',
-            message: `Successfully rendered ${items.length} items using Web Workers.`,
-          });
-        };
-
-        window.addEventListener('renderProgress', handleProgress);
-        window.addEventListener('renderComplete', handleComplete);
-
-        // Timeout fallback (60 seconds max wait for web rendering)
-        _completionTimeout = setTimeout(() => {
-          window.removeEventListener('renderProgress', handleProgress);
-          window.removeEventListener('renderComplete', handleComplete);
-          isRendering = false;
-          renderingProgress = 100;
-          onComplete({
-            status: 'success',
-            message: `Successfully rendered ${items.length} items.`,
-          });
-        }, 60000);
-      } catch (error) {
+      _completionTimeout = setTimeout(() => {
+        window.removeEventListener('renderProgress', handleProgress);
+        window.removeEventListener('renderComplete', handleComplete);
         isRendering = false;
-        console.error('❌ [Web] Failed to start background rendering:', error);
-        throw error;
-      }
+        renderingProgress = 100;
+        onComplete({
+          status: 'success',
+          message: `Successfully rendered ${items.length} items.`,
+        });
+      }, 60000);
+    } catch (error) {
+      isRendering = false;
+      console.error('❌ Failed to start background rendering:', error);
+      throw error;
     }
   } catch (error) {
     isRendering = false;
@@ -301,7 +237,7 @@ export async function cancelBackgroundRendering(): Promise<void> {
 
     console.log('📱 Cancelling background rendering...');
 
-    const result = await BackgroundRenderer.stopRendering();
+    const result = await jsBackgroundRenderer().stopRendering();
     console.log('✅ Background rendering cancelled:', result);
   } catch (error) {
     console.error('❌ Failed to cancel rendering:', error);
@@ -324,11 +260,11 @@ export function isRenderingActive(): boolean {
 }
 
 /**
- * Get rendering status from native service
+ * Get rendering status from the in-app worker (not the native Android service).
  */
 export async function getRenderingStatus(): Promise<{ isRunning: boolean }> {
   try {
-    const status = await BackgroundRenderer.getStatus();
+    const status = await jsBackgroundRenderer().getStatus();
     return status;
   } catch (error) {
     console.error('❌ Failed to get rendering status:', error);

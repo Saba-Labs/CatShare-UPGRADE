@@ -78,6 +78,8 @@ async function httpGetImageAsDataUrl(url: string): Promise<string> {
     headers: {
       Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
     },
+    // Android @capacitor-community/http: omitting params yields null in setUrlParams → NPE.
+    params: {},
     connectTimeout: 60000,
     readTimeout: 60000,
   });

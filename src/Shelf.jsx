@@ -8,9 +8,11 @@ import { deleteRenderedImageForProduct } from "./Save";
 import { tryReadProductSourceAsDataUrl, deleteProductSourceImagesBestEffort } from "./utils/productSourceImage";
 import { deleteAllDeletedProducts, deleteProductFromSupabase } from "./services/supabaseSync";
 import { useSync } from "./context/SyncContext";
+import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
 export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap, user }) {
   const { syncProductsToCloud, isStrictMode } = useSync();
+  const [shelfPermanentDeleteBusy, setShelfPermanentDeleteBusy] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -74,27 +76,32 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       return;
     }
 
-    // 1) Delete from Supabase + R2 FIRST
-    const result = await deleteProductFromSupabase(user.uid, String(toDelete.id));
-    if (!result.success) {
-      console.error(`❌ Failed to delete from Supabase:`, result.error);
-      alert(result.error || "Failed to delete from cloud. Please try again.");
-      return;
-    }
-    console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
-
-    // 2) After cloud success, remove from local state (no product-added event)
-    const freshDeleted = deletedProducts.filter((p) => p.id !== deleteTargetId);
-    setDeletedProducts(freshDeleted);
-    setDeleteTargetId(null);
     setShowDeleteConfirm(false);
+    setDeleteTargetId(null);
+    setShelfPermanentDeleteBusy(true);
 
-    // 3) Local file cleanup (best-effort)
     try {
-      await deleteRenderedImageForProduct(toDelete.id);
-      await deleteProductSourceImagesBestEffort(toDelete);
-    } catch (err) {
-      console.warn(`⚠️ Failed to clean up files for product ${toDelete.id}:`, err);
+      // 1) Delete from Supabase + R2 FIRST
+      const result = await deleteProductFromSupabase(user.uid, String(toDelete.id));
+      if (!result.success) {
+        console.error(`❌ Failed to delete from Supabase:`, result.error);
+        alert(result.error || "Failed to delete from cloud. Please try again.");
+        return;
+      }
+      console.log(`✅ Product ${toDelete.id} permanently deleted from Supabase`);
+
+      // 2) After cloud success, remove from local state (no product-added event)
+      setDeletedProducts((prev) => prev.filter((p) => p.id !== toDelete.id));
+
+      // 3) Local file cleanup (best-effort)
+      try {
+        await deleteRenderedImageForProduct(toDelete.id);
+        await deleteProductSourceImagesBestEffort(toDelete);
+      } catch (err) {
+        console.warn(`⚠️ Failed to clean up files for product ${toDelete.id}:`, err);
+      }
+    } finally {
+      setShelfPermanentDeleteBusy(false);
     }
   };
 
@@ -107,6 +114,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     }
 
     const snapshot = [...deletedProducts];
+    setShelfPermanentDeleteBusy(true);
 
     try {
       const result = await deleteAllDeletedProducts(user.uid);
@@ -131,11 +139,19 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     } catch (err) {
       console.error('❌ Error deleting shelf:', err);
       alert("Failed to delete shelf items from cloud. Please try again.");
+    } finally {
+      setShelfPermanentDeleteBusy(false);
     }
   };
 
   return (
     <div className="w-full h-screen flex flex-col bg-gradient-to-b from-white to-gray-100 relative">
+        {shelfPermanentDeleteBusy && (
+          <SyncBusyOverlay
+            title="Deleting…"
+            subtitle="Removing from cloud and cleaning up files"
+          />
+        )}
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
         <button

@@ -5,6 +5,8 @@ export type WhatsAppCountryOption = {
   /** ISO 3166-1 alpha-2 */
   iso2: string;
   name: string;
+  /** Used for search (e.g. "Republic of India") */
+  officialName: string;
   flag: string;
   /** E.164-style prefix including + (e.g. +1, +1242, +91) */
   dial: string;
@@ -54,6 +56,7 @@ function buildOptions(): WhatsAppCountryOption[] {
       out.push({
         iso2: c.cca2,
         name: c.name.common,
+        officialName: c.name.official,
         flag: c.flag,
         dial: override,
       });
@@ -65,6 +68,7 @@ function buildOptions(): WhatsAppCountryOption[] {
       out.push({
         iso2: c.cca2,
         name: c.name.common,
+        officialName: c.name.official,
         flag: c.flag,
         dial,
       });

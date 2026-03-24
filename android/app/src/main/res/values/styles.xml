@@ -16,9 +16,11 @@
         <item name="android:statusBarColor">@color/colorPrimaryDark</item>
     </style>
 
-    <!-- Fixed: dot before Launch -->
+    <!-- Plain white cold start: avoids a second “logo-only” screen before the in-app SplashLoadingLayout. -->
     <style name="AppTheme.NoActionBar.Launch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:background">@android:color/white</item>
+        <item name="windowSplashScreenBackground">@android:color/white</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>

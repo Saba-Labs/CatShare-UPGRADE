@@ -7,6 +7,14 @@ function optionKey(o: WhatsAppCountryOption): string {
   return `${o.iso2}::${o.dial}`;
 }
 
+/** Lowercase ASCII for matching; strips combining marks so "cote" finds "Côte". */
+function searchNormalize(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+}
+
 type Props = {
   valueDial: string;
   /** Stable selection when multiple countries share the same dial (e.g. +1) */
@@ -31,16 +39,20 @@ export function WhatsAppCountryPicker({ valueDial, valueKey, onChange, disabled 
   }, [valueDial, valueKey]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return WHATSAPP_COUNTRY_OPTIONS;
+    const raw = query.trim();
+    if (!raw) return WHATSAPP_COUNTRY_OPTIONS;
+
+    const qNorm = searchNormalize(raw);
+    const qDigits = raw.replace(/\D/g, '');
+    // Only match dial digits when the user typed digits; otherwise `''.includes('')`-style logic matches every row.
+    const dialDigitMatch = qDigits.length > 0;
+
     return WHATSAPP_COUNTRY_OPTIONS.filter((o) => {
+      const haystack = searchNormalize(`${o.name} ${o.officialName} ${o.dial} ${o.iso2}`);
+      if (haystack.includes(qNorm)) return true;
+      if (!dialDigitMatch) return false;
       const dialDigits = o.dial.replace(/\D/g, '');
-      return (
-        o.name.toLowerCase().includes(q) ||
-        o.dial.toLowerCase().includes(q) ||
-        o.iso2.toLowerCase().includes(q) ||
-        dialDigits.includes(q.replace(/\D/g, ''))
-      );
+      return dialDigits.includes(qDigits);
     });
   }, [query]);
 

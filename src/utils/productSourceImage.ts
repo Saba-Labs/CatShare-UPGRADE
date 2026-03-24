@@ -9,6 +9,10 @@ import { getAllCatalogues } from '../config/catalogueConfig';
 import { getUserImagePath } from './safeStorage';
 import { fetchUrlAsDataUrl } from './fetchImageCrossPlatform';
 import { safeWriteFile } from './platformFilesystem';
+import {
+  buildDataUrlFromDiskBase64,
+  normalizeExistingDataUrlMime,
+} from './imageDataUrlMime';
 
 const HTTP_URL = /^https?:\/\//i;
 
@@ -134,7 +138,7 @@ export async function tryReadProductSourceAsDataUrl(product: {
     for (const path of getOrderedSourceImagePaths(product)) {
       const b64 = await readFileDataBase64(path);
       if (b64) {
-        return `data:image/png;base64,${b64}`;
+        return buildDataUrlFromDiskBase64(b64, path);
       }
     }
   }
@@ -158,6 +162,21 @@ export async function hydrateProductSourceForRender(product: any): Promise<boole
     product.image.startsWith('data:') &&
     product.image.length > 64
   ) {
+    product.image = normalizeExistingDataUrlMime(product.image);
+    const payload = stripDataUrlToBase64(product.image);
+    try {
+      atob(payload.replace(/\s/g, '').slice(0, Math.min(payload.length, 120)));
+    } catch {
+      delete product.image;
+    }
+  }
+
+  if (
+    product?.image &&
+    typeof product.image === 'string' &&
+    product.image.startsWith('data:') &&
+    product.image.length > 64
+  ) {
     return true;
   }
 
@@ -171,7 +190,7 @@ export async function hydrateProductSourceForRender(product: any): Promise<boole
       const b64 = await readFileDataBase64(path);
       if (!b64) continue;
 
-      product.image = `data:image/png;base64,${b64}`;
+      product.image = buildDataUrlFromDiskBase64(b64, path);
       if (path !== canonical) {
         const ok = await safeWriteFile({ path: canonical, data: b64 });
         if (ok) {

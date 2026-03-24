@@ -3,20 +3,35 @@
  * Replaces html2canvas with native Canvas API for better performance
  */
 
-/**
- * Load an image from URL or data URI and return as Image object
- */
-export async function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    if (!src) {
-      reject(new Error('Image source is empty or undefined'));
-      return;
-    }
+import { Capacitor } from '@capacitor/core';
 
+const LOAD_TIMEOUT_MS = 30000;
+
+/**
+ * Native app WebView: loading https R2 URLs via <img crossOrigin> or fetch() hits CORS for
+ * capacitor:// / ionic:// origins. Use Capacitor HTTP (fetchUrlAsDataUrl) on the main thread instead.
+ * Web Workers have no `window` — keep browser fetch/img path there.
+ */
+function shouldLoadHttpsViaCapacitorHttp(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
+
+function loadImageWithOptionalCrossOrigin(
+  src: string,
+  crossOriginAnonymous: boolean
+): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const timeout = setTimeout(() => {
-      reject(new Error(`Image load timeout after 30s: ${src.substring(0, 50)}...`));
-    }, 30000);
+      reject(new Error(`Image load timeout after ${LOAD_TIMEOUT_MS / 1000}s: ${src.substring(0, 50)}...`));
+    }, LOAD_TIMEOUT_MS);
 
     img.onload = () => {
       clearTimeout(timeout);
@@ -24,26 +39,76 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
       resolve(img);
     };
 
-    img.onerror = (err) => {
+    img.onerror = () => {
       clearTimeout(timeout);
-      console.error(`[loadImage] Error loading image:`, err);
       reject(new Error(`Failed to load image: ${src.substring(0, 100)}`));
     };
 
-    // Only set crossOrigin for HTTP(S) URLs, not for data URLs or blob URLs
-    if (src.startsWith('http://') || src.startsWith('https://')) {
+    if (crossOriginAnonymous && (src.startsWith('http://') || src.startsWith('https://'))) {
       img.crossOrigin = 'anonymous';
     }
 
-    console.log(`[loadImage] Loading image with source type:`, {
-      isDataUrl: src.startsWith('data:'),
-      isBlob: src.startsWith('blob:'),
-      isHttp: src.startsWith('http'),
-      srcLength: src.length,
-    });
-
     img.src = src;
   });
+}
+
+/**
+ * Load an image from URL or data URI and return as Image object.
+ * - Native (main thread): https → Capacitor HTTP → data URL (avoids WebView CORS on R2).
+ * - Web: https → crossOrigin img, then fetch→blob fallback.
+ */
+export async function loadImage(src: string): Promise<HTMLImageElement> {
+  if (!src) {
+    throw new Error('Image source is empty or undefined');
+  }
+
+  console.log(`[loadImage] Loading image with source type:`, {
+    isDataUrl: src.startsWith('data:'),
+    isBlob: src.startsWith('blob:'),
+    isHttp: src.startsWith('http'),
+    srcLength: src.length,
+  });
+
+  if (src.startsWith('data:') || src.startsWith('blob:')) {
+    return loadImageWithOptionalCrossOrigin(src, false);
+  }
+
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    if (shouldLoadHttpsViaCapacitorHttp()) {
+      try {
+        const { fetchUrlAsDataUrl } = await import('./fetchImageCrossPlatform');
+        const dataUrl = await fetchUrlAsDataUrl(src.trim());
+        return await loadImageWithOptionalCrossOrigin(dataUrl, false);
+      } catch (e) {
+        console.error('[loadImage] native Capacitor HTTP load failed:', e);
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+    }
+
+    try {
+      return await loadImageWithOptionalCrossOrigin(src, true);
+    } catch (firstErr) {
+      console.warn('[loadImage] crossOrigin load failed, trying fetch → blob:', firstErr);
+      try {
+        const res = await fetch(src);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        try {
+          return await loadImageWithOptionalCrossOrigin(objectUrl, false);
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      } catch (secondErr) {
+        console.error('[loadImage] fetch→blob fallback failed:', secondErr);
+        throw secondErr instanceof Error ? secondErr : new Error(String(secondErr));
+      }
+    }
+  }
+
+  return loadImageWithOptionalCrossOrigin(src, false);
 }
 
 /**

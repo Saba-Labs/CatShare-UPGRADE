@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiDownload } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -26,7 +26,6 @@ import {
   tryReadProductSourceAsDataUrl,
   deleteProductSourceImagesBestEffort,
 } from "./utils/productSourceImage";
-import { cacheCloudProductImages } from "./utils/productImageLocalCache";
 
 declare global {
   interface Window {
@@ -159,7 +158,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showShelfConfirm, setShowShelfConfirm] = useState(false);
   const [shelfTarget, setShelfTarget] = useState(null);
-  const [r2DownloadingId, setR2DownloadingId] = useState<string | number | null>(null);
   const [confirmToggleStock, setConfirmToggleStock] = useState(null);
   const [bypassChecked, setBypassChecked] = useState(false);
   const [localIsRendering, setLocalIsRendering] = useState(false);
@@ -465,62 +463,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     } else {
       // Show confirmation with special flag for master toggle
       setConfirmToggleStock({ id, field: "MASTER" });
-    }
-  };
-
-  const handleDownloadR2Product = async (e: React.MouseEvent, rowProduct: any) => {
-    e.stopPropagation();
-    const url =
-      typeof rowProduct?.imageUrl === "string" ? rowProduct.imageUrl.trim() : "";
-    if (!url || !/^https?:\/\//i.test(url)) {
-      showToast(
-        "No cloud image URL for this product. Sync from cloud or add an image online.",
-        "info"
-      );
-      return;
-    }
-    const completeProduct = products.find((x) => x.id === rowProduct.id) || rowProduct;
-    const uid = user?.uid || localStorage.getItem("firebaseUserId") || "";
-    setR2DownloadingId(rowProduct.id);
-    try {
-      if (Capacitor.isNativePlatform()) {
-        if (!uid) {
-          showToast("Sign in to save images to your device.", "warning");
-          return;
-        }
-        const [updated] = await cacheCloudProductImages(uid, [completeProduct]);
-        setProducts((prev) =>
-          prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x))
-        );
-        showToast("Cloud image saved to your Products folder.", "success");
-      } else {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const blob = await res.blob();
-        const mime = blob.type || "";
-        const ext = mime.includes("png")
-          ? "png"
-          : mime.includes("webp")
-            ? "webp"
-            : mime.includes("jpeg") || mime.includes("jpg")
-              ? "jpg"
-              : "jpg";
-        const a = document.createElement("a");
-        const objectUrl = URL.createObjectURL(blob);
-        a.href = objectUrl;
-        a.download = `product-${rowProduct.id}.${ext}`;
-        a.rel = "noopener";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(objectUrl);
-        showToast("Download started.", "success");
-      }
-    } catch (err: any) {
-      console.error("R2 download failed:", err);
-      showToast(err?.message || "Could not download image.", "error");
-    } finally {
-      setR2DownloadingId(null);
     }
   };
 
@@ -1008,33 +950,6 @@ if (isStrictMode() && user?.uid) {
                                 className="text-blue-600 hover:text-blue-800"
                               >
                                 <FiEdit size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDownloadR2Product(e, p)}
-                                disabled={
-                                  r2DownloadingId === p.id ||
-                                  !(
-                                    typeof p.imageUrl === "string" &&
-                                    /^https?:\/\//i.test(p.imageUrl.trim())
-                                  )
-                                }
-                                className={`text-emerald-600 hover:text-emerald-800 disabled:cursor-not-allowed ${
-                                  typeof p.imageUrl === "string" &&
-                                  /^https?:\/\//i.test(p.imageUrl.trim())
-                                    ? r2DownloadingId === p.id
-                                      ? "opacity-100 animate-pulse"
-                                      : ""
-                                    : "opacity-30"
-                                }`}
-                                title={
-                                  typeof p.imageUrl === "string" &&
-                                  /^https?:\/\//i.test(p.imageUrl.trim())
-                                    ? "Download cloud (R2) image"
-                                    : "No cloud image URL — sync from cloud first"
-                                }
-                              >
-                                <FiDownload size={16} />
                               </button>
                               <button
                                 onClick={() => {

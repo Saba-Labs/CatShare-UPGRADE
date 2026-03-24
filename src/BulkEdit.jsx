@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { useToast } from "./context/ToastContext";
-import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue } from "./config/catalogueProductUtils";
+import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue, normalizeOrderQuantityStep } from "./config/catalogueProductUtils";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
@@ -31,6 +31,7 @@ const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
   }
 
   baseFields.push({ key: "stock", label: "Stock Update" });
+  baseFields.push({ key: "orderQuantityStep", label: "Qty step" });
   return baseFields;
 };
 
@@ -130,6 +131,7 @@ useEffect(() => {
     normalized.wholesale = p.wholesale || "";
     normalized.wholesaleUnit = p.wholesaleUnit || "/ piece";
     normalized.stock = p.stock || "";
+    normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
 
     // Store master values for fallback/fill from master
     normalized.masterName = p.name || "";
@@ -187,6 +189,7 @@ useEffect(() => {
     if (stockField && !(stockField in defaults)) {
       defaults[stockField] = item[stockField] ?? "";
     }
+    defaults.orderQuantityStep = normalizeOrderQuantityStep(item.orderQuantityStep);
 
     // Merge with item, ensuring all values are defined
     const result = { ...defaults };
@@ -244,6 +247,8 @@ useEffect(() => {
             updates.category = [];
           } else if (fieldKey === "stock") {
             updates[stockField] = "out";
+          } else if (fieldKey === "orderQuantityStep") {
+            updates.orderQuantityStep = 1;
           }
 
           return ensureFieldDefaults({ ...item, ...updates });
@@ -289,6 +294,8 @@ useEffect(() => {
           updates[stockField] = typeof masterStockVal === "boolean"
             ? (masterStockVal ? "in" : "out")
             : (masterStockVal || "in");
+        } else if (fieldKey === "orderQuantityStep") {
+          updates.orderQuantityStep = normalizeOrderQuantityStep(masterData.orderQuantityStep);
         }
 
         return ensureFieldDefaults({ ...item, ...updates });
@@ -338,6 +345,7 @@ useEffect(() => {
     [priceField]: priceField ? p[priceField] : undefined,
     [priceUnitField]: priceField ? p[priceUnitField] : undefined,
     [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
+    orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
   };
 
   // Save all fieldX slots
@@ -449,6 +457,8 @@ useEffect(() => {
                     normalized[cat.priceField] = catData[cat.priceField] || p[cat.priceField] || "";
                     normalized[cat.priceUnitField] = catData[cat.priceUnitField] || p[cat.priceUnitField] || "/ piece";
                   }
+
+                  normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
 
                   return normalized;
                 });
@@ -813,6 +823,24 @@ useEffect(() => {
     </button>
   </div>
 )}
+
+            {selectedFields.includes("orderQuantityStep") && (
+              <input
+                type="text"
+                inputMode="numeric"
+                value={String(item.orderQuantityStep ?? 1)}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "");
+                  const n = parseInt(digits, 10);
+                  const next =
+                    !digits || !Number.isFinite(n) || n < 1 ? 1 : Math.min(n, 999999);
+                  handleFieldChange(item.id, "orderQuantityStep", next);
+                }}
+                className="border rounded px-2 py-1 w-20"
+                title="Minimum order quantity step (1 = any quantity)"
+                aria-label="Qty step"
+              />
+            )}
 
 
           </div>

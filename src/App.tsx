@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { flushSync } from "react-dom";
 import {
   BrowserRouter as Router,
@@ -29,27 +29,27 @@ import { useSync, applyUserSettingsFromCloud } from "./context/SyncContext";
 import SyncStatusIndicator from "./components/SyncStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 
-import CatalogueApp from "./CatalogueApp";
-import CreateProduct from "./CreateProduct";
-import Shelf from "./Shelf";
-import Retail from "./Retail";
-import Settings from "./Settings";
-import AppearanceSettings from "./pages/AppearanceSettings";
-import ThemesSettings from "./pages/ThemesSettings";
-import WatermarkSettings from "./pages/WatermarkSettings";
-import FieldsSettings from "./pages/FieldsSettings";
-import CurrencySettings from "./pages/CurrencySettings";
-import ProInfo from "./pages/ProInfo";
-import Welcome from "./pages/Welcome";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import Account from "./pages/Account";
-import OrderForm from "./pages/OrderForm";
-import PrivacyPolicy from "./PrivacyPolicy";
-import TermsOfService from "./TermsOfService";
-import Website from "./Website";
-import Tutorial from "./Tutorial";
+const CatalogueApp = lazy(() => import("./CatalogueApp"));
+const CreateProduct = lazy(() => import("./CreateProduct"));
+const Shelf = lazy(() => import("./Shelf"));
+const Retail = lazy(() => import("./Retail"));
+const Settings = lazy(() => import("./Settings"));
+const AppearanceSettings = lazy(() => import("./pages/AppearanceSettings"));
+const ThemesSettings = lazy(() => import("./pages/ThemesSettings"));
+const WatermarkSettings = lazy(() => import("./pages/WatermarkSettings"));
+const FieldsSettings = lazy(() => import("./pages/FieldsSettings"));
+const CurrencySettings = lazy(() => import("./pages/CurrencySettings"));
+const ProInfo = lazy(() => import("./pages/ProInfo"));
+const Welcome = lazy(() => import("./pages/Welcome"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const Account = lazy(() => import("./pages/Account"));
+const OrderForm = lazy(() => import("./pages/OrderForm"));
+const PrivacyPolicy = lazy(() => import("./PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./TermsOfService"));
+const Website = lazy(() => import("./Website"));
+const Tutorial = lazy(() => import("./Tutorial"));
 import { ToastProvider } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
@@ -64,12 +64,24 @@ import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
-import Lottie from "lottie-react";
-import syncAnimationData from "./loading.json";
+import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
-const SyncLottie = () => (
-  <Lottie animationData={syncAnimationData} loop autoplay style={{ width: '100%', height: '100%' }} />
-);
+/** Run non-critical work after first paint to shorten time-to-interactive. */
+function scheduleIdleTask(fn: () => void) {
+  if (typeof requestIdleCallback !== "undefined") {
+    requestIdleCallback(() => fn(), { timeout: 4000 });
+  } else {
+    window.setTimeout(fn, 1);
+  }
+}
+
+function RouteLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white" role="status" aria-label="Loading">
+      <div className="h-9 w-9 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function AppWithBackHandler() {
   const navigate = useNavigate();
@@ -100,35 +112,27 @@ function AppWithBackHandler() {
   const [startupPhase, setStartupPhase] = useState<'pending' | 'resolving' | 'done'>('pending');
   const startupRanForUserRef = useRef<string | null>(null);
 
-  /** When true, keep the native splash visible (fills the gap instead of an empty products tab). */
   const isHomeRoute = location.pathname === '/' || location.pathname === '';
   const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
+  // Gate on startup phase only — not supabaseDataLoading, so cached local rows can show while cloud finishes.
   const showCloudBootstrapOverlay =
     isHomeRoute &&
     !!user &&
     !isGuestUser &&
     !showOfflineSyncModal &&
-    (supabaseDataLoading || startupPhase === 'pending');
+    startupPhase === "pending";
 
   const isNative = Capacitor.getPlatform() !== "web";
 
-  // Native: Android 12+ often dismisses the *launch* splash when the WebView paints, before JS runs.
-  // Call SplashScreen.show({ autoHide: false }) whenever we still need cover; hide only when ready.
-  // In-WebView overlay (SplashLoadingLayout) matches the same art so there is no blank gap if native dismisses early.
-  const keepNativeSplash =
-    !isSyncContextSyncing && (loading || showCloudBootstrapOverlay);
-
+  // Never re-show the native Capacitor splash (logo-only). Cold start uses a plain white window (Android styles);
+  // loading UX is SplashLoadingLayout / auth UI inside the WebView.
   useEffect(() => {
     if (!isNative) {
       SplashScreen.hide().catch(() => {});
       return;
     }
-    if (keepNativeSplash) {
-      SplashScreen.show({ autoHide: false }).catch(() => {});
-    } else {
-      SplashScreen.hide().catch(() => {});
-    }
-  }, [isNative, keepNativeSplash]);
+    SplashScreen.hide().catch(() => {});
+  }, [isNative]);
 
   const getProductsKey = (uid: string) => getStorageKey('products', uid);
   const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
@@ -199,8 +203,6 @@ function AppWithBackHandler() {
     // Step 2: Check if strict online mode is already enabled (returning user).
     const strictAlreadyEnabled = localStorage.getItem('strictOnlineMode::device') === 'true';
     const legacyResolved = localStorage.getItem('offlineLegacyResolved::device') === 'true';
-    // ADD THIS LINE:
-console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlreadyEnabled, 'legacyResolved:', legacyResolved);
 
     if (strictAlreadyEnabled && legacyResolved) {
       // Returning strict-mode user: load exclusively from Supabase snapshot.
@@ -231,7 +233,8 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
       }
       applyUserSettingsFromCloud(supabaseData?.userSettings);
       setSupabaseSyncStatus('synced');
-      (async () => {
+      setStartupPhase('done');
+      void (async () => {
         try {
           const cloudData = await refreshFromCloud();
           if (cloudData) {
@@ -241,8 +244,6 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
         } catch (e) {
           console.warn('⚠️ Image cache refresh failed:', e);
         }
-        setStartupPhase('done');
-        console.log('✅ [startup] Strict mode user loaded from cloud:', filteredProducts.length, 'products');
       })();
       return;
     }
@@ -344,6 +345,23 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
   }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches]);
+
+  // Strict-mode returning user: paint cached catalogue while fetchAllUserData runs (cold start / slow network).
+  useEffect(() => {
+    if (loading || !user?.uid) return;
+    if (localStorage.getItem("isOfflineGuest") === "true") return;
+    const strict =
+      localStorage.getItem("strictOnlineMode::device") === "true" &&
+      localStorage.getItem("offlineLegacyResolved::device") === "true";
+    if (!strict || !supabaseDataLoading) return;
+    const uid = user.uid;
+    const localP = safeGetFromStorage(getStorageKey("products", uid), []);
+    const localD = safeGetFromStorage(getStorageKey("deletedProducts", uid), []);
+    if (localP.length === 0 && localD.length === 0) return;
+    setProducts(localP);
+    setDeletedProducts(localD);
+    setStartupPhase("done");
+  }, [loading, user?.uid, supabaseDataLoading]);
 
   // ──────────────────────────────────────────────────────
   // SYNC OFFLINE DATA (called when user taps "Sync" in the popup)
@@ -905,44 +923,39 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
     initializeFieldSystem();
   }, []);
 
-  // Initialize Firebase messaging for notifications
+  // Initialize Firebase messaging for notifications (deferred — not needed for first paint).
   useEffect(() => {
+    let cancelled = false;
+
     const setupFirebase = async () => {
-      // Ensure user has a unique ID
+      if (cancelled) return;
       if (!localStorage.getItem("userId")) {
         localStorage.setItem("userId", `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
       }
 
-      // Initialize Capacitor Firebase Analytics for mobile
       if (isNative) {
         try {
           await FirebaseAnalytics.setEnabled({ enabled: true });
-          await FirebaseAnalytics.logEvent({ name: 'app_open' });
+          await FirebaseAnalytics.logEvent({ name: "app_open" });
 
-          // Expose FirebaseAnalytics to window for use by analyticsEvents.ts
           (window as any).FirebaseAnalytics = {
             logEvent: async (options: { name: string; parameters: Record<string, any> }) => {
               try {
                 await FirebaseAnalytics.logEvent(options);
               } catch (error) {
-                console.error('Error logging event to Capacitor:', error);
+                console.error("Error logging event to Capacitor:", error);
               }
-            }
+            },
           };
-
-          console.log('✅ Firebase Analytics initialized on mobile');
         } catch (error) {
-          console.warn('⚠️ Firebase Analytics error on mobile:', error);
+          console.warn("⚠️ Firebase Analytics error on mobile:", error);
         }
       }
 
-      await initializeFirebaseMessaging();
+      if (!cancelled) await initializeFirebaseMessaging();
     };
-    setupFirebase();
 
-    // Listen for Firebase notifications
     const handleFirebaseNotification = (event: any) => {
-      console.log("Firebase notification received in app:", event.detail);
       setRenderResult({
         status: "success",
         message: event.detail.body || "Rendering completed successfully!",
@@ -951,7 +964,12 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
     };
 
     window.addEventListener("firebaseNotification", handleFirebaseNotification);
+    scheduleIdleTask(() => {
+      void setupFirebase();
+    });
+
     return () => {
+      cancelled = true;
       window.removeEventListener("firebaseNotification", handleFirebaseNotification);
     };
   }, []);
@@ -1103,14 +1121,10 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
   }, [handleRenderPNGs]);
 
   useEffect(() => {
-    if (isNative) {
-      // Request permissions for local notifications
-      LocalNotifications.requestPermissions().then((permission) => {
-        console.log("✅ Local notification permission requested:", permission);
-      }).catch((error) => {
-        console.error("❌ Failed to request local notification permissions:", error);
-      });
-    }
+    if (!isNative) return;
+    scheduleIdleTask(() => {
+      LocalNotifications.requestPermissions().catch(() => {});
+    });
   }, [isNative]);
 
   return (
@@ -1238,13 +1252,11 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
       <OfflineStatusIndicator />
 
       {isSyncContextSyncing && (
-        <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-black/50">
-          <div className="w-52 h-52">
-            <SyncLottie />
-          </div>
-          <p className="text-white font-semibold text-lg mt-2">Syncing to cloud</p>
-          <p className="text-white/60 text-sm mt-1">Please wait...</p>
-        </div>
+        <SyncBusyOverlay
+          zClassName="z-[110]"
+          title="Syncing to cloud"
+          subtitle="Please wait..."
+        />
       )}
 
       {/* Fills gap when native launch splash is gone but catalogue is not ready yet (esp. Android 12+ WebView first paint). */}
@@ -1296,9 +1308,12 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
       )}
 
       {showTutorial && (
-        <Tutorial onClose={() => setShowTutorial(false)} />
+        <Suspense fallback={null}>
+          <Tutorial onClose={() => setShowTutorial(false)} />
+        </Suspense>
       )}
 
+      <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
         {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
@@ -1454,6 +1469,7 @@ console.log('🚀 [startup] userId:', userId, 'strictAlreadyEnabled:', strictAlr
           }
         />
       </Routes>
+      </Suspense>
     </div>
   );
 }
