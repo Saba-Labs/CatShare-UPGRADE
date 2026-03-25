@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineHome } from "react-icons/md";
 import ProductPreviewModal from "./ProductPreviewModal";
@@ -19,8 +20,15 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [imageMap, setImageMap] = useState({});
+  const [showHiddenShelfActions, setShowHiddenShelfActions] = useState(false);
 
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onUnlocked = () => setShowHiddenShelfActions(true);
+    window.addEventListener(HIDDEN_MENU_UNLOCKED_EVENT, onUnlocked);
+    return () => window.removeEventListener(HIDDEN_MENU_UNLOCKED_EVENT, onUnlocked);
+  }, []);
 
   // Load imageMap for deleted products
   useEffect(() => {
@@ -171,7 +179,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
           </svg>
         </button>
         <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Shelf</h1>
-        {deletedProducts.length > 0 && (
+        {showHiddenShelfActions && deletedProducts.length > 0 && (
           <button
             onClick={() => setShowDeleteAllConfirm(true)}
             className="text-xs font-medium px-3 py-1 bg-red-500 text-white rounded hover:bg-red-700 transition"

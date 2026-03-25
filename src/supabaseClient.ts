@@ -82,6 +82,56 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+/** Supabase JS v2 stores session under keys prefixed with `sb-`. */
+const SUPABASE_AUTH_LS_PREFIX = 'sb-';
+
+/** Snapshot before `localStorage.clear()` so restore flows keep the user logged in for RLS. */
+export function snapshotSupabaseAuthFromLocalStorage(): Record<string, string> {
+  const snap: Record<string, string> = {};
+  if (typeof window === 'undefined' || !window.localStorage) return snap;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(SUPABASE_AUTH_LS_PREFIX)) {
+        const v = localStorage.getItem(key);
+        if (v !== null) snap[key] = v;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return snap;
+}
+
+/** Put session keys back after clear + app data restore. */
+export function restoreSupabaseAuthToLocalStorage(snapshot: Record<string, string>): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    Object.entries(snapshot).forEach(([k, v]) => {
+      localStorage.setItem(k, v);
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Re-read session from storage into the client after manual localStorage writes.
+ * Returns whether a user access token is available for REST calls.
+ */
+export async function refreshSupabaseSessionFromStorage(): Promise<boolean> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) return true;
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    return !!refreshed.session?.access_token;
+  } catch {
+    return false;
+  }
+}
+
 /** @deprecated Use persistAuthUserIdsForStorage — kept for any stray imports */
 export function setSupabaseUser(userId: string | null | undefined): void {
   persistAuthUserIdsForStorage(userId);

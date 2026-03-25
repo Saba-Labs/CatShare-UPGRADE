@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
@@ -7,6 +7,9 @@ import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.catshare.official';
+
+/** History state key so swipe / hardware back closes the drawer before leaving the page. */
+const ORDER_FORM_DRAWER_HISTORY_KEY = 'ofProductDrawer';
 
 type QtyMap = Record<string, number>;
 
@@ -281,21 +284,20 @@ const CSS = `
 
   .of-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 
-  /* Name + subtitle in one flow (max 2 lines) — less vertical stack */
+  /* Product name + subtitle on one row (wrap when needed) */
   .of-item-title-line {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    word-break: break-word;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
     line-height: 1.3;
+    word-break: break-word;
   }
   .of-item-name {
     font-size: 14px;
     font-weight: 700;
     color: var(--text);
   }
-  /* Clearly smaller than product name (14px) */
   .of-item-subtitle-inline {
     font-size: 12px;
     font-weight: 400;
@@ -334,7 +336,6 @@ const CSS = `
     line-height: 1.2;
   }
 
-  /* − 0 + Pack of XX — one continuous row */
   .of-item-qty-cluster {
     display: flex;
     align-items: center;
@@ -344,8 +345,8 @@ const CSS = `
   .of-qty-inline-row {
     display: inline-flex;
     align-items: center;
-    flex-wrap: nowrap;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 8px 10px;
     min-width: 0;
   }
   .of-step-hint--next-to-qty {
@@ -359,37 +360,58 @@ const CSS = `
     flex-shrink: 0;
   }
 
-  .of-line-total {
-    text-align: right;
-    flex-shrink: 0;
-    max-width: 52%;
+  /* Line math + amount — one horizontal row below qty */
+  .of-line-total-below {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
   }
   .of-line-calc {
-    font-size: 9px;
-    font-weight: 400;
+    font-size: 10px;
+    font-weight: 500;
     color: #94a3b8;
-    line-height: 1.3;
-    margin-bottom: 3px;
-    word-break: break-word;
+    line-height: 1.2;
+    margin: 0;
     letter-spacing: 0.01em;
+    min-width: 0;
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .of-line-sep {
+    color: #cbd5e1;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+    line-height: 1;
   }
   .of-line-total-val {
     font-size: 15px;
     font-weight: 800;
     color: var(--green-dark);
-    display: block;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .of-line-total-na {
     font-size: 14px;
     color: #cbd5e1;
     font-weight: 600;
+    flex-shrink: 0;
   }
   .of-subtotal-label {
     font-size: 10px;
     color: #94a3b8;
-    margin-top: 2px;
-    text-align: right;
+    font-weight: 600;
+    text-transform: lowercase;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .of-item-bottom {
@@ -397,6 +419,7 @@ const CSS = `
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   /* ── Qty control ── */
@@ -771,8 +794,43 @@ export default function OrderForm() {
   const [qty, setQty] = useState<QtyMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  /** Number of drawer entries we pushed onto session history (usually 0 or 1). */
+  const drawerHistoryDepthRef = useRef(0);
+
+  const openProductDrawer = useCallback((item: ShareLinkItem) => {
+    setDrawerItem(item);
+    window.history.pushState({ [ORDER_FORM_DRAWER_HISTORY_KEY]: true }, '', window.location.href);
+    drawerHistoryDepthRef.current += 1;
+  }, []);
+
+  const closeProductDrawer = useCallback(() => {
+    if (drawerHistoryDepthRef.current > 0) {
+      window.history.back();
+    } else {
+      setDrawerItem(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setDrawerItem((current) => {
+        if (current) {
+          drawerHistoryDepthRef.current = Math.max(0, drawerHistoryDepthRef.current - 1);
+          return null;
+        }
+        return current;
+      });
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => { injectCSS(); }, []);
+
+  useEffect(() => {
+    setDrawerItem(null);
+    drawerHistoryDepthRef.current = 0;
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1014,7 +1072,7 @@ export default function OrderForm() {
                 className={`of-item-card${isSelected ? ' is-selected' : ''}`}
               >
                 {/* Image */}
-                <div className="of-img-wrap" onClick={() => setDrawerItem(item)}>
+                <div className="of-img-wrap" onClick={() => openProductDrawer(item)}>
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.name} className="of-img" />
                   ) : (
@@ -1029,9 +1087,9 @@ export default function OrderForm() {
                     <div className="of-item-text">
                       <div className="of-item-title-line">
                         <span className="of-item-name">{item.name}</span>
-                        {item.subtitle && (
-                          <span className="of-item-subtitle-inline"> ({item.subtitle})</span>
-                        )}
+                        {item.subtitle ? (
+                          <span className="of-item-subtitle-inline">({item.subtitle})</span>
+                        ) : null}
                       </div>
                       <div className="of-item-price-row">
                         {item.price !== undefined && item.price !== null && item.price !== '' && (
@@ -1042,22 +1100,6 @@ export default function OrderForm() {
                         )}
                       </div>
                     </div>
-
-                    {isSelected && (
-                      <div className="of-line-total">
-                        {lineCalcDetail && (
-                          <div className="of-line-calc">{lineCalcDetail}</div>
-                        )}
-                        {hasParsedPrice ? (
-                          <span className="of-line-total-val">
-                            {formatOrderMoney(lineAmt, currencySymbol)}
-                          </span>
-                        ) : (
-                          <span className="of-line-total-na">—</span>
-                        )}
-                        <div className="of-subtotal-label">subtotal</div>
-                      </div>
-                    )}
                   </div>
 
                   <div className="of-item-bottom">
@@ -1068,22 +1110,48 @@ export default function OrderForm() {
                           step={getQuantityStep(item)}
                           onChange={(delta) => changeQty(item.productId, delta)}
                         />
-                        {getQuantityStep(item) > 1 && (
+                        {getQuantityStep(item) > 1 ? (
                           <div className="of-step-hint of-step-hint--next-to-qty">
                             <AlertIcon />
                             Pack of {getQuantityStep(item)}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                     <button
                       type="button"
                       className="of-view-btn"
-                      onClick={() => setDrawerItem(item)}
+                      onClick={() => openProductDrawer(item)}
                     >
                       Details ›
                     </button>
                   </div>
+
+                  {isSelected && (
+                    <div className="of-line-total-below" aria-live="polite">
+                      <span className="of-subtotal-label">subtotal</span>
+                      <span className="of-line-sep" aria-hidden>
+                        ·
+                      </span>
+                      {lineCalcDetail ? (
+                        <>
+                          <span className="of-line-calc" title={lineCalcDetail}>
+                            {lineCalcDetail}
+                          </span>
+                          <span className="of-line-sep" aria-hidden>
+                            ·
+                          </span>
+                        </>
+                      ) : null}
+                      {hasParsedPrice ? (
+                        <span className="of-line-total-val">
+                          {formatOrderMoney(lineAmt, currencySymbol)}
+                        </span>
+                      ) : (
+                        <span className="of-line-total-na">—</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -1157,7 +1225,7 @@ export default function OrderForm() {
           <div
             ref={overlayRef}
             className="of-overlay"
-            onClick={(e) => { if (e.target === overlayRef.current) setDrawerItem(null); }}
+            onClick={(e) => { if (e.target === overlayRef.current) closeProductDrawer(); }}
           >
             <div className="of-drawer">
               <div className="of-drawer-handle" />
@@ -1169,7 +1237,7 @@ export default function OrderForm() {
                 ) : (
                   <div className="of-drawer-img-ph"><ImgIcon size={48} /></div>
                 )}
-                <button className="of-drawer-close" onClick={() => setDrawerItem(null)}>✕</button>
+                <button type="button" className="of-drawer-close" onClick={() => closeProductDrawer()}>✕</button>
               </div>
 
               {/* Content */}
@@ -1222,7 +1290,7 @@ export default function OrderForm() {
                   </div>
                 </div>
 
-                <button className="of-drawer-done" onClick={() => setDrawerItem(null)}>
+                <button type="button" className="of-drawer-done" onClick={() => closeProductDrawer()}>
                   Done — {dQ > 0 ? `${dQ} added` : 'close'}
                 </button>
               </div>

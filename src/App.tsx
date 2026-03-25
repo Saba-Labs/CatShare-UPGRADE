@@ -87,7 +87,13 @@ function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
-  const { isSyncing: isSyncContextSyncing, syncProductsToCloud, refreshFromCloud, isStrictMode } = useSync();
+  const {
+    isSyncing: isSyncContextSyncing,
+    syncStatusDetail,
+    syncProductsToCloud,
+    refreshFromCloud,
+    isStrictMode,
+  } = useSync();
   const [imageMap, setImageMap] = useState({});
   const [products, setProducts] = useState<any[]>([]);
   const [deletedProducts, setDeletedProducts] = useState<any[]>([]);
@@ -205,44 +211,51 @@ function AppWithBackHandler() {
     const legacyResolved = localStorage.getItem('offlineLegacyResolved::device') === 'true';
 
     if (strictAlreadyEnabled && legacyResolved) {
-      // Returning strict-mode user: load exclusively from Supabase snapshot.
-      const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
-      const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
-      const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
-      const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
-
-      setProducts(filteredProducts);
-      safeSetInStorage(getProductsKey(userId), filteredProducts);
-      setDeletedProducts(cloudDeleted);
-      safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
-
-      const rawCats = supabaseData?.categories || [];
-      const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
-      localStorage.setItem('categories', JSON.stringify(normalizedCats));
-      if (supabaseData?.fieldsDefinition) {
-        setFieldsDefinition(supabaseData.fieldsDefinition, userId);
-        window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
-          detail: { newDefinition: supabaseData.fieldsDefinition, template: supabaseData.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
-        }));
-      }
-      if (supabaseData?.cataloguesDefinition) {
-        setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
-        window.dispatchEvent(new CustomEvent('catalogues-changed', {
-          detail: { action: 'update', catalogues: supabaseData.cataloguesDefinition.catalogues }
-        }));
-      }
-      applyUserSettingsFromCloud(supabaseData?.userSettings);
-      setSupabaseSyncStatus('synced');
-      setStartupPhase('done');
+      // Returning strict-mode user: apply auth snapshot, then wait for full cloud refresh
+      // (image cache + storage) before ending startup — keeps splash up until catalogue is ready.
       void (async () => {
         try {
-          const cloudData = await refreshFromCloud();
-          if (cloudData) {
-            setProducts(cloudData.products);
-            setDeletedProducts(cloudData.deletedProducts);
+          const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
+          const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
+          const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
+          const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
+
+          setProducts(filteredProducts);
+          safeSetInStorage(getProductsKey(userId), filteredProducts);
+          setDeletedProducts(cloudDeleted);
+          safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
+
+          const rawCats = supabaseData?.categories || [];
+          const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+          localStorage.setItem('categories', JSON.stringify(normalizedCats));
+          if (supabaseData?.fieldsDefinition) {
+            setFieldsDefinition(supabaseData.fieldsDefinition, userId);
+            window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+              detail: { newDefinition: supabaseData.fieldsDefinition, template: supabaseData.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
+            }));
           }
+          if (supabaseData?.cataloguesDefinition) {
+            setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
+            window.dispatchEvent(new CustomEvent('catalogues-changed', {
+              detail: { action: 'update', catalogues: supabaseData.cataloguesDefinition.catalogues }
+            }));
+          }
+          applyUserSettingsFromCloud(supabaseData?.userSettings);
+
+          try {
+            const cloudData = await refreshFromCloud();
+            if (cloudData) {
+              setProducts(cloudData.products);
+              setDeletedProducts(cloudData.deletedProducts);
+            }
+          } catch (e) {
+            console.warn('⚠️ refreshFromCloud failed (using auth snapshot):', e);
+          }
+          setSupabaseSyncStatus('synced');
         } catch (e) {
-          console.warn('⚠️ Image cache refresh failed:', e);
+          console.error('❌ Strict startup bootstrap failed:', e);
+        } finally {
+          setStartupPhase('done');
         }
       })();
       return;
@@ -344,9 +357,11 @@ function AppWithBackHandler() {
       setSupabaseSyncStatus('synced');
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
-  }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches]);
+  }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches, refreshFromCloud]);
 
-  // Strict-mode returning user: paint cached catalogue while fetchAllUserData runs (cold start / slow network).
+  // Strict-mode: hydrate React state from local cache while Supabase profile is still loading.
+  // Do not call setStartupPhase('done') here — that stays tied to the main pipeline so the splash
+  // stays until refreshFromCloud() has applied the full catalogue (avoids empty dashboard flash).
   useEffect(() => {
     if (loading || !user?.uid) return;
     if (localStorage.getItem("isOfflineGuest") === "true") return;
@@ -360,7 +375,6 @@ function AppWithBackHandler() {
     if (localP.length === 0 && localD.length === 0) return;
     setProducts(localP);
     setDeletedProducts(localD);
-    setStartupPhase("done");
   }, [loading, user?.uid, supabaseDataLoading]);
 
   // ──────────────────────────────────────────────────────
@@ -1255,7 +1269,7 @@ function AppWithBackHandler() {
         <SyncBusyOverlay
           zClassName="z-[110]"
           title="Syncing to cloud"
-          subtitle="Please wait..."
+          subtitle={syncStatusDetail ?? 'Please wait…'}
         />
       )}
 

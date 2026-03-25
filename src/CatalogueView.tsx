@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback, Dispatch, Set
 import { flushSync } from "react-dom";
 import { handleShare } from "./Share";
 import { HiCheck } from "react-icons/hi";
-import { FiPlus, FiEdit, FiImage, FiLink } from "react-icons/fi";
+import { FiPlus, FiEdit, FiImage, FiLink, FiMessageCircle } from "react-icons/fi";
 import { FaRegFilePdf } from "react-icons/fa6";
 import { MdLayers } from "react-icons/md";
 import { RiEdit2Line } from "react-icons/ri";
@@ -24,6 +24,7 @@ import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
 import { businessProfileFromUserSettings } from "./config/businessProfile";
 import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
+import { parseWhatsAppNumber } from "./data/whatsappCountryCodes";
 
 const ProductCard = React.memo(({
   p,
@@ -322,6 +323,11 @@ export default React.memo(function CatalogueView({
   const [showAddProductsModal, setShowAddProductsModal] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
+  const [showWhatsAppRequiredForLink, setShowWhatsAppRequiredForLink] = useState(false);
+  const [linkWhatsappDial, setLinkWhatsappDial] = useState("");
+  const [linkWhatsappLocal, setLinkWhatsappLocal] = useState("");
+  const [linkWhatsappError, setLinkWhatsappError] = useState("");
+  const [linkWhatsappSaving, setLinkWhatsappSaving] = useState(false);
 
   // Touch state - moved to useRef for better performance
   const touchStateRef = useRef({
@@ -874,6 +880,137 @@ const handleTouchEnd = useCallback(() => {
     window.addEventListener("toggle-catalogue-filter", toggleFilterHandler);
     return () => window.removeEventListener("toggle-catalogue-filter", toggleFilterHandler);
   }, []);
+
+  useEffect(() => {
+    if (!showWhatsAppRequiredForLink) return;
+    const saved = localStorage.getItem("whatsappNumber") || "";
+    const parsed = parseWhatsAppNumber(saved);
+    setLinkWhatsappDial(parsed.dial);
+    setLinkWhatsappLocal(parsed.local);
+    setLinkWhatsappError("");
+  }, [showWhatsAppRequiredForLink]);
+
+  const handleLinkWhatsappDialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) {
+      setLinkWhatsappDial(raw.trim() === "+" ? "+" : "");
+      return;
+    }
+    setLinkWhatsappDial(`+${digits}`);
+  };
+
+  const runOrderFormShareFlow = useCallback(
+    async (sellerWhatsapp: string) => {
+      if (!user?.uid) return;
+      try {
+        setShowShareOptions(false);
+
+        const selectedProducts = allProducts.filter((p) => selected.includes(p.id));
+        const items = selectedProducts.map((p) => productToShareLinkItem(p, catalogueId));
+
+        const biz = businessProfileFromUserSettings(supabaseData?.userSettings);
+        const sellerBusinessName = biz.businessName?.trim() || undefined;
+        const sellerLogoUrl = biz.logoUrl?.trim() || undefined;
+
+        const { code: sellerCurrencyCode, symbol: sellerCurrencySymbol } =
+          getSellerCurrencyForShareLink(supabaseData?.userSettings);
+
+        const { url } = await createShareLink({
+          sellerUserId: user.uid,
+          sellerWhatsapp,
+          items,
+          sellerBusinessName,
+          sellerCurrencyCode,
+          sellerCurrencySymbol,
+          sellerLogoUrl,
+        });
+
+        const shareMessage = `Order using the link ${url}`;
+
+        let shared = false;
+        try {
+          const { Capacitor } = await import("@capacitor/core");
+          if (Capacitor.isNativePlatform()) {
+            const { Share } = await import("@capacitor/share");
+            await Share.share({
+              title: "Order Link",
+              text: shareMessage,
+              dialogTitle: "Share order link",
+            });
+            shared = true;
+          }
+        } catch (shareErr: any) {
+          if (shareErr?.name !== "AbortError") {
+            console.warn("Capacitor share failed, trying web share:", shareErr);
+          } else {
+            shared = true;
+          }
+        }
+
+        if (!shared && navigator.share) {
+          try {
+            await navigator.share({ title: "Order Link", text: shareMessage });
+            shared = true;
+          } catch (shareErr: any) {
+            if (!(shareErr.name === "AbortError" || shareErr.name === "NotAllowedError")) {
+              console.error("Web share failed:", shareErr);
+            } else {
+              shared = true;
+            }
+          }
+        }
+
+        if (!shared) {
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+            alert("Order link copied to clipboard for sharing.");
+          } catch {
+            // Clipboard copy failed; silently continue.
+          }
+        }
+      } catch (err: any) {
+        console.error("Failed to create order form link:", err);
+        const msg = typeof err?.message === "string" ? err.message : String(err);
+        const hint =
+          /row-level security|rls|permission denied|42501/i.test(msg)
+            ? " Sign in again, or ask an admin to check Supabase policies on share_links."
+            : /column|schema cache|pgrst/i.test(msg)
+              ? " Run the latest SQL in SUPABASE_SHARE_LINKS_SQL.md (currency columns + get_share_link)."
+              : "";
+        alert(
+          msg && msg.length < 200
+            ? `Could not create link: ${msg}${hint ? `\n\n${hint}` : ""}`
+            : `Could not create link.${hint ? ` ${hint}` : " Please try again."}`
+        );
+      }
+    },
+    [user, supabaseData, allProducts, selected, catalogueId]
+  );
+
+  const saveWhatsAppFromLinkModal = async () => {
+    setLinkWhatsappError("");
+    const dialDigits = linkWhatsappDial.replace(/\D/g, "");
+    if (!dialDigits) {
+      setLinkWhatsappError("Enter country code (e.g. +91).");
+      return;
+    }
+    const local = (linkWhatsappLocal || "").replace(/\D/g, "");
+    if (!local) {
+      setLinkWhatsappError("Enter your WhatsApp number.");
+      return;
+    }
+    const clean = `+${dialDigits}${local}`;
+    setLinkWhatsappSaving(true);
+    try {
+      localStorage.setItem("whatsappNumber", clean);
+      window.dispatchEvent(new CustomEvent("whatsappNumberLocalStorageUpdated"));
+      setShowWhatsAppRequiredForLink(false);
+      await runOrderFormShareFlow(clean);
+    } finally {
+      setLinkWhatsappSaving(false);
+    }
+  };
 
   useEffect(() => {
     const container = document.getElementById("catalogue-header-icons");
@@ -1440,104 +1577,21 @@ const handleTouchEnd = useCallback(() => {
 
             <button
               onClick={async () => {
-                try {
+                if (!user?.uid) {
                   setShowShareOptions(false);
-                  if (!user?.uid) {
-                    alert('Please login first.');
-                    return;
-                  }
-                  const sellerWhatsapp = supabaseData?.userSettings?.whatsapp_number 
-  || supabaseData?.userSettings?.whatsappNumber 
-  || localStorage.getItem('whatsappNumber') 
-  || '';
-                  if (!sellerWhatsapp.trim()) {
-                    alert('Please set your WhatsApp number in Account first.');
-                    return;
-                  }
-
-                  const selectedProducts = allProducts.filter((p) => selected.includes(p.id));
-                  const items = selectedProducts.map((p) =>
-                    productToShareLinkItem(p, catalogueId)
-                  );
-
-                  const biz = businessProfileFromUserSettings(supabaseData?.userSettings);
-                  const sellerBusinessName = biz.businessName?.trim() || undefined;
-                  const sellerLogoUrl = biz.logoUrl?.trim() || undefined;
-
-                  const { code: sellerCurrencyCode, symbol: sellerCurrencySymbol } =
-                    getSellerCurrencyForShareLink(supabaseData?.userSettings);
-
-                  const { url } = await createShareLink({
-                    sellerUserId: user.uid,
-                    sellerWhatsapp,
-                    items,
-                    sellerBusinessName,
-                    sellerCurrencyCode,
-                    sellerCurrencySymbol,
-                    sellerLogoUrl,
-                  });
-
-                  const shareMessage = `Order using the link ${url}`;
-
-                  // Try Capacitor native share first (most reliable on mobile)
-                  let shared = false;
-                  try {
-                    const { Capacitor } = await import('@capacitor/core');
-                    if (Capacitor.isNativePlatform()) {
-                      const { Share } = await import('@capacitor/share');
-                      await Share.share({
-                        title: 'Order Link',
-                        text: shareMessage,
-                        dialogTitle: 'Share order link',
-                      });
-                      shared = true;
-                    }
-                  } catch (shareErr: any) {
-                    if (shareErr?.name !== 'AbortError') {
-                      console.warn('Capacitor share failed, trying web share:', shareErr);
-                    } else {
-                      shared = true;
-                    }
-                  }
-
-                  // Fallback: Web Share API
-                  if (!shared && navigator.share) {
-                    try {
-                      await navigator.share({ title: 'Order Link', text: shareMessage });
-                      shared = true;
-                    } catch (shareErr: any) {
-                      if (!(shareErr.name === 'AbortError' || shareErr.name === 'NotAllowedError')) {
-                        console.error('Web share failed:', shareErr);
-                      } else {
-                        shared = true;
-                      }
-                    }
-                  }
-
-                  // Final fallback: copy to clipboard
-                  if (!shared) {
-                    try {
-                      await navigator.clipboard.writeText(shareMessage);
-                      alert('Order link copied to clipboard for sharing.');
-                    } catch {
-                      // Clipboard copy failed; silently continue.
-                    }
-                  }
-                } catch (err: any) {
-                  console.error('Failed to create order form link:', err);
-                  const msg = typeof err?.message === 'string' ? err.message : String(err);
-                  const hint =
-                    /row-level security|rls|permission denied|42501/i.test(msg)
-                      ? ' Sign in again, or ask an admin to check Supabase policies on share_links.'
-                      : /column|schema cache|pgrst/i.test(msg)
-                        ? ' Run the latest SQL in SUPABASE_SHARE_LINKS_SQL.md (currency columns + get_share_link).'
-                        : '';
-                  alert(
-                    msg && msg.length < 200
-                      ? `Could not create link: ${msg}${hint ? `\n\n${hint}` : ''}`
-                      : `Could not create link.${hint ? ` ${hint}` : ' Please try again.'}`
-                  );
+                  alert("Please login first.");
+                  return;
                 }
+                const sellerWhatsapp =
+                  localStorage.getItem("whatsappNumber") ||
+                  supabaseData?.userSettings?.whatsapp_number ||
+                  supabaseData?.userSettings?.whatsappNumber ||
+                  "";
+                if (!String(sellerWhatsapp).trim()) {
+                  setShowWhatsAppRequiredForLink(true);
+                  return;
+                }
+                await runOrderFormShareFlow(String(sellerWhatsapp).trim());
               }}
               className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
             >
@@ -1562,6 +1616,92 @@ const handleTouchEnd = useCallback(() => {
     </div>
   )}
 </AnimatePresence>
+
+  {/* WhatsApp input — required for order link (saved locally only) */}
+  <AnimatePresence>
+    {showWhatsAppRequiredForLink && (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => !linkWhatsappSaving && setShowWhatsAppRequiredForLink(false)}
+        />
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 10 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 10 }}
+          className="relative w-full max-w-[340px] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden p-5 sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start gap-3 mb-4">
+            <div className="shrink-0 w-11 h-11 rounded-2xl bg-green-500/15 dark:bg-green-500/20 flex items-center justify-center">
+              <FiMessageCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                WhatsApp number needed to share as link
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                Saved on this device only — same as Account.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 min-w-0 mb-2">
+            <input
+              type="text"
+              inputMode="tel"
+              autoComplete="tel-country-code"
+              aria-label="Country code"
+              value={linkWhatsappDial}
+              onChange={handleLinkWhatsappDialChange}
+              disabled={linkWhatsappSaving}
+              placeholder="+91"
+              className="w-[7rem] shrink-0 px-2.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-base font-mono tabular-nums text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 disabled:opacity-60"
+            />
+            <input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              aria-label="Mobile number"
+              value={linkWhatsappLocal}
+              onChange={(e) => setLinkWhatsappLocal(e.target.value.replace(/\D/g, ""))}
+              disabled={linkWhatsappSaving}
+              placeholder="98XXXXXXXX"
+              className="min-w-0 flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-base tabular-nums text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 disabled:opacity-60"
+            />
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3">
+            Example: <span className="font-mono text-slate-500 dark:text-slate-400">+91 9876543210</span>
+          </p>
+          {linkWhatsappError ? (
+            <p className="text-sm text-red-600 dark:text-red-400 mb-3">{linkWhatsappError}</p>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void saveWhatsAppFromLinkModal()}
+              disabled={linkWhatsappSaving}
+              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors touch-manipulation disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {linkWhatsappSaving ? "Saving…" : "Save & create link"}
+            </button>
+            <button
+              type="button"
+              disabled={linkWhatsappSaving}
+              onClick={() => setShowWhatsAppRequiredForLink(false)}
+              className="w-full py-2.5 rounded-xl text-slate-500 dark:text-slate-400 font-semibold text-sm hover:text-slate-700 dark:hover:text-slate-200 transition-colors touch-manipulation disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
 
     
 

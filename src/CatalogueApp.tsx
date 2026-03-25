@@ -26,6 +26,7 @@ import {
   tryReadProductSourceAsDataUrl,
   deleteProductSourceImagesBestEffort,
 } from "./utils/productSourceImage";
+import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 
 declare global {
   interface Window {
@@ -158,6 +159,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showShelfConfirm, setShowShelfConfirm] = useState(false);
   const [shelfTarget, setShelfTarget] = useState(null);
+  const [showHiddenDangerShelfActions, setShowHiddenDangerShelfActions] = useState(false);
+
+  useEffect(() => {
+    const onUnlocked = () => setShowHiddenDangerShelfActions(true);
+    window.addEventListener(HIDDEN_MENU_UNLOCKED_EVENT, onUnlocked);
+    return () => window.removeEventListener(HIDDEN_MENU_UNLOCKED_EVENT, onUnlocked);
+  }, []);
+
   const [confirmToggleStock, setConfirmToggleStock] = useState(null);
   const [bypassChecked, setBypassChecked] = useState(false);
   const [localIsRendering, setLocalIsRendering] = useState(false);
@@ -1059,6 +1068,7 @@ if (isStrictMode() && user?.uid) {
                 >
                   Shelf
                 </button>
+                {showHiddenDangerShelfActions && (
                 <button
                   className="px-4 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-800 transition"
                   onClick={async () => {
@@ -1085,6 +1095,7 @@ if (isStrictMode() && user?.uid) {
                 >
                   Shelf All
                 </button>
+                )}
                 <button
                   className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"
                   onClick={() => {

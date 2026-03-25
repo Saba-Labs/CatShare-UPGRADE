@@ -1,17 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiMail, FiLock, FiUser, FiAlertCircle, FiCheck } from 'react-icons/fi';
-import { FaGoogle } from 'react-icons/fa';
+import { Capacitor } from '@capacitor/core';
+import { FiMail, FiLock, FiUser, FiAlertCircle, FiCheck, FiShoppingCart, FiZap, FiImage } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 
+const introHighlights = [
+  {
+    icon: FiShoppingCart,
+    title: 'Order forms',
+    text: 'One link—qty, line totals, then WhatsApp.',
+  },
+  {
+    icon: FiZap,
+    title: 'Easier days',
+    text: 'Your prices and packs carry through—less back-and-forth.',
+  },
+  {
+    icon: FiImage,
+    title: 'Smart catalogues',
+    text: 'Lists, renders, sync—aligned with what you stock.',
+  },
+];
+
+function GoogleIcon() {
+  return (
+    <svg
+      className="h-5 w-5 shrink-0"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  );
+}
+
 export default function Register() {
+  const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { supabaseData, supabaseDataLoading } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
@@ -23,11 +70,9 @@ export default function Register() {
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustSignedUp, setHasJustSignedUp] = useState(false);
 
-  // After user signs up and supabaseData loads, redirect to onboarding
   useEffect(() => {
     if (hasJustSignedUp && !supabaseDataLoading) {
       showToast('Account created successfully!', 'success');
-      // New users always go to onboarding for industry/field setup
       navigate('/welcome');
       setHasJustSignedUp(false);
     }
@@ -45,14 +90,13 @@ export default function Register() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!formData.displayName.trim()) {
       setError('Please enter your name');
       return;
@@ -69,11 +113,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await authService.registerWithEmail(
-        formData.email,
-        formData.password,
-        formData.displayName
-      );
+      await authService.registerWithEmail(formData.email, formData.password, formData.displayName);
       setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
@@ -100,164 +140,306 @@ export default function Register() {
     }
   };
 
+  const inputClass =
+    'w-full min-h-[44px] pl-11 pr-4 py-3 text-base text-slate-900 placeholder:text-slate-400 bg-slate-50/80 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-shadow';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+    <div
+      className={[
+        'min-h-[100dvh] min-h-screen bg-slate-50 flex flex-col lg:flex-row',
+        'pt-[env(safe-area-inset-top,0px)]',
+        isNativeApp ? 'overscroll-y-contain' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      <motion.aside
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.45 }}
+        className="relative shrink-0 lg:w-[46%] xl:w-[44%] flex flex-col justify-center px-5 pt-2 pb-6 sm:px-8 lg:min-h-[100dvh] lg:py-10 lg:px-12 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
       >
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-            <p className="text-gray-600">Join us and get started</p>
-          </div>
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.35), transparent 45%), radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.25), transparent 40%)',
+          }}
+        />
+        <div className="relative z-10 max-w-md mx-auto lg:mx-0 w-full">
+          <Link
+            to="/website"
+            className="inline-flex items-center gap-2.5 sm:gap-3 group mb-4 lg:mb-10 min-h-[44px] -ml-1 pl-1 rounded-lg active:opacity-90"
+          >
+            <span className="inline-flex items-center justify-center shrink-0 rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-black/10">
+              <img
+                src="/CatShare_logo.png"
+                alt="CatShare"
+                className="h-8 w-auto sm:h-10 max-h-10 object-contain object-center"
+              />
+            </span>
+            <span className="text-lg sm:text-2xl font-semibold tracking-tight text-white group-active:text-blue-100 transition-colors">
+              CatShare
+            </span>
+          </Link>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <FiAlertCircle className="text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          )}
+          <p className="text-sm font-medium tracking-wide text-sky-200/95 mb-3 lg:mb-4">
+            Share faster · Sell quicker
+          </p>
 
-          {/* Registration Form */}
-          <form onSubmit={handleRegister} className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <div className="relative">
-                <FiUser className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="text"
-                  name="displayName"
-                  value={formData.displayName}
-                  onChange={handleInputChange}
-                  placeholder="John Doe"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-            </div>
+          <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
+            Catalogues and order links—less busywork.
+          </h1>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-            </div>
+          <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
+            Order links with live prices; buyers pick qty and message you on WhatsApp.
+          </p>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                />
-              </div>
-              {/* Password Requirements */}
-              {formData.password && (
-                <div className="mt-3 space-y-2">
-                  {[
-                    { text: 'At least 6 characters', met: formData.password.length >= 6 },
-                    { text: 'One uppercase letter', met: /[A-Z]/.test(formData.password) },
-                    { text: 'One number', met: /[0-9]/.test(formData.password) },
-                  ].map((req) => (
-                    <div key={req.text} className="flex items-center gap-2 text-xs">
-                      <div className={`w-4 h-4 rounded flex items-center justify-center ${req.met ? 'bg-green-100' : 'bg-gray-100'}`}>
-                        {req.met && <FiCheck className="text-green-600 text-xs" />}
-                      </div>
-                      <span className={req.met ? 'text-green-700' : 'text-gray-500'}>{req.text}</span>
-                    </div>
-                  ))}
+          <p className="hidden lg:block text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
+            Shareable order forms from your catalogue—clear prices and subtotals, then one tap to WhatsApp.
+          </p>
+
+          <ul className="hidden lg:block space-y-4">
+            {introHighlights.map(({ icon: Icon, title, text }, i) => (
+              <motion.li
+                key={title}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.12 + i * 0.08, duration: 0.35 }}
+                className="flex gap-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+                  <Icon className="h-5 w-5 text-sky-200" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-medium text-white">{title}</p>
+                  <p className="text-xs sm:text-sm text-blue-100/80 leading-snug mt-0.5">{text}</p>
                 </div>
-              )}
+              </motion.li>
+            ))}
+          </ul>
+
+          <p className="mt-4 lg:mt-10 text-xs text-blue-200/70 hidden lg:block">
+            <Link
+              to="/website"
+              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
+            >
+              Learn more
+            </Link>
+            {' · '}
+            <Link
+              to="/login"
+              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </motion.aside>
+
+      <div
+        style={{ WebkitOverflowScrolling: 'touch' }}
+        className={[
+          'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
+          'overflow-y-auto lg:overflow-visible',
+          'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
+          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
+          'lg:items-center lg:justify-center',
+        ].join(' ')}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="w-full max-w-[420px] mx-auto lg:my-auto"
+        >
+          <div className="lg:hidden text-center mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">Create account</h2>
+            <p className="text-sm text-slate-500 mt-1">Set up your CatShare workspace</p>
+          </div>
+
+          <div
+            className={[
+              'rounded-2xl bg-white border border-slate-200/80 shadow-xl shadow-slate-200/40 p-5 sm:p-8',
+              isNativeApp ? 'shadow-slate-300/30' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <div className="hidden lg:block mb-6">
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Create account</h2>
+              <p className="text-slate-500 text-sm mt-1.5">Set up your CatShare workspace</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-3 text-gray-400" />
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                />
+            {error && (
+              <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
+                <FiAlertCircle className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800 leading-snug">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleRegister} className="space-y-4 mb-6">
+              <div>
+                <label
+                  htmlFor="register-name"
+                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                >
+                  Full name
+                </label>
+                <div className="relative">
+                  <FiUser className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    id="register-name"
+                    type="text"
+                    name="displayName"
+                    value={formData.displayName}
+                    onChange={handleInputChange}
+                    placeholder="John Doe"
+                    autoComplete="name"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="register-email"
+                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                >
+                  Email
+                </label>
+                <div className="relative">
+                  <FiMail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    id="register-email"
+                    type="email"
+                    name="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="register-password"
+                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    id="register-password"
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+                {formData.password && (
+                  <div className="mt-3 space-y-2">
+                    {[
+                      { text: 'At least 6 characters', met: formData.password.length >= 6 },
+                      { text: 'One uppercase letter', met: /[A-Z]/.test(formData.password) },
+                      { text: 'One number', met: /[0-9]/.test(formData.password) },
+                    ].map((req) => (
+                      <div key={req.text} className="flex items-center gap-2 text-xs">
+                        <div
+                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                            req.met ? 'bg-emerald-100' : 'bg-slate-100'
+                          }`}
+                        >
+                          {req.met && <FiCheck className="text-emerald-600 text-xs" />}
+                        </div>
+                        <span className={req.met ? 'text-emerald-800' : 'text-slate-500'}>{req.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="register-confirm"
+                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                >
+                  Confirm password
+                </label>
+                <div className="relative">
+                  <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    id="register-confirm"
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className={inputClass}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || passwordRequirements.length > 0}
+                className="w-full mt-2 min-h-[48px] py-3.5 rounded-xl text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 active:from-blue-500 active:to-indigo-500 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-blue-600/20 transition-all"
+              >
+                {isLoading ? 'Creating account…' : 'Create account'}
+              </button>
+            </form>
+
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-white text-slate-500 font-medium">Or sign up with</span>
               </div>
             </div>
 
             <button
-              type="submit"
-              disabled={isLoading || passwordRequirements.length > 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 rounded-lg transition-colors"
-            >
-              {isLoading ? 'Creating Account...' : 'Create Account'}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Or sign up with</span>
-            </div>
-          </div>
-
-          {/* OAuth Buttons */}
-          <div className="mb-6">
-            <button
+              type="button"
               onClick={handleGoogleSignUp}
               disabled={authLoading !== null}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 transition-colors"
+              className="w-full min-h-[48px] flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-base font-medium active:bg-slate-50 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
-              <FaGoogle className="text-red-600" />
-              <span className="text-gray-700 font-medium">
-                {authLoading === 'google' ? 'Signing up...' : 'Google'}
-              </span>
+              <GoogleIcon />
+              {authLoading === 'google' ? 'Signing up…' : 'Google'}
             </button>
+
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center text-sm">
+              <p className="text-slate-600">
+                Already have an account?{' '}
+                <Link to="/login" className="text-blue-600 font-semibold hover:text-blue-500">
+                  Sign in
+                </Link>
+              </p>
+            </div>
           </div>
 
-          {/* Footer Links */}
-          <div className="text-center text-sm">
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="text-blue-600 hover:underline font-medium">
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
-      </motion.div>
+          <p className="lg:hidden text-center text-xs text-slate-500 mt-4 pb-1">
+            <Link to="/website" className="text-blue-600 font-medium active:text-blue-700 py-2">
+              About CatShare
+            </Link>
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 }

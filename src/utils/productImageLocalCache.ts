@@ -31,13 +31,27 @@ function stripDataUrlToBase64(dataUrl: string): string {
   return dataUrl.slice(i + 1);
 }
 
+export type CacheCloudImageProgress = {
+  current: number;
+  total: number;
+  productName?: string;
+};
+
 /**
  * For native apps: ensure each product with imageUrl has a local source file at the Products path.
+ * Optional `onProgress`: once per product row that has an `id` (in order), for live UI during long syncs.
  */
-export async function cacheCloudProductImages(userId: string, products: any[]): Promise<any[]> {
+export async function cacheCloudProductImages(
+  userId: string,
+  products: any[],
+  onProgress?: (info: CacheCloudImageProgress) => void
+): Promise<any[]> {
   if (!Capacitor.isNativePlatform() || !userId || !Array.isArray(products) || products.length === 0) {
     return products;
   }
+
+  const totalWithId = products.reduce((n, p) => n + (p?.id != null ? 1 : 0), 0);
+  let seenWithId = 0;
 
   const out: any[] = [];
   for (const p of products) {
@@ -45,6 +59,12 @@ export async function cacheCloudProductImages(userId: string, products: any[]): 
       out.push(p);
       continue;
     }
+
+    seenWithId += 1;
+    const rawName = typeof p.name === 'string' ? p.name.trim() : '';
+    const productName =
+      rawName.length > 42 ? `${rawName.slice(0, 39)}…` : rawName || undefined;
+    onProgress?.({ current: seenWithId, total: totalWithId, productName });
 
     const url = p.imageUrl;
     if (typeof url !== 'string' || !HTTP_URL.test(url.trim())) {

@@ -6,11 +6,16 @@ import { cacheCloudProductImages } from '../utils/productImageLocalCache';
 import { getFieldsDefinition, setFieldsDefinition } from '../config/fieldConfig';
 import { getCataloguesDefinition, setCataloguesDefinition } from '../config/catalogueConfig';
 
+export type RefreshFromCloudOptions = {
+  onStatus?: (message: string) => void;
+};
+
 interface SyncContextType {
   isSyncing: boolean;
+  syncStatusDetail: string | null;
   syncError: string | null;
   syncProductsToCloud: (products: any[], deletedProducts: any[]) => Promise<{ products: any[]; deletedProducts: any[] }>;
-  refreshFromCloud: () => Promise<{ products: any[]; deletedProducts: any[] } | null>;
+  refreshFromCloud: (opts?: RefreshFromCloudOptions) => Promise<{ products: any[]; deletedProducts: any[] } | null>;
   isStrictMode: () => boolean;
 }
 
@@ -55,10 +60,6 @@ function applyUserSettingsFromCloud(us: any) {
     safeSetInStorage('customCurrencies', us.data.customCurrencies);
   }
 
-  if (typeof us.whatsapp_number === 'string' && us.whatsapp_number.length > 0) {
-    localStorage.setItem('whatsappNumber', us.whatsapp_number);
-  }
-
   if (us.data && typeof us.data === 'object' && us.data.businessProfile && typeof us.data.businessProfile === 'object') {
     try {
       localStorage.setItem('businessProfile', JSON.stringify(us.data.businessProfile));
@@ -71,6 +72,7 @@ function applyUserSettingsFromCloud(us: any) {
 export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const syncLockRef = useRef(false);
 
@@ -78,9 +80,13 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return localStorage.getItem('strictOnlineMode::device') === 'true';
   }, []);
 
-  const refreshFromCloud = useCallback(async (): Promise<{ products: any[]; deletedProducts: any[] } | null> => {
+  const refreshFromCloud = useCallback(async (
+    opts?: RefreshFromCloudOptions
+  ): Promise<{ products: any[]; deletedProducts: any[] } | null> => {
     if (!user?.uid) return null;
     const userId = user.uid;
+
+    opts?.onStatus?.('Loading data from cloud…');
 
     const { fetchAllUserData } = await import('../services/supabaseSync');
     const result = await fetchAllUserData(userId);
@@ -100,8 +106,16 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       (p: any) => p?.id != null && !deletedIds.has(String(p.id))
     );
 
-    const cachedProducts = await cacheCloudProductImages(userId, filteredProducts);
-    const cachedDeleted = await cacheCloudProductImages(userId, nextDeleted);
+    opts?.onStatus?.('Saving catalogue on device…');
+
+    const cachedProducts = await cacheCloudProductImages(userId, filteredProducts, (info) => {
+      const suffix = info.productName ? ` · ${info.productName}` : '';
+      opts?.onStatus?.(`Syncing product ${info.current} of ${info.total}${suffix}`);
+    });
+    const cachedDeleted = await cacheCloudProductImages(userId, nextDeleted, (info) => {
+      const suffix = info.productName ? ` · ${info.productName}` : '';
+      opts?.onStatus?.(`Syncing removed item ${info.current} of ${info.total}${suffix}`);
+    });
 
     let storedProducts = cachedProducts;
     let storedDeleted = cachedDeleted;
@@ -153,21 +167,34 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     syncLockRef.current = true;
     setIsSyncing(true);
     setSyncError(null);
+    setSyncStatusDetail('Preparing sync…');
 
     try {
       const userId = user.uid;
+      const setDetail = (message: string) => setSyncStatusDetail(message);
 
       // Helper: upload missing R2 images for any product array
-      const uploadMissingImages = async (items: any[]): Promise<any[]> => {
+      const uploadMissingImages = async (items: any[], phaseLabel: string): Promise<any[]> => {
         const missing = items.filter((p: any) => !p.imageUrl && p.imagePath);
         if (missing.length === 0) return items;
 
         const { uploadProductImageToR2 } = await import('../services/r2Upload');
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
 
+        const total = missing.length;
+        let finished = 0;
+
         const uploadedPairs = await Promise.all(
-          missing.map(async (p: any) => {
+          missing.map(async (p: any, slot: number) => {
             try {
+              const rawName = typeof p.name === 'string' ? p.name.trim() : '';
+              const shortName =
+                rawName.length > 36 ? `${rawName.slice(0, 33)}…` : rawName || undefined;
+              const slotMsg = shortName
+                ? `${phaseLabel} ${slot + 1}/${total} · ${shortName}`
+                : `${phaseLabel} ${slot + 1}/${total}`;
+              setDetail(slotMsg);
+
               const fileData = await Filesystem.readFile({
                 path: p.imagePath,
                 directory: Directory.Data,
@@ -186,6 +213,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (err) {
               console.warn(`⚠️ Image upload failed for product ${p.id}:`, err);
               return null;
+            } finally {
+              finished += 1;
+              setDetail(`${phaseLabel} ${finished}/${total}`);
             }
           })
         );
@@ -201,10 +231,12 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Upload images for both active and deleted products
       let productsForSync = await uploadMissingImages(
-        Array.isArray(products) ? [...products] : []
+        Array.isArray(products) ? [...products] : [],
+        'Uploading image'
       );
       let deletedForSync = await uploadMissingImages(
-        Array.isArray(deletedProducts) ? [...deletedProducts] : []
+        Array.isArray(deletedProducts) ? [...deletedProducts] : [],
+        'Uploading removed item image'
       );
 
       const {
@@ -214,12 +246,14 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Active products -> products table
       if (productsForSync.length > 0) {
+        setDetail('Saving products to cloud…');
         const res = await syncProducts(userId, productsForSync);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
 
       // Deleted products -> deleted_products table (with full data)
       if (deletedForSync.length > 0) {
+        setDetail('Saving removed items to cloud…');
         const res = await syncDeletedProducts(userId, deletedForSync);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');
       }
@@ -236,12 +270,14 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .map((p: any) => String(p.id))
         .filter((id: string) => !deletedIds.has(id));
 
+      setDetail('Updating cloud records…');
       await Promise.all([
         removeFromProductsTable(userId, idsToRemoveFromProducts),
         removeFromDeletedProductsTable(userId, idsToRemoveFromDeleted),
       ]);
 
-      const cloudData = await refreshFromCloud();
+      setDetail('Refreshing from cloud…');
+      const cloudData = await refreshFromCloud({ onStatus: setDetail });
       if (!cloudData) throw new Error('Cloud refresh returned null');
 
       return cloudData;
@@ -252,11 +288,21 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       syncLockRef.current = false;
       setIsSyncing(false);
+      setSyncStatusDetail(null);
     }
   }, [user?.uid, isStrictMode, refreshFromCloud]);
 
   return (
-    <SyncContext.Provider value={{ isSyncing, syncError, syncProductsToCloud, refreshFromCloud, isStrictMode }}>
+    <SyncContext.Provider
+      value={{
+        isSyncing,
+        syncStatusDetail,
+        syncError,
+        syncProductsToCloud,
+        refreshFromCloud,
+        isStrictMode,
+      }}
+    >
       {children}
     </SyncContext.Provider>
   );

@@ -17,8 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { syncUserSettings } from '../services/supabaseSync';
 import { uploadProductImageToR2 } from '../services/r2Upload';
-import { WhatsAppCountryPicker } from '../components/WhatsAppCountryPicker';
-import { defaultCountryOptionForDial, parseWhatsAppNumber } from '../data/whatsappCountryCodes';
+import { parseWhatsAppNumber } from '../data/whatsappCountryCodes';
 import {
   type BusinessProfile,
   EMPTY_BUSINESS_PROFILE,
@@ -53,7 +52,6 @@ export default function Account() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [error, setError] = useState('');
   const [whatsappCountryCode, setWhatsappCountryCode] = useState('');
-  const [whatsappCountryKey, setWhatsappCountryKey] = useState('');
   const [whatsappLocalNumber, setWhatsappLocalNumber] = useState('');
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(EMPTY_BUSINESS_PROFILE);
   const [businessSectionOpen, setBusinessSectionOpen] = useState(() =>
@@ -62,15 +60,33 @@ export default function Account() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const fromSupabase = supabaseData?.userSettings?.whatsapp_number || '';
-    const fromLocal = localStorage.getItem('whatsappNumber') || '';
-    const saved = fromSupabase || fromLocal;
-    const parsed = parseWhatsAppNumber(saved);
-    setWhatsappCountryCode(parsed.dial);
-    setWhatsappLocalNumber(parsed.local);
-    const match = defaultCountryOptionForDial(parsed.dial);
-    setWhatsappCountryKey(match ? `${match.iso2}::${match.dial}` : '');
-  }, [supabaseData?.userSettings]);
+    const syncWhatsAppFromStorage = () => {
+      const saved = localStorage.getItem('whatsappNumber') || '';
+      const parsed = parseWhatsAppNumber(saved);
+      setWhatsappCountryCode(parsed.dial);
+      setWhatsappLocalNumber(parsed.local);
+    };
+    syncWhatsAppFromStorage();
+    window.addEventListener('whatsappNumberLocalStorageUpdated', syncWhatsAppFromStorage);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'whatsappNumber') syncWhatsAppFromStorage();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('whatsappNumberLocalStorageUpdated', syncWhatsAppFromStorage);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  const handleWhatsAppDialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) {
+      setWhatsappCountryCode(raw.trim() === '+' ? '+' : '');
+      return;
+    }
+    setWhatsappCountryCode(`+${digits}`);
+  };
 
   useEffect(() => {
     setBusinessProfile(businessProfileFromUserSettings(supabaseData?.userSettings));
@@ -93,8 +109,9 @@ export default function Account() {
     setIsLoading(true);
     setError('');
     try {
-      if (!whatsappCountryCode) {
-        const msg = 'Please select your WhatsApp country code.';
+      const dialDigits = whatsappCountryCode.replace(/\D/g, '');
+      if (!dialDigits) {
+        const msg = 'Please enter country code (e.g. +91).';
         setError(msg);
         showToast(msg, 'error');
         return;
@@ -108,20 +125,9 @@ export default function Account() {
         return;
       }
 
-      const clean = `${whatsappCountryCode}${local}`;
-      const res = await syncUserSettings(user.uid, {
-        whatsapp_number: clean,
-      });
-      if (!res.success) {
-        throw new Error(res.error || 'Failed to sync WhatsApp number to cloud');
-      }
-
-      const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
-      if (strictOnline) {
-        window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
-      }
+      const clean = `+${dialDigits}${local}`;
       localStorage.setItem('whatsappNumber', clean);
-      await refreshSupabaseData();
+      window.dispatchEvent(new CustomEvent('whatsappNumberLocalStorageUpdated'));
       showToast('WhatsApp number saved', 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save WhatsApp number';
@@ -294,27 +300,38 @@ export default function Account() {
                 <FiMessageCircle className="text-green-600 w-5 h-5" />
                 <h2 className="text-base font-semibold text-gray-900">WhatsApp</h2>
               </div>
-              <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+              <p className="text-xs text-gray-500 mb-3 leading-relaxed">
                 Used for order links so customers can message you on WhatsApp.
               </p>
-              <div className="space-y-3">
-                <WhatsAppCountryPicker
-                  valueDial={whatsappCountryCode}
-                  valueKey={whatsappCountryKey}
-                  onChange={(dial, key) => {
-                    setWhatsappCountryCode(dial);
-                    setWhatsappCountryKey(key);
-                  }}
-                  disabled={isLoading}
-                />
-                <input
-                  value={whatsappLocalNumber}
-                  onChange={(e) => setWhatsappLocalNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Mobile number (without country code)"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  className="w-full px-3 py-3 rounded-xl border border-gray-200 bg-white text-base focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    autoComplete="tel-country-code"
+                    aria-label="Country code"
+                    value={whatsappCountryCode}
+                    onChange={handleWhatsAppDialChange}
+                    disabled={isLoading}
+                    placeholder="+91"
+                    className="w-[7rem] shrink-0 px-2.5 py-2.5 rounded-xl border border-gray-200 bg-white text-base font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 disabled:opacity-60"
+                  />
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    aria-label="Mobile number"
+                    value={whatsappLocalNumber}
+                    onChange={(e) => setWhatsappLocalNumber(e.target.value.replace(/\D/g, ''))}
+                    placeholder="98XXXXXXXX"
+                    className="min-w-0 flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 disabled:opacity-60"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400 leading-snug">
+                  <span className="text-gray-500">Example:</span>{' '}
+                  <span className="font-mono text-gray-600">+91 9876543210</span>
+                  <span className="text-gray-400"> — country code and local number on one row.</span>
+                </p>
                 <button
                   type="button"
                   onClick={saveWhatsApp}
@@ -324,7 +341,7 @@ export default function Account() {
                   {isLoading ? 'Saving…' : 'Save WhatsApp number'}
                 </button>
                 <p className="text-[11px] text-gray-400 leading-snug">
-                  Saved in international format (E.164). Search country by name or dial code.
+                  Stored on this device in full international format for WhatsApp links.
                 </p>
               </div>
             </div>

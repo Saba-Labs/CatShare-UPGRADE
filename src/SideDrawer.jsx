@@ -27,6 +27,12 @@ import { getCurrentCurrency } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBackupCreated, logBackupRestored, logBackupSharedFileSharer, logBackupDownloaded, logCsvExported, logFileSharerError, logCategoryManaged } from "./config/analyticsEvents";
 import { syncCategories } from "./services/supabaseSync";
+import { notifyHiddenMenuUnlocked } from "./utils/hiddenMenuFeatures";
+import {
+  snapshotSupabaseAuthFromLocalStorage,
+  restoreSupabaseAuthToLocalStorage,
+  refreshSupabaseSessionFromStorage,
+} from "./supabaseClient";
 
 
 export default function SideDrawer({
@@ -141,6 +147,7 @@ const navigate = useNavigate();
     setClickCountN(newCount);
     if (newCount === 7) {
       setShowHiddenFeatures(true);
+      notifyHiddenMenuUnlocked();
       setClickCountN(0); // Reset counter
     }
   };
@@ -965,6 +972,7 @@ const exportProductsToCSV = (products) => {
         }
       }
 
+      const supabaseAuthSnapshotBrowse = snapshotSupabaseAuthFromLocalStorage();
       setDeletedProducts([]);
       localStorage.clear(); // Nuclear option - clear EVERYTHING
 
@@ -979,6 +987,8 @@ const exportProductsToCSV = (products) => {
           }
         }
       });
+      restoreSupabaseAuthToLocalStorage(supabaseAuthSnapshotBrowse);
+      void refreshSupabaseSessionFromStorage();
       console.log("✅ Preserved settings restored with auto-detected fields");
 
       // Log currency and price units restoration
@@ -1470,6 +1480,7 @@ const restoreFromDetectedBackup = async (backupFile) => {
           preservedSettings.priceFieldUnits = parsed.metadata.priceUnits;
         }
 
+        const supabaseAuthSnapshotZip = snapshotSupabaseAuthFromLocalStorage();
         localStorage.clear();
 Object.entries(preservedSettings).forEach(([key, value]) => {
   if (value !== undefined && value !== null) {
@@ -1480,6 +1491,8 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
     }
   }
 });
+        restoreSupabaseAuthToLocalStorage(supabaseAuthSnapshotZip);
+        void refreshSupabaseSessionFromStorage();
 
         const cleanedProducts = rebuilt.map(p => {
           const clean = { ...p };
@@ -1619,6 +1632,11 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
 if (user && user.uid) {
   (async () => {
     try {
+      const hasSession = await refreshSupabaseSessionFromStorage();
+      if (!hasSession) {
+        console.warn('⚠️ No Supabase session after restore; skipping cloud sync. Try signing in again.');
+        return;
+      }
       // Standardized: use single deterministic per-product uploader (JPEG only)
       const { uploadProductImageToR2 } = await import('./services/r2Upload');
       const updatedProducts = await Promise.all(
