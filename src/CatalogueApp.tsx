@@ -324,6 +324,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   useEffect(() => {
     let removeListener: any;
     CapacitorApp.addListener("backButton", () => {
+      if ((window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress) {
+        return;
+      }
       // If currently rendering, minimize app instead of navigating
       if (isRendering) {
         CapacitorApp.minimizeApp();

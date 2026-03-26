@@ -30,7 +30,7 @@ export default function Login() {
   const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { user, supabaseData, supabaseDataLoading, loading: authBootstrapLoading } = useAuth();
+  const { user, supabaseData, loading: authBootstrapLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,33 +41,24 @@ export default function Login() {
 
   /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
   const postAuthRedirectDoneRef = useRef(false);
+  const fieldsSyncAttemptedRef = useRef(false);
 
   useEffect(() => {
     postAuthRedirectDoneRef.current = false;
+    fieldsSyncAttemptedRef.current = false;
   }, [user?.uid]);
 
   /**
-   * Redirect off /login when we have a real Supabase session and profile load finished.
-   * - Email / native Google: hasJustLoggedIn is set.
-   * - Web Google OAuth: redirect returns with session but hasJustLoggedIn stays false — still redirect.
-   * - supabaseData may be null in edge cases; treat as empty and still navigate.
+   * Redirect off /login as soon as the session is ready — do not wait for fetchAllUserData.
+   * Home shows SplashLoadingLayout (CatShare loading) while cloud sync / startup pipeline runs.
+   * Welcome vs catalogue is handled in App after data loads.
    */
   useEffect(() => {
     if (authService.isOfflineGuest()) return;
     if (authBootstrapLoading) return;
     if (!user?.uid || user.isAnonymous) return;
-    if (supabaseDataLoading) return;
-    if (postAuthRedirectDoneRef.current) return;
-
-    postAuthRedirectDoneRef.current = true;
 
     const data = supabaseData ?? { fieldsDefinition: null };
-    console.log('🔍 Login check - supabaseData:', data);
-    console.log('🔍 fieldsDefinition from Supabase:', data.fieldsDefinition);
-
-    if (hasJustLoggedIn) {
-      showToast('Login successful!', 'success');
-    }
 
     const hasSupabaseFields =
       data.fieldsDefinition &&
@@ -82,14 +73,15 @@ export default function Login() {
       Array.isArray(localStorageFields.fields) &&
       localStorageFields.fields.length > 0;
 
-    const hasFieldsDefinition = hasSupabaseFields || hasLocalFields;
-
-    console.log('🔍 hasSupabaseFields:', hasSupabaseFields);
-    console.log('🔍 hasLocalFields:', hasLocalFields);
-    console.log('🔍 hasFieldsDefinition (combined):', hasFieldsDefinition);
-
-    if (hasLocalFields && !hasSupabaseFields && user?.uid) {
-      console.log('🔄 Syncing local fields to Supabase for old user...');
+    // After cloud snapshot exists: one-shot sync of legacy local fields (same as before).
+    if (
+      supabaseData != null &&
+      hasLocalFields &&
+      !hasSupabaseFields &&
+      user?.uid &&
+      !fieldsSyncAttemptedRef.current
+    ) {
+      fieldsSyncAttemptedRef.current = true;
       import('../services/supabaseSync').then(({ syncFieldsDefinition }) => {
         syncFieldsDefinition(user.uid, localStorageFields).then((result) => {
           if (result.success) {
@@ -101,24 +93,16 @@ export default function Login() {
       });
     }
 
+    if (postAuthRedirectDoneRef.current) return;
+    postAuthRedirectDoneRef.current = true;
+
+    if (hasJustLoggedIn) {
+      showToast('Login successful!', 'success');
+    }
     setHasJustLoggedIn(false);
 
-    if (hasFieldsDefinition) {
-      console.log('✅ User has fields definition (Supabase or localStorage) - redirecting to home');
-      navigate('/', { replace: true });
-    } else {
-      console.log('🆕 No fields definition found - redirecting to welcome');
-      navigate('/welcome', { replace: true });
-    }
-  }, [
-    authBootstrapLoading,
-    user,
-    supabaseDataLoading,
-    supabaseData,
-    hasJustLoggedIn,
-    navigate,
-    showToast,
-  ]);
+    navigate('/', { replace: true });
+  }, [authBootstrapLoading, user, supabaseData, hasJustLoggedIn, navigate, showToast]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

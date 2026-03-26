@@ -52,7 +52,7 @@ const PrivacyPolicy = lazy(() => import("./PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./TermsOfService"));
 const Website = lazy(() => import("./Website"));
 const Tutorial = lazy(() => import("./Tutorial"));
-import { ToastProvider } from "./context/ToastContext";
+import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
 import { SyncProvider } from "./context/SyncContext";
@@ -66,6 +66,7 @@ import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
+import { SyncProgressModal } from "./components/SyncProgressModal";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
 /** Run non-critical work after first paint to shorten time-to-interactive. */
@@ -88,10 +89,12 @@ function RouteLoadingFallback() {
 function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useToast();
   const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
   const {
     isSyncing: isSyncContextSyncing,
     syncStatusDetail,
+    syncProgressPercent: syncContextProgressPercent,
     syncProductsToCloud,
     refreshFromCloud,
     isStrictMode,
@@ -113,6 +116,12 @@ function AppWithBackHandler() {
   const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
   const [syncNowLoading, setSyncNowLoading] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
+  const [syncProgressPercent, setSyncProgressPercent] = useState(0);
+
+  useEffect(() => {
+    (window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress =
+      syncNowLoading;
+  }, [syncNowLoading]);
 
   // Startup pipeline state: gates everything until legacy offline data is resolved.
   // 'pending' = haven't checked yet, 'resolving' = popup shown / sync in progress,
@@ -385,6 +394,11 @@ function AppWithBackHandler() {
   const syncOfflineDataNow = useCallback(async () => {
     if (!user?.uid) return;
     setSyncNowLoading(true);
+    setSyncProgressPercent(0);
+    setSyncProgress('');
+    if (Capacitor.isNativePlatform()) {
+      KeepAwake.keepAwake().catch(() => {});
+    }
     try {
       const userId = user.uid;
       const parseStoredJsonArray = (raw: string | null): any[] => {
@@ -420,51 +434,77 @@ function AppWithBackHandler() {
         removeFromDeletedProductsTable,
       } = await import('./services/supabaseSync');
 
+      const setSyncPhase = (percent: number, detail: string) => {
+        const p = Math.min(100, Math.max(0, Math.round(percent)));
+        setSyncProgressPercent(p);
+        setSyncProgress(detail);
+      };
+
       // Helper: upload missing R2 images (Data + External + legacy paths; fail if image cannot be cloud-linked)
-      const uploadMissingImages = async (items: any[], label: string): Promise<any[]> => {
+      const uploadMissingImages = async (
+        items: any[],
+        label: string,
+        opts?: { percentFrom: number; percentTo: number; detailPrefix: string }
+      ): Promise<any[]> => {
         const missing = items.filter((p: any) => {
           const hasHttps =
             typeof p.imageUrl === 'string' && /^https?:\/\//i.test(p.imageUrl.trim());
           return !hasHttps && p.imagePath;
         });
-        if (missing.length === 0) return items;
+        const from = opts?.percentFrom ?? 8;
+        const to = opts?.percentTo ?? 28;
+        const prefix = opts?.detailPrefix ?? 'Uploading images';
+
+        if (missing.length === 0) {
+          if (opts) setSyncPhase(to, `${prefix} — nothing to upload`);
+          return items;
+        }
 
         const { uploadProductImageToR2 } = await import('./services/r2Upload');
 
         if (!Capacitor.isNativePlatform()) {
           assertProductsHaveCloudImageUrlForSync(items, label);
+          if (opts) setSyncPhase(to, `${prefix} — ready`);
           return items;
         }
 
-        const uploadedPairs = await Promise.all(
-          missing.map(async (p: any) => {
-            let base64: string | null = null;
-            for (let attempt = 0; attempt < 3; attempt++) {
-              base64 = await readProductSourceBase64ForCloudUpload(p);
-              if (base64) break;
-              if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
-            }
-            if (!base64) {
-              throw new Error(
-                `[${label}] Cannot read image file for product "${p.name || p.id}" (${p.id}).`
-              );
-            }
-            const pathHint =
-              typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
-            const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
-            const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
-              ? 'data:image/jpeg;base64,'
-              : 'data:image/png;base64,';
-            const uploaded = await uploadProductImageToR2({
-              productId: String(p.id),
-              dataUrl: `${dataUrlPrefix}${base64}`,
-            });
-            if (!uploaded?.url) {
-              throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
-            }
-            return { productId: p.id, imageUrl: uploaded.url };
-          })
-        );
+        const uploadedPairs: { productId: string; imageUrl: string }[] = [];
+        for (let i = 0; i < missing.length; i++) {
+          const p = missing[i];
+          let base64: string | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            base64 = await readProductSourceBase64ForCloudUpload(p);
+            if (base64) break;
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
+          }
+          if (!base64) {
+            throw new Error(
+              `[${label}] Cannot read image file for product "${p.name || p.id}" (${p.id}).`
+            );
+          }
+          const pathHint =
+            typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
+          const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
+          const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+            ? 'data:image/jpeg;base64,'
+            : 'data:image/png;base64,';
+          const uploaded = await uploadProductImageToR2({
+            productId: String(p.id),
+            dataUrl: `${dataUrlPrefix}${base64}`,
+          });
+          if (!uploaded?.url) {
+            throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
+          }
+          uploadedPairs.push({ productId: String(p.id), imageUrl: uploaded.url });
+          const done = i + 1;
+          const span = Math.max(0, to - from);
+          const pct = from + Math.round((done / missing.length) * span);
+          setSyncPhase(
+            pct,
+            `${prefix} (${done}/${missing.length})${p.name ? ` · ${p.name}` : ''}`
+          );
+        }
+
         const urlMap = new Map(uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl]));
         const merged = items.map((p: any) => {
           const url = urlMap.get(String(p.id));
@@ -474,18 +514,24 @@ function AppWithBackHandler() {
         return merged;
       };
 
-      setSyncProgress('Uploading images...');
+      setSyncPhase(0, 'Preparing…');
+      await new Promise((r) => requestAnimationFrame(r));
+      setSyncPhase(5, 'Uploading product images…');
       localProducts = await uploadMissingImages(
-        Array.isArray(localProducts) ? localProducts : [], 'active'
+        Array.isArray(localProducts) ? localProducts : [],
+        'active',
+        { percentFrom: 6, percentTo: 26, detailPrefix: 'Uploading product images' }
       );
       safeSetInStorage(getProductsKey(userId), localProducts);
 
-      // Also upload images for shelf (deleted) products
+      setSyncPhase(28, 'Uploading shelf images…');
       let localDeletedUpdated = await uploadMissingImages(
-        Array.isArray(localDeleted) ? localDeleted : [], 'shelf'
+        Array.isArray(localDeleted) ? localDeleted : [],
+        'shelf',
+        { percentFrom: 28, percentTo: 40, detailPrefix: 'Uploading shelf images' }
       );
 
-      setSyncProgress('Syncing categories...');
+      setSyncPhase(42, 'Syncing categories…');
       let localCategories: any[] = [];
       try {
         const keyed = localStorage.getItem(getStorageKey('categories', userId));
@@ -549,7 +595,7 @@ function AppWithBackHandler() {
         if (!res.success) throw new Error(res.error || 'User settings sync failed');
       }
 
-      setSyncProgress('Syncing products...');
+      setSyncPhase(68, 'Fetching cloud snapshot…');
       const remoteSnapshot = await fetchAllUserData(userId);
       if (!remoteSnapshot.success || !remoteSnapshot.data) {
         throw new Error(remoteSnapshot.error || 'Failed to fetch remote snapshot for merge');
@@ -569,12 +615,12 @@ function AppWithBackHandler() {
       const mergedProducts = mergeProductsData(localProductsFiltered, remoteProducts, deletedIds);
       const mergedDeleted = mergeProductsData(localDeletedUpdated, remoteDeleted);
 
-      // Active products -> products table
+      setSyncPhase(74, 'Syncing products to cloud…');
       {
         const res = await syncProducts(userId, mergedProducts);
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
-      // Deleted products -> deleted_products table (with full data)
+      setSyncPhase(80, 'Syncing removed items to cloud…');
       {
         const res = await syncDeletedProducts(userId, mergedDeleted);
         if (!res.success) throw new Error(res.error || 'Deleted products sync failed');
@@ -617,18 +663,28 @@ function AppWithBackHandler() {
       localStorage.setItem('strictOnlineMode::device', 'true');
       clearAllOfflineCaches();
 
+      setSyncPhase(100, 'Done');
       setShowOfflineSyncModal(false);
       setStartupPhase('done');
       setSyncProgress('');
+      setSyncProgressPercent(0);
       console.log('✅ Offline data synced to account');
     } catch (err: any) {
       console.error('❌ Sync failed:', err);
       setSyncProgress('');
-      alert(`Sync failed: ${err?.message || 'Unknown error'}. Please try again.`);
+      setSyncProgressPercent(0);
+      showToast(
+        `Sync failed: ${err?.message || 'Unknown error'}. Please try again.`,
+        'error',
+        8000
+      );
     } finally {
       setSyncNowLoading(false);
+      if (Capacitor.isNativePlatform()) {
+        KeepAwake.allowSleep().catch(() => {});
+      }
     }
-  }, [user, clearAllOfflineCaches, refreshFromCloud]);
+  }, [user, clearAllOfflineCaches, refreshFromCloud, showToast]);
 
   // ──────────────────────────────────────────────────────
   // R2 CLEANUP QUEUE (process orphaned images on startup)
@@ -668,8 +724,14 @@ function AppWithBackHandler() {
   // (fired by CreateProduct after saving)
   // ──────────────────────────────────────────────────────
   useEffect(() => {
-    const handleNewProduct = async () => {
+    const handleNewProduct = async (e?: Event) => {
       if (!user?.uid) return;
+      // Backup restore dispatches product-added before its own detailed sync; avoid grabbing
+      // the sync lock here or restore would show Lottie and skip detailedStatus.
+      const skipStrictSync = (e as CustomEvent<{ skipStrictSync?: boolean }> | undefined)?.detail
+        ?.skipStrictSync;
+      if (skipStrictSync) return;
+
       const freshProducts = safeGetFromStorage(getProductsKey(user.uid), []);
       const freshDeleted = safeGetFromStorage(getDeletedProductsKey(user.uid), []);
 
@@ -1053,6 +1115,9 @@ function AppWithBackHandler() {
     // For home page (/) routes, CatalogueApp handles back navigation and dispatches
     // "catalogue-app-back-not-handled" event when it can't handle it.
     const handleBackPress = () => {
+      if (syncNowLoading) {
+        return;
+      }
       if (isRendering) {
         CapacitorApp.minimizeApp();
         return;
@@ -1108,6 +1173,9 @@ function AppWithBackHandler() {
     // Listen for fallback event from CatalogueApp when back is pressed on products tab
     // and no internal navigation is possible
     const handleCatalogueAppBackFallback = () => {
+      if ((window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress) {
+        return;
+      }
       CapacitorApp.exitApp();
     };
 
@@ -1121,7 +1189,7 @@ function AppWithBackHandler() {
       if (removeListener) removeListener();
       window.removeEventListener("catalogue-app-back-not-handled", handleCatalogueAppBackFallback);
     };
-  }, [location, navigate, isRendering, showTutorial]);
+  }, [location, navigate, isRendering, showTutorial, syncNowLoading]);
 
   // Listen for render request from watermark settings and other components
   // Auto-dismiss render result popup after 5 seconds
@@ -1176,11 +1244,28 @@ function AppWithBackHandler() {
         backgroundColor: "#fff",
       }}
     >
-      {/* Offline sync opt-in modal */}
-      {showOfflineSyncModal && user?.uid && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      {/* Offline sync: same progress popup as restore / cloud sync while syncing */}
+      {showOfflineSyncModal && user?.uid && syncNowLoading && (
+        <SyncProgressModal
+          open
+          zClassName="z-[120]"
+          percent={syncProgressPercent}
+          detail={syncProgress || 'Preparing…'}
+          title="Syncing to your account"
+          helperText="Please keep the app open on this screen until the sync finishes."
+        />
+      )}
+
+      {/* Offline sync opt-in (choices only when not syncing) */}
+      {showOfflineSyncModal && user?.uid && !syncNowLoading && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6"
+          role="dialog"
+          aria-label="Offline data"
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden="true" />
           <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+              <>
             <div className="flex justify-center mb-4">
               <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1193,15 +1278,6 @@ function AppWithBackHandler() {
             <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
               We found data on this device from the previous offline version. Would you like to sync it to your account or start fresh?
             </p>
-
-            {syncNowLoading && (
-              <div className="mb-4">
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                  <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{ width: '100%' }} />
-                </div>
-                <p className="text-xs text-gray-500 text-center">{syncProgress || 'Preparing...'}</p>
-              </div>
-            )}
 
             <div className="space-y-3 mb-4">
               <button
@@ -1284,6 +1360,7 @@ function AppWithBackHandler() {
             >
               Delete offline data
               </button>
+              </>
           </div>
         </div>
       )}
@@ -1292,11 +1369,23 @@ function AppWithBackHandler() {
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
 
-      {isSyncContextSyncing && (
+      {/* Detailed sync (e.g. backup restore → cloud): same popup as offline→cloud — ring, %, status text */}
+      {isSyncContextSyncing && syncStatusDetail != null && (
+        <SyncProgressModal
+          open
+          zClassName="z-[130]"
+          percent={syncContextProgressPercent}
+          detail={syncStatusDetail}
+          title="Syncing to cloud"
+          helperText="Please keep the app open until this finishes."
+        />
+      )}
+      {/* Routine strict-mode syncs: original full-screen Lottie */}
+      {isSyncContextSyncing && syncStatusDetail == null && (
         <SyncBusyOverlay
           zClassName="z-[110]"
           title="Syncing to cloud"
-          subtitle={syncStatusDetail ?? 'Please wait…'}
+          subtitle="Please wait…"
         />
       )}
 

@@ -20,6 +20,8 @@ export type SyncProductsToCloudOptions = {
 interface SyncContextType {
   isSyncing: boolean;
   syncStatusDetail: string | null;
+  /** 0–100 during detailed sync (restore); 0 otherwise */
+  syncProgressPercent: number;
   syncError: string | null;
   syncProductsToCloud: (
     products: any[],
@@ -34,6 +36,38 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 const getProductsKey = (uid: string) => getStorageKey('products', uid);
 const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
+
+/** Map status lines from detailed cloud sync to 0–100 for SyncProgressModal (restore, etc.). */
+export function computeSyncPercentFromDetail(message: string): number {
+  if (!message || !message.trim()) return 0;
+  const m = message.trim();
+  if (/Preparing sync/i.test(m)) return 3;
+  let im = m.match(/Uploading image (\d+)\/(\d+)/);
+  if (im) {
+    const cur = parseInt(im[1], 10);
+    const tot = parseInt(im[2], 10);
+    if (tot > 0) return 5 + Math.round((cur / tot) * 32);
+  }
+  im = m.match(/Uploading removed item image (\d+)\/(\d+)/);
+  if (im) {
+    const cur = parseInt(im[1], 10);
+    const tot = parseInt(im[2], 10);
+    if (tot > 0) return 38 + Math.round((cur / tot) * 22);
+  }
+  if (/Saving products to cloud/i.test(m)) return 62;
+  if (/Saving removed items to cloud/i.test(m)) return 70;
+  if (/Updating cloud records/i.test(m)) return 78;
+  if (/Refreshing from cloud/i.test(m)) return 84;
+  const ofMatch = m.match(/(\d+)\s+of\s+(\d+)/);
+  if (ofMatch) {
+    const cur = parseInt(ofMatch[1], 10);
+    const tot = parseInt(ofMatch[2], 10);
+    if (tot > 0) return 85 + Math.round((cur / tot) * 13);
+  }
+  if (/Loading data from cloud/i.test(m)) return 86;
+  if (/Saving catalogue on device/i.test(m)) return 96;
+  return 50;
+}
 
 function applyUserSettingsFromCloud(us: any) {
   if (!us) return;
@@ -84,6 +118,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusDetail, setSyncStatusDetail] = useState<string | null>(null);
+  const [syncProgressPercent, setSyncProgressPercent] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const syncLockRef = useRef(false);
 
@@ -181,12 +216,21 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     syncLockRef.current = true;
     setIsSyncing(true);
     setSyncError(null);
-    setSyncStatusDetail(detailedStatus ? 'Preparing sync…' : null);
+    setSyncProgressPercent(0);
+    if (detailedStatus) {
+      setSyncStatusDetail('Preparing sync…');
+      setSyncProgressPercent(computeSyncPercentFromDetail('Preparing sync…'));
+    } else {
+      setSyncStatusDetail(null);
+    }
 
     try {
       const userId = user.uid;
       const setDetail = (message: string) => {
-        if (detailedStatus) setSyncStatusDetail(message);
+        if (detailedStatus) {
+          setSyncStatusDetail(message);
+          setSyncProgressPercent(computeSyncPercentFromDetail(message));
+        }
       };
 
       // Helper: upload missing R2 images (reads Data + External + legacy paths like hydration)
@@ -329,6 +373,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       syncLockRef.current = false;
       setIsSyncing(false);
       setSyncStatusDetail(null);
+      setSyncProgressPercent(0);
     }
   }, [user?.uid, isStrictMode, refreshFromCloud]);
 
@@ -337,6 +382,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         isSyncing,
         syncStatusDetail,
+        syncProgressPercent,
         syncError,
         syncProductsToCloud,
         refreshFromCloud,

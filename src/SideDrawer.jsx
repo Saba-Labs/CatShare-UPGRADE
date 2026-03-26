@@ -21,7 +21,6 @@ import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES, g
 import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
 import { applyBackupFieldAnalysis } from "./config/fieldConfig";
-import { Capacitor } from "@capacitor/core";
 import { getPersistedAuthUserId } from "./utils/authUserId";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 import { getCurrentCurrency } from "./utils/currencyUtils";
@@ -34,61 +33,7 @@ import {
   restoreSupabaseAuthToLocalStorage,
   refreshSupabaseSessionFromStorage,
 } from "./supabaseClient";
-import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
-import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
-
-/**
- * After backup restore, ensure every product with a local imagePath gets an HTTPS imageUrl (R2)
- * before Supabase sync — same path resolution as main sync (Data + External + legacy).
- */
-async function uploadMissingProductImagesToR2ForRestore(items) {
-  if (!Array.isArray(items) || items.length === 0) return items;
-  const { uploadProductImageToR2 } = await import("./services/r2Upload");
-
-  if (!Capacitor.isNativePlatform()) {
-    assertProductsHaveCloudImageUrlForSync(items, "Backup restore");
-    return items;
-  }
-
-  const merged = await Promise.all(
-    items.map(async (p) => {
-      const hasHttps =
-        typeof p.imageUrl === "string" && /^https?:\/\//i.test(p.imageUrl.trim());
-      if (hasHttps || !p.imagePath) return p;
-
-      let base64 = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        base64 = await readProductSourceBase64ForCloudUpload(p);
-        if (base64) break;
-        if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
-      }
-      if (!base64) {
-        throw new Error(
-          `Cannot read image file for product "${p.name || p.id}" (${p.id}). ` +
-            `The file may be missing or still writing — try restore again.`
-        );
-      }
-      const pathHint =
-        typeof p.imagePath === "string" && p.imagePath.trim() ? p.imagePath.trim() : "";
-      const filename = (pathHint.split("/").pop() || "product.png").toLowerCase();
-      const dataUrlPrefix =
-        filename.endsWith(".jpg") || filename.endsWith(".jpeg")
-          ? "data:image/jpeg;base64,"
-          : "data:image/png;base64,";
-      const uploaded = await uploadProductImageToR2({
-        productId: String(p.id),
-        dataUrl: `${dataUrlPrefix}${base64}`,
-      });
-      if (!uploaded?.url) {
-        throw new Error(`Cloud upload returned no URL for product ${p.id}`);
-      }
-      return { ...p, imageUrl: uploaded.url };
-    })
-  );
-
-  assertProductsHaveCloudImageUrlForSync(merged, "Backup restore");
-  return merged;
-}
+import { useSync } from "./context/SyncContext";
 
 export default function SideDrawer({
   open,
@@ -129,6 +74,7 @@ const navigate = useNavigate();
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
   const { user } = useAuth();
+  const { syncProductsToCloud } = useSync();
   const { isPro, isPaidPro, isTrialActive, trialEndsAt, loading: subscriptionLoading } =
     useSubscription();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
@@ -978,6 +924,9 @@ const exportProductsToCSV = (products) => {
         fieldsDefinition: backupFieldDef,
         userId: localStorage.getItem('userId'),
         supabase_user_id: localStorage.getItem('supabase_user_id'), // ✅ ADD THIS LINE
+        // Keep strict-mode sync enabled after nuclear clear (same as normal startup)
+        'strictOnlineMode::device': localStorage.getItem('strictOnlineMode::device'),
+        'offlineLegacyResolved::device': localStorage.getItem('offlineLegacyResolved::device'),
       };
 
       // Restore currency and price units from backup if available
@@ -1033,10 +982,16 @@ const exportProductsToCSV = (products) => {
 
       // Restore preserved settings
       console.log("♻️ Restoring preserved settings...");
+      const plainLocalStorageKeys = new Set([
+        'userId',
+        'supabase_user_id',
+        'strictOnlineMode::device',
+        'offlineLegacyResolved::device',
+      ]);
       Object.entries(preservedSettings).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          if (key === 'userId' || key === 'supabase_user_id') {
-            localStorage.setItem(key, value); // ✅ plain string, no JSON
+          if (plainLocalStorageKeys.has(key)) {
+            localStorage.setItem(key, value); // plain string (strict flags must be 'true' not JSON)
           } else {
             safeSetInStorage(key, value);
           }
@@ -1108,7 +1063,9 @@ const exportProductsToCSV = (products) => {
       }
 
       setProducts(productsToUse);
-      window.dispatchEvent(new CustomEvent("product-added"));
+      window.dispatchEvent(
+        new CustomEvent("product-added", { detail: { skipStrictSync: true } })
+      );
 
       // Restore categories from backup if available, otherwise extract from products
       try {
@@ -1261,61 +1218,40 @@ const exportProductsToCSV = (products) => {
       // ✅ Sync restored products to Supabase in background for cloud persistence
       // This ensures imageUrl fields are synced to cloud and available on other devices
       if (user && user.uid) {
-  (async () => {
-    try {
-      // ✅ Upload missing images to R2 (Data + External + legacy paths, with retries)
-      const updatedProducts = await uploadMissingProductImagesToR2ForRestore(productsToUse);
-
-      // Save updated products with new imageUrls to localStorage
-      localStorage.setItem(
-        user?.uid ? getStorageKey("products", user.uid) : "products",
-        JSON.stringify(updatedProducts)
-      );
-      setProducts(updatedProducts);
-      window.dispatchEvent(new CustomEvent("product-added"));
-      console.log('✅ Products updated with R2 image URLs');
-            const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
-
-            // Sync active products
-            const productsSyncResult = await syncProducts(user.uid, updatedProducts);
-            if (productsSyncResult.success) {
-              console.log(`✅ Restored ${productsToUse.length} products synced to Supabase successfully`);
-            } else {
-              console.warn('⚠️ Products sync warning:', productsSyncResult.error);
-            }
-
-            // Shelf items: same R2 path resolution as active products, then sync
-            if (restoredDeletedShelf.length > 0) {
-              const updatedDeletedShelf = await uploadMissingProductImagesToR2ForRestore(
-                restoredDeletedShelf
+        (async () => {
+          try {
+            const hasSession = await refreshSupabaseSessionFromStorage();
+            if (!hasSession) {
+              console.warn(
+                "⚠️ No Supabase session after restore; skipping cloud sync. Try signing in again."
               );
-              localStorage.setItem(
-                user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
-                JSON.stringify(updatedDeletedShelf)
-              );
-              setDeletedProducts(updatedDeletedShelf);
-              const deletedSyncResult = await syncDeletedProducts(user.uid, updatedDeletedShelf);
-              if (deletedSyncResult.success) {
-                console.log(
-                  `✅ Restored ${updatedDeletedShelf.length} deleted products synced to Supabase successfully`
-                );
-              } else {
-                console.warn('⚠️ Deleted products sync warning:', deletedSyncResult.error);
-              }
+              return;
             }
+            const cloudData = await syncProductsToCloud(
+              productsToUse,
+              restoredDeletedShelf,
+              { detailedStatus: true }
+            );
+            setProducts(cloudData.products);
+            setDeletedProducts(cloudData.deletedProducts);
+            window.dispatchEvent(
+              new CustomEvent("product-added", { detail: { skipStrictSync: true } })
+            );
+            console.log("✅ Restored catalogue synced to cloud");
 
-            // Sync fieldsDefinition to Supabase if it was restored
+            const { syncFieldsDefinition } = await import("./services/supabaseSync");
             if (backupFieldDef) {
               const fieldsSyncResult = await syncFieldsDefinition(user.uid, backupFieldDef);
               if (fieldsSyncResult.success) {
-                console.log(`✅ Fields definition synced to Supabase: ${backupFieldDef.industry || 'Custom'}`);
+                console.log(
+                  `✅ Fields definition synced to Supabase: ${backupFieldDef.industry || "Custom"}`
+                );
               } else {
-                console.warn('⚠️ Fields definition sync warning:', fieldsSyncResult.error);
+                console.warn("⚠️ Fields definition sync warning:", fieldsSyncResult.error);
               }
             }
           } catch (syncErr) {
-            console.warn('⚠️ Background sync of restored products failed:', syncErr.message);
-            // Don't show error to user - restore was successful, just sync failed
+            console.warn("⚠️ Background sync of restored products failed:", syncErr.message);
           }
         })();
       }
@@ -1499,6 +1435,8 @@ const restoreFromDetectedBackup = async (backupFile) => {
           fieldsDefinition: backupFieldDef,
           userId: localStorage.getItem('userId'),
           supabase_user_id: localStorage.getItem('supabase_user_id'), // ✅ ADD THIS LINE
+          'strictOnlineMode::device': localStorage.getItem('strictOnlineMode::device'),
+          'offlineLegacyResolved::device': localStorage.getItem('offlineLegacyResolved::device'),
         };
 
         if (isV3Backup && parsed.metadata?.currencySettings) {
@@ -1516,15 +1454,21 @@ const restoreFromDetectedBackup = async (backupFile) => {
 
         const supabaseAuthSnapshotZip = snapshotSupabaseAuthFromLocalStorage();
         localStorage.clear();
-Object.entries(preservedSettings).forEach(([key, value]) => {
-  if (value !== undefined && value !== null) {
-    if (key === 'userId' || key === 'supabase_user_id') {
-      localStorage.setItem(key, value); // ✅ plain string, no JSON
-    } else {
-      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-    }
-  }
-});
+        const plainZipKeys = new Set([
+          'userId',
+          'supabase_user_id',
+          'strictOnlineMode::device',
+          'offlineLegacyResolved::device',
+        ]);
+        Object.entries(preservedSettings).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            if (plainZipKeys.has(key)) {
+              localStorage.setItem(key, value);
+            } else {
+              localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+            }
+          }
+        });
         restoreSupabaseAuthToLocalStorage(supabaseAuthSnapshotZip);
         void refreshSupabaseSessionFromStorage();
 
@@ -1565,7 +1509,9 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
         }
 
         setProducts(productsToUse);
-        window.dispatchEvent(new CustomEvent("product-added"));
+        window.dispatchEvent(
+          new CustomEvent("product-added", { detail: { skipStrictSync: true } })
+        );
 
         try {
           if (parsed.categories && Array.isArray(parsed.categories)) {
@@ -1663,43 +1609,45 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
         }));
         console.log(`🔄 Dispatched fieldDefinitionsChanged event - Template: ${templateName}`);
 
-       // ✅ Upload missing images to R2 and sync to Supabase
-if (user && user.uid) {
-  (async () => {
-    try {
-      const hasSession = await refreshSupabaseSessionFromStorage();
-      if (!hasSession) {
-        console.warn('⚠️ No Supabase session after restore; skipping cloud sync. Try signing in again.');
-        return;
-      }
-      const updatedProducts = await uploadMissingProductImagesToR2ForRestore(productsToUse);
+       // ✅ Same pipeline as main sync: R2 upload + Supabase + full-screen sync animation
+        if (user && user.uid) {
+          (async () => {
+            try {
+              const hasSession = await refreshSupabaseSessionFromStorage();
+              if (!hasSession) {
+                console.warn(
+                  "⚠️ No Supabase session after restore; skipping cloud sync. Try signing in again."
+                );
+                return;
+              }
+              const cloudData = await syncProductsToCloud(
+                productsToUse,
+                restoredDeletedShelfZip,
+                { detailedStatus: true }
+              );
+              setProducts(cloudData.products);
+              setDeletedProducts(cloudData.deletedProducts);
+              window.dispatchEvent(
+                new CustomEvent("product-added", { detail: { skipStrictSync: true } })
+              );
+              console.log("✅ Restored catalogue synced to cloud");
 
-      localStorage.setItem(
-        user?.uid ? getStorageKey("products", user.uid) : "products",
-        JSON.stringify(updatedProducts)
-      );
-      setProducts(updatedProducts);
-      window.dispatchEvent(new CustomEvent("product-added"));
-      console.log('✅ Products updated with R2 image URLs');
-
-      const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
-      await syncProducts(user.uid, updatedProducts);
-      if (restoredDeletedShelfZip.length > 0) {
-        const updatedDeletedShelf = await uploadMissingProductImagesToR2ForRestore(
-          restoredDeletedShelfZip
-        );
-        localStorage.setItem(
-          user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
-          JSON.stringify(updatedDeletedShelf)
-        );
-        setDeletedProducts(updatedDeletedShelf);
-        await syncDeletedProducts(user.uid, updatedDeletedShelf);
-      }
-    } catch (err) {
-      console.warn('⚠️ Background sync failed:', err.message);
-    }
-  })();
-}
+              const { syncFieldsDefinition } = await import("./services/supabaseSync");
+              if (backupFieldDef) {
+                const fieldsSyncResult = await syncFieldsDefinition(user.uid, backupFieldDef);
+                if (fieldsSyncResult.success) {
+                  console.log(
+                    `✅ Fields definition synced to Supabase: ${backupFieldDef.industry || "Custom"}`
+                  );
+                } else {
+                  console.warn("⚠️ Fields definition sync warning:", fieldsSyncResult.error);
+                }
+              }
+            } catch (err) {
+              console.warn("⚠️ Background sync failed:", err.message);
+            }
+          })();
+        }
 
 setShowRenderAfterRestore(true);
 setShowBackupPopup(false);
