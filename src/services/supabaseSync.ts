@@ -4,6 +4,7 @@
  */
 
 import { getSupabaseClient } from '../supabaseClient';
+import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { deleteImageFromR2 } from './cloudflareService';
 
 interface SyncResult {
@@ -14,10 +15,12 @@ interface SyncResult {
 
 /**
  * Sync products to Supabase
+ * @param syncOptions.skipImageUrlAssertion — set true only for rare callers (e.g. raw backup JSON) that have not run the R2 upload step yet.
  */
 export async function syncProducts(
   userId: string,
-  products: any[]
+  products: any[],
+  syncOptions?: { skipImageUrlAssertion?: boolean }
 ): Promise<SyncResult> {
   try {
     if (!userId || !Array.isArray(products)) {
@@ -35,6 +38,10 @@ export async function syncProducts(
       // imageUrl is intentionally preserved - it's the Cloudflare R2 URL needed for sync
       return clean;
     });
+
+    if (!syncOptions?.skipImageUrlAssertion) {
+      assertProductsHaveCloudImageUrlForSync(cleanedProducts, 'syncProducts');
+    }
 
     const upsertData = cleanedProducts.map((product, index) => ({
   user_id: userId,
@@ -128,7 +135,8 @@ export async function removeFromDeletedProductsTable(
  */
 export async function syncDeletedProducts(
   userId: string,
-  deletedProducts: any[]
+  deletedProducts: any[],
+  syncOptions?: { skipImageUrlAssertion?: boolean }
 ): Promise<SyncResult> {
   try {
     if (!userId || !Array.isArray(deletedProducts)) {
@@ -144,6 +152,10 @@ export async function syncDeletedProducts(
 
     if (upsertData.length === 0) {
       return { success: true, data: [] };
+    }
+
+    if (!syncOptions?.skipImageUrlAssertion) {
+      assertProductsHaveCloudImageUrlForSync(deletedProducts, 'syncDeletedProducts');
     }
 
     const { data, error } = await getSupabaseClient()

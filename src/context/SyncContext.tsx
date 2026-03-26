@@ -3,6 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { useAuth } from './AuthContext';
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
 import { cacheCloudProductImages } from '../utils/productImageLocalCache';
+import { readProductSourceBase64ForCloudUpload } from '../utils/productSourceImage';
+import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { getFieldsDefinition, setFieldsDefinition } from '../config/fieldConfig';
 import { getCataloguesDefinition, setCataloguesDefinition } from '../config/catalogueConfig';
 
@@ -10,11 +12,20 @@ export type RefreshFromCloudOptions = {
   onStatus?: (message: string) => void;
 };
 
+/** When true, updates `syncStatusDetail` during sync (full-screen overlay). Default false — routine saves stay on “Please wait…”. */
+export type SyncProductsToCloudOptions = {
+  detailedStatus?: boolean;
+};
+
 interface SyncContextType {
   isSyncing: boolean;
   syncStatusDetail: string | null;
   syncError: string | null;
-  syncProductsToCloud: (products: any[], deletedProducts: any[]) => Promise<{ products: any[]; deletedProducts: any[] }>;
+  syncProductsToCloud: (
+    products: any[],
+    deletedProducts: any[],
+    options?: SyncProductsToCloudOptions
+  ) => Promise<{ products: any[]; deletedProducts: any[] }>;
   refreshFromCloud: (opts?: RefreshFromCloudOptions) => Promise<{ products: any[]; deletedProducts: any[] } | null>;
   isStrictMode: () => boolean;
 }
@@ -152,7 +163,8 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const syncProductsToCloud = useCallback(async (
     products: any[],
-    deletedProducts: any[]
+    deletedProducts: any[],
+    options?: SyncProductsToCloudOptions
   ): Promise<{ products: any[]; deletedProducts: any[] }> => {
     if (!user?.uid) throw new Error('Not authenticated');
 
@@ -164,55 +176,79 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { products, deletedProducts };
     }
 
+    const detailedStatus = options?.detailedStatus === true;
+
     syncLockRef.current = true;
     setIsSyncing(true);
     setSyncError(null);
-    setSyncStatusDetail('Preparing sync…');
+    setSyncStatusDetail(detailedStatus ? 'Preparing sync…' : null);
 
     try {
       const userId = user.uid;
-      const setDetail = (message: string) => setSyncStatusDetail(message);
+      const setDetail = (message: string) => {
+        if (detailedStatus) setSyncStatusDetail(message);
+      };
 
-      // Helper: upload missing R2 images for any product array
+      // Helper: upload missing R2 images (reads Data + External + legacy paths like hydration)
       const uploadMissingImages = async (items: any[], phaseLabel: string): Promise<any[]> => {
-        const missing = items.filter((p: any) => !p.imageUrl && p.imagePath);
+        const missing = items.filter((p: any) => {
+          const hasHttps =
+            typeof p.imageUrl === 'string' && /^https?:\/\//i.test(p.imageUrl.trim());
+          return !hasHttps && p.imagePath;
+        });
         if (missing.length === 0) return items;
 
         const { uploadProductImageToR2 } = await import('../services/r2Upload');
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+        if (!Capacitor.isNativePlatform()) {
+          assertProductsHaveCloudImageUrlForSync(items, phaseLabel);
+          return items;
+        }
 
         const total = missing.length;
         let finished = 0;
 
         const uploadedPairs = await Promise.all(
           missing.map(async (p: any, slot: number) => {
-            try {
-              const rawName = typeof p.name === 'string' ? p.name.trim() : '';
-              const shortName =
-                rawName.length > 36 ? `${rawName.slice(0, 33)}…` : rawName || undefined;
-              const slotMsg = shortName
-                ? `${phaseLabel} ${slot + 1}/${total} · ${shortName}`
-                : `${phaseLabel} ${slot + 1}/${total}`;
-              setDetail(slotMsg);
+            const rawName = typeof p.name === 'string' ? p.name.trim() : '';
+            const shortName =
+              rawName.length > 36 ? `${rawName.slice(0, 33)}…` : rawName || undefined;
+            const slotMsg = shortName
+              ? `${phaseLabel} ${slot + 1}/${total} · ${shortName}`
+              : `${phaseLabel} ${slot + 1}/${total}`;
+            setDetail(slotMsg);
 
-              const fileData = await Filesystem.readFile({
-                path: p.imagePath,
-                directory: Directory.Data,
-              });
-              const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
+            try {
+              let base64: string | null = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                base64 = await readProductSourceBase64ForCloudUpload(p);
+                if (base64) break;
+                if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
+              }
+              if (!base64) {
+                throw new Error(
+                  `Cannot read image file for product "${p.name || p.id}" (${p.id}). ` +
+                    `The file may be missing or still writing — try sync again in a moment.`
+                );
+              }
+              const pathHint =
+                typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
+              const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
               const dataUrlPrefix =
                 filename.endsWith('.jpg') || filename.endsWith('.jpeg')
                   ? 'data:image/jpeg;base64,'
                   : 'data:image/png;base64,';
               const uploaded = await uploadProductImageToR2({
                 productId: String(p.id),
-                dataUrl: `${dataUrlPrefix}${fileData.data}`,
+                dataUrl: `${dataUrlPrefix}${base64}`,
               });
-              if (!uploaded?.url) return null;
+              if (!uploaded?.url) {
+                throw new Error(`Cloud upload returned no URL for product ${p.id}`);
+              }
               return { productId: p.id, imageUrl: uploaded.url };
             } catch (err) {
-              console.warn(`⚠️ Image upload failed for product ${p.id}:`, err);
-              return null;
+              console.error(`❌ Image upload failed for product ${p.id}:`, err);
+              throw err;
             } finally {
               finished += 1;
               setDetail(`${phaseLabel} ${finished}/${total}`);
@@ -221,12 +257,14 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
 
         const urlMap = new Map(
-          uploadedPairs.filter(Boolean).map((x: any) => [String(x.productId), x.imageUrl])
+          uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl])
         );
-        return items.map((p: any) => {
+        const merged = items.map((p: any) => {
           const url = urlMap.get(String(p.id));
           return url ? { ...p, imageUrl: url } : p;
         });
+        assertProductsHaveCloudImageUrlForSync(merged, phaseLabel);
+        return merged;
       };
 
       // Upload images for both active and deleted products
@@ -277,7 +315,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       ]);
 
       setDetail('Refreshing from cloud…');
-      const cloudData = await refreshFromCloud({ onStatus: setDetail });
+      const cloudData = await refreshFromCloud(
+        detailedStatus ? { onStatus: setDetail } : undefined
+      );
       if (!cloudData) throw new Error('Cloud refresh returned null');
 
       return cloudData;

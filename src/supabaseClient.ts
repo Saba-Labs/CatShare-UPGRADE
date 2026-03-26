@@ -54,14 +54,12 @@ export function getSupabaseClient(): SupabaseClient {
 }
 
 /**
- * After login, keep legacy keys in sync so existing code using firebaseUserId / supabase_user_id still works.
- * Values are the Supabase auth user UUID (same as JWT sub).
+ * After Supabase login, persist the auth user UUID for storage keys and paths.
  */
 export function persistAuthUserIdsForStorage(userId: string | null | undefined): void {
   if (!userId) return;
   try {
     localStorage.setItem('supabase_user_id', userId);
-    localStorage.setItem('firebaseUserId', userId);
   } catch {
     /* ignore */
   }
@@ -70,7 +68,6 @@ export function persistAuthUserIdsForStorage(userId: string | null | undefined):
 export function clearAuthUserIdsFromStorage(): void {
   try {
     localStorage.removeItem('supabase_user_id');
-    localStorage.removeItem('firebaseUserId');
   } catch {
     /* ignore */
   }

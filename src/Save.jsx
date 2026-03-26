@@ -14,12 +14,13 @@ import {
   hydrateProductSourceForRender,
   pickRenderableImageForCanvas,
 } from "./utils/productSourceImage";
+import { getPersistedAuthUserId } from "./utils/authUserId";
 
 function getUserFolderForRenderedImages(product) {
-  // Always use the currently logged-in user to avoid cross-user mixing.
+  // Always use the currently logged-in Supabase user to avoid cross-user mixing.
   try {
-    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
-    return `user-${firebaseUserId}`;
+    const authUserId = getPersistedAuthUserId() || "anonymous";
+    return `user-${authUserId}`;
   } catch {
     return "user-anonymous";
   }
@@ -34,8 +35,8 @@ export async function deleteRenderedImageForProduct(productId) {
 
   try {
     const catalogues = getAllCatalogues();
-    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
-    const userFolder = `user-${firebaseUserId}`;
+    const authUserId = getPersistedAuthUserId() || "anonymous";
+    const userFolder = `user-${authUserId}`;
     for (const cat of catalogues) {
       const folder = cat.folder || cat.label;
       const filename = `product_${productId}_${folder}.png`;
@@ -95,8 +96,8 @@ export async function renameRenderedImagesForCatalogue(oldFolder, newFolder, old
   try {
     console.log(`📁 Renaming rendered images from folder "${oldFolder}" (label: "${oldLabel}") to folder "${newFolder}" (label: "${newLabel}")`);
 
-    const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
-    const userFolder = `user-${firebaseUserId}`;
+    const authUserId = getPersistedAuthUserId() || "anonymous";
+    const userFolder = `user-${authUserId}`;
 
     const renameInDir = async (baseDirOld, baseDirNew) => {
       let oldFiles = [];
@@ -198,8 +199,8 @@ export async function deleteRenderedImagesFromFolder(folderName) {
 
     // 2) User folder: user-<uid>/<folderName>/
     try {
-      const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
-      const userFolder = `user-${firebaseUserId}`;
+      const authUserId = getPersistedAuthUserId() || "anonymous";
+      const userFolder = `user-${authUserId}`;
       const productsDir = `${userFolder}/${folderName}`;
       const result2 = await Filesystem.readdir({
         path: productsDir,
@@ -219,8 +220,8 @@ export async function deleteRenderedImagesFromFolder(folderName) {
 
     // 3) Old user layout: user-<uid>/<folderName>/products/
     try {
-      const firebaseUserId = localStorage.getItem("firebaseUserId") || "anonymous";
-      const userFolder = `user-${firebaseUserId}`;
+      const authUserId = getPersistedAuthUserId() || "anonymous";
+      const userFolder = `user-${authUserId}`;
       const oldDir = `${userFolder}/${folderName}/products`;
       const result3 = await Filesystem.readdir({
         path: oldDir,

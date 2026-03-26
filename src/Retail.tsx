@@ -15,15 +15,16 @@ import { getFieldConfig } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logProductAdded, logProductEdited, logProductDeleted } from "./config/analyticsEvents";
+import { getPersistedAuthUserId } from "./utils/authUserId";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 
 export default function Retail({ products = [] }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const firebaseUserId = localStorage.getItem("firebaseUserId");
-  const retailProductsStorageKey = firebaseUserId
-    ? getStorageKey("retailProducts", firebaseUserId)
+  const authUserId = getPersistedAuthUserId();
+  const retailProductsStorageKey = authUserId
+    ? getStorageKey("retailProducts", authUserId)
     : "retailProducts";
 
   const [retailProducts, setRetailProducts] = useState(() =>
@@ -270,8 +271,8 @@ export default function Retail({ products = [] }) {
   // For authenticated users, this must be user-scoped to prevent cross-account leakage.
   const syncUpsertProductToGlobal = (prod) => {
     try {
-      const firebaseUserId = localStorage.getItem("firebaseUserId");
-      const keyedKey = firebaseUserId ? getStorageKey("products", firebaseUserId) : null;
+      const uid = getPersistedAuthUserId();
+      const keyedKey = uid ? getStorageKey("products", uid) : null;
 
       const all = keyedKey
         ? safeGetFromStorage(keyedKey, [])

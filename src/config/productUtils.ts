@@ -15,6 +15,7 @@ import {
   migrateProductToNewFormat,
 } from './fieldMigration';
 import { getFieldsDefinition, getFieldConfig, FieldConfig } from './fieldConfig';
+import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
 
 /**
@@ -241,9 +242,9 @@ export function getAllProducts(userId?: string): Product[] {
       storageKey = getStorageKey('products', userId);
     } else {
       // Try to get userId from localStorage as fallback
-      const firebaseUserId = localStorage.getItem('firebaseUserId');
-      if (firebaseUserId) {
-        storageKey = getStorageKey('products', firebaseUserId);
+      const authUserId = getPersistedAuthUserId();
+      if (authUserId) {
+        storageKey = getStorageKey('products', authUserId);
       }
     }
 
@@ -271,7 +272,7 @@ export function saveProduct(product: Product, userId?: string): void {
     : [...all, normalized];
 
   try {
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(updated));
     // Trigger Supabase sync
@@ -289,7 +290,7 @@ export function saveProduct(product: Product, userId?: string): void {
 export function saveProducts(products: Product[], userId?: string): void {
   try {
     const normalized = products.map(normalizeProduct);
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(normalized));
     // Trigger Supabase sync
@@ -309,9 +310,9 @@ function triggerSupabaseSync(products: Product[], userId?: string): void {
     // In strict mode, sync is handled centrally by the product-added event in App.tsx.
     if (localStorage.getItem('strictOnlineMode::device') === 'true') return;
 
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
+    const effectiveUserId = userId || getPersistedAuthUserId();
     if (!effectiveUserId) {
-      console.warn('⚠️ No Firebase user ID found. Skipping Supabase sync.');
+      console.warn('⚠️ No authenticated user id found. Skipping Supabase sync.');
       return;
     }
 

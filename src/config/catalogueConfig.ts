@@ -10,6 +10,7 @@
  * - Existing backups and data remain unchanged and work seamlessly
  */
 
+import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
 
 export interface Catalogue {
@@ -99,10 +100,9 @@ export function getCataloguesDefinition(userId?: string): CataloguesDefinition {
     if (userId) {
       storageKey = getStorageKey("cataloguesDefinition", userId);
     } else {
-      // Try to get from keyed storage using localStorage fallback
-      const firebaseUserId = localStorage.getItem('firebaseUserId');
-      if (firebaseUserId) {
-        storageKey = getStorageKey("cataloguesDefinition", firebaseUserId);
+      const authUserId = getPersistedAuthUserId();
+      if (authUserId) {
+        storageKey = getStorageKey("cataloguesDefinition", authUserId);
       }
     }
 
@@ -116,7 +116,7 @@ export function getCataloguesDefinition(userId?: string): CataloguesDefinition {
         !Array.isArray(parsed) &&
         Array.isArray((parsed as { catalogues?: unknown }).catalogues);
       if (!hadValidCataloguesArray) {
-        const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+        const effectiveUserId = userId || getPersistedAuthUserId() || '';
         if (effectiveUserId) {
           setCataloguesDefinition(normalized, effectiveUserId);
         } else {
@@ -154,7 +154,7 @@ export function setCataloguesDefinition(definition: CataloguesDefinition, userId
     };
 
     // Determine storage key
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey("cataloguesDefinition", effectiveUserId) : "cataloguesDefinition";
 
     localStorage.setItem(storageKey, JSON.stringify(updated));

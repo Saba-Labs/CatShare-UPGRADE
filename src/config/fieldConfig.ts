@@ -11,6 +11,7 @@
  */
 
 import { INDUSTRY_PRESETS } from './industryPresets';
+import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
 
 export interface FieldConfig {
@@ -148,9 +149,9 @@ export function getFieldsDefinition(userId?: string): FieldsDefinition {
       storageKey = getStorageKey('fieldsDefinition', userId);
     } else {
       // Try to get from keyed storage using localStorage fallback
-      const firebaseUserId = localStorage.getItem('firebaseUserId');
-      if (firebaseUserId) {
-        storageKey = getStorageKey('fieldsDefinition', firebaseUserId);
+      const authUserId = getPersistedAuthUserId();
+      if (authUserId) {
+        storageKey = getStorageKey('fieldsDefinition', authUserId);
       }
     }
 
@@ -201,7 +202,7 @@ export function setFieldsDefinition(definition: FieldsDefinition, userId?: strin
     }
 
     // Determine storage key
-    const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || '';
+    const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('fieldsDefinition', effectiveUserId) : 'fieldsDefinition';
 
     localStorage.setItem(storageKey, JSON.stringify({

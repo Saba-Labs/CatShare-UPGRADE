@@ -2,6 +2,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { hydrateProductSourceForRender } from "./utils/productSourceImage";
 import { Share } from "@capacitor/share";
 import { getRenderedImage } from "./utils/renderingUtils";
+import { getPersistedAuthUserId } from "./utils/authUserId";
 import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
 import { logRenderStarted, logRenderCompleted, logShareInitiated, logShareCompleted } from "./config/analyticsEvents";
 
@@ -39,23 +40,23 @@ export async function handleShare({
   // Extract catalogue label from folder (folder is the catalogue name/label)
   const catalogueLabel = targetFolder;
 
-  const firebaseUserId = localStorage.getItem("firebaseUserId");
-  const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+  const authUserId = getPersistedAuthUserId();
+  const userFolder = authUserId ? `user-${authUserId}` : null;
   const renderedRoot = userFolder ? `${userFolder}/${targetFolder}` : targetFolder;
 
   // Get all products to support selective rendering
   let allProducts = products;
   if (!allProducts) {
-    if (firebaseUserId) {
-      allProducts = safeGetFromStorage(getStorageKey("products", firebaseUserId), []);
+    if (authUserId) {
+      allProducts = safeGetFromStorage(getStorageKey("products", authUserId), []);
     } else {
       // Offline guest fallback (no authenticated user)
       allProducts = JSON.parse(localStorage.getItem("products") || "[]");
     }
   }
   if (!products && (mode === "retail" || mode === "cat2")) {
-    const retailStorageKey = firebaseUserId
-      ? getStorageKey("retailProducts", firebaseUserId)
+    const retailStorageKey = authUserId
+      ? getStorageKey("retailProducts", authUserId)
       : "retailProducts";
     const retailProducts = safeGetFromStorage(retailStorageKey, []);
     if (retailProducts.length > 0) {

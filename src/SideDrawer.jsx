@@ -22,6 +22,7 @@ import { ensureProductsHaveStockFields } from "./utils/dataMigration";
 import { migrateProductToNewFormat } from "./config/fieldMigration";
 import { applyBackupFieldAnalysis } from "./config/fieldConfig";
 import { Capacitor } from "@capacitor/core";
+import { getPersistedAuthUserId } from "./utils/authUserId";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 import { getCurrentCurrency } from "./utils/currencyUtils";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
@@ -33,7 +34,61 @@ import {
   restoreSupabaseAuthToLocalStorage,
   refreshSupabaseSessionFromStorage,
 } from "./supabaseClient";
+import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
+import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 
+/**
+ * After backup restore, ensure every product with a local imagePath gets an HTTPS imageUrl (R2)
+ * before Supabase sync — same path resolution as main sync (Data + External + legacy).
+ */
+async function uploadMissingProductImagesToR2ForRestore(items) {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  const { uploadProductImageToR2 } = await import("./services/r2Upload");
+
+  if (!Capacitor.isNativePlatform()) {
+    assertProductsHaveCloudImageUrlForSync(items, "Backup restore");
+    return items;
+  }
+
+  const merged = await Promise.all(
+    items.map(async (p) => {
+      const hasHttps =
+        typeof p.imageUrl === "string" && /^https?:\/\//i.test(p.imageUrl.trim());
+      if (hasHttps || !p.imagePath) return p;
+
+      let base64 = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        base64 = await readProductSourceBase64ForCloudUpload(p);
+        if (base64) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
+      }
+      if (!base64) {
+        throw new Error(
+          `Cannot read image file for product "${p.name || p.id}" (${p.id}). ` +
+            `The file may be missing or still writing — try restore again.`
+        );
+      }
+      const pathHint =
+        typeof p.imagePath === "string" && p.imagePath.trim() ? p.imagePath.trim() : "";
+      const filename = (pathHint.split("/").pop() || "product.png").toLowerCase();
+      const dataUrlPrefix =
+        filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+          ? "data:image/jpeg;base64,"
+          : "data:image/png;base64,";
+      const uploaded = await uploadProductImageToR2({
+        productId: String(p.id),
+        dataUrl: `${dataUrlPrefix}${base64}`,
+      });
+      if (!uploaded?.url) {
+        throw new Error(`Cloud upload returned no URL for product ${p.id}`);
+      }
+      return { ...p, imageUrl: uploaded.url };
+    })
+  );
+
+  assertProductsHaveCloudImageUrlForSync(merged, "Backup restore");
+  return merged;
+}
 
 export default function SideDrawer({
   open,
@@ -168,8 +223,8 @@ const navigate = useNavigate();
       "Resell"     // Legacy support
     ];
 
-    const firebaseUserId = localStorage.getItem("firebaseUserId");
-    const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+    const authUserId = getPersistedAuthUserId();
+    const userFolder = authUserId ? `user-${authUserId}` : null;
 
     // Try to read each catalogue folder
     for (const folderName of foldersToCheck) {
@@ -1074,10 +1129,11 @@ const exportProductsToCSV = (products) => {
       }
 
       // Restore deleted products (shelf items) from backup
+      let restoredDeletedShelf = [];
       if (Array.isArray(parsed.deleted) && parsed.deleted.length > 0) {
         console.log(`📂 Restoring ${parsed.deleted.length} deleted products (shelf items)...`);
 
-        const restoredDeleted = await Promise.all(
+        restoredDeletedShelf = await Promise.all(
           parsed.deleted.map(async (p) => {
             // Restore image from ZIP
             if (p.imageFilename && p.imagePath) {
@@ -1112,10 +1168,10 @@ const exportProductsToCSV = (products) => {
         try {
           localStorage.setItem(
             user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
-            JSON.stringify(restoredDeleted)
+            JSON.stringify(restoredDeletedShelf)
           );
-          setDeletedProducts(restoredDeleted);
-          console.log(`✅ Restored ${restoredDeleted.length} shelf items successfully`);
+          setDeletedProducts(restoredDeletedShelf);
+          console.log(`✅ Restored ${restoredDeletedShelf.length} shelf items successfully`);
         } catch (err) {
           console.warn("⚠️ Could not save deleted products (shelf items):", err.message);
         }
@@ -1207,40 +1263,8 @@ const exportProductsToCSV = (products) => {
       if (user && user.uid) {
   (async () => {
     try {
-      // ✅ Upload missing images to R2 now that user is confirmed authenticated
-      // Standardized: use the single deterministic per-product uploader (JPEG only)
-      const { uploadProductImageToR2 } = await import('./services/r2Upload');
-      const updatedProducts = await Promise.all(
-        productsToUse.map(async (p) => {
-          if (p.imageUrl || !p.imagePath) return p; // already has cloud URL, skip
-
-          try {
-            // Read the local file we just restored
-            const fileData = await Filesystem.readFile({
-              path: p.imagePath,
-              directory: Directory.Data,
-            });
-
-            const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
-            const dataUrlPrefix = filename.endsWith(".jpg") || filename.endsWith(".jpeg")
-              ? "data:image/jpeg;base64,"
-              : "data:image/png;base64,";
-
-            const uploaded = await uploadProductImageToR2({
-              productId: String(p.id),
-              dataUrl: `${dataUrlPrefix}${fileData.data}`,
-            });
-
-            if (uploaded?.url && !uploaded.url.startsWith('undefined')) {
-              console.log(`☁️ R2 upload success for "${p.name}": ${uploaded.url}`);
-              return { ...p, imageUrl: uploaded.url };
-            }
-          } catch (err) {
-            console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
-          }
-          return p;
-        })
-      );
+      // ✅ Upload missing images to R2 (Data + External + legacy paths, with retries)
+      const updatedProducts = await uploadMissingProductImagesToR2ForRestore(productsToUse);
 
       // Save updated products with new imageUrls to localStorage
       localStorage.setItem(
@@ -1260,11 +1284,21 @@ const exportProductsToCSV = (products) => {
               console.warn('⚠️ Products sync warning:', productsSyncResult.error);
             }
 
-            // Also sync deleted products (shelf items) if any were restored
-            if (Array.isArray(parsed.deleted) && parsed.deleted.length > 0) {
-              const deletedSyncResult = await syncDeletedProducts(user.uid, restoredDeleted || []);
+            // Shelf items: same R2 path resolution as active products, then sync
+            if (restoredDeletedShelf.length > 0) {
+              const updatedDeletedShelf = await uploadMissingProductImagesToR2ForRestore(
+                restoredDeletedShelf
+              );
+              localStorage.setItem(
+                user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
+                JSON.stringify(updatedDeletedShelf)
+              );
+              setDeletedProducts(updatedDeletedShelf);
+              const deletedSyncResult = await syncDeletedProducts(user.uid, updatedDeletedShelf);
               if (deletedSyncResult.success) {
-                console.log(`✅ Restored ${(restoredDeleted || []).length} deleted products synced to Supabase successfully`);
+                console.log(
+                  `✅ Restored ${updatedDeletedShelf.length} deleted products synced to Supabase successfully`
+                );
               } else {
                 console.warn('⚠️ Deleted products sync warning:', deletedSyncResult.error);
               }
@@ -1550,10 +1584,11 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
           console.warn("⚠️ Could not save categories:", catErr.message);
         }
 
+        let restoredDeletedShelfZip = [];
         if (Array.isArray(parsed.deleted) && parsed.deleted.length > 0) {
           console.log(`📂 Restoring ${parsed.deleted.length} deleted products (shelf items)...`);
 
-          const restoredDeleted = await Promise.all(
+          restoredDeletedShelfZip = await Promise.all(
             parsed.deleted.map(async (p) => {
               if (p.imageFilename && p.imagePath) {
                 const imgFile = zip.file(`images/${p.imageFilename}`);
@@ -1584,10 +1619,10 @@ Object.entries(preservedSettings).forEach(([key, value]) => {
           try {
             localStorage.setItem(
               user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
-              JSON.stringify(restoredDeleted)
+              JSON.stringify(restoredDeletedShelfZip)
             );
-            setDeletedProducts(restoredDeleted);
-            console.log(`✅ Restored ${restoredDeleted.length} shelf items successfully`);
+            setDeletedProducts(restoredDeletedShelfZip);
+            console.log(`✅ Restored ${restoredDeletedShelfZip.length} shelf items successfully`);
           } catch (err) {
             console.warn("⚠️ Could not save deleted products (shelf items):", err.message);
           }
@@ -1637,36 +1672,7 @@ if (user && user.uid) {
         console.warn('⚠️ No Supabase session after restore; skipping cloud sync. Try signing in again.');
         return;
       }
-      // Standardized: use single deterministic per-product uploader (JPEG only)
-      const { uploadProductImageToR2 } = await import('./services/r2Upload');
-      const updatedProducts = await Promise.all(
-        productsToUse.map(async (p) => {
-          if (p.imageUrl || !p.imagePath) return p;
-          try {
-            const fileData = await Filesystem.readFile({
-              path: p.imagePath,
-              directory: Directory.Data,
-            });
-            const filename = (p.imagePath.split("/").pop() || "").toLowerCase();
-            const dataUrlPrefix = filename.endsWith(".jpg") || filename.endsWith(".jpeg")
-              ? "data:image/jpeg;base64,"
-              : "data:image/png;base64,";
-
-            const uploaded = await uploadProductImageToR2({
-              productId: String(p.id),
-              dataUrl: `${dataUrlPrefix}${fileData.data}`,
-            });
-
-            if (uploaded?.url && !uploaded.url.startsWith('undefined')) {
-              console.log(`☁️ R2 upload success for "${p.name}": ${uploaded.url}`);
-              return { ...p, imageUrl: uploaded.url };
-            }
-          } catch (err) {
-            console.warn(`⚠️ R2 upload failed for "${p.name}":`, err.message);
-          }
-          return p;
-        })
-      );
+      const updatedProducts = await uploadMissingProductImagesToR2ForRestore(productsToUse);
 
       localStorage.setItem(
         user?.uid ? getStorageKey("products", user.uid) : "products",
@@ -1678,6 +1684,17 @@ if (user && user.uid) {
 
       const { syncProducts, syncDeletedProducts, syncFieldsDefinition } = await import('./services/supabaseSync');
       await syncProducts(user.uid, updatedProducts);
+      if (restoredDeletedShelfZip.length > 0) {
+        const updatedDeletedShelf = await uploadMissingProductImagesToR2ForRestore(
+          restoredDeletedShelfZip
+        );
+        localStorage.setItem(
+          user?.uid ? getStorageKey("deletedProducts", user.uid) : "deletedProducts",
+          JSON.stringify(updatedDeletedShelf)
+        );
+        setDeletedProducts(updatedDeletedShelf);
+        await syncDeletedProducts(user.uid, updatedDeletedShelf);
+      }
     } catch (err) {
       console.warn('⚠️ Background sync failed:', err.message);
     }

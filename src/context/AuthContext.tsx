@@ -9,7 +9,7 @@ import {
 import { fetchAllUserData } from '../services/supabaseSync';
 import { authService } from '../services/authService';
 
-/** Shape compatible with previous Firebase `user` (components use .uid, .email, .displayName). */
+/** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
   uid: string;
   email: string | null;

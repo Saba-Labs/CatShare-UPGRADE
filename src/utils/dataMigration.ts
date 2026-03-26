@@ -8,6 +8,7 @@
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } from "../config/catalogueConfig";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
+import { getPersistedAuthUserId } from "./authUserId";
 import { getStorageKey, getUserImagePath, safeGetFromStorage, safeSetInStorage } from "./safeStorage";
 import { getFieldsDefinition, setFieldsDefinition } from "../config/fieldConfig";
 
@@ -352,8 +353,7 @@ export async function runMigrations(): Promise<void> {
   ensureProductsHaveStockFields();
 
   // Step 4b: Move source images to user-<uid>/Products/product-<id>.png (native only)
-  const uid =
-    localStorage.getItem("firebaseUserId") || localStorage.getItem("supabase_user_id");
+  const uid = getPersistedAuthUserId();
   if (uid && Capacitor.isNativePlatform()) {
     const pk = getStorageKey("products", uid);
     const dk = getStorageKey("deletedProducts", uid);

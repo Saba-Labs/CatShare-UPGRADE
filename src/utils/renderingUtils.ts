@@ -4,6 +4,7 @@ import { hydrateProductSourceForRender, pickRenderableImageForCanvas } from "./p
 import { renderProductToCanvas, canvasToBase64 } from "./canvasRenderer";
 import { renderProductToCanvasGlass } from "./canvasRenderer-glass";
 import { getCatalogueData } from "../config/catalogueProductUtils";
+import { getPersistedAuthUserId } from "./authUserId";
 import { safeGetFromStorage } from "./safeStorage";
 import { getAllFields } from "../config/fieldConfig";
 import { getThemeById } from "../config/themeConfig";
@@ -16,8 +17,8 @@ export async function getRenderedImage(
   productId: string,
   catalogueLabel: string
 ): Promise<string | null> {
-  const firebaseUserId = localStorage.getItem("firebaseUserId");
-  const userFolder = firebaseUserId ? `user-${firebaseUserId}` : null;
+  const authUserId = getPersistedAuthUserId();
+  const userFolder = authUserId ? `user-${authUserId}` : null;
 
   // First try localStorage
   const storageKey = userFolder

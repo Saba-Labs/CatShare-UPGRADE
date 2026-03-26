@@ -14,6 +14,7 @@ import { useTheme } from "../context/ThemeContext";
 import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
 import { migrateProductToNewFormat } from "../config/fieldMigration";
 import { getProductFieldValue, getProductUnitValue } from "../config/fieldMigration";
+import { getPersistedAuthUserId } from "../utils/authUserId";
 import {
   safeGetFromStorage,
   safeSetInStorage,
@@ -320,11 +321,11 @@ export default function CreateProduct() {
 
   // When logged in, product/offline state should be stored per-user.
   // This prevents localStorage quota errors from the legacy unkeyed "products".
-  const firebaseUserId = localStorage.getItem("firebaseUserId");
-  const productsStorageKey = firebaseUserId
-    ? getStorageKey("products", firebaseUserId)
+  const authUserId = getPersistedAuthUserId();
+  const productsStorageKey = authUserId
+    ? getStorageKey("products", authUserId)
     : "products";
-  const useUserImages = Boolean(firebaseUserId);
+  const useUserImages = Boolean(authUserId);
 
   const categories = JSON.parse(localStorage.getItem("categories") || "[]");
 
@@ -968,15 +969,14 @@ if (migratedProduct.suggestedColors?.length > 0) {
     const id = editingId || Date.now().toString();
     // Re-read user id at the time of saving to avoid timing issues
     // when the auth/localStorage value is still being populated.
-    const firebaseUserIdNow =
-      localStorage.getItem("firebaseUserId") || localStorage.getItem("supabase_user_id");
-    const productsStorageKeyNow = firebaseUserIdNow
-      ? getStorageKey("products", firebaseUserIdNow)
+    const authUserIdNow = getPersistedAuthUserId();
+    const productsStorageKeyNow = authUserIdNow
+      ? getStorageKey("products", authUserIdNow)
       : "products";
-    const useUserImagesNow = Boolean(firebaseUserIdNow);
+    const useUserImagesNow = Boolean(authUserIdNow);
 
     const imagePath = useUserImagesNow
-      ? getUserImagePath(id, firebaseUserIdNow || undefined)
+      ? getUserImagePath(id, authUserIdNow || undefined)
       : `catalogue/product-${id}.png`;
 
     try {

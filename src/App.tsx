@@ -22,6 +22,8 @@ import {
 } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
+import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
+import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { useAuth } from "./context/AuthContext";
@@ -418,36 +420,58 @@ function AppWithBackHandler() {
         removeFromDeletedProductsTable,
       } = await import('./services/supabaseSync');
 
-      // Helper: upload missing R2 images for any product array
+      // Helper: upload missing R2 images (Data + External + legacy paths; fail if image cannot be cloud-linked)
       const uploadMissingImages = async (items: any[], label: string): Promise<any[]> => {
-        const missing = items.filter((p: any) => !p.imageUrl && p.imagePath);
+        const missing = items.filter((p: any) => {
+          const hasHttps =
+            typeof p.imageUrl === 'string' && /^https?:\/\//i.test(p.imageUrl.trim());
+          return !hasHttps && p.imagePath;
+        });
         if (missing.length === 0) return items;
 
         const { uploadProductImageToR2 } = await import('./services/r2Upload');
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+        if (!Capacitor.isNativePlatform()) {
+          assertProductsHaveCloudImageUrlForSync(items, label);
+          return items;
+        }
 
         const uploadedPairs = await Promise.all(
           missing.map(async (p: any) => {
-            try {
-              const fileData = await Filesystem.readFile({ path: p.imagePath, directory: Directory.Data });
-              const filename = (p.imagePath.split('/').pop() || '').toLowerCase();
-              const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg') ? 'data:image/jpeg;base64,' : 'data:image/png;base64,';
-              const uploaded = await uploadProductImageToR2({ productId: String(p.id), dataUrl: `${dataUrlPrefix}${fileData.data}` });
-              if (!uploaded?.url) return null;
-              return { productId: p.id, imageUrl: uploaded.url };
-            } catch (err: any) {
-              console.warn(`⚠️ Image upload failed for ${label} product ${p.id}:`, err?.message);
-              return null;
+            let base64: string | null = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              base64 = await readProductSourceBase64ForCloudUpload(p);
+              if (base64) break;
+              if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
             }
+            if (!base64) {
+              throw new Error(
+                `[${label}] Cannot read image file for product "${p.name || p.id}" (${p.id}).`
+              );
+            }
+            const pathHint =
+              typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
+            const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
+            const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+              ? 'data:image/jpeg;base64,'
+              : 'data:image/png;base64,';
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${base64}`,
+            });
+            if (!uploaded?.url) {
+              throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
+            }
+            return { productId: p.id, imageUrl: uploaded.url };
           })
         );
-        const urlMap = new Map(
-          uploadedPairs.filter(Boolean).map((x: any) => [String(x.productId), x.imageUrl])
-        );
-        return items.map((p: any) => {
+        const urlMap = new Map(uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl]));
+        const merged = items.map((p: any) => {
           const url = urlMap.get(String(p.id));
           return url ? { ...p, imageUrl: url } : p;
         });
+        assertProductsHaveCloudImageUrlForSync(merged, label);
+        return merged;
       };
 
       setSyncProgress('Uploading images...');
@@ -573,7 +597,10 @@ function AppWithBackHandler() {
 
       setSyncProgress('Refreshing from cloud...');
       // Fetch fresh snapshot from cloud as the single source of truth.
-      const cloudData = await refreshFromCloud();
+      // Live per-product lines while native image cache runs (modal subtitle).
+      const cloudData = await refreshFromCloud({
+        onStatus: (msg) => setSyncProgress(msg),
+      });
       if (cloudData) {
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);

@@ -3,6 +3,8 @@
  * Prevents app crashes from corrupted or invalid JSON data
  */
 
+import { getPersistedAuthUserId } from './authUserId';
+
 /**
  * Generate a per-user storage key
  * @param baseKey - Base key name (e.g., "products", "categories")
@@ -23,7 +25,7 @@ export function getUserImagePath(
   userId?: string,
   _catalogueFolder?: string
 ): string {
-  const effectiveUserId = userId || localStorage.getItem('firebaseUserId') || 'anonymous';
+  const effectiveUserId = userId || getPersistedAuthUserId() || 'anonymous';
   return `user-${effectiveUserId}/Products/product-${productId}.png`;
 }
 

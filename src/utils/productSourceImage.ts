@@ -6,6 +6,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { getAllCatalogues } from '../config/catalogueConfig';
+import { getPersistedAuthUserId } from './authUserId';
 import { getUserImagePath } from './safeStorage';
 import { fetchUrlAsDataUrl } from './fetchImageCrossPlatform';
 import { safeWriteFile } from './platformFilesystem';
@@ -17,11 +18,7 @@ import {
 const HTTP_URL = /^https?:\/\//i;
 
 export function getEffectiveUserIdForImages(): string {
-  return (
-    localStorage.getItem('firebaseUserId') ||
-    localStorage.getItem('supabase_user_id') ||
-    ''
-  );
+  return getPersistedAuthUserId() || '';
 }
 
 /** True if the string can be passed to canvas Image() / loadImage (data, http(s), blob). */
@@ -116,6 +113,30 @@ async function readFileDataBase64(path: string): Promise<string | null> {
     if (res?.data) return String(res.data);
   } catch {
     /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Read raw base64 for a single path (Data then External). Use for R2 upload from on-disk paths.
+ */
+export async function readProductImageFileBase64(path: string): Promise<string | null> {
+  return readFileDataBase64(path);
+}
+
+/**
+ * For cloud sync: read source bytes using the same path order as hydration (canonical, imagePath, legacy).
+ * Ensures uploads work when CreateProduct wrote to External or path metadata is slightly off.
+ */
+export async function readProductSourceBase64ForCloudUpload(product: {
+  id?: unknown;
+  imagePath?: unknown;
+}): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  for (const path of getOrderedSourceImagePaths(product)) {
+    if (!path) continue;
+    const b64 = await readFileDataBase64(path);
+    if (b64) return b64;
   }
   return null;
 }

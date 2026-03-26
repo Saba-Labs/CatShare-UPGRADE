@@ -64,8 +64,10 @@ export async function syncRestoreToSupabase(
       fieldsResult,
       settingsResult,
     ] = await Promise.all([
-      syncProducts(userId, restoredData.products || []),
-      syncDeletedProducts(userId, restoredData.deletedProducts || []),
+      syncProducts(userId, restoredData.products || [], { skipImageUrlAssertion: true }),
+      syncDeletedProducts(userId, restoredData.deletedProducts || [], {
+        skipImageUrlAssertion: true,
+      }),
       restoredData.cataloguesDefinition
         ? syncCataloguesDefinition(userId, restoredData.cataloguesDefinition)
         : Promise.resolve({ success: true }),
