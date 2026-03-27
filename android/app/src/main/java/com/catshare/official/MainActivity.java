@@ -9,6 +9,7 @@ import com.catshare.official.BackgroundRendererPlugin;
 import com.codetrixstudio.capacitor.GoogleAuth.GoogleAuth;
 
 // In-app update imports
+import android.content.IntentSender;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.play.core.appupdate.AppUpdateInfo;
 import com.google.android.play.core.appupdate.AppUpdateManager;
@@ -51,13 +52,17 @@ public class MainActivity extends BridgeActivity {
         Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
         appUpdateInfoTask.addOnSuccessListener(info -> {
             if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE
-                    && info.isFlexibleUpdateAllowed()) {
-                appUpdateManager.startUpdateFlowForResult(
-                        info,
-                        this,
-                        AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
-                        UPDATE_REQUEST_CODE
-                );
+                    && info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)) {
+                try {
+                    appUpdateManager.startUpdateFlowForResult(
+                            info,
+                            this,
+                            AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
+                            UPDATE_REQUEST_CODE
+                    );
+                } catch (IntentSender.SendIntentException e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -73,7 +78,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // If user left the app mid-download and came back, prompt them
         if (appUpdateManager != null) {
             appUpdateManager.getAppUpdateInfo().addOnSuccessListener(info -> {
                 if (info.installStatus() == InstallStatus.DOWNLOADED) {
