@@ -3,6 +3,12 @@
   publish = "dist"
   functions = "netlify/functions"
 
+# Same path as Vercel `/api/*` so the web app can use one URL for the image proxy.
+[[redirects]]
+  from = "/api/fetch-public-image"
+  to = "/.netlify/functions/fetch-public-image"
+  status = 200
+
 [dev]
   command = "npm run dev"
   port = 8888

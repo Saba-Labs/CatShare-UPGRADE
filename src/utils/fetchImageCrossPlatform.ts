@@ -8,6 +8,10 @@
 
 import { Capacitor } from '@capacitor/core';
 import { Http } from '@capacitor-community/http';
+import {
+  fetchPublicImageProxyAsDataUrl,
+  isPublicR2ImageUrlForProxy,
+} from './publicImageProxyClient';
 
 function readBlobAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -103,12 +107,46 @@ export async function fetchUrlAsDataUrl(url: string): Promise<string> {
   }
 
   if (Capacitor.getPlatform() === 'web') {
-    const response = await fetch(trimmed);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    try {
+      const response = await fetch(trimmed, {
+        credentials: 'omit',
+        mode: 'cors',
+        referrerPolicy: 'no-referrer',
+        cache: 'force-cache',
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const blob = await response.blob();
+      return readBlobAsDataUrl(blob);
+    } catch (fetchErr) {
+      if (isPublicR2ImageUrlForProxy(trimmed)) {
+        try {
+          return await fetchPublicImageProxyAsDataUrl(trimmed);
+        } catch (proxyErr) {
+          console.warn('fetchUrlAsDataUrl: same-origin proxy failed', proxyErr);
+        }
+      }
+      // Raw fetch often fails on R2 when CORS is tight; <img crossOrigin> + same fetch→blob
+      // fallback in loadImage() sometimes still succeeds (matches on-screen thumbnails).
+      console.warn('fetchUrlAsDataUrl: direct fetch failed, trying loadImage + canvas', fetchErr);
+      const { loadImage } = await import('./canvasRenderer');
+      const img = await loadImage(trimmed);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) {
+        throw new Error('Image has zero dimensions');
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas 2D context unavailable');
+      }
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/png');
     }
-    const blob = await response.blob();
-    return readBlobAsDataUrl(blob);
   }
 
   const tryOnce = () => httpGetImageAsDataUrl(trimmed);

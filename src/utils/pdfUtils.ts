@@ -2,6 +2,9 @@ import { jsPDF } from "jspdf";
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { FileSharer } from "@byteowls/capacitor-filesharer";
+import type { BusinessProfile } from "../config/businessProfile";
+import { EMPTY_BUSINESS_PROFILE } from "../config/businessProfile";
+import { fetchUrlAsDataUrl } from "./fetchImageCrossPlatform";
 
 interface ProductWithImage {
   id: string | number;
@@ -38,8 +41,32 @@ interface ProductWithImage {
 interface PDFGenerationOptions {
   products: ProductWithImage[];
   catalogueName?: string;
+  /** Account company / seller details for PDF header (replaces catalogue name + date). */
+  businessProfile?: BusinessProfile;
   currencySymbol?: string;
   fieldLabels?: { [key: string]: string };
+}
+
+  /** Google Play listing for CatShare (PDF footer link). */
+const CATSHARE_PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=com.catshare.official";
+
+function sanitizePdfFilenameSegment(raw: string): string {
+  const s = raw
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return s.slice(0, 48) || "products";
+}
+
+export function pdfFilenamePrefix(
+  businessProfile: BusinessProfile | undefined,
+  catalogueFallback: string
+): string {
+  const name = businessProfile?.businessName?.trim();
+  if (name) return sanitizePdfFilenameSegment(name);
+  return sanitizePdfFilenameSegment(catalogueFallback);
 }
 
 /**
@@ -58,6 +85,135 @@ function getImageDimensions(
     };
     img.src = base64Image;
   });
+}
+
+type PdfLogoAsset = {
+  dataUrl: string;
+  format: "PNG" | "JPEG" | "WEBP";
+  width: number;
+  height: number;
+};
+
+function dataUrlToPdfImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
+  const m = dataUrl.match(/^data:([^;]+);/i);
+  const mime = (m?.[1] || "").toLowerCase();
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "JPEG";
+  if (mime.includes("webp")) return "WEBP";
+  return "PNG";
+}
+
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** GIF frames → PNG (jsPDF has no GIF). */
+async function rasterizeToPngDataUrl(dataUrl: string): Promise<{ dataUrl: string; format: "PNG" } | null> {
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("load"));
+      el.src = dataUrl;
+    });
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return { dataUrl: canvas.toDataURL("image/png"), format: "PNG" };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalize product image for jsPDF: correct PNG/JPEG/WEBP flag, and stable data URLs.
+ * - data:/blob: → no network (mobile keeps fast local path).
+ * - https: → fetchUrlAsDataUrl (native uses Capacitor HTTP; web uses fetch + CORS).
+ */
+async function resolveProductImageForPdf(
+  src: string | undefined
+): Promise<{ dataUrl: string; format: "PNG" | "JPEG" | "WEBP" } | null> {
+  const s = typeof src === "string" ? src.trim() : "";
+  if (!s) return null;
+
+  if (s.startsWith("data:")) {
+    if (/data:image\/svg/i.test(s)) {
+      console.warn("PDF: skipping SVG product image");
+      return null;
+    }
+    if (/data:image\/gif/i.test(s)) {
+      const r = await rasterizeToPngDataUrl(s);
+      return r;
+    }
+    return { dataUrl: s, format: dataUrlToPdfImageFormat(s) };
+  }
+
+  if (s.startsWith("blob:")) {
+    try {
+      const res = await fetch(s);
+      const blob = await res.blob();
+      if (!blob.type.startsWith("image/")) return null;
+      const dataUrl = await readBlobAsDataUrl(blob);
+      if (/data:image\/svg/i.test(dataUrl)) return null;
+      if (/data:image\/gif/i.test(dataUrl)) {
+        return rasterizeToPngDataUrl(dataUrl);
+      }
+      return { dataUrl, format: dataUrlToPdfImageFormat(dataUrl) };
+    } catch {
+      return null;
+    }
+  }
+
+  if (s.startsWith("http://") || s.startsWith("https://")) {
+    try {
+      const dataUrl = await fetchUrlAsDataUrl(s);
+      if (!dataUrl.startsWith("data:image/")) return null;
+      if (/data:image\/svg/i.test(dataUrl)) return null;
+      if (/data:image\/gif/i.test(dataUrl)) {
+        return rasterizeToPngDataUrl(dataUrl);
+      }
+      return { dataUrl, format: dataUrlToPdfImageFormat(dataUrl) };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Load company logo for PDF. Uses fetchUrlAsDataUrl so native apps bypass WebView CORS (R2, etc.).
+ */
+async function loadPdfLogo(url: string | undefined): Promise<PdfLogoAsset | null> {
+  const u = url?.trim();
+  if (!u || (!u.startsWith("http://") && !u.startsWith("https://"))) return null;
+  try {
+    const dataUrl = await fetchUrlAsDataUrl(u);
+    if (!dataUrl.startsWith("data:image/")) {
+      console.warn("PDF: logo URL did not resolve to an image");
+      return null;
+    }
+    if (/data:image\/svg/i.test(dataUrl)) {
+      console.warn("PDF: SVG logos are not supported in PDF export");
+      return null;
+    }
+    const dims = await getImageDimensions(dataUrl);
+    const format = dataUrlToPdfImageFormat(dataUrl);
+    return { dataUrl, format, width: dims.width, height: dims.height };
+  } catch (e) {
+    console.warn("PDF: could not load company logo", e);
+    return null;
+  }
 }
 
 /**
@@ -126,55 +282,127 @@ const drawGlassBackground = (
   }
 };
 
-const addHeader = (
+/** Minimal header: white strip, company text left, logo right (no nested boxes). */
+const addCompanyHeader = (
   pdf: jsPDF,
-  title: string,
+  profile: BusinessProfile,
   pageWidth: number,
   margin: number,
-  accentBlue: number[],
+  _contentWidth: number,
+  _accentBlue: number[],
   textDark: number[],
-  textMuted: number[]
-) => {
+  textMuted: number[],
+  logo: PdfLogoAsset | null
+): number => {
+  const line = 3.9;
+  const hasLogo = !!logo;
+  const logoBox = 34;
+  const logoGap = 10;
+  const textColW = pageWidth - 2 * margin - (hasLogo ? logoBox + logoGap : 0);
+  const textX = margin;
+  const title = profile.businessName?.trim() || "Product catalogue";
+
+  const rawAbout = profile.about?.trim();
+  const rawDesc = profile.description?.trim();
+  let tagline = "";
+  if (rawAbout) tagline = rawAbout.length > 100 ? `${rawAbout.slice(0, 97)}…` : rawAbout;
+  else if (rawDesc) tagline = rawDesc.length > 100 ? `${rawDesc.slice(0, 97)}…` : rawDesc;
+
+  const address = profile.address?.trim() || "";
+  const addrLines = address ? pdf.splitTextToSize(address, textColW) : [];
+  const tagLines = tagline ? pdf.splitTextToSize(tagline, textColW) : [];
+
+  const parts: string[] = [];
+  if (profile.phone?.trim()) parts.push(profile.phone.trim());
+  if (profile.email?.trim()) parts.push(profile.email.trim());
+  if (profile.website?.trim()) {
+    parts.push(profile.website.trim().replace(/^https?:\/\//i, ""));
+  }
+  const contactLine = parts.join("    ·    ");
+  const contactLines = contactLine
+    ? pdf.splitTextToSize(contactLine, textColW)
+    : [];
+
+  let ySim = 10 + 8;
+  ySim += tagLines.length * 4;
+  if (tagLines.length) ySim += 3;
+  if (addrLines.length) ySim += addrLines.length * line + 3;
+  else ySim += 1;
+  if (contactLines.length) ySim += contactLines.length * line;
+  ySim += 10;
+
+  const logoBottom = hasLogo ? 8 + logoBox + 6 : 0;
+  const headerHeight = Math.max(ySim, logoBottom);
+
   pdf.setFillColor(255, 255, 255);
-  // @ts-ignore
-  if (pdf.GState) {
-    // @ts-ignore
-    pdf.setGState(new pdf.GState({ opacity: 0.7 }));
-  }
-  pdf.rect(0, 0, pageWidth, 30, "F");
+  pdf.rect(0, 0, pageWidth, headerHeight, "F");
+  pdf.setDrawColor(226, 232, 240);
+  pdf.setLineWidth(0.2);
+  pdf.line(0, headerHeight, pageWidth, headerHeight);
 
-  // @ts-ignore
-  if (pdf.GState) {
-    // @ts-ignore
-    pdf.setGState(new pdf.GState({ opacity: 0.3 }));
-  }
-  pdf.setDrawColor(255, 255, 255);
-  pdf.setLineWidth(0.5);
-  pdf.line(0, 30, pageWidth, 30);
-
-  // @ts-ignore
-  if (pdf.GState) {
-    // @ts-ignore
-    pdf.setGState(new pdf.GState({ opacity: 1.0 }));
-  }
-
-  pdf.setFillColor(accentBlue[0], accentBlue[1], accentBlue[2]);
-  pdf.rect(margin, 10, 2, 12, "F");
-
+  let y = 10;
   pdf.setTextColor(textDark[0], textDark[1], textDark[2]);
   pdf.setFont(undefined, "bold");
-  pdf.setFontSize(22);
-  pdf.text(title, margin + 5, 18);
+  pdf.setFontSize(15);
+  pdf.text(title, textX, y);
+  y += 8;
 
-  pdf.setFont(undefined, "normal");
-  pdf.setFontSize(8);
-  pdf.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  pdf.text(dateStr.toUpperCase(), margin + 5, 23);
+  if (tagLines.length) {
+    pdf.setFont(undefined, "italic");
+    pdf.setFontSize(8);
+    pdf.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    for (const ln of tagLines) {
+      pdf.text(ln, textX, y);
+      y += 4;
+    }
+    pdf.setFont(undefined, "normal");
+    y += 3;
+  }
+
+  if (addrLines.length) {
+    pdf.setFontSize(8);
+    pdf.setTextColor(textDark[0], textDark[1], textDark[2]);
+    for (const ln of addrLines) {
+      pdf.text(ln, textX, y);
+      y += line;
+    }
+    y += 3;
+  }
+
+  if (contactLines.length) {
+    pdf.setFont(undefined, "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(textDark[0], textDark[1], textDark[2]);
+    for (const ln of contactLines) {
+      pdf.text(ln, textX, y);
+      y += line;
+    }
+  }
+
+  if (hasLogo) {
+    const lx = pageWidth - margin - logoBox;
+    const ly = 8;
+    pdf.setDrawColor(235, 238, 242);
+    pdf.setLineWidth(0.3);
+    (pdf as any).roundedRect(lx, ly, logoBox, logoBox, 2, 2, "S");
+
+    const ar = logo!.width / logo!.height;
+    let iw = 28;
+    let ih = 28;
+    if (ar >= 1) ih = iw / ar;
+    else iw = ih * ar;
+    const ix = lx + (logoBox - iw) / 2;
+    const iy = ly + (logoBox - ih) / 2;
+    try {
+      pdf.addImage(logo!.dataUrl, logo!.format, ix, iy, iw, ih);
+    } catch {
+      pdf.setFontSize(8);
+      pdf.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      pdf.text("Logo", lx + logoBox / 2, ly + logoBox / 2 + 1, { align: "center" });
+    }
+  }
+
+  return headerHeight;
 };
 
 const addFooter = (
@@ -182,21 +410,41 @@ const addFooter = (
   pageNum: number,
   pageWidth: number,
   pageHeight: number,
-  textMuted: number[]
+  textMuted: number[],
+  footerBrand: string,
+  accentBlue: number[]
 ) => {
+  const lineYPage = pageHeight - 20;
+  const lineYGen = pageHeight - 14;
+  const lineYPlay = pageHeight - 8;
+
   // @ts-ignore
   if (pdf.GState) {
     // @ts-ignore
     pdf.setGState(new pdf.GState({ opacity: 0.5 }));
   }
+
   pdf.setFontSize(7);
+  pdf.setFont(undefined, "normal");
   pdf.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  pdf.text(
-    `CATSHARE OFFICIAL CATALOGUE • PAGE ${pageNum}`,
-    pageWidth / 2,
-    pageHeight - 10,
-    { align: "center" }
-  );
+  pdf.text(`${footerBrand} • PAGE ${pageNum}`, pageWidth / 2, lineYPage, {
+    align: "center",
+  });
+
+  pdf.setFontSize(6.5);
+  pdf.text("PDF generated by CatShare", pageWidth / 2, lineYGen, {
+    align: "center",
+  });
+
+  const linkLabel = "Download on Google Play";
+  pdf.setFontSize(7);
+  pdf.setTextColor(accentBlue[0], accentBlue[1], accentBlue[2]);
+  const linkW = pdf.getTextWidth(linkLabel);
+  const linkX = pageWidth / 2 - linkW / 2;
+  // @ts-ignore — annotations plugin (included in default jsPDF build)
+  pdf.textWithLink(linkLabel, linkX, lineYPlay, {
+    url: CATSHARE_PLAY_STORE_URL,
+  });
 
   // @ts-ignore
   if (pdf.GState) {
@@ -214,9 +462,17 @@ export async function generateProductPDF(
   const {
     products,
     catalogueName = "Product Catalogue",
+    businessProfile: businessProfileOpt,
     currencySymbol = "₹",
     fieldLabels = {},
   } = options;
+
+  const profile: BusinessProfile = {
+    ...EMPTY_BUSINESS_PROFILE,
+    ...businessProfileOpt,
+  };
+
+  const logoAsset = await loadPdfLogo(profile.logoUrl);
 
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -235,17 +491,19 @@ export async function generateProductPDF(
   const textMuted = [100, 116, 139]; // Slate-500
 
   drawGlassBackground(pdf, pageWidth, pageHeight, accentBlue);
-  addHeader(
+  const headerHeight = addCompanyHeader(
     pdf,
-    catalogueName,
+    profile,
     pageWidth,
     margin,
+    contentWidth,
     accentBlue,
     textDark,
-    textMuted
+    textMuted,
+    logoAsset
   );
 
-  let currentY = 40;
+  let currentY = headerHeight + 10;
 
   for (let i = 0; i < products.length; i++) {
     const product = products[i];
@@ -254,16 +512,8 @@ export async function generateProductPDF(
     if (currentY > pageHeight - 85) {
       pdf.addPage();
       drawGlassBackground(pdf, pageWidth, pageHeight, accentBlue);
-      addHeader(
-        pdf,
-        catalogueName,
-        pageWidth,
-        margin,
-        accentBlue,
-        textDark,
-        textMuted
-      );
-      currentY = 40;
+      // Company header only on page 1; later pages use top margin only
+      currentY = margin + 10;
     }
 
     // --- Glass Product Card ---
@@ -381,27 +631,31 @@ export async function generateProductPDF(
 
     if (product.image) {
       try {
-        const imgDimensions = await getImageDimensions(product.image);
-        const aspectRatio = imgDimensions.width / imgDimensions.height;
-        imageHeight = imageWidth / aspectRatio;
+        const resolved = await resolveProductImageForPdf(product.image);
+        if (!resolved) {
+          console.warn("PDF: could not resolve product image", product.id);
+        } else {
+          const imgDimensions = await getImageDimensions(resolved.dataUrl);
+          const aspectRatio = imgDimensions.width / imgDimensions.height;
+          imageHeight = imageWidth / aspectRatio;
 
-        if (imageHeight > 50) {
-          imageHeight = 50;
-          imageWidth = imageHeight * aspectRatio;
+          if (imageHeight > 50) {
+            imageHeight = 50;
+            imageWidth = imageHeight * aspectRatio;
+          }
+
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(margin + 8, innerY, imageWidth, imageHeight, "F");
+
+          pdf.addImage(
+            resolved.dataUrl,
+            resolved.format,
+            margin + 8,
+            innerY,
+            imageWidth,
+            imageHeight
+          );
         }
-
-        // Image container (slight white background for the image itself)
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(margin + 8, innerY, imageWidth, imageHeight, "F");
-
-        pdf.addImage(
-          product.image,
-          "JPEG",
-          margin + 8,
-          innerY,
-          imageWidth,
-          imageHeight
-        );
       } catch (e) {
         console.warn("Image failed", e);
       }
@@ -523,9 +777,13 @@ export async function generateProductPDF(
 
   // Finalize Footers
   const pageCount = (pdf as any).internal.getNumberOfPages();
+  const footerBrand =
+    profile.businessName?.trim() ||
+    catalogueName.trim() ||
+    "CatShare";
   for (let i = 1; i <= pageCount; i++) {
     pdf.setPage(i);
-    addFooter(pdf, i, pageWidth, pageHeight, textMuted);
+    addFooter(pdf, i, pageWidth, pageHeight, textMuted, footerBrand, accentBlue);
   }
 
   return pdf.output("blob") as Blob;

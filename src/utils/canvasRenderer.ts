@@ -4,6 +4,10 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import {
+  fetchPublicImageProxyAsDataUrl,
+  isPublicR2ImageUrlForProxy,
+} from './publicImageProxyClient';
 
 const LOAD_TIMEOUT_MS = 30000;
 
@@ -102,6 +106,14 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
           URL.revokeObjectURL(objectUrl);
         }
       } catch (secondErr) {
+        if (isPublicR2ImageUrlForProxy(src)) {
+          try {
+            const dataUrl = await fetchPublicImageProxyAsDataUrl(src);
+            return await loadImageWithOptionalCrossOrigin(dataUrl, false);
+          } catch (proxyErr) {
+            console.error('[loadImage] same-origin proxy failed:', proxyErr);
+          }
+        }
         console.error('[loadImage] fetch→blob fallback failed:', secondErr);
         throw secondErr instanceof Error ? secondErr : new Error(String(secondErr));
       }

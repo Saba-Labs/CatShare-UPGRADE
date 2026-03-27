@@ -4,6 +4,9 @@
   "functions": {
     "api/upload-product-image.ts": {
       "maxDuration": 60
+    },
+    "api/fetch-public-image.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

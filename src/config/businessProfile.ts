@@ -46,3 +46,25 @@ export function parseBusinessProfile(raw: unknown): BusinessProfile {
 export function businessProfileFromUserSettings(userSettings: any | null | undefined): BusinessProfile {
   return parseBusinessProfile(userSettings?.data?.businessProfile);
 }
+
+function businessProfileHasVisibleDetail(bp: BusinessProfile): boolean {
+  return [bp.businessName, bp.address, bp.email, bp.phone, bp.website, bp.about, bp.description].some(
+    (s) => typeof s === 'string' && s.trim().length > 0
+  );
+}
+
+/** Prefer Supabase user_settings; fall back to local cache from Account / sync. */
+export function getBusinessProfileForPdf(userSettings: any | null | undefined): BusinessProfile {
+  const fromSettings = businessProfileFromUserSettings(userSettings);
+  if (businessProfileHasVisibleDetail(fromSettings)) return fromSettings;
+  try {
+    const raw = localStorage.getItem('businessProfile');
+    if (raw) {
+      const parsed = parseBusinessProfile(JSON.parse(raw));
+      if (businessProfileHasVisibleDetail(parsed)) return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fromSettings;
+}

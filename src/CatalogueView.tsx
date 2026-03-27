@@ -18,13 +18,14 @@ import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, getSellerCurrencyForShareLink, onCurrencyChange } from "./utils/currencyUtils";
-import { generateProductPDF, downloadPDF, sharePDF } from "./utils/pdfUtils";
+import { generateProductPDF, downloadPDF, sharePDF, pdfFilenamePrefix } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
 import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
-import { businessProfileFromUserSettings } from "./config/businessProfile";
+import { businessProfileFromUserSettings, getBusinessProfileForPdf } from "./config/businessProfile";
 import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { parseWhatsAppNumber } from "./data/whatsappCountryCodes";
+import { prepareSelectedProductsForPdfExport } from "./utils/pdfProductImages";
 
 const ProductCard = React.memo(({
   p,
@@ -313,7 +314,7 @@ export default React.memo(function CatalogueView({
   const [processing, setProcessing] = useState(false);
   const [processingIndex, setProcessingIndex] = useState(0);
   const [processingTotal, setProcessingTotal] = useState(0);
-  const [processingPhase, setProcessingPhase] = useState("rendering"); // "rendering" or "sharing"
+  const [processingPhase, setProcessingPhase] = useState("rendering"); // "rendering" | "loading_images" | "sharing"
   const [totalToRender, setTotalToRender] = useState(0);
   const [totalToShare, setTotalToShare] = useState(0);
   const [search, setSearch] = useState("");
@@ -795,7 +796,8 @@ const handleTouchEnd = useCallback(() => {
       }
 
       setProcessing(true);
-      setProcessingPhase("rendering");
+      setProcessingPhase("loading_images");
+      setProcessingIndex(0);
       setProcessingTotal(selected.length);
 
       // Get selected products with their data
@@ -840,6 +842,15 @@ const handleTouchEnd = useCallback(() => {
           };
         });
 
+      const productsForPdf = await prepareSelectedProductsForPdfExport(
+        selectedProducts,
+        allProducts,
+        (loaded, total) => {
+          setProcessingIndex(loaded);
+          setProcessingTotal(total);
+        }
+      );
+
       // Get field labels for PDF
       const allFields = getAllFields();
       const fieldLabels: { [key: string]: string } = {};
@@ -849,11 +860,13 @@ const handleTouchEnd = useCallback(() => {
         }
       });
 
-      // Generate PDF
+      // Generate PDF (header + footer use Account company details, not catalogue name / date)
       setProcessingPhase("sharing");
+      const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
       const pdfBlob = await generateProductPDF({
-        products: selectedProducts,
+        products: productsForPdf,
         catalogueName: catalogueLabel,
+        businessProfile,
         currencySymbol,
         fieldLabels,
       });
@@ -861,12 +874,16 @@ const handleTouchEnd = useCallback(() => {
       setProcessing(false);
       setShowToolsMenu(false);
 
+      const filePrefix = pdfFilenamePrefix(businessProfile, catalogueLabel);
+      const filename = `${filePrefix}_products_${new Date().getTime()}.pdf`;
+      const shareTitle =
+        businessProfile.businessName?.trim() ||
+        `${catalogueLabel} products`;
+
       if (actionType === 'download') {
-        downloadPDF(pdfBlob, `${catalogueLabel}_products_${new Date().getTime()}.pdf`);
+        downloadPDF(pdfBlob, filename);
       } else {
-        // Share PDF
-        const filename = `${catalogueLabel}_products_${new Date().getTime()}.pdf`;
-        await sharePDF(pdfBlob, filename, `Share ${catalogueLabel} Products`);
+        await sharePDF(pdfBlob, filename, `Share ${shareTitle}`);
       }
     } catch (err) {
       console.error('PDF generation failed:', err);
@@ -1740,17 +1757,25 @@ const handleTouchEnd = useCallback(() => {
       {/* Title with phase indicator */}
       <div className="space-y-1">
         <div className="text-lg font-semibold text-gray-700">
-          {processingPhase === "rendering" ? "🖼️ Rendering Images" : "📦 Preparing Files"}
+          {processingPhase === "rendering"
+            ? "🖼️ Rendering Images"
+            : processingPhase === "loading_images"
+              ? "📷 Loading photos for PDF"
+              : "📦 Preparing Files"}
         </div>
         <div className="text-sm text-gray-500">
           {processingPhase === "rendering"
             ? `Image ${processingIndex} of ${processingTotal}`
-            : `Fetching ${processingIndex} of ${processingTotal}`}
+            : processingPhase === "loading_images"
+              ? processingIndex === 0
+                ? `Preparing ${processingTotal} photo${processingTotal !== 1 ? "s" : ""}…`
+                : `Loaded ${processingIndex} of ${processingTotal}`
+              : `Fetching ${processingIndex} of ${processingTotal}`}
         </div>
       </div>
 
-      {/* Rendering Phase Progress */}
-      {processingPhase === "rendering" && totalToRender > 0 && (
+      {/* Rendering or PDF image preload progress */}
+      {((processingPhase === "rendering" && totalToRender > 0) || processingPhase === "loading_images") && (
         <div className="space-y-2">
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden relative">
             <div
@@ -1801,8 +1826,8 @@ const handleTouchEnd = useCallback(() => {
         </div>
       )}
 
-      {/* Info Section - Show rendering details */}
-      {totalToRender > 0 && (
+      {/* Info Section - Show rendering details (not during PDF photo preload) */}
+      {totalToRender > 0 && processingPhase === "rendering" && (
         <div className="bg-blue-50 rounded-lg px-3 py-2 space-y-1 border border-blue-100">
           <div className="text-xs font-semibold text-blue-900">
             💡 First-time rendering
