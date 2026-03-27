@@ -12,6 +12,11 @@ import { getCatalogueData } from "../config/catalogueProductUtils";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "../config/fieldConfig";
 import { safeGetFromStorage } from "../utils/safeStorage";
+import { useSubscription } from "../context/SubscriptionContext";
+import {
+  getEffectiveWatermarkText,
+  getEffectiveWatermarkPosition,
+} from "../utils/freeTierWatermark";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 
@@ -374,6 +379,7 @@ export default function ProductPreviewModal_Classic({
 }) {
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
+  const { isPro } = useSubscription();
 
   // Debug: Log product colors
   useEffect(() => {
@@ -457,6 +463,9 @@ export default function ProductPreviewModal_Classic({
   const [watermarkPosition, setWatermarkPosition] = useState(() => {
     return safeGetFromStorage("watermarkPosition", "bottom-left");
   });
+
+  const effectiveWatermarkText = getEffectiveWatermarkText(isPro);
+  const effectiveWatermarkPosition = getEffectiveWatermarkPosition(isPro);
 
   // Listen for watermark setting changes from Settings modal
   useEffect(() => {
@@ -769,13 +778,13 @@ export default function ProductPreviewModal_Classic({
               {showWatermark && (
                 <div
                   style={{
-                    ...getWatermarkPositionStyles(watermarkPosition),
+                    ...getWatermarkPositionStyles(effectiveWatermarkPosition),
                     fontSize: "10px",
                     letterSpacing: "0.3px",
                     color: isWhiteBg ? "rgba(0, 0, 0, 0.25)" : "rgba(255, 255, 255, 0.4)"
                   }}
                 >
-                  {watermarkText}
+                  {effectiveWatermarkText}
                 </div>
               )}
 
@@ -969,8 +978,8 @@ export default function ProductPreviewModal_Classic({
           isOpen={showFullScreenImage}
           onClose={() => setShowFullScreenImage(false)}
           showWatermark={showWatermark}
-          watermarkText={watermarkText}
-          watermarkPosition={watermarkPosition}
+          watermarkText={effectiveWatermarkText}
+          watermarkPosition={effectiveWatermarkPosition}
         />
       )}
 

@@ -1,13 +1,27 @@
 import React from "react";
 import { MdClose, MdStar } from "react-icons/md";
+import {
+  FREE_MAX_CATALOGUES,
+  FREE_MAX_PDF_PER_DAY,
+  FREE_MAX_PRODUCTS,
+  FREE_MAX_SHARE_LINK_PER_DAY,
+  TRIAL_DAYS_UI_FALLBACK,
+} from "../config/freeTierLimits";
 
 export default function ProModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const proFeatures = [
     { name: "Bulk Editor", description: "Edit multiple products at once with batch operations" },
-    { name: "Watermark Customization", description: "Change watermark text and customize it for your brand" },
-    { name: "Manage Categories", description: "Create, edit, and organize unlimited product categories" },
+    { name: "Watermark customization", description: "Choose watermark text and placement (Free plan uses a fixed default)" },
+    {
+      name: "Catalogues & products",
+      description: `Unlimited catalogues and products (Free plan: up to ${FREE_MAX_PRODUCTS} products and ${FREE_MAX_CATALOGUES} catalogues)`,
+    },
+    {
+      name: "PDFs & order links",
+      description: `Unlimited PDF exports and shareable order links (Free plan: ${FREE_MAX_PDF_PER_DAY} PDF and ${FREE_MAX_SHARE_LINK_PER_DAY} share link per calendar day)`,
+    },
     { name: "Stock Control", description: "Toggle wholesale and resell stock IN/OUT status" },
   ];
 
@@ -20,7 +34,9 @@ export default function ProModal({ isOpen, onClose }) {
             <MdStar className="text-yellow-500 text-2xl" />
             <div>
               <h2 className="text-xl font-bold text-gray-800">CatShare Pro</h2>
-              <p className="text-xs text-green-600 font-medium">You're using Pro for FREE</p>
+              <p className="text-xs text-gray-600 font-medium">
+                New accounts get a {TRIAL_DAYS_UI_FALLBACK}-day full Pro trial
+              </p>
             </div>
           </div>
           <button
@@ -37,18 +53,18 @@ export default function ProModal({ isOpen, onClose }) {
           {/* Current Status */}
           <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-300 shadow-sm">
             <p className="text-sm text-green-900 mb-2">
-              <span className="font-semibold">🎉 Special Offer:</span> Pro Features - Completely Free
+              <span className="font-semibold">Pro trial:</span> full Pro features for {TRIAL_DAYS_UI_FALLBACK} days
             </p>
             <p className="text-xs text-green-800 leading-relaxed">
-              You have unlimited access to all CatShare Pro features at no cost. Make the most of it while you can!
+              After the trial, you can subscribe to keep Pro, or continue on the Free plan with the limits shown below.
             </p>
           </div>
 
-          {/* Coming Soon Notice */}
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm font-semibold text-blue-900 mb-2">⏰ Limited Time Offer</p>
+            <p className="text-sm font-semibold text-blue-900 mb-2">Free vs Pro</p>
             <p className="text-xs text-blue-800">
-              You're getting Pro features for free during our beta phase. When CatShare Pro officially launches, these premium features will require a subscription. Enjoy everything now!
+              On the Free plan, product, catalogue, PDF, and share-link limits apply. Pro removes those caps and unlocks full
+              watermark customization.
             </p>
           </div>
 
@@ -78,11 +94,11 @@ export default function ProModal({ isOpen, onClose }) {
               </li>
               <li className="flex gap-2">
                 <span className="text-blue-600 font-bold">✓</span>
-                <span>Full control over watermark and branding</span>
+                <span>Custom watermark text and placement</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-blue-600 font-bold">✓</span>
-                <span>Unlimited categories for organizing products</span>
+                <span>Unlimited catalogues and products</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-blue-600 font-bold">✓</span>
@@ -93,9 +109,9 @@ export default function ProModal({ isOpen, onClose }) {
 
           {/* CTA */}
           <div className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white">
-            <p className="text-sm font-semibold mb-2">🚀 Make the Most of It</p>
+            <p className="text-sm font-semibold mb-2">Upgrade or continue on Free</p>
             <p className="text-xs mb-3 opacity-90">
-              Use all these Pro features now while they're free. We'll let you know when pricing takes effect, and you'll have plenty of notice!
+              See the Pro &amp; billing page for current pricing and to manage your subscription after your trial.
             </p>
             <button
               onClick={onClose}
@@ -106,9 +122,8 @@ export default function ProModal({ isOpen, onClose }) {
           </div>
 
           {/* Footer Note */}
-          <p className="text-xs text-center">
-            <span className="text-green-600 font-semibold">✓ Free access to Pro features during beta</span>
-            <span className="text-gray-500 block mt-1">Pricing model coming soon</span>
+          <p className="text-xs text-center text-gray-500">
+            Trial length and Free-tier limits match what you see on the Pro &amp; billing page.
           </p>
         </div>
       </div>

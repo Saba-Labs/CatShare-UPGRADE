@@ -1,4 +1,4 @@
-// api/subscription.ts — Pro entitlement: paid subscription OR 30-day trial from account creation
+// api/subscription.ts — Pro entitlement: paid subscription OR 14-day trial from account creation
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";

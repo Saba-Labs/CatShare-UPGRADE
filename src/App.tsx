@@ -30,6 +30,7 @@ import { useAuth } from "./context/AuthContext";
 import { useSync, applyUserSettingsFromCloud } from "./context/SyncContext";
 import SyncStatusIndicator from "./components/SyncStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
+import { supabase } from "./supabaseClient";
 
 const CatalogueApp = lazy(() => import("./CatalogueApp"));
 const CreateProduct = lazy(() => import("./CreateProduct"));
@@ -66,6 +67,7 @@ import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
+import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
@@ -1041,6 +1043,15 @@ function AppWithBackHandler() {
           await FirebaseAnalytics.setEnabled({ enabled: true });
           await FirebaseAnalytics.logEvent({ name: "app_open" });
 
+          // Update last_seen on every app open
+if (user?.uid && !authService.isOfflineGuest()) {
+  supabase
+    .from('user_settings')
+    .update({ last_seen: new Date().toISOString() })
+    .eq('user_id', user.uid)
+    .then(() => console.log('✅ last_seen updated'));
+}
+
           (window as any).FirebaseAnalytics = {
             logEvent: async (options: { name: string; parameters: Record<string, any> }) => {
               try {
@@ -1612,6 +1623,7 @@ export default function App() {
           <AuthProvider>
             <SyncProvider>
             <SubscriptionProvider>
+              <GlassThemeProGate />
               <Router>
                 <AppWithBackHandler />
               </Router>

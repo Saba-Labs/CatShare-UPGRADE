@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase, getSupabaseAccessToken } from '../supabaseClient';
+import { TRIAL_DAYS_UI_FALLBACK } from '../config/freeTierLimits';
 
 const LS_TRIAL_ENDS = 'subscription_trialEndsAt';
 const LS_TRIAL_ACTIVE = 'subscription_isTrialActive';
 const LS_PAID_PRO = 'subscription_isPaidPro';
+const LS_TRIAL_DAYS = 'subscription_trialDays';
 
 type SubscriptionContextValue = {
   /** Full Pro access (paid subscription or active free trial). */
@@ -12,20 +14,33 @@ type SubscriptionContextValue = {
   isPaidPro: boolean;
   /** Free trial still active (Pro features via trial, no purchase yet). */
   isTrialActive: boolean;
-  /** ISO date when the 30-day Pro trial ends (from account creation). */
+  /** ISO date when the Pro trial ends (from account creation; length is `trialDays`). */
   trialEndsAt: string | null;
+  /** Trial length in days from server (`/api/subscription`); use for UI copy. */
+  trialDays: number;
   loading: boolean;
   refresh: () => Promise<void>;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
-function readCachedTrial(): Pick<SubscriptionContextValue, 'trialEndsAt' | 'isTrialActive' | 'isPaidPro'> {
+function readCachedTrialDays(): number {
+  const raw = localStorage.getItem(LS_TRIAL_DAYS);
+  if (raw == null || raw === '') return TRIAL_DAYS_UI_FALLBACK;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : TRIAL_DAYS_UI_FALLBACK;
+}
+
+function readCachedTrial(): Pick<
+  SubscriptionContextValue,
+  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays'
+> {
   const trialEndsAt = localStorage.getItem(LS_TRIAL_ENDS);
   return {
     trialEndsAt: trialEndsAt && trialEndsAt.length > 0 ? trialEndsAt : null,
     isTrialActive: localStorage.getItem(LS_TRIAL_ACTIVE) === 'true',
     isPaidPro: localStorage.getItem(LS_PAID_PRO) === 'true',
+    trialDays: readCachedTrialDays(),
   };
 }
 
@@ -36,6 +51,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isPaidPro, setIsPaidPro] = useState<boolean>(() => readCachedTrial().isPaidPro);
   const [isTrialActive, setIsTrialActive] = useState<boolean>(() => readCachedTrial().isTrialActive);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(() => readCachedTrial().trialEndsAt);
+  const [trialDays, setTrialDays] = useState<number>(() => readCachedTrial().trialDays);
   const [loading, setLoading] = useState<boolean>(true);
 
   const clearSubscriptionCache = useCallback(() => {
@@ -43,10 +59,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsPaidPro(false);
     setIsTrialActive(false);
     setTrialEndsAt(null);
+    setTrialDays(TRIAL_DAYS_UI_FALLBACK);
     localStorage.setItem('isPro', 'false');
     localStorage.removeItem(LS_TRIAL_ENDS);
     localStorage.setItem(LS_TRIAL_ACTIVE, 'false');
     localStorage.setItem(LS_PAID_PRO, 'false');
+    localStorage.removeItem(LS_TRIAL_DAYS);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -83,13 +101,19 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const nextTrial = !!json?.isTrialActive;
       const nextTrialEnd =
         typeof json?.trialEndsAt === 'string' && json.trialEndsAt.length > 0 ? json.trialEndsAt : null;
+      const nextTrialDays =
+        typeof json?.trialDays === 'number' && Number.isFinite(json.trialDays) && json.trialDays > 0
+          ? json.trialDays
+          : TRIAL_DAYS_UI_FALLBACK;
 
       setIsPro(next);
       setIsPaidPro(nextPaid);
       setIsTrialActive(nextTrial);
       setTrialEndsAt(nextTrialEnd);
+      setTrialDays(nextTrialDays);
 
       localStorage.setItem('isPro', next ? 'true' : 'false');
+      localStorage.setItem(LS_TRIAL_DAYS, String(nextTrialDays));
       localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
       localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
       if (nextTrialEnd) {
@@ -124,8 +148,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [refresh, clearSubscriptionCache]);
 
   const value = useMemo(
-    () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, loading, refresh }),
-    [isPro, isPaidPro, isTrialActive, trialEndsAt, loading, refresh]
+    () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, loading, refresh }),
+    [isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, loading, refresh]
   );
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;

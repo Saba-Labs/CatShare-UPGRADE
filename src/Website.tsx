@@ -464,7 +464,7 @@ export default function Website() {
               </li>
               <li className="flex gap-3">
                 <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                <span>Pro features available—start with a trial and upgrade when you need more.</span>
+                <span>Pro features available—start with a 14-day trial and upgrade when you need more.</span>
               </li>
             </ul>
           </motion.div>

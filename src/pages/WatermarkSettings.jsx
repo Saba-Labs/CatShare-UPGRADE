@@ -6,9 +6,16 @@ import { MdCircle } from "react-icons/md";
 import { safeGetFromStorage, safeSetInStorage } from "../utils/safeStorage";
 import { logWatermarkApplied } from "../config/analyticsEvents";
 import { useAuth } from "../context/AuthContext";
+import { useSubscription } from "../context/SubscriptionContext";
+import { FREE_WATERMARK_TEXT } from "../config/freeTierLimits";
+import {
+  getEffectiveWatermarkText,
+  getEffectiveWatermarkPosition,
+} from "../utils/freeTierWatermark";
 
 export default function WatermarkSettings() {
   const { user } = useAuth();
+  const { isPro, refresh } = useSubscription();
   const navigate = useNavigate();
   const [showWatermark, setShowWatermark] = useState(() => {
     return safeGetFromStorage("showWatermark", true);
@@ -33,6 +40,13 @@ export default function WatermarkSettings() {
   const [renderBoxVisible, setRenderBoxVisible] = useState(false);
   const renderBoxRef = useRef(null);
   const [showRenderConfirm, setShowRenderConfirm] = useState(false);
+
+  const displayWatermarkText = getEffectiveWatermarkText(isPro);
+  const displayWatermarkPosition = getEffectiveWatermarkPosition(isPro);
+
+  useEffect(() => {
+    refresh().catch(() => {});
+  }, [refresh]);
 
   // Migration logic handled here to ensure it moves to bottom-left if it was bottom-center
   useEffect(() => {
@@ -136,6 +150,7 @@ export default function WatermarkSettings() {
   };
 
   const handleSaveWatermarkText = () => {
+    if (!isPro) return;
     const trimmedText = editingWatermarkText.trim();
     if (trimmedText.length === 0) {
       setEditingWatermarkText(watermarkText);
@@ -179,7 +194,8 @@ export default function WatermarkSettings() {
   };
 
   const handleResetWatermarkText = () => {
-    const defaultText = "Created using CatShare";
+    if (!isPro) return;
+    const defaultText = FREE_WATERMARK_TEXT;
     setWatermarkText(defaultText);
     setEditingWatermarkText(defaultText);
     safeSetInStorage("watermarkText", defaultText);
@@ -219,6 +235,7 @@ export default function WatermarkSettings() {
   };
 
   const handlePositionChange = (position) => {
+    if (!isPro) return;
     setWatermarkPosition(position);
     safeSetInStorage("watermarkPosition", position);
     logWatermarkApplied("position_changed", { position });
@@ -288,6 +305,13 @@ export default function WatermarkSettings() {
             Display custom text on all product images and previews
           </p>
 
+          {!isPro && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-950">
+              <strong>Free plan:</strong> watermark text is fixed to &quot;{FREE_WATERMARK_TEXT}&quot; and
+              position is fixed to bottom-left. Upgrade to Pro in Pricing to customize text and placement.
+            </div>
+          )}
+
           {/* Toggle */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
             <div className="flex items-center justify-between">
@@ -334,27 +358,29 @@ export default function WatermarkSettings() {
                 <label className="block text-sm font-medium text-gray-800 mb-2">Watermark Text</label>
                 <input
                   type="text"
-                  value={editingWatermarkText}
+                  value={isPro ? editingWatermarkText : FREE_WATERMARK_TEXT}
                   onChange={(e) => setEditingWatermarkText(e.target.value)}
                   placeholder="Enter watermark text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm mb-2"
+                  disabled={!isPro}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm mb-2 disabled:bg-gray-100 disabled:text-gray-600"
                 />
                 <p className="text-xs text-gray-500 mb-3">
-                  Current: <span className="font-mono">{watermarkText}</span>
+                  Current: <span className="font-mono">{isPro ? watermarkText : FREE_WATERMARK_TEXT}</span>
                 </p>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveWatermarkText}
-                    disabled={editingWatermarkText.trim() === ""}
+                    disabled={!isPro || editingWatermarkText.trim() === ""}
                     className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
                   >
                     Save Changes
                   </button>
                   <button
                     onClick={handleResetWatermarkText}
-                    className="flex-1 px-3 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 transition font-medium"
+                    disabled={!isPro}
+                    className="flex-1 px-3 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 transition font-medium disabled:opacity-50"
                   >
                     Reset to Default
                   </button>
@@ -388,25 +414,27 @@ export default function WatermarkSettings() {
                       textShadow: "none",
                       pointerEvents: "none",
                       zIndex: 3,
-                      ...(watermarkPosition === "top-left" && { top: 10, left: 10, transform: "none" }),
-                      ...(watermarkPosition === "top-center" && { top: 10, left: "50%", transform: "translateX(-50%)" }),
-                      ...(watermarkPosition === "top-right" && { top: 10, right: 10, left: "auto", transform: "none" }),
-                      ...(watermarkPosition === "middle-left" && { top: "50%", left: 10, transform: "translateY(-50%)" }),
-                      ...(watermarkPosition === "middle-center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
-                      ...(watermarkPosition === "middle-right" && { top: "50%", right: 10, left: "auto", transform: "translateY(-50%)" }),
-                      ...(watermarkPosition === "bottom-left" && { bottom: 10, left: 10, transform: "none" }),
-                      ...(watermarkPosition === "bottom-center" && { bottom: 10, left: "50%", transform: "translateX(-50%)" }),
-                      ...(watermarkPosition === "bottom-right" && { bottom: 10, right: 10, left: "auto", transform: "none" }),
+                      ...(displayWatermarkPosition === "top-left" && { top: 10, left: 10, transform: "none" }),
+                      ...(displayWatermarkPosition === "top-center" && { top: 10, left: "50%", transform: "translateX(-50%)" }),
+                      ...(displayWatermarkPosition === "top-right" && { top: 10, right: 10, left: "auto", transform: "none" }),
+                      ...(displayWatermarkPosition === "middle-left" && { top: "50%", left: 10, transform: "translateY(-50%)" }),
+                      ...(displayWatermarkPosition === "middle-center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                      ...(displayWatermarkPosition === "middle-right" && { top: "50%", right: 10, left: "auto", transform: "translateY(-50%)" }),
+                      ...(displayWatermarkPosition === "bottom-left" && { bottom: 10, left: 10, transform: "none" }),
+                      ...(displayWatermarkPosition === "bottom-center" && { bottom: 10, left: "50%", transform: "translateX(-50%)" }),
+                      ...(displayWatermarkPosition === "bottom-right" && { bottom: 10, right: 10, left: "auto", transform: "none" }),
                     }}
                   >
-                    {watermarkText}
+                    {displayWatermarkText}
                   </div>
 
                   {/* Top Left Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("top-left")}
                     className={`absolute top-1 left-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "top-left"
+                      displayWatermarkPosition === "top-left"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -417,9 +445,11 @@ export default function WatermarkSettings() {
 
                   {/* Top Center Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("top-center")}
                     className={`absolute top-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "top-center"
+                      displayWatermarkPosition === "top-center"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -430,9 +460,11 @@ export default function WatermarkSettings() {
 
                   {/* Top Right Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("top-right")}
                     className={`absolute top-1 right-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "top-right"
+                      displayWatermarkPosition === "top-right"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -443,9 +475,11 @@ export default function WatermarkSettings() {
 
                   {/* Middle Left Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("middle-left")}
                     className={`absolute top-1/2 -translate-y-1/2 left-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "middle-left"
+                      displayWatermarkPosition === "middle-left"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -456,9 +490,11 @@ export default function WatermarkSettings() {
 
                   {/* Middle Center Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("middle-center")}
                     className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "middle-center"
+                      displayWatermarkPosition === "middle-center"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -469,9 +505,11 @@ export default function WatermarkSettings() {
 
                   {/* Middle Right Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("middle-right")}
                     className={`absolute top-1/2 -translate-y-1/2 right-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "middle-right"
+                      displayWatermarkPosition === "middle-right"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -482,9 +520,11 @@ export default function WatermarkSettings() {
 
                   {/* Bottom Left Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("bottom-left")}
                     className={`absolute bottom-1 left-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "bottom-left"
+                      displayWatermarkPosition === "bottom-left"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -495,9 +535,11 @@ export default function WatermarkSettings() {
 
                   {/* Bottom Center Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("bottom-center")}
                     className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "bottom-center"
+                      displayWatermarkPosition === "bottom-center"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -508,9 +550,11 @@ export default function WatermarkSettings() {
 
                   {/* Bottom Right Position Button */}
                   <button
+                    type="button"
+                    disabled={!isPro}
                     onClick={() => handlePositionChange("bottom-right")}
                     className={`absolute bottom-1 right-1 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      watermarkPosition === "bottom-right"
+                      displayWatermarkPosition === "bottom-right"
                         ? "hidden"
                         : "bg-gray-400 text-white hover:bg-gray-500"
                     }`}
@@ -521,7 +565,7 @@ export default function WatermarkSettings() {
                 </div>
 
                 <p className="text-xs text-gray-500 text-center">
-                  Current: <span className="font-medium capitalize">{watermarkPosition.replace("-", " ")}</span>
+                  Current: <span className="font-medium capitalize">{displayWatermarkPosition.replace("-", " ")}</span>
                 </p>
               </div>
             </>

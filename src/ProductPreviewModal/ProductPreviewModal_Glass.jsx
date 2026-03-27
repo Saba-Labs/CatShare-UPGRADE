@@ -9,6 +9,11 @@ import { getCatalogueData } from "../config/catalogueProductUtils";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "../config/fieldConfig";
 import { safeGetFromStorage } from "../utils/safeStorage";
+import { useSubscription } from "../context/SubscriptionContext";
+import {
+  getEffectiveWatermarkText,
+  getEffectiveWatermarkPosition,
+} from "../utils/freeTierWatermark";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 
 // Helper function to get CSS styles based on watermark position
@@ -86,6 +91,7 @@ export default function ProductPreviewModal_Glass({
 }) {
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
+  const { isPro } = useSubscription();
 
   // Helper to darken color for gradient
   const darkenColor = (color, amount) => {
@@ -129,6 +135,9 @@ export default function ProductPreviewModal_Glass({
   const [watermarkPosition, setWatermarkPosition] = useState(() => {
     return safeGetFromStorage("watermarkPosition", "bottom-left");
   });
+
+  const effectiveWatermarkText = getEffectiveWatermarkText(isPro);
+  const effectiveWatermarkPosition = getEffectiveWatermarkPosition(isPro);
 
   const handleDragEnd = (event, info) => {
     const offsetX = info.offset.x;
@@ -469,16 +478,16 @@ export default function ProductPreviewModal_Glass({
                     )}
 
                     {/* Watermark - Top and Center positions remain in image section */}
-                    {showWatermark && !watermarkPosition.startsWith('bottom') && (
+                    {showWatermark && !effectiveWatermarkPosition.startsWith('bottom') && (
                       <div
                         style={{
-                          ...getGlassThemeWatermarkPosition(watermarkPosition),
+                          ...getGlassThemeWatermarkPosition(effectiveWatermarkPosition),
                           fontSize: "10px",
                           letterSpacing: "0.3px",
                           color: isWhiteBg ? "rgba(0, 0, 0, 0.25)" : "rgba(255, 255, 255, 0.4)"
                         }}
                       >
-                        {watermarkText}
+                        {effectiveWatermarkText}
                       </div>
                     )}
 
@@ -631,10 +640,10 @@ export default function ProductPreviewModal_Glass({
                     </div>
 
                     {/* Watermark - Bottom positions moved to card bottom */}
-                    {showWatermark && (watermarkPosition || "").startsWith('bottom') && (
+                    {showWatermark && (effectiveWatermarkPosition || "").startsWith('bottom') && (
                       <div
                         style={{
-                          ...getGlassThemeWatermarkPosition(watermarkPosition),
+                          ...getGlassThemeWatermarkPosition(effectiveWatermarkPosition),
                           fontSize: "10px",
                           letterSpacing: "0.3px",
                           color: isLightCardBg ? "rgba(0, 0, 0, 0.25)" : "rgba(255, 255, 255, 0.45)",
@@ -642,7 +651,7 @@ export default function ProductPreviewModal_Glass({
                           bottom: 8,
                         }}
                       >
-                        {watermarkText}
+                        {effectiveWatermarkText}
                       </div>
                     )}
                   </div>

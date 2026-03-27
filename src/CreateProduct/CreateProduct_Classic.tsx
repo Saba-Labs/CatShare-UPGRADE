@@ -33,6 +33,9 @@ import { getFieldConfig, getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded } from "../config/analyticsEvents";
+import { useSubscription } from "../context/SubscriptionContext";
+import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
+import { getAllProducts } from "../config/productUtils";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -287,6 +290,7 @@ export default function CreateProduct() {
   const fromParam = searchParams.get("from");
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
+  const { isPro } = useSubscription();
 
   // When logged in, product/offline state should be stored per-user.
   // This prevents localStorage quota errors from the legacy unkeyed "products".
@@ -906,6 +910,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
     if (!imagePreview) {
       showToast("Please upload and crop an image before saving.", "warning");
       return;
+    }
+
+    if (!editingId && !isPro) {
+      const count = getAllProducts(authUserId || undefined).length;
+      if (count >= FREE_MAX_PRODUCTS) {
+        showToast(
+          `Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro for unlimited.`,
+          "warning"
+        );
+        return;
+      }
     }
 
     setIsSaving(true);

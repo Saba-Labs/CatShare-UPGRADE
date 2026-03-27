@@ -26,6 +26,12 @@ import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { parseWhatsAppNumber } from "./data/whatsappCountryCodes";
 import { prepareSelectedProductsForPdfExport } from "./utils/pdfProductImages";
+import {
+  canConsumePdfToday,
+  recordPdfConsumption,
+  canCreateShareLinkToday,
+  recordShareLinkConsumption,
+} from "./utils/freeTierDailyQuota";
 
 const ProductCard = React.memo(({
   p,
@@ -788,6 +794,13 @@ const handleTouchEnd = useCallback(() => {
         return;
       }
 
+      if (!isPro && !canConsumePdfToday(user?.uid, isPro)) {
+        alert(
+          "Daily PDF limit reached for the Free plan (1 per day). Try again tomorrow, or upgrade to Pro for unlimited PDFs."
+        );
+        return;
+      }
+
       if (selected.length > 80) {
         const confirmed = window.confirm(
           `You have selected ${selected.length} products. Generating a PDF with more than 80 images may make the app unstable. Do you want to continue?`
@@ -871,6 +884,10 @@ const handleTouchEnd = useCallback(() => {
         fieldLabels,
       });
 
+      if (!isPro) {
+        recordPdfConsumption(user?.uid);
+      }
+
       setProcessing(false);
       setShowToolsMenu(false);
 
@@ -920,6 +937,12 @@ const handleTouchEnd = useCallback(() => {
   const runOrderFormShareFlow = useCallback(
     async (sellerWhatsapp: string) => {
       if (!user?.uid) return;
+      if (!isPro && !canCreateShareLinkToday(user.uid, isPro)) {
+        alert(
+          "Daily share-link limit reached for the Free plan (1 per day). Try again tomorrow, or upgrade to Pro for unlimited links."
+        );
+        return;
+      }
       try {
         setShowShareOptions(false);
 
@@ -942,6 +965,10 @@ const handleTouchEnd = useCallback(() => {
           sellerCurrencySymbol,
           sellerLogoUrl,
         });
+
+        if (!isPro) {
+          recordShareLinkConsumption(user.uid);
+        }
 
         const shareMessage = `Order using the link ${url}`;
 
@@ -1002,7 +1029,7 @@ const handleTouchEnd = useCallback(() => {
         );
       }
     },
-    [user, supabaseData, allProducts, selected, catalogueId]
+    [user, supabaseData, allProducts, selected, catalogueId, isPro]
   );
 
   const saveWhatsAppFromLinkModal = async () => {

@@ -6,12 +6,17 @@ import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
 import { getSupabaseAccessToken } from "../supabaseClient";
 import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
+import {
+  FREE_MAX_PRODUCTS,
+  FREE_MAX_CATALOGUES,
+  FREE_MAX_PDF_PER_DAY,
+  FREE_MAX_SHARE_LINK_PER_DAY,
+  FREE_WATERMARK_TEXT,
+  TRIAL_DAYS_UI_FALLBACK,
+} from "../config/freeTierLimits";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 const ANDROID_PACKAGE_NAME = "com.catshare.official";
-
-/** Matches server `lib/subscriptionEntitlement.mjs` TRIAL_DAYS (for display copy). */
-const TRIAL_DAYS = 30;
 
 function formatTrialEndDate(iso) {
   try {
@@ -23,7 +28,8 @@ function formatTrialEndDate(iso) {
 
 export default function ProInfo() {
   const navigate = useNavigate();
-  const { isPro, isPaidPro, isTrialActive, trialEndsAt, refresh } = useSubscription();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, refresh } = useSubscription();
+  const trialDaysDisplay = trialDays ?? TRIAL_DAYS_UI_FALLBACK;
   const [loading, setLoading] = useState(false);
   const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
@@ -186,16 +192,13 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
     }
   };
 
-  // Free plan feature limits
   const freePlanLimits = {
-    products: 100,
-    catalogues: 5,
-    watermarkSettings: false,
-    shareAsLink: false,
-    glassTheme: false,
+    products: FREE_MAX_PRODUCTS,
+    catalogues: FREE_MAX_CATALOGUES,
+    pdfPerDay: FREE_MAX_PDF_PER_DAY,
+    shareLinkPerDay: FREE_MAX_SHARE_LINK_PER_DAY,
   };
 
-  // Feature comparison data
   const features = [
     {
       name: "Product Creation",
@@ -210,52 +213,28 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
       locked: true,
     },
     {
-      name: "Product Editing",
-      free: "Basic",
-      pro: "Advanced",
-      locked: false,
-    },
-    {
-      name: "Bulk Editor",
-      free: "Available",
-      pro: "Advanced",
-      locked: false,
-    },
-    {
-      name: "Theme Selection",
-      free: "Basic Themes",
-      pro: "All Themes",
-      locked: false,
-    },
-    {
       name: "Watermark Settings",
-      free: "Locked",
-      pro: "Full Control",
+      free: `"${FREE_WATERMARK_TEXT}" (fixed)`,
+      pro: "Full control",
       locked: true,
     },
     {
-      name: "Share as Link",
-      free: "Locked",
-      pro: "Available",
-      locked: true,
+      name: "PDF generation (per day)",
+      free: `${freePlanLimits.pdfPerDay}`,
+      pro: "Unlimited",
+      locked: false,
+    },
+    {
+      name: "Shareable order links (per day)",
+      free: `${freePlanLimits.shareLinkPerDay}`,
+      pro: "Unlimited",
+      locked: false,
     },
     {
       name: "Glass Theme",
       free: "Locked",
       pro: "Available",
       locked: true,
-    },
-    {
-      name: "PDF Export",
-      free: "Basic",
-      pro: "Advanced",
-      locked: false,
-    },
-    {
-      name: "Priority Support",
-      free: "Community",
-      pro: "Email Support",
-      locked: false,
     },
   ];
 
@@ -295,7 +274,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
             {isTrialActive && trialEndsAt && (
               <div className="inline-block mt-4 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl max-w-xl mx-auto text-left">
                 <p className="text-sm font-semibold text-amber-900">
-                  ✨ {TRIAL_DAYS}-day Pro trial — full access
+                  ✨ {trialDaysDisplay}-day Pro trial — full access
                 </p>
                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                   Your trial includes every Pro feature. It ends on{" "}
@@ -400,11 +379,11 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   <ul className="space-y-3 text-sm">
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Up to 100 Products</span>
+                      <span className="text-gray-700">Up to {FREE_MAX_PRODUCTS} products</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Up to 5 Catalogues</span>
+                      <span className="text-gray-700">Up to {FREE_MAX_CATALOGUES} catalogues</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
@@ -420,7 +399,11 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Basic PDF Export</span>
+                      <span className="text-gray-700">{FREE_MAX_PDF_PER_DAY} PDF export per day</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">{FREE_MAX_SHARE_LINK_PER_DAY} shareable order link per day</span>
                     </li>
                   </ul>
                 </div>
@@ -560,7 +543,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
-                      <span className="text-gray-700">Advanced PDF Export</span>
+                      <span className="text-gray-700">Unlimited PDF exports &amp; order links</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
@@ -747,7 +730,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 </p>
                 {isTrialActive && trialEndsAt && (
                   <p className="text-xs text-gray-500">
-                    Trial ends {formatTrialEndDate(trialEndsAt)} · {TRIAL_DAYS} days from account creation
+                    Trial ends {formatTrialEndDate(trialEndsAt)} · {trialDaysDisplay} days from account creation
                   </p>
                 )}
               </div>

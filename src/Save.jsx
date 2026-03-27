@@ -15,6 +15,10 @@ import {
   pickRenderableImageForCanvas,
 } from "./utils/productSourceImage";
 import { getPersistedAuthUserId } from "./utils/authUserId";
+import {
+  getEffectiveWatermarkText,
+  getEffectiveWatermarkPosition,
+} from "./utils/freeTierWatermark";
 
 function getUserFolderForRenderedImages(product) {
   // Always use the currently logged-in Supabase user to avoid cross-user mixing.
@@ -354,10 +358,12 @@ export async function saveRenderedImage(product, type, units = {}) {
         productData[unitKey] = catalogueData[unitKey] || "None";
       });
 
-    // Get watermark settings with proper fallbacks
+    // Get watermark settings with proper fallbacks (Free tier: forced default text/position)
     let isWatermarkEnabled = safeGetFromStorage("showWatermark", true);
-    let watermarkText = safeGetFromStorage("watermarkText", "Created using CatShare");
-    let watermarkPosition = safeGetFromStorage("watermarkPosition", "bottom-left");
+    const isPro =
+      typeof localStorage !== "undefined" && localStorage.getItem("isPro") === "true";
+    let watermarkText = getEffectiveWatermarkText(isPro);
+    let watermarkPosition = getEffectiveWatermarkPosition(isPro);
 
     // Additional safety check - ensure watermarkPosition is a string, not JSON
     if (typeof watermarkPosition !== 'string' || !watermarkPosition) {

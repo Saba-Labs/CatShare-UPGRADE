@@ -11,6 +11,8 @@ import { deleteRenderedImagesFromFolder, renameRenderedImagesForCatalogue } from
 import { FiX, FiPlus, FiEdit2, FiTrash2, FiImage, FiCheck, FiLoader } from "react-icons/fi";
 import { logCatalogueCreated, logCatalogueDeleted } from "./config/analyticsEvents";
 import { useAuth } from "./context/AuthContext";
+import { useSubscription } from "./context/SubscriptionContext";
+import { FREE_MAX_CATALOGUES } from "./config/freeTierLimits";
 import { syncCataloguesDefinition } from "./services/supabaseSync";
 import { getStorageKey, safeSetInStorage } from "./utils/safeStorage";
 import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "./services/cloudflareService";
@@ -53,6 +55,7 @@ export default React.memo(function ManageCatalogues({
   renamingCatalogueIds = new Set(),
 }: ManageCataloguesProps) {
   const { user } = useAuth();
+  const { isPro } = useSubscription();
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState<Catalogue | null>(null);
@@ -105,6 +108,13 @@ export default React.memo(function ManageCatalogues({
 
     if (catalogues.some((c) => c.label.toLowerCase() === formLabel.toLowerCase())) {
       setFormError("A catalogue with this name already exists");
+      return;
+    }
+
+    if (!isPro && catalogues.length >= FREE_MAX_CATALOGUES) {
+      setFormError(
+        `Free plan allows up to ${FREE_MAX_CATALOGUES} catalogues. Upgrade to Pro for unlimited.`
+      );
       return;
     }
 

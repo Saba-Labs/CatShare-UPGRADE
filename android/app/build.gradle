@@ -19,8 +19,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 
-        versionCode 64
-        versionName "4.0.33"
+        versionCode 65
+        versionName "4.0.34"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -105,6 +105,7 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation "androidx.work:work-runtime-ktx:2.9.0"
+    implementation "com.google.android.material:material:1.11.0"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -118,6 +119,8 @@ dependencies {
     implementation 'com.facebook.android:facebook-android-sdk:latest.release'
     implementation platform('com.google.firebase:firebase-bom:32.8.0')
     implementation 'com.google.firebase:firebase-analytics'
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
 
 }
 

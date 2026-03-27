@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdArrowBack, MdOutlineHome, MdWarning } from "react-icons/md";
+import { MdArrowBack, MdOutlineHome, MdWarning, MdLock } from "react-icons/md";
 import { FiEdit3, FiPackage, FiArchive, FiCheckCircle, FiX } from "react-icons/fi";
 import { useTheme } from "../context/ThemeContext";
+import { useSubscription } from "../context/SubscriptionContext";
 import { getAllThemes } from "../config/themeConfig";
 
 export default function ThemesSettings() {
   const navigate = useNavigate();
+  const { isPro } = useSubscription();
   const { selectedThemeId, setTheme } = useTheme();
   const [expandedThemeId, setExpandedThemeId] = useState(null);
   const [initialThemeId] = useState(selectedThemeId);
@@ -63,6 +65,10 @@ export default function ThemesSettings() {
   }, [renderBoxRef]);
 
   const handleThemeSelect = (themeId) => {
+    if (themeId === "glass" && !isPro) {
+      navigate("/settings/pro");
+      return;
+    }
     setTheme(themeId);
     console.log(`🎨 Theme selected: ${themeId}`);
   };
@@ -158,6 +164,7 @@ export default function ThemesSettings() {
             {themes.map((theme) => {
               const sampleProduct = theme.id === "classic" ? classicProduct : glassProduct;
               const isGlassTheme = theme.id === "glass";
+              const glassLocked = isGlassTheme && !isPro;
               const isExpanded = expandedThemeId === theme.id;
 
               return (
@@ -184,7 +191,17 @@ export default function ThemesSettings() {
                         </span>
                       </div>
                       <div>
-                        <h3 className="text-sm sm:text-lg font-semibold sm:font-bold text-slate-900 dark:text-white tracking-tight">{theme.name} Edition</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm sm:text-lg font-semibold sm:font-bold text-slate-900 dark:text-white tracking-tight">
+                            {theme.name} Edition
+                          </h3>
+                          {glassLocked && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 border border-amber-200/80 dark:border-amber-700/60">
+                              <MdLock size={10} aria-hidden />
+                              Pro
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${isGlassTheme ? "bg-blue-400" : "bg-emerald-400"}`}></span>
                           <p className="text-[8px] sm:text-[10px] font-semibold text-slate-500 dark:text-slate-500 uppercase tracking-widest">
@@ -204,18 +221,36 @@ export default function ThemesSettings() {
 
                     <div className="flex items-center gap-3">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (glassLocked) {
+                            navigate("/settings/pro");
+                            return;
+                          }
                           handleThemeSelect(theme.id);
                         }}
                         className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold sm:font-black text-[9px] sm:text-[11px] transition-all duration-300 active:scale-95 flex items-center gap-2 shadow-lg ${
-                          selectedThemeId === theme.id
-                            ? "bg-red-600 text-white shadow-red-500/30"
-                            : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
+                          glassLocked
+                            ? "bg-amber-50 dark:bg-amber-950/50 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                            : selectedThemeId === theme.id
+                              ? "bg-red-600 text-white shadow-red-500/30"
+                              : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750"
                         }`}
                       >
-                        {selectedThemeId === theme.id ? "Selected" : "Select"}
-                        {selectedThemeId === theme.id && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>}
+                        {glassLocked ? (
+                          <>
+                            <MdLock size={14} className="shrink-0" aria-hidden />
+                            Upgrade
+                          </>
+                        ) : (
+                          <>
+                            {selectedThemeId === theme.id ? "Selected" : "Select"}
+                            {selectedThemeId === theme.id && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                            )}
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
