@@ -202,7 +202,7 @@ function StatusSelector({
       position: 'absolute', top: '110%', right: 0,
       background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0',
       boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 200,
-      overflow: 'hidden', minWidth: 160,
+      overflow: 'hidden', minWidth: 50,
     }}>
       {statuses.map((s) => {
         const cfg = getStatusConfig(s);
@@ -1018,7 +1018,7 @@ export default function Orders() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 72, paddingTop: 160 }}>
+      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 72, paddingTop: 10 }}>
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
