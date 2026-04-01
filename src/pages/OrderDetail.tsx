@@ -528,7 +528,7 @@ export default function OrderDetail() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 20, paddingTop: 10 }}>
+      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 20, paddingTop: 70 }}>
         <div style={{ padding: '0 16px 20px' }}>
           {/* Status row (non-edit) */}
           {!editMode && (
