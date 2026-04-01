@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
+import { createOrder, type OrderItem } from '../services/orderService';
+import { getSupabaseClient } from '../supabaseClient';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -790,9 +792,14 @@ export default function OrderForm() {
   const [sellerLogoUrl, setSellerLogoUrl] = useState('');
   const [headerLogoFailed, setHeaderLogoFailed] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
+  const [currencyCode, setCurrencyCode] = useState('INR');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [qty, setQty] = useState<QtyMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [sellerUserId, setSellerUserId] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   /** Number of drawer entries we pushed onto session history (usually 0 or 1). */
   const drawerHistoryDepthRef = useRef(0);
@@ -853,10 +860,24 @@ export default function OrderForm() {
             sellerCustomCurrencies: data.sellerCustomCurrencies,
           })
         );
+        setCurrencyCode(data.sellerCurrencyCode || 'INR');
         setItems(data.items || []);
         const initial: QtyMap = {};
         (data.items || []).forEach((i) => { initial[i.productId] = 0; });
         setQty(initial);
+
+        // Fetch seller_user_id from share_links table
+        if (token) {
+          const client = getSupabaseClient();
+          const { data: linkData } = await client
+            .from('share_links')
+            .select('seller_user_id')
+            .eq('token', token)
+            .single();
+          if (linkData) {
+            setSellerUserId(linkData.seller_user_id);
+          }
+        }
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load order form.');
       } finally {
@@ -957,9 +978,67 @@ export default function OrderForm() {
     return lines.join('\n');
   }, [items, qty, currencySymbol]);
 
-  const openWhatsApp = () => {
+  const openWhatsApp = async () => {
     const to = (sellerWhatsapp || '').replace(/[^\d]/g, '');
     if (!to) { alert('Seller WhatsApp number is not configured.'); return; }
+
+    // Validate customer name
+    if (!customerName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+
+    // Save order to Supabase
+    if (token && sellerUserId) {
+      setSavingOrder(true);
+      try {
+        const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
+        if (selectedItems.length === 0) {
+          alert('Please select at least one item');
+          setSavingOrder(false);
+          return;
+        }
+
+        // Build order items structure
+        const orderItems: OrderItem[] = selectedItems.map((i) => {
+          const q = qty[i.productId] ?? 0;
+          const unitPrice = parseItemPriceNumeric(i.price);
+          const rowTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
+
+          return {
+            productId: i.productId,
+            name: i.name,
+            quantity: q,
+            unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+            rowTotal: rowTotal,
+            category: i.subtitle || '',
+          };
+        });
+
+        // Create order
+        const { error } = await createOrder(
+          sellerUserId,
+          token,
+          customerName.trim(),
+          orderItems,
+          orderTotalAmount,
+          currencyCode,
+          customerWhatsapp.trim() || undefined
+        );
+
+        if (error) {
+          console.error('Error creating order:', error);
+          // Don't block WhatsApp opening even if order creation fails
+        }
+      } catch (err) {
+        console.error('Error saving order:', err);
+        // Don't block WhatsApp opening on error
+      } finally {
+        setSavingOrder(false);
+      }
+    }
+
+    // Open WhatsApp
     window.location.href = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
   };
 
