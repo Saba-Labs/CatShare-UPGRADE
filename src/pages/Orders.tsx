@@ -202,7 +202,7 @@ function StatusSelector({
       position: 'absolute', top: '110%', right: 0,
       background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0',
       boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 200,
-      overflow: 'hidden', minWidth: 100,
+      overflow: 'hidden', minWidth: 160,
     }}>
       {statuses.map((s) => {
         const cfg = getStatusConfig(s);
