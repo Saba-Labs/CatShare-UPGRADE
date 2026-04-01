@@ -679,6 +679,94 @@ const CSS = `
   }
   @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 
+  /* ── Confirmation Modal ── */
+  .of-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,0.6);
+    z-index: 200;
+    display: flex; align-items: flex-end; justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+  }
+
+  .of-modal {
+    background: var(--surface);
+    border-radius: 24px 24px 0 0;
+    width: 100%; max-width: 680px;
+    padding: 24px 20px 32px;
+    animation: slideUp 0.25s cubic-bezier(0.34,1.2,0.64,1);
+  }
+
+  .of-modal-handle {
+    width: 36px; height: 4px;
+    background: #e2e8f0; border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .of-modal-title {
+    font-size: 18px; font-weight: 800; color: var(--text);
+    margin-bottom: 16px; letter-spacing: -0.3px;
+  }
+
+  .of-modal-input-group {
+    margin-bottom: 16px;
+  }
+
+  .of-modal-label {
+    display: block;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #64748b;
+    margin-bottom: 8px;
+  }
+
+  .of-modal-input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-family: var(--font);
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .of-modal-input:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
+  }
+
+  .of-modal-required {
+    font-size: 11px; color: #dc2626; margin-left: 4px;
+  }
+
+  .of-modal-buttons {
+    display: flex; gap: 10px; margin-top: 20px;
+  }
+
+  .of-modal-btn {
+    flex: 1; padding: 12px; border-radius: 12px; border: none;
+    font-family: var(--font); font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: background 0.15s;
+  }
+
+  .of-modal-cancel {
+    background: #f1f5f9; color: #64748b;
+  }
+
+  .of-modal-cancel:hover { background: #e2e8f0; }
+
+  .of-modal-confirm {
+    background: var(--green); color: #fff;
+    box-shadow: 0 4px 12px rgba(22,163,74,0.3);
+  }
+
+  .of-modal-confirm:hover:not(:disabled) { background: #15803d; }
+
+  .of-modal-confirm:disabled {
+    background: #cbd5e1; cursor: not-allowed; box-shadow: none;
+  }
+
   @media (max-width: 400px) {
     .of-item-name { font-size: 13px; }
     .of-item-subtitle-inline { font-size: 9px; }
@@ -800,6 +888,7 @@ export default function OrderForm() {
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [sellerUserId, setSellerUserId] = useState<string | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   /** Number of drawer entries we pushed onto session history (usually 0 or 1). */
   const drawerHistoryDepthRef = useRef(0);
@@ -978,17 +1067,24 @@ export default function OrderForm() {
     return lines.join('\n');
   }, [items, qty, currencySymbol]);
 
-  const openWhatsApp = async () => {
-    const to = (sellerWhatsapp || '').replace(/[^\d]/g, '');
-    if (!to) { alert('Seller WhatsApp number is not configured.'); return; }
-
-    // Validate customer name
-    if (!customerName.trim()) {
-      alert('Please enter your name');
-      // Scroll to customer info section
-      document.querySelector('[data-customer-info-section]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const openConfirmModal = () => {
+    const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
+    if (selectedItems.length === 0) {
+      alert('Please select at least one item');
       return;
     }
+    setShowConfirmModal(true);
+  };
+
+  const confirmOrder = async () => {
+    // Validate customer name (required)
+    if (!customerName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+
+    const to = (sellerWhatsapp || '').replace(/[^\d]/g, '');
+    if (!to) { alert('Seller WhatsApp number is not configured.'); return; }
 
     // Save order to Supabase
     if (token && sellerUserId) {
@@ -1041,7 +1137,8 @@ export default function OrderForm() {
       }
     }
 
-    // Open WhatsApp
+    // Close modal and open WhatsApp
+    setShowConfirmModal(false);
     window.location.href = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
   };
 
@@ -1118,92 +1215,12 @@ export default function OrderForm() {
             </div>
             <button
               className="of-confirm-btn"
-              onClick={openWhatsApp}
+              onClick={openConfirmModal}
               disabled={selectedProductCount === 0}
             >
               <WhatsAppIcon size={14} />
               <span className="btn-label">Order on WhatsApp</span>
             </button>
-          </div>
-        </div>
-
-        {/* Customer Info Section */}
-        <div data-customer-info-section style={{ padding: '16px 12px 12px' }}>
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            border: '1.5px solid #e2e8f0',
-            padding: '16px',
-            marginBottom: '12px'
-          }}>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                color: '#64748b',
-                marginBottom: '8px'
-              }}>Your Name *</label>
-              <input
-                type="text"
-                placeholder="Enter your name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: 10,
-                  fontFamily: 'var(--font)',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#16a34a';
-                  e.currentTarget.style.outlineColor = '#16a34a';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                }}
-              />
-            </div>
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase',
-                color: '#64748b',
-                marginBottom: '8px'
-              }}>Your WhatsApp (Optional)</label>
-              <input
-                type="tel"
-                placeholder="Enter your WhatsApp number"
-                value={customerWhatsapp}
-                onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '14px',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: 10,
-                  fontFamily: 'var(--font)',
-                  boxSizing: 'border-box',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#16a34a';
-                  e.currentTarget.style.outlineColor = '#16a34a';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                }}
-              />
-            </div>
           </div>
         </div>
 
@@ -1341,7 +1358,7 @@ export default function OrderForm() {
       {/* Floating summary bar */}
       {selectedProductCount > 0 && (
         <div className="of-summary">
-          <div className="of-summary-card" onClick={openWhatsApp}>
+          <div className="of-summary-card" onClick={openConfirmModal}>
             <div className="of-summary-left">
               <span className="of-summary-count">
                 {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
@@ -1363,6 +1380,60 @@ export default function OrderForm() {
               <WhatsAppIcon size={16} />
               Place Order
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="of-modal-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div className="of-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="of-modal-handle" />
+            <div className="of-modal-title">Confirm Your Order</div>
+
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">
+                Your Name
+                <span className="of-modal-required">*</span>
+              </label>
+              <input
+                type="text"
+                className="of-modal-input"
+                placeholder="Enter your name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">Your WhatsApp</label>
+              <input
+                type="tel"
+                className="of-modal-input"
+                placeholder="Enter your WhatsApp number (optional)"
+                value={customerWhatsapp}
+                onChange={(e) => setCustomerWhatsapp(e.target.value)}
+              />
+            </div>
+
+            <div className="of-modal-buttons">
+              <button
+                type="button"
+                className="of-modal-btn of-modal-cancel"
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="of-modal-btn of-modal-confirm"
+                onClick={confirmOrder}
+                disabled={!customerName.trim() || savingOrder}
+              >
+                {savingOrder ? 'Saving…' : 'Confirm & Order'}
+              </button>
+            </div>
           </div>
         </div>
       )}
