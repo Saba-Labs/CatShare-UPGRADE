@@ -185,7 +185,7 @@ export default function Orders() {
           Products
         </button>
         <button
-          onClick={() => handleNavigate('/catalogues')}
+          onClick={() => handleNavigate('/?tab=catalogues')}
           className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600 hover:bg-gray-50"
         >
           Catalogues
