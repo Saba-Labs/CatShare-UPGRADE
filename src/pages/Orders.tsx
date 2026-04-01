@@ -47,23 +47,23 @@ export default function Orders() {
     navigate('/');
   };
 
+  const handleNavigate = async (path: string) => {
+    await Haptics.impact({ style: ImpactStyle.Light });
+    navigate(path);
+  };
+
   const filteredOrders = tab === 'all'
     ? orders
     : orders.filter(order => order.status === tab);
 
   return (
     <div className="flex flex-col h-screen bg-white pb-[env(safe-area-inset-bottom,0px)]">
+      {/* Status bar */}
+      <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50" />
+
       {/* Header with back button */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-[40px] z-40 bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between p-4">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition"
-            aria-label="Go back"
-          >
-            <FiArrowLeft size={24} />
-            <span className="text-sm font-medium">Back</span>
-          </button>
           <h1 className="text-lg font-semibold text-gray-900">Orders</h1>
           <div className="w-12" />
         </div>
@@ -93,7 +93,7 @@ export default function Orders() {
       </div>
 
       {/* Orders content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pb-16">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -175,6 +175,27 @@ export default function Orders() {
           </div>
         )}
       </main>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-around text-sm font-medium pb-[env(safe-area-inset-bottom,0px)] bg-white border-t border-gray-200">
+        <button
+          onClick={() => handleNavigate('/')}
+          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600 hover:bg-gray-50"
+        >
+          Products
+        </button>
+        <button
+          onClick={() => handleNavigate('/catalogues')}
+          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600 hover:bg-gray-50"
+        >
+          Catalogues
+        </button>
+        <button
+          className="flex-1 py-3.5 text-center transition-all bg-blue-500 text-white"
+        >
+          Orders
+        </button>
+      </nav>
     </div>
   );
 }
