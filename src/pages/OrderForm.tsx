@@ -1110,6 +1110,7 @@ export default function OrderForm() {
             unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
             rowTotal: rowTotal,
             category: i.subtitle || '',
+            priceUnit: i.priceUnit || undefined,
             imageUrl: i.imageUrl,
           };
         });

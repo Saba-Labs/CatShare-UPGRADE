@@ -12,6 +12,14 @@ export interface OrderItem {
   unitPrice?: number;
   rowTotal?: number;
   category?: string;
+  priceUnit?: string;
+}
+
+function formatQuantityLabel(quantity: number, priceUnit?: string): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return `${quantity} Units`;
+  }
+  return `${quantity} ${String(priceUnit).trim()}`;
 }
 
 export interface Order {
@@ -169,7 +177,7 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     addUniformText(pdf, displayTitle, MARGIN + 4, midY, 5, '#000000', true);
 
     // 2. Qty + Unit
-    const qtyLabel = `${item.quantity} ${item.category || 'Units'}`;
+    const qtyLabel = formatQuantityLabel(item.quantity, item.priceUnit);
     addUniformText(pdf, qtyLabel, colQty, midY, 5, '#000000', false, 'center');
     
     // 3. Rate (Now Black)
