@@ -1014,6 +1014,7 @@ export default function OrderForm() {
             unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
             rowTotal: rowTotal,
             category: i.subtitle || '',
+            imageUrl: i.imageUrl,
           };
         });
 
