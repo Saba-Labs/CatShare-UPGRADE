@@ -25,11 +25,14 @@ export function setSupabaseRlsUserId(userId: string | null | undefined): void {
 }
 
 const supabaseFetch: typeof fetch = (input, init) => {
-  const headers = new Headers(init?.headers ?? undefined);
+  // Create headers from existing headers or empty object
+  const headers = new Headers(init?.headers || {});
   if (rlsUserIdForRequestHeaders) {
     headers.set('x-user-id', rlsUserIdForRequestHeaders);
   }
-  return fetch(input, { ...init, headers });
+  // Spread init but exclude headers, then add our merged headers
+  const { headers: _, ...restInit } = init || {};
+  return fetch(input, { ...restInit, headers });
 };
 
 export const supabase: SupabaseClient = createClient(
