@@ -294,24 +294,7 @@ function OrderRow({
           </div>
         </div>
 
-        {/* Row 2: Items preview */}
-        <div style={{ fontSize: 12, color: '#64748B', marginBottom: 10, lineHeight: 1.4 }}>
-          {itemCount > 0 ? (
-            <>
-              {(order.items || []).slice(0, 2).map((item: OrderItem, i: number) => (
-                <span key={i}>
-                  {i > 0 && <span style={{ color: '#CBD5E1', margin: '0 4px' }}>·</span>}
-                  {item.name} ×{item.quantity}
-                </span>
-              ))}
-              {itemCount > 2 && <span style={{ color: '#94A3B8' }}> +{itemCount - 2} more</span>}
-            </>
-          ) : (
-            <span style={{ color: '#CBD5E1' }}>No items</span>
-          )}
-        </div>
-
-        {/* Row 3: Date + Status */}
+        {/* Row 2: Date + Status */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94A3B8', fontSize: 11 }}>
             <IconCalendar />
