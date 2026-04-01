@@ -4,7 +4,7 @@ import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/share
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 import { createOrder, type OrderItem } from '../services/orderService';
-import { getSupabaseClient } from '../supabaseClient';
+import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -1089,6 +1089,7 @@ export default function OrderForm() {
     // Save order to Supabase
     if (token && sellerUserId) {
       setSavingOrder(true);
+      setSupabaseRlsUserId(sellerUserId);
       try {
         const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
         if (selectedItems.length === 0) {
@@ -1134,6 +1135,7 @@ export default function OrderForm() {
         console.error('Error saving order:', err);
         // Don't block WhatsApp opening on error
       } finally {
+        setSupabaseRlsUserId(null);
         setSavingOrder(false);
       }
     }
