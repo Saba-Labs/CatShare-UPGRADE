@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -237,6 +237,42 @@ function EditItemRow({
   item: OrderItem & { productId?: string; _key: string };
   onChange: (key: string, qty: number) => void;
 }) {
+  const [isEditingQty, setIsEditingQty] = useState(false);
+  const [inputValue, setInputValue] = useState(String(item.quantity));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setInputValue(String(item.quantity));
+  }, [item.quantity]);
+
+  useEffect(() => {
+    if (isEditingQty && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditingQty]);
+
+  const handleQtyInputChange = (value: string) => {
+    setInputValue(value);
+  };
+
+  const handleQtyInputBlur = () => {
+    const num = parseInt(inputValue, 10);
+    const newQty = isNaN(num) || num < 0 ? item.quantity : num;
+    onChange(item._key, newQty);
+    setIsEditingQty(false);
+    setInputValue(String(newQty));
+  };
+
+  const handleQtyInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleQtyInputBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditingQty(false);
+      setInputValue(String(item.quantity));
+    }
+  };
+
   const hasImage = item.imageUrl && /^https?:\/\//i.test(item.imageUrl);
   return (
     <div style={{
@@ -271,9 +307,49 @@ function EditItemRow({
         >
           <IconMinus />
         </button>
-        <span style={{ minWidth: 28, textAlign: 'center', fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-          {item.quantity}
-        </span>
+        {isEditingQty ? (
+          <input
+            ref={inputRef}
+            type="number"
+            value={inputValue}
+            onChange={(e) => handleQtyInputChange(e.target.value)}
+            onBlur={handleQtyInputBlur}
+            onKeyDown={handleQtyInputKeyDown}
+            min="0"
+            style={{
+              minWidth: 28,
+              width: 28,
+              textAlign: 'center',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#0F172A',
+              border: 'none',
+              background: '#fff',
+              padding: '2px 0',
+              outline: 'none',
+            }}
+          />
+        ) : (
+          <span
+            onClick={() => setIsEditingQty(true)}
+            style={{
+              minWidth: 28,
+              textAlign: 'center',
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#0F172A',
+              cursor: 'pointer',
+              userSelect: 'none',
+              padding: '4px 0',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#E2E8F0')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            title="Click to edit quantity"
+          >
+            {item.quantity}
+          </span>
+        )}
         <button
           onClick={() => onChange(item._key, item.quantity + 1)}
           style={{ width: 30, height: 30, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#374151' }}
