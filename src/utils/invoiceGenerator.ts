@@ -1,6 +1,6 @@
 /**
  * invoiceGenerator.ts
- * Fixed: Restored Footer, Enlarged Header/Date, and Uniform Table Sizing.
+ * Features: Multi-page support, Unit labels, Subtitles, and High-Contrast Table.
  */
 
 import { jsPDF } from 'jspdf';
@@ -24,6 +24,7 @@ export interface Order {
 }
 
 const MARGIN = 16;
+const PAGE_BREAK_THRESHOLD = 260; // MM before jumping to new page
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -33,14 +34,12 @@ function formatDate(dateStr: string): string {
   });
 }
 
-/** * High-resolution text rendering for symbols and alignment perfection 
- */
 function renderTextToImage(text: string, fontSize: number, color: string, bold: boolean) {
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    const scale = 4; 
+    const scale = 4;
     const weight = bold ? '700' : '400';
     const font = `${weight} ${fontSize}px -apple-system, sans-serif`;
     ctx.font = font;
@@ -71,106 +70,62 @@ function addUniformText(
   pdf.addImage(img.dataUrl, 'PNG', drawX, y - sizeMm / 2, wMm, sizeMm);
 }
 
-// ─── Renderers ───────────────────────────────────────────────────────────────
+// ─── Component Renderers ─────────────────────────────────────────────────────
 
 function drawHeader(pdf: jsPDF, order: Order, business: BusinessProfile, pageWidth: number) {
   const headerH = 48;
   pdf.setFillColor(15, 23, 42); 
   pdf.rect(0, 0, pageWidth, headerH, 'F');
 
-  // Business Name (Increased Size)
   addUniformText(pdf, (business.businessName || 'Your Business').toUpperCase(), MARGIN, 20, 8, '#FFFFFF', true);
 
-  // Green Accent Line
   pdf.setFillColor(22, 163, 74); 
   pdf.rect(0, headerH, pageWidth, 3, 'F');
 
-  // Invoice Meta
   const bx = pageWidth - MARGIN;
   addUniformText(pdf, 'INVOICE', bx, 15, 4, '#94A3B8', true, 'right');
   addUniformText(pdf, `INV-${order.id.substring(0, 8).toUpperCase()}`, bx, 24, 7, '#FFFFFF', true, 'right');
-  
-  // Date (Increased Size)
   addUniformText(pdf, formatDate(order.created_at), bx, 34, 5, '#CBD5E1', false, 'right');
 }
 
-function drawBillTo(pdf: jsPDF, order: Order, y: number) {
-  addUniformText(pdf, 'BILL TO', MARGIN, y, 3.5, '#64748B', true);
-  y += 9;
-  addUniformText(pdf, order.customer_name, MARGIN, y, 7, '#0F172A', true);
-  if (order.customer_whatsapp) {
-    y += 8;
-    addUniformText(pdf, `WhatsApp: ${order.customer_whatsapp}`, MARGIN, y, 4.5, '#475569');
-  }
-  return y + 18;
-}
-
-function drawItemsTable(pdf: jsPDF, items: OrderItem[], symbol: string, startY: number, pageWidth: number) {
+function drawTableHeader(pdf: jsPDF, y: number, pageWidth: number) {
   const contentW = pageWidth - 2 * MARGIN;
+  pdf.setFillColor(241, 245, 249); // Lighter background for header
+  pdf.rect(MARGIN, y, contentW, 14, 'F');
+  
+  const hY = y + 7;
   const colQty = MARGIN + contentW * 0.65;
   const colRate = MARGIN + contentW * 0.82;
   const colTotal = MARGIN + contentW;
   
-  // Header Row
-  pdf.setFillColor(248, 250, 252);
-  pdf.rect(MARGIN, startY, contentW, 14, 'F');
-  const hY = startY + 7;
+  // INCREASED FONT SIZE FOR HEADINGS
+  addUniformText(pdf, 'ITEM DESCRIPTION', MARGIN + 4, hY, 4.5, '#0F172A', true);
+  addUniformText(pdf, 'QTY', colQty, hY, 4.5, '#0F172A', true, 'center');
+  addUniformText(pdf, 'RATE', colRate, hY, 4.5, '#0F172A', true, 'center');
+  addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 4.5, '#0F172A', true, 'right');
   
-  const hColor = '#475569';
-  addUniformText(pdf, 'DESCRIPTION', MARGIN + 4, hY, 4, hColor, true);
-  addUniformText(pdf, 'QTY', colQty, hY, 4, hColor, true, 'center');
-  addUniformText(pdf, 'RATE', colRate, hY, 4, hColor, true, 'center');
-  addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 4, hColor, true, 'right');
-
-  let y = startY + 14;
-  const rowH = 16;
-
-  items.forEach((item) => {
-    const midY = y + (rowH / 2);
-    pdf.setDrawColor(241, 245, 249);
-    pdf.line(MARGIN, y + rowH, MARGIN + contentW, y + rowH);
-
-    // Uniform row size: 5mm for all text
-    addUniformText(pdf, item.name, MARGIN + 4, midY, 5, '#0F172A', true);
-    addUniformText(pdf, String(item.quantity), colQty, midY, 5, '#0F172A', false, 'center');
-    
-    const rate = `${symbol}${ (item.unitPrice || 0).toLocaleString() }`;
-    addUniformText(pdf, rate, colRate, midY, 5, '#475569', false, 'center');
-
-    const total = `${symbol}${ (item.rowTotal || (item.unitPrice || 0) * item.quantity).toLocaleString() }`;
-    addUniformText(pdf, total, colTotal - 4, midY, 5, '#0F172A', true, 'right');
-
-    y += rowH;
-  });
-
-  return y;
-}
-
-function drawThankYouBox(pdf: jsPDF, y: number, pageWidth: number) {
-  const boxW = pageWidth - (MARGIN * 2);
-  const boxH = 22;
-  pdf.setFillColor(248, 250, 252);
-  pdf.setDrawColor(226, 232, 240);
-  (pdf as any).roundedRect(MARGIN, y, boxW, boxH, 2, 2, 'FD');
-
-  pdf.setFillColor(22, 163, 74);
-  pdf.rect(MARGIN, y, 2.5, boxH, 'F');
-
-  addUniformText(pdf, 'Thank you for your business!', MARGIN + 8, y + 8, 4.5, '#16A34A', true);
-  addUniformText(pdf, 'Please contact us if you have any questions regarding this invoice.', MARGIN + 8, y + 15, 3.8, '#64748B');
+  return y + 14;
 }
 
 function drawFooter(pdf: jsPDF, pageWidth: number, pageHeight: number) {
-  const footerY = pageHeight - 15;
-  addUniformText(pdf, 'This is a computer generated invoice.', MARGIN, footerY, 3, '#94A3B8');
+  const footerH = 15;
+  const footerY = pageHeight - footerH;
+
+  // Differentiation band
+  pdf.setFillColor(248, 250, 252);
+  pdf.rect(0, footerY, pageWidth, footerH, 'F');
+  pdf.setDrawColor(226, 232, 240);
+  pdf.line(0, footerY, pageWidth, footerY);
+
+  const textY = footerY + (footerH / 2) + 1;
+  addUniformText(pdf, 'This is a computer generated document.', MARGIN, textY, 3, '#94A3B8');
   
-  // Restored: Generated by CatShare
   const brandX = pageWidth - MARGIN;
-  addUniformText(pdf, 'Generated by ', brandX - 18, footerY, 3, '#94A3B8', false, 'right');
-  addUniformText(pdf, 'CatShare', brandX, footerY, 3, '#16A34A', true, 'right');
+  addUniformText(pdf, 'Generated by ', brandX - 18, textY, 3.2, '#64748B', false, 'right');
+  addUniformText(pdf, 'CatShare', brandX, textY, 3.2, '#16A34A', true, 'right');
 }
 
-// ─── Main Function ───────────────────────────────────────────────────────────
+// ─── Main Logic ──────────────────────────────────────────────────────────────
 
 export async function generateInvoicePDF(order: Order, business: BusinessProfile, symbol: string): Promise<Blob> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -179,20 +134,77 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
   
   drawHeader(pdf, order, business, pageWidth);
 
+  // Bill To (Large Heading)
   let currentY = 65;
-  currentY = drawBillTo(pdf, order, currentY);
-  currentY = drawItemsTable(pdf, order.items || [], symbol, currentY, pageWidth);
+  addUniformText(pdf, 'BILL TO', MARGIN, currentY, 4.5, '#64748B', true);
+  currentY += 9;
+  addUniformText(pdf, order.customer_name, MARGIN, currentY, 7, '#000000', true);
+  currentY += 18;
 
-  // Grand Total Section
-  currentY += 12;
-  addUniformText(pdf, 'GRAND TOTAL', pageWidth - MARGIN - 50, currentY, 5, '#64748B', true);
+  // Table Start
+  currentY = drawTableHeader(pdf, currentY, pageWidth);
+
+  const items = order.items || [];
+  const contentW = pageWidth - 2 * MARGIN;
+  const colQty = MARGIN + contentW * 0.65;
+  const colRate = MARGIN + contentW * 0.82;
+  const colTotal = MARGIN + contentW;
+  const rowH = 16;
+
+  items.forEach((item, index) => {
+    // Check for page break
+    if (currentY > PAGE_BREAK_THRESHOLD) {
+      drawFooter(pdf, pageWidth, pageHeight);
+      pdf.addPage();
+      currentY = 20; // Margin at top of new page
+      currentY = drawTableHeader(pdf, currentY, pageWidth);
+    }
+
+    const midY = currentY + (rowH / 2);
+    pdf.setDrawColor(241, 245, 249);
+    pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
+
+    // 1. Item Name + Subtitle (Category)
+    const displayTitle = item.category ? `${item.name} (${item.category})` : item.name;
+    addUniformText(pdf, displayTitle, MARGIN + 4, midY, 5, '#000000', true);
+
+    // 2. Qty + Unit
+    const qtyLabel = `${item.quantity} ${item.category || 'Units'}`;
+    addUniformText(pdf, qtyLabel, colQty, midY, 5, '#000000', false, 'center');
+    
+    // 3. Rate (Now Black)
+    const rate = `${symbol}${ (item.unitPrice || 0).toLocaleString() }`;
+    addUniformText(pdf, rate, colRate, midY, 5, '#000000', false, 'center');
+
+    // 4. Total
+    const total = `${symbol}${ (item.rowTotal || (item.unitPrice || 0) * item.quantity).toLocaleString() }`;
+    addUniformText(pdf, total, colTotal - 4, midY, 5, '#000000', true, 'right');
+
+    currentY += rowH;
+  });
+
+  // Totals & Thank You Box (Ensure they don't get cut off)
+  if (currentY > 230) {
+    drawFooter(pdf, pageWidth, pageHeight);
+    pdf.addPage();
+    currentY = 20;
+  }
+
+  currentY += 15;
+  addUniformText(pdf, 'GRAND TOTAL', pageWidth - MARGIN - 55, currentY, 5.5, '#64748B', true);
   const totalStr = `${symbol}${ (order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }`;
-  addUniformText(pdf, totalStr, pageWidth - MARGIN, currentY, 8, '#16A34A', true, 'right');
+  addUniformText(pdf, totalStr, pageWidth - MARGIN, currentY, 8.5, '#16A34A', true, 'right');
 
-  // Thank you box
-  drawThankYouBox(pdf, currentY + 20, pageWidth);
-  
-  // Footer
+  // Thank You Box
+  currentY += 15;
+  pdf.setFillColor(248, 250, 252);
+  (pdf as any).roundedRect(MARGIN, currentY, pageWidth - (MARGIN * 2), 20, 2, 2, 'F');
+  pdf.setFillColor(22, 163, 74);
+  pdf.rect(MARGIN, currentY, 2.5, 20, 'F');
+  addUniformText(pdf, 'Thank you for your business!', MARGIN + 8, currentY + 7, 4.5, '#16A34A', true);
+  addUniformText(pdf, 'Please contact us if you have any questions regarding this invoice.', MARGIN + 8, currentY + 14, 3.8, '#64748B');
+
+  // Final page footer
   drawFooter(pdf, pageWidth, pageHeight);
 
   return pdf.output('blob') as Blob;

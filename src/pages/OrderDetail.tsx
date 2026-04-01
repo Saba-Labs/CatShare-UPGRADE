@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
+import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = 'pending' | 'completed' | 'cancelled';
@@ -22,12 +23,6 @@ interface OrderItem {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function getCurrencySymbol(code?: string) {
-  if (code === 'USD') return '$';
-  if (code === 'EUR') return '€';
-  return '₹';
-}
-
 function formatMoney(amount: number, symbol: string) {
   return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
@@ -484,7 +479,7 @@ export default function OrderDetail() {
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
-      const symbol = getCurrencySymbol(order.currency_code);
+      const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
@@ -508,7 +503,7 @@ export default function OrderDetail() {
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
-      const symbol = getCurrencySymbol(order.currency_code);
+      const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
@@ -526,7 +521,7 @@ export default function OrderDetail() {
       window.open(cleaned ? `https://wa.me/${cleaned}?text=${message}` : `https://wa.me/?text=${message}`, '_blank');
       showToast('Invoice downloaded. Attach in WhatsApp.', 'success');
     } catch {
-      const symbol = getCurrencySymbol(order.currency_code);
+      const symbol = getSymbolForCurrencyCode(order.currency_code);
       const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
       const text = encodeURIComponent(billText(order, symbol));
       window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
@@ -536,7 +531,7 @@ export default function OrderDetail() {
 
   const handleCopy = () => {
     if (!order) return;
-    const symbol = getCurrencySymbol(order.currency_code);
+    const symbol = getSymbolForCurrencyCode(order.currency_code);
     navigator.clipboard.writeText(billText(order, symbol)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -545,7 +540,7 @@ export default function OrderDetail() {
 
   const handleNativeShare = async () => {
     if (!order) return;
-    const symbol = getCurrencySymbol(order.currency_code);
+    const symbol = getSymbolForCurrencyCode(order.currency_code);
     if (navigator.share) {
       await navigator.share({ title: `Order — ${order.customer_name}`, text: billText(order, symbol) });
     } else {
@@ -582,7 +577,7 @@ export default function OrderDetail() {
     </div>
   );
 
-  const symbol = getCurrencySymbol(order.currency_code);
+  const symbol = getSymbolForCurrencyCode(order.currency_code);
   const items: OrderItem[] = order.items || [];
   const phone = (order as any).customer_whatsapp || '';
   const editTotal = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
@@ -809,22 +804,24 @@ export default function OrderDetail() {
                           {item.category && (
                             <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.category}</div>
                           )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: COLORS.muted }}>
                               {symbol}{item.unitPrice} × {item.quantity}
                             </div>
                           )}
                           {!hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: COLORS.muted }}>
                               Qty: {item.quantity}
                             </div>
                           )}
+                          {lineTotal != null ? (
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>
+                              {formatMoney(lineTotal, symbol)}
+                            </div>
+                          ) : null}
                         </div>
-                        {lineTotal != null ? (
-                          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, flexShrink: 0 }}>
-                            {formatMoney(lineTotal, symbol)}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   );
