@@ -1,7 +1,6 @@
 /**
  * invoiceGenerator.ts
- * Generates a clean, professional invoice PDF from an order.
- * Uses jsPDF directly — no html2canvas dependency.
+ * Upgraded with larger fonts, better spacing, and modern layout.
  */
 
 import { jsPDF } from 'jspdf';
@@ -27,6 +26,9 @@ export interface Order {
   created_at: string;
 }
 
+// ─── Configuration ──────────────────────────────────────────────────────────
+const MARGIN = 16; // Increased margin for a more "breathable" design
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -49,14 +51,9 @@ function getStatusColors(status: string): { bg: number[]; text: number[]; border
   }
 }
 
-/**
- * Render any text — including Unicode currency symbols (₹, €, etc.) and
- * emoji — to a crisp PNG via canvas, then embed in the PDF as an image.
- * jsPDF's built-in fonts cannot render these characters correctly.
- */
 function renderTextToImage(
   text: string,
-  fontSize = 40,
+  fontSize = 48, // Increased default
   color = '#0f172a',
   bold = false,
 ): { dataUrl: string; width: number; height: number } | null {
@@ -66,22 +63,22 @@ function renderTextToImage(
     if (!ctx) return null;
 
     const weight = bold ? '700' : '400';
-    const font   = `${weight} ${fontSize}px -apple-system, "Segoe UI", Arial, sans-serif`;
+    const font = `${weight} ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif`;
     ctx.font = font;
     const metrics = ctx.measureText(text);
 
-    const pad    = fontSize * 0.4;
-    const scale  = 3; // high-res for crisp text
-    const cw     = metrics.width + pad * 2;
-    const ch     = fontSize * 1.8;
+    const pad = fontSize * 0.5;
+    const scale = 4; // Higher resolution for crispness
+    const cw = metrics.width + pad * 2;
+    const ch = fontSize * 2;
 
-    canvas.width  = cw * scale;
+    canvas.width = cw * scale;
     canvas.height = ch * scale;
 
     ctx.scale(scale, scale);
-    ctx.font          = font;
-    ctx.fillStyle     = color;
-    ctx.textBaseline  = 'middle';
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
     ctx.fillText(text, pad, ch / 2);
 
     return { dataUrl: canvas.toDataURL('image/png'), width: cw, height: ch };
@@ -90,10 +87,6 @@ function renderTextToImage(
   }
 }
 
-/**
- * Add a canvas-rendered text image to the PDF, vertically centred at `midY`.
- * Returns the rendered width in mm (useful for layout).
- */
 function addTextImage(
   pdf: jsPDF,
   text: string,
@@ -101,7 +94,7 @@ function addTextImage(
   midY: number,
   targetHeightMm: number,
   color: string,
-  fontSize = 36,
+  fontSize = 48,
   bold = false,
   alignRight = false,
 ): number {
@@ -115,387 +108,174 @@ function addTextImage(
 
 // ─── Section renderers ───────────────────────────────────────────────────────
 
-/** Dark header band */
 function drawHeader(
   pdf: jsPDF,
   order: Order,
   business: BusinessProfile,
   pageWidth: number,
-  margin: number,
   headerH: number,
 ) {
-  pdf.setFillColor(15, 23, 42);
+  pdf.setFillColor(15, 23, 42); // Slate 900
   pdf.rect(0, 0, pageWidth, headerH, 'F');
 
-  // ── Left: business info ──
+  // Business Name (Large)
   const businessName = business.businessName?.trim() || 'Your Business';
-  let y = 13;
+  addTextImage(pdf, businessName, MARGIN, 18, 8, '#ffffff', 56, true);
 
-  // Business name via canvas (handles any Unicode in the name)
-  addTextImage(pdf, businessName, margin, y + 3, 6, '#ffffff', 42, true);
-  y += 9;
-
-  // Meta lines — plain ASCII so jsPDF font is fine
-  pdf.setFont(undefined, 'normal');
-  pdf.setFontSize(8);
-  pdf.setTextColor(148, 163, 184);
-
-  const metaLines: string[] = [];
-  if ((business as any).businessAddress) metaLines.push((business as any).businessAddress.trim());
-  const cp: string[] = [];
-  if ((business as any).businessPhone) cp.push((business as any).businessPhone.trim());
-  if ((business as any).businessEmail) cp.push((business as any).businessEmail.trim());
-  if (cp.length) metaLines.push(cp.join('  ·  '));
-  if ((business as any).gstNumber) metaLines.push(`GST: ${(business as any).gstNumber.trim()}`);
-
-  const maxW = pageWidth * 0.55;
-  for (const line of metaLines) {
-    for (const wl of pdf.splitTextToSize(line, maxW)) {
-      pdf.text(wl, margin, y);
-      y += 4.2;
-    }
+  // Business Details
+  pdf.setFontSize(10); // Increased from 8
+  pdf.setTextColor(148, 163, 184); // Slate 400
+  let y = 28;
+  
+  const address = (business as any).businessAddress?.trim();
+  if (address) {
+    pdf.text(address, MARGIN, y);
+    y += 5;
+  }
+  
+  const contact = [(business as any).businessPhone, (business as any).businessEmail].filter(Boolean).join('  |  ');
+  if (contact) {
+    pdf.text(contact, MARGIN, y);
+    y += 5;
   }
 
-  // ── Right: invoice badge ──
-  const bx = pageWidth - margin;
-
+  // Right Side: Invoice Branding
+  const bx = pageWidth - MARGIN;
   pdf.setFont(undefined, 'bold');
-  pdf.setFontSize(7.5);
+  pdf.setFontSize(10);
   pdf.setTextColor(100, 116, 139);
-  pdf.text('INVOICE', bx, 12, { align: 'right' });
+  pdf.text('INVOICE', bx, 18, { align: 'right' });
 
-  // Invoice number
-  addTextImage(pdf, getInvoiceNumber(order.id), bx, 22, 7.5, '#ffffff', 52, true, true);
+  addTextImage(pdf, getInvoiceNumber(order.id), bx, 28, 8, '#ffffff', 52, true, true);
 
   pdf.setFont(undefined, 'normal');
-  pdf.setFontSize(8);
-  pdf.setTextColor(100, 116, 139);
-  pdf.text(formatDate(order.created_at), bx, 30, { align: 'right' });
+  pdf.setFontSize(10);
+  pdf.text(formatDate(order.created_at), bx, 38, { align: 'right' });
 }
 
-/** Green solid accent line below header */
-function drawAccentLine(pdf: jsPDF, y: number, pageWidth: number) {
-  pdf.setFillColor(22, 163, 74); // #16A34A
-  pdf.rect(0, y, pageWidth, 3, 'F');
-}
-
-/** Bill-To + Status chip row */
-function drawBillToRow(
-  pdf: jsPDF,
-  order: Order,
-  y: number,
-  margin: number,
-  pageWidth: number,
-): number {
-  const labelColor: [number, number, number] = [148, 163, 184];
-  const darkColor:  [number, number, number] = [15, 23, 42];
-
+function drawBillTo(pdf: jsPDF, order: Order, y: number, pageWidth: number): number {
   pdf.setFont(undefined, 'bold');
-  pdf.setFontSize(7);
-  pdf.setTextColor(...labelColor);
-  pdf.text('BILL TO', margin, y);
-  pdf.text('STATUS', pageWidth - margin, y, { align: 'right' });
+  pdf.setFontSize(9);
+  pdf.setTextColor(148, 163, 184);
+  pdf.text('BILL TO', MARGIN, y);
+  pdf.text('STATUS', pageWidth - MARGIN, y, { align: 'right' });
 
-  y += 5.5;
+  y += 8;
 
-  // Customer name via canvas
-  addTextImage(pdf, order.customer_name, margin, y + 2, 5.5, '#0f172a', 44, true);
-  y += 7;
+  // Customer Name (Large)
+  addTextImage(pdf, order.customer_name, MARGIN, y, 6.5, '#0f172a', 50, true);
+  
+  // Status Badge
+  const statusLabel = order.status.toUpperCase();
+  const sc = getStatusColors(order.status);
+  const chipW = 34, chipH = 10;
+  const chipX = pageWidth - MARGIN - chipW;
+  
+  pdf.setFillColor(...(sc.bg as [number, number, number]));
+  (pdf as any).roundedRect(chipX, y - 6, chipW, chipH, 2, 2, 'F');
+  addTextImage(pdf, statusLabel, chipX + chipW / 2, y - 1, 4, `rgb(${sc.text.join(',')})`, 34, true, false);
 
   if (order.customer_whatsapp) {
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(100, 116, 139);
-    // Avoid emoji — use plain text prefix
-    pdf.text(`Ph: ${order.customer_whatsapp}`, margin, y);
+    y += 8;
+    pdf.setFontSize(11);
+    pdf.setTextColor(71, 85, 105);
+    pdf.text(`WhatsApp: ${order.customer_whatsapp}`, MARGIN, y);
   }
 
-  // Status chip
-  const statusLabel  = order.status.charAt(0).toUpperCase() + order.status.slice(1);
-  const sc           = getStatusColors(order.status);
-  const chipW = 30, chipH = 9;
-  const chipX = pageWidth - margin - chipW;
-  const chipY = y - 12;
-
-  pdf.setFillColor(...(sc.bg   as [number,number,number]));
-  pdf.setDrawColor(...(sc.border as [number,number,number]));
-  pdf.setLineWidth(0.4);
-  (pdf as any).roundedRect(chipX, chipY, chipW, chipH, 4, 4, 'FD');
-
-  // Dot
-  pdf.setFillColor(...(sc.text as [number,number,number]));
-  pdf.circle(chipX + 5.5, chipY + chipH / 2, 1.5, 'F');
-
-  // Status label via canvas so it's always crisp
-  addTextImage(
-    pdf, statusLabel,
-    chipX + chipW / 2 + 1, chipY + chipH / 2,
-    4, `rgb(${sc.text.join(',')})`, 30, true,
-  );
-
-  return y + 6;
+  return y + 15;
 }
 
-/** Items table — full border box, no emojis */
 function drawItemsTable(
   pdf: jsPDF,
   items: OrderItem[],
   symbol: string,
   startY: number,
-  margin: number,
   pageWidth: number,
 ): number {
-  const contentW = pageWidth - 2 * margin;
-  const rowH     = 13;
-  const headH    = 10;
-  const totalH   = headH + items.length * rowH;
+  const contentW = pageWidth - 2 * MARGIN;
+  const rowH = 16; // Increased for better spacing
+  const headH = 12;
+  
+  const colQty = MARGIN + contentW * 0.6;
+  const colRate = MARGIN + contentW * 0.75;
+  const colAmount = MARGIN + contentW;
 
-  // Column X positions
-  const colItem   = margin;
-  const colQty    = margin + contentW * 0.55;
-  const colRate   = margin + contentW * 0.72;
-  const colAmount = margin + contentW;
-
-  // ── Outer border (full table) ──
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.35);
-  (pdf as any).roundedRect(margin, startY, contentW, totalH, 3, 3, 'S');
-
-  // ── Header background ──
+  // Header
   pdf.setFillColor(248, 250, 252);
-  (pdf as any).roundedRect(margin, startY, contentW, headH, 3, 3, 'F');
-
-  // Header bottom divider
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.3);
-  pdf.line(margin, startY + headH, margin + contentW, startY + headH);
-
-  // Header labels
-  const hMid = startY + headH / 2 + 1;
+  pdf.rect(MARGIN, startY, contentW, headH, 'F');
+  
+  pdf.setFontSize(9.5);
   pdf.setFont(undefined, 'bold');
-  pdf.setFontSize(7.5);
-  pdf.setTextColor(148, 163, 184);
-  pdf.text('ITEM',   colItem + 4,    hMid);
-  pdf.text('QTY',    colQty  + (colRate - colQty) / 2, hMid, { align: 'center' });
-  pdf.text('RATE',   colRate + (colAmount - colRate) / 2, hMid, { align: 'center' });
-  pdf.text('AMOUNT', colAmount - 4,  hMid, { align: 'right' });
+  pdf.setTextColor(100, 116, 139);
+  
+  const hY = startY + headH / 2 + 1.5;
+  pdf.text('DESCRIPTION', MARGIN + 4, hY);
+  pdf.text('QTY', colQty, hY, { align: 'center' });
+  pdf.text('RATE', colRate, hY, { align: 'center' });
+  pdf.text('TOTAL', colAmount - 4, hY, { align: 'right' });
 
   let y = startY + headH;
 
-  for (let i = 0; i < items.length; i++) {
-    const item      = items[i];
-    const hasCost   = item.unitPrice != null && item.unitPrice > 0;
-    const lineTotal = item.rowTotal ?? (hasCost ? item.unitPrice! * item.quantity : null);
-    const rowMidY   = y + rowH / 2;
+  items.forEach((item, i) => {
+    const rowMidY = y + rowH / 2;
+    
+    // Bottom border for rows
+    pdf.setDrawColor(241, 245, 249);
+    pdf.line(MARGIN, y + rowH, MARGIN + contentW, y + rowH);
 
-    // Row separator (skip after last row)
-    if (i > 0) {
-      pdf.setDrawColor(241, 245, 249);
-      pdf.setLineWidth(0.2);
-      pdf.line(margin, y, margin + contentW, y);
-    }
-
-    // ── Item box icon (drawn, no emoji) ──
-    const iconX = colItem + 3;
-    const iconY = rowMidY - 3;
-    const iconS = 6;
-    pdf.setFillColor(241, 245, 249);
-    pdf.setDrawColor(226, 232, 240);
-    pdf.setLineWidth(0.2);
-    (pdf as any).roundedRect(iconX, iconY, iconS, iconS, 1, 1, 'FD');
-    // Small square inside as "product" symbol
-    pdf.setFillColor(148, 163, 184);
-    pdf.rect(iconX + 1.5, iconY + 1.5, 3, 3, 'F');
-
-    // ── Item name ──
-    const nameX    = colItem + 12;
-    const nameMaxW = colQty - nameX - 3;
-    pdf.setFont(undefined, 'bold');
-    pdf.setFontSize(9);
+    // Item Name
+    pdf.setFontSize(11);
     pdf.setTextColor(15, 23, 42);
-    const nameLines = pdf.splitTextToSize(item.name, nameMaxW);
-    pdf.text(nameLines[0], nameX, item.category ? rowMidY - 1 : rowMidY + 1);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(item.name, MARGIN + 4, rowMidY);
 
     if (item.category) {
+      pdf.setFontSize(8);
       pdf.setFont(undefined, 'normal');
-      pdf.setFontSize(7);
       pdf.setTextColor(148, 163, 184);
-      pdf.text(item.category, nameX, rowMidY + 4);
+      pdf.text(item.category.toUpperCase(), MARGIN + 4, rowMidY + 5);
     }
 
-    // ── Qty ──
-    pdf.setFont(undefined, 'bold');
-    pdf.setFontSize(9.5);
-    pdf.setTextColor(55, 65, 81);
-    pdf.text(String(item.quantity), colQty + (colRate - colQty) / 2, rowMidY + 1, { align: 'center' });
+    // Qty
+    pdf.setFontSize(11);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text(String(item.quantity), colQty, rowMidY + 1, { align: 'center' });
 
-    // ── Rate (canvas for ₹) ──
-    if (hasCost) {
-      const rateStr = `${symbol}${item.unitPrice!.toLocaleString('en-IN')}`;
-      addTextImage(pdf, rateStr, colRate + (colAmount - colRate) / 2, rowMidY, 4, '#374151', 30, false, false);
-    } else {
-      pdf.setFont(undefined, 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text('—', colRate + (colAmount - colRate) / 2, rowMidY + 1, { align: 'center' });
-    }
-
-    // ── Amount (canvas for ₹) ──
-    if (lineTotal != null) {
-      const amtStr = `${symbol}${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      addTextImage(pdf, amtStr, colAmount - 4, rowMidY, 4.2, '#0f172a', 32, true, true);
-    } else {
-      pdf.setFont(undefined, 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text('—', colAmount - 4, rowMidY + 1, { align: 'right' });
-    }
+    // Rate & Total (Canvas for symbols)
+    const rate = item.unitPrice || 0;
+    const total = item.rowTotal || (rate * item.quantity);
+    
+    addTextImage(pdf, `${symbol}${rate.toLocaleString()}`, colRate, rowMidY + 1, 4.5, '#475569', 36, false, false);
+    addTextImage(pdf, `${symbol}${total.toLocaleString()}`, colAmount - 4, rowMidY + 1, 5, '#0f172a', 40, true, true);
 
     y += rowH;
-  }
-
-  return y; // returns exact bottom edge of table
-}
-
-/** Totals block — right-aligned, tight spacing */
-function drawTotals(
-  pdf: jsPDF,
-  items: OrderItem[],
-  total: number,
-  symbol: string,
-  y: number,
-  margin: number,
-  pageWidth: number,
-  gstNumber?: string,
-): number {
-  const subtotal     = items.reduce((s, it) => s + (it.rowTotal ?? ((it.unitPrice || 0) * it.quantity)), 0);
-  const hasAnyPrice  = items.some(it => it.unitPrice != null && it.unitPrice > 0);
-  const showSubtotal = hasAnyPrice && subtotal !== total;
-
-  const labelX = pageWidth - margin - 55;
-  const valueX = pageWidth - margin;
-
-  y += 5;
-
-  if (showSubtotal) {
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(100, 116, 139);
-    pdf.text('Subtotal', labelX, y);
-
-    const subStr = `${symbol}${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    addTextImage(pdf, subStr, valueX, y, 4, '#374151', 28, false, true);
-    y += 7;
-  }
-
-  // Divider line
-  pdf.setDrawColor(15, 23, 42);
-  pdf.setLineWidth(0.6);
-  pdf.line(labelX, y, valueX, y);
-  y += 6;
-
-  // Grand total label
-  pdf.setFont(undefined, 'bold');
-  pdf.setFontSize(11);
-  pdf.setTextColor(15, 23, 42);
-  pdf.text('Total', labelX, y);
-
-  // Grand total value via canvas
-  if (total > 0) {
-    const gtStr = `${symbol}${total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    addTextImage(pdf, gtStr, valueX, y, 5.5, '#16A34A', 40, true, true);
-  } else {
-    pdf.setTextColor(148, 163, 184);
-    pdf.text('—', valueX, y, { align: 'right' });
-  }
-
-  y += 6;
-
-  if (gstNumber) {
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(148, 163, 184);
-    pdf.text(`GST No. ${gstNumber}`, valueX, y, { align: 'right' });
-    y += 5;
-  }
+  });
 
   return y;
 }
 
-/** Thank-you note box — no emoji, clean layout */
-function drawThankYouBox(
+function drawTotals(
   pdf: jsPDF,
+  total: number,
+  symbol: string,
   y: number,
-  margin: number,
   pageWidth: number,
 ): number {
-  const contentW = pageWidth - 2 * margin;
-  const boxH     = 16;
+  y += 12;
+  const labelX = pageWidth - MARGIN - 60;
+  const valueX = pageWidth - MARGIN;
 
-  pdf.setFillColor(248, 250, 252);
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.3);
-  (pdf as any).roundedRect(margin, y, contentW, boxH, 3, 3, 'FD');
-
-  // Green left accent bar
-  pdf.setFillColor(22, 163, 74);
-  (pdf as any).roundedRect(margin, y, 2.5, boxH, 1.5, 1.5, 'F');
-
-  pdf.setFont(undefined, 'bold');
-  pdf.setFontSize(8.5);
-  pdf.setTextColor(22, 163, 74);
-  pdf.text('Thank you for your order!', margin + 6, y + 6);
-
-  pdf.setFont(undefined, 'normal');
-  pdf.setFontSize(7.5);
+  pdf.setFontSize(12);
   pdf.setTextColor(100, 116, 139);
-  pdf.text(
-    'If you have any questions about this invoice, please contact us. We appreciate your business.',
-    margin + 6,
-    y + 11.5,
-    { maxWidth: contentW - 10 },
-  );
+  pdf.text('Grand Total', labelX, y);
 
-  return y + boxH;
-}
+  // Big Green Total
+  addTextImage(pdf, `${symbol}${total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, valueX, y, 8, '#16A34A', 60, true, true);
 
-/** Footer — pinned to bottom of page */
-function drawFooter(pdf: jsPDF, pageWidth: number, pageHeight: number) {
-  const footerH = 14;
-  const footerY = pageHeight - footerH;
-
-  pdf.setFillColor(248, 250, 252);
-  pdf.rect(0, footerY, pageWidth, footerH, 'F');
-  pdf.setDrawColor(226, 232, 240);
-  pdf.setLineWidth(0.2);
-  pdf.line(0, footerY, pageWidth, footerY);
-
-  const midY = footerY + footerH / 2 + 1;
-
-  pdf.setFont(undefined, 'normal');
-  pdf.setFontSize(7.5);
-  pdf.setTextColor(148, 163, 184);
-  pdf.text('This is a computer-generated invoice. No signature required.', margin + 2, midY);
-
-  // Right: "Generated with CatShare"
-  const catshare = 'CatShare';
-  const prefix   = 'Generated with ';
-  const prefixW  = pdf.getTextWidth(prefix);
-  const brandW   = pdf.getTextWidth(catshare);
-  const totalW   = prefixW + brandW;
-  const startX   = pageWidth - margin - 2 - totalW;
-
-  pdf.setTextColor(148, 163, 184);
-  pdf.text(prefix, startX, midY);
-
-  pdf.setFont(undefined, 'bold');
-  pdf.setTextColor(22, 163, 74);
-  pdf.text(catshare, startX + prefixW, midY);
+  return y + 20;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
-
-const margin = 14;
 
 export async function generateInvoicePDF(
   order: Order,
@@ -503,32 +283,30 @@ export async function generateInvoicePDF(
   symbol: string,
 ): Promise<Blob> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  const pageWidth  = pdf.internal.pageSize.getWidth();
+  const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
 
-  const items   = order.items || [];
-  const total   = order.total_amount
-    ?? items.reduce((s, it) => s + (it.rowTotal ?? ((it.unitPrice || 0) * it.quantity)), 0);
-  const headerH = 44;
+  const items = order.items || [];
+  const total = order.total_amount || items.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
+  
+  // 1. Header
+  drawHeader(pdf, order, business, pageWidth, 48);
 
-  drawHeader(pdf, order, business, pageWidth, margin, headerH);
-  drawAccentLine(pdf, headerH, pageWidth);
+  // 2. Bill To
+  let currentY = 65;
+  currentY = drawBillTo(pdf, order, currentY, pageWidth);
 
-  let y = headerH + 3; // just below accent line
+  // 3. Items Table
+  currentY = drawItemsTable(pdf, items, symbol, currentY, pageWidth);
 
-  y = drawBillToRow(pdf, order, y + 8, margin, pageWidth);
+  // 4. Totals
+  currentY = drawTotals(pdf, total, symbol, currentY, pageWidth);
 
-  y += 4; // gap before table
-
-  y = drawItemsTable(pdf, items, symbol, y, margin, pageWidth);
-
-  y = drawTotals(pdf, items, total, symbol, y, margin, pageWidth, (business as any).gstNumber);
-
-  y += 5; // gap before thank-you box
-
-  drawThankYouBox(pdf, y, margin, pageWidth);
-  drawFooter(pdf, pageWidth, pageHeight);
+  // 5. Footer (Simple & Clean)
+  pdf.setFontSize(9);
+  pdf.setTextColor(148, 163, 184);
+  pdf.text('Thank you for choosing ' + (business.businessName || 'us') + '!', MARGIN, pageHeight - 20);
+  pdf.text('Generated via CatShare PDF Engine', pageWidth - MARGIN, pageHeight - 20, { align: 'right' });
 
   return pdf.output('blob') as Blob;
 }
