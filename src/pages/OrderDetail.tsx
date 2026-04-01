@@ -5,6 +5,8 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
+import { generateInvoicePDF } from '../utils/invoiceGenerator';
+import { getBusinessProfileForPdf } from '../config/businessProfile';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = 'pending' | 'completed' | 'cancelled';
@@ -320,7 +322,7 @@ function ActionBtn({
 export default function OrderDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, supabaseData } = useAuth();
   const { showToast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -440,14 +442,56 @@ export default function OrderDetail() {
     return lines.join('\n');
   };
 
-  const handleShareWhatsApp = () => {
-    const phone = (order as any).customer_whatsapp || '';
-    const text = encodeURIComponent(billText());
-    if (phone) {
-      const cleaned = phone.replace(/[^\d]/g, '');
-      window.open(`https://wa.me/${cleaned}?text=${text}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${text}`, '_blank');
+  const handleShareWhatsApp = async () => {
+    try {
+      showToast('Generating invoice PDF...', 'success');
+
+      // Get business profile
+      const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
+
+      // Generate PDF
+      const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
+
+      // Download the PDF
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const fileName = `Invoice_${order.id.substring(0, 8)}_${order.customer_name?.replace(/\s+/g, '_')}.pdf`;
+
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Give it a moment for the download to start
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+      }, 100);
+
+      // Open WhatsApp with the customer's number
+      const phone = (order as any).customer_whatsapp || '';
+      const message = encodeURIComponent(`Hi ${order.customer_name}, please find your invoice attached. 📎`);
+
+      if (phone) {
+        const cleaned = phone.replace(/[^\d]/g, '');
+        window.open(`https://wa.me/${cleaned}?text=${message}`, '_blank');
+      } else {
+        window.open(`https://wa.me/?text=${message}`, '_blank');
+      }
+
+      showToast('Invoice generated! Please attach it in WhatsApp', 'success');
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      showToast('Failed to generate invoice. Sharing text instead.', 'error');
+      // Fallback to text sharing
+      const phone = (order as any).customer_whatsapp || '';
+      const text = encodeURIComponent(billText());
+      if (phone) {
+        const cleaned = phone.replace(/[^\d]/g, '');
+        window.open(`https://wa.me/${cleaned}?text=${text}`, '_blank');
+      } else {
+        window.open(`https://wa.me/?text=${text}`, '_blank');
+      }
     }
   };
 
