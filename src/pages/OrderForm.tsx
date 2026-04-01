@@ -985,6 +985,8 @@ export default function OrderForm() {
     // Validate customer name
     if (!customerName.trim()) {
       alert('Please enter your name');
+      // Scroll to customer info section
+      document.querySelector('[data-customer-info-section]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -1121,6 +1123,86 @@ export default function OrderForm() {
               <WhatsAppIcon size={14} />
               <span className="btn-label">Order on WhatsApp</span>
             </button>
+          </div>
+        </div>
+
+        {/* Customer Info Section */}
+        <div data-customer-info-section style={{ padding: '16px 12px 12px' }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 16,
+            border: '1.5px solid #e2e8f0',
+            padding: '16px',
+            marginBottom: '12px'
+          }}>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                color: '#64748b',
+                marginBottom: '8px'
+              }}>Your Name *</label>
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: 10,
+                  fontFamily: 'var(--font)',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#16a34a';
+                  e.currentTarget.style.outlineColor = '#16a34a';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                }}
+              />
+            </div>
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                color: '#64748b',
+                marginBottom: '8px'
+              }}>Your WhatsApp (Optional)</label>
+              <input
+                type="tel"
+                placeholder="Enter your WhatsApp number"
+                value={customerWhatsapp}
+                onChange={(e) => setCustomerWhatsapp(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: 10,
+                  fontFamily: 'var(--font)',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#16a34a';
+                  e.currentTarget.style.outlineColor = '#16a34a';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                }}
+              />
+            </div>
           </div>
         </div>
 
