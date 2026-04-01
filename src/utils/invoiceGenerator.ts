@@ -107,7 +107,7 @@ function drawTableHeader(pdf: jsPDF, y: number, pageWidth: number) {
   const colTotal = MARGIN + contentW;
   
   // INCREASED FONT SIZE FOR HEADINGS
-  addUniformText(pdf, 'ITEM DESCRIPTION', MARGIN + 4, hY, 4.5, '#0F172A', true);
+  addUniformText(pdf, 'ITEM', MARGIN + 4, hY, 4.5, '#0F172A', true);
   addUniformText(pdf, 'QTY', colQty, hY, 4.5, '#0F172A', true, 'center');
   addUniformText(pdf, 'RATE', colRate, hY, 4.5, '#0F172A', true, 'center');
   addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 4.5, '#0F172A', true, 'right');
