@@ -12,6 +12,14 @@ export interface OrderItem {
   unitPrice?: number;
   rowTotal?: number;
   category?: string;
+  priceUnit?: string;
+}
+
+function formatQuantityLabel(quantity: number, priceUnit?: string): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return `${quantity} Units`;
+  }
+  return `${quantity} ${String(priceUnit).trim()}`;
 }
 
 export interface Order {
@@ -99,7 +107,7 @@ function drawTableHeader(pdf: jsPDF, y: number, pageWidth: number) {
   const colTotal = MARGIN + contentW;
   
   // INCREASED FONT SIZE FOR HEADINGS
-  addUniformText(pdf, 'ITEM DESCRIPTION', MARGIN + 4, hY, 4.5, '#0F172A', true);
+  addUniformText(pdf, 'ITEM', MARGIN + 4, hY, 4.5, '#0F172A', true);
   addUniformText(pdf, 'QTY', colQty, hY, 4.5, '#0F172A', true, 'center');
   addUniformText(pdf, 'RATE', colRate, hY, 4.5, '#0F172A', true, 'center');
   addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 4.5, '#0F172A', true, 'right');
@@ -165,11 +173,13 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
 
     // 1. Item Name + Subtitle (Category)
-    const displayTitle = item.category ? `${item.name} (${item.category})` : item.name;
-    addUniformText(pdf, displayTitle, MARGIN + 4, midY, 5, '#000000', true);
+    addUniformText(pdf, item.name, MARGIN + 4, currentY + 5.5, 5, '#000000', true);
+    if (item.category) {
+      addUniformText(pdf, item.category, MARGIN + 4, currentY + 11.5, 3.8, '#64748B', false);
+    }
 
     // 2. Qty + Unit
-    const qtyLabel = `${item.quantity} ${item.category || 'Units'}`;
+    const qtyLabel = formatQuantityLabel(item.quantity, item.priceUnit);
     addUniformText(pdf, qtyLabel, colQty, midY, 5, '#000000', false, 'center');
     
     // 3. Rate (Now Black)
