@@ -173,8 +173,10 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
 
     // 1. Item Name + Subtitle (Category)
-    const displayTitle = item.category ? `${item.name} (${item.category})` : item.name;
-    addUniformText(pdf, displayTitle, MARGIN + 4, midY, 5, '#000000', true);
+    addUniformText(pdf, item.name, MARGIN + 4, currentY + 5.5, 5, '#000000', true);
+    if (item.category) {
+      addUniformText(pdf, item.category, MARGIN + 4, currentY + 11.5, 3.8, '#64748B', false);
+    }
 
     // 2. Qty + Unit
     const qtyLabel = formatQuantityLabel(item.quantity, item.priceUnit);
