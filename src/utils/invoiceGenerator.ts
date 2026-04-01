@@ -183,5 +183,13 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
   // Thank you box
   drawThankYouBox(pdf, currentY + 15, pageWidth);
 
+
+
+  // 5. Footer (Simple & Clean)
+  pdf.setFontSize(9);
+  pdf.setTextColor(148, 163, 184);
+  pdf.text('Thank you for choosing ' + (business.businessName || 'us') + '!', MARGIN, pageHeight - 20);
+  pdf.text('Generated via CatShare PDF Engine', pageWidth - MARGIN, pageHeight - 20, { align: 'right' });
+
   return pdf.output('blob') as Blob;
 }
