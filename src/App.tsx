@@ -32,7 +32,7 @@ import SyncStatusIndicator from "./components/SyncStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 import { supabase } from "./supabaseClient";
 
-const CatalogueApp = lazy(() => import("./CatalogueApp"));
+import CatalogueApp from "./CatalogueApp";
 const CreateProduct = lazy(() => import("./CreateProduct"));
 const Shelf = lazy(() => import("./Shelf"));
 const Retail = lazy(() => import("./Retail"));
