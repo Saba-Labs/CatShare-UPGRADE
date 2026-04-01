@@ -804,22 +804,24 @@ export default function OrderDetail() {
                           {item.category && (
                             <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.category}</div>
                           )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: COLORS.muted }}>
                               {symbol}{item.unitPrice} × {item.quantity}
                             </div>
                           )}
                           {!hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}>
+                            <div style={{ fontSize: 12, color: COLORS.muted }}>
                               Qty: {item.quantity}
                             </div>
                           )}
+                          {lineTotal != null ? (
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>
+                              {formatMoney(lineTotal, symbol)}
+                            </div>
+                          ) : null}
                         </div>
-                        {lineTotal != null ? (
-                          <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, flexShrink: 0 }}>
-                            {formatMoney(lineTotal, symbol)}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
                   );
