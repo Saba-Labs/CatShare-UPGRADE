@@ -398,11 +398,19 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
     loadOrders();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
 
   const loadOrders = async () => {
     if (!user?.uid) return;
@@ -486,26 +494,47 @@ export default function Orders() {
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>{stats.total} total · {stats.pending} pending</div>
           </div>
-          {stats.revenue > 0 && (
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Earned</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatMoney(stats.revenue, symbol)}</div>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setShowSearch(prev => !prev)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', fontSize: 18,
+                color: '#64748B', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#0F172A'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
+              title="Search"
+            >
+              <IconSearch />
+            </button>
+            {stats.revenue > 0 && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Earned</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatMoney(stats.revenue, symbol)}</div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Search */}
-        <div style={{ padding: '10px 16px 0' }}>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}>
+        {/* Expanding Search */}
+        <div style={{
+          padding: '10px 16px 10px 16px',
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease-out',
+          maxHeight: showSearch ? '60px' : '0px',
+        }}>
+          <div style={{ position: 'relative', height: 40 }}>
+            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', display: 'flex', alignItems: 'center' }}>
               <IconSearch />
             </span>
             <input
+              ref={searchInputRef}
               placeholder="Search by name or product..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
-                width: '100%', padding: '9px 32px 9px 34px',
+                width: '100%', height: '100%', padding: '9px 32px 9px 34px',
                 borderRadius: 10, border: '1.5px solid #E2E8F0',
                 fontSize: 13, fontFamily: 'inherit', background: '#F8FAFC',
               }}
