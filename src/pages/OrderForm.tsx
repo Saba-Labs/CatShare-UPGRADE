@@ -92,6 +92,25 @@ function getFieldLabelAndUnitSuffix(
   return { label: `Field ${n}`, unitSuffix: '' };
 }
 
+function getItemSearchText(item: ShareLinkItem): string {
+  const extraFields = Array.from({ length: 4 }, (_, index) => {
+    const fieldNumber = index + 1;
+    const row = item as unknown as Record<string, string | undefined>;
+    return [
+      row[`field${fieldNumber}`],
+      row[`field${fieldNumber}Label`],
+      row[`field${fieldNumber}Unit`],
+    ]
+      .filter(Boolean)
+      .join(' ');
+  });
+
+  return [item.name, item.subtitle, item.priceUnit, ...extraFields]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 // ─── CSS injected once ────────────────────────────────────────────────────────
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -209,13 +228,76 @@ const CSS = `
   .of-confirm-btn:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; transform: none; }
 
   /* ── Section heading ── */
-  .of-section-head {
+  .of-toolbar {
     padding: 20px 20px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .of-section-head {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.8px;
     text-transform: uppercase;
     color: var(--muted);
+  }
+
+  .of-search {
+    position: relative;
+  }
+
+  .of-search-input {
+    width: 100%;
+    min-height: 44px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--font);
+    padding: 0 40px 0 40px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .of-search-input:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.1);
+  }
+
+  .of-search-icon,
+  .of-search-clear {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+  }
+
+  .of-search-icon {
+    left: 14px;
+    pointer-events: none;
+  }
+
+  .of-search-clear {
+    right: 12px;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .of-search-clear:hover {
+    background: #f1f5f9;
+    color: #475569;
   }
 
   /* ── Items list ── */
@@ -475,6 +557,13 @@ const CSS = `
     padding: 60px 20px;
     color: var(--muted);
     font-size: 14px;
+  }
+
+  .of-empty strong {
+    display: block;
+    color: var(--text);
+    font-size: 16px;
+    margin-bottom: 6px;
   }
 
   /* ── Summary bar ── */
@@ -884,6 +973,7 @@ export default function OrderForm() {
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [qty, setQty] = useState<QtyMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [sellerUserId, setSellerUserId] = useState<string | null>(null);
@@ -989,6 +1079,12 @@ export default function OrderForm() {
     () => items.filter((i) => (qty[i.productId] ?? 0) > 0).length,
     [items, qty]
   );
+
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => getItemSearchText(item).includes(query));
+  }, [items, searchQuery]);
 
   const lineAmounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1228,8 +1324,36 @@ export default function OrderForm() {
         </div>
 
         {/* Section label */}
-        <div className="of-section-head">
-          {items.length} item{items.length === 1 ? '' : 's'} available
+        <div className="of-toolbar">
+          <div className="of-section-head">
+            {searchQuery.trim()
+              ? `${filteredItems.length} of ${items.length} item${items.length === 1 ? '' : 's'} shown`
+              : `${items.length} item${items.length === 1 ? '' : 's'} available`}
+          </div>
+
+          {items.length > 0 && (
+            <div className="of-search">
+              <span className="of-search-icon" aria-hidden="true">⌕</span>
+              <input
+                type="text"
+                className="of-search-input"
+                placeholder="Search items"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Search items"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="of-search-clear"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Product list */}
@@ -1238,7 +1362,14 @@ export default function OrderForm() {
             <div className="of-empty">No items in this order link.</div>
           )}
 
-          {items.map((item) => {
+          {items.length > 0 && filteredItems.length === 0 && (
+            <div className="of-empty">
+              <strong>No matching items</strong>
+              Try a different name or keyword.
+            </div>
+          )}
+
+          {filteredItems.map((item) => {
             const q = qty[item.productId] ?? 0;
             const isSelected = q > 0;
             const lineAmt = lineAmounts[item.productId] ?? 0;
