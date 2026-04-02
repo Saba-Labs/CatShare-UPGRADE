@@ -355,7 +355,7 @@ export default function ConfirmOrder() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && Number.isFinite(unitPrice) && (
                             <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} × {q}
+                              {q} {getOrderUnitLabel(item.priceUnit)} × {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                             </div>
                           )}
                           {(!hasCost || !Number.isFinite(unitPrice)) && (
