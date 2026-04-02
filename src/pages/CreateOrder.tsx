@@ -782,7 +782,7 @@ export default function CreateOrder() {
                               fontWeight: 700,
                               color: '#166534',
                             }}>
-                              ₹{price.toLocaleString('en-IN')}
+                              ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
                             </div>
                           )}
                         </div>
