@@ -52,6 +52,20 @@ function IconArrowLeft() {
   );
 }
 
+// Helper function to get unit label
+function getOrderUnitLabel(priceUnit: string | undefined): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return 'units';
+  }
+  const cleaned = String(priceUnit)
+    .replace(/^\s*\/\s*/i, '')
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return 'units';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  return cleaned;
+}
+
 // Design tokens
 const FONT = "'DM Sans', system-ui, sans-serif";
 const COLORS = {
@@ -170,6 +184,7 @@ export default function CreateOrder() {
       rowTotal: number;
       category?: string;
       imageUrl?: string;
+      priceUnit?: string;
     }> = [];
 
     let total = 0;
@@ -182,6 +197,7 @@ export default function CreateOrder() {
         const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
         const rowTotal = unitPrice * quantity;
         
+        const priceUnit = catData[catalogue.priceUnitField];
         items.push({
           productId,
           name: product.name,
@@ -190,6 +206,7 @@ export default function CreateOrder() {
           rowTotal,
           category: product.category?.[0],
           imageUrl: product.image,
+          priceUnit,
         });
         
         total += rowTotal;
@@ -616,6 +633,7 @@ export default function CreateOrder() {
                   const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+                  const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
                   const hasImage = product.image && /^https?:\/\//i.test(product.image);
                   const isSelected = quantity > 0;
                   const lineTotal = price * quantity;
@@ -844,7 +862,7 @@ export default function CreateOrder() {
                                 Subtotal
                               </div>
                               <div style={{ fontSize: 11, fontWeight: 600 }}>
-                                {quantity} × ₹{price.toLocaleString('en-IN')}
+                                {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
                               </div>
                               <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
                                 ₹{lineTotal.toLocaleString('en-IN')}
@@ -958,7 +976,7 @@ export default function CreateOrder() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              {item.quantity} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              {item.quantity} {getOrderUnitLabel(item.priceUnit)} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                             </div>
                           )}
                           {hasCost && lineTotal > 0 && (
