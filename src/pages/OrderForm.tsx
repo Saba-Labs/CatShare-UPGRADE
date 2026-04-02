@@ -1,10 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
-import { createOrder, type OrderItem } from '../services/orderService';
-import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+import { getSupabaseClient } from '../supabaseClient';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -1076,12 +1075,9 @@ export default function OrderForm() {
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [customerName, setCustomerName] = useState('');
-  const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [sellerUserId, setSellerUserId] = useState<string | null>(null);
-  const [savingOrder, setSavingOrder] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   /** Number of drawer entries we pushed onto session history (usually 0 or 1). */
   const drawerHistoryDepthRef = useRef(0);
 
@@ -1285,82 +1281,28 @@ export default function OrderForm() {
     return lines.join('\n');
   }, [items, qty, currencySymbol]);
 
-  const openConfirmModal = () => {
+  const goToConfirmOrder = () => {
     const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
     if (selectedItems.length === 0) {
       alert('Please select at least one item');
       return;
     }
-    setShowConfirmModal(true);
-  };
 
-  const confirmOrder = async () => {
-    // Validate customer name (required)
-    if (!customerName.trim()) {
-      alert('Please enter your name');
-      return;
-    }
-
-    const to = (sellerWhatsapp || '').replace(/[^\d]/g, '');
-    if (!to) { alert('Seller WhatsApp number is not configured.'); return; }
-
-    // Save order to Supabase
-    if (token && sellerUserId) {
-      setSavingOrder(true);
-      setSupabaseRlsUserId(sellerUserId);
-      try {
-        const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
-        if (selectedItems.length === 0) {
-          alert('Please select at least one item');
-          setSavingOrder(false);
-          return;
-        }
-
-        // Build order items structure
-        const orderItems: OrderItem[] = selectedItems.map((i) => {
-          const q = qty[i.productId] ?? 0;
-          const unitPrice = parseItemPriceNumeric(i.price);
-          const rowTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
-
-          return {
-            productId: i.productId,
-            name: i.name,
-            quantity: q,
-            unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
-            rowTotal: rowTotal,
-            category: (i.category || []).join(', ') || i.subtitle || '',
-            priceUnit: i.priceUnit || undefined,
-            imageUrl: i.imageUrl,
-          };
-        });
-
-        // Create order
-        const { error } = await createOrder(
-          sellerUserId,
-          token,
-          customerName.trim(),
-          orderItems,
-          orderTotalAmount,
-          currencyCode,
-          customerWhatsapp.trim() || undefined
-        );
-
-        if (error) {
-          console.error('Error creating order:', error);
-          // Don't block WhatsApp opening even if order creation fails
-        }
-      } catch (err) {
-        console.error('Error saving order:', err);
-        // Don't block WhatsApp opening on error
-      } finally {
-        setSupabaseRlsUserId(null);
-        setSavingOrder(false);
-      }
-    }
-
-    // Close modal and open WhatsApp
-    setShowConfirmModal(false);
-    window.location.href = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
+    // Navigate to confirm page with order data
+    navigate(`/o/${token}/confirm`, {
+      state: {
+        selectedItems,
+        qty,
+        currencySymbol,
+        currencyCode,
+        sellerWhatsapp,
+        sellerUserId,
+        customerName: '',
+        customerWhatsapp: '',
+        lineAmounts,
+        orderTotalAmount,
+      },
+    });
   };
 
   // ── Loading ──
@@ -1436,7 +1378,7 @@ export default function OrderForm() {
             </div>
             <button
               className="of-confirm-btn"
-              onClick={openConfirmModal}
+              onClick={goToConfirmOrder}
               disabled={selectedProductCount === 0}
             >
               <WhatsAppIcon size={14} />
@@ -1645,7 +1587,7 @@ export default function OrderForm() {
       {/* Floating summary bar */}
       {selectedProductCount > 0 && (
         <div className="of-summary">
-          <div className="of-summary-card" onClick={openConfirmModal}>
+          <div className="of-summary-card" onClick={goToConfirmOrder}>
             <div className="of-summary-left">
               <span className="of-summary-count">
                 {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
@@ -1667,117 +1609,6 @@ export default function OrderForm() {
               <WhatsAppIcon size={16} />
               Place Order
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="of-modal-overlay" onClick={() => setShowConfirmModal(false)}>
-          <div className="of-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="of-modal-handle" />
-            <div className="of-modal-title">Confirm Your Order</div>
-
-            <div className="of-modal-input-group">
-              <label className="of-modal-label">
-                Your Name
-                <span className="of-modal-required">*</span>
-              </label>
-              <input
-                type="text"
-                className="of-modal-input"
-                placeholder="Enter your name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            <div className="of-modal-input-group">
-              <label className="of-modal-label">Your WhatsApp</label>
-              <input
-                type="tel"
-                className="of-modal-input"
-                placeholder="Enter your WhatsApp number (optional)"
-                value={customerWhatsapp}
-                onChange={(e) => setCustomerWhatsapp(e.target.value)}
-              />
-            </div>
-
-            {/* Order Items Summary */}
-            {(() => {
-              const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
-              if (selectedItems.length === 0) return null;
-
-              let orderTotal = 0;
-              selectedItems.forEach((item) => {
-                const q = qty[item.productId] ?? 0;
-                orderTotal += (lineAmounts[item.productId] ?? 0);
-              });
-
-              return (
-                <div className="of-modal-items-section">
-                  <div className="of-modal-items-title">Order Items ({selectedItems.length})</div>
-                  {selectedItems.map((item) => {
-                    const q = qty[item.productId] ?? 0;
-                    const amount = lineAmounts[item.productId] ?? 0;
-                    const categories = getItemCategories(item);
-
-                    return (
-                      <div key={item.productId} className="of-modal-item">
-                        <div className="of-modal-item-detail">
-                          <div className="of-modal-item-name">{item.name}</div>
-                          {item.subtitle && (
-                            <div className="of-modal-item-info">Category: {item.subtitle}</div>
-                          )}
-                          {categories.length > 0 && (
-                            <div className="of-modal-item-info">Tags: {categories.join(', ')}</div>
-                          )}
-                          {item.price && (
-                            <div className="of-modal-item-info">Price: {formatUnitPrice(item.price, currencySymbol)}</div>
-                          )}
-                          <div className="of-modal-item-qty">Qty: {q} {getOrderUnitLabel(item.priceUnit)}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', minWidth: '80px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>
-                            {item.price ? formatOrderMoney(amount, currencySymbol) : '—'}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="of-modal-order-summary">
-                    <div className="of-modal-total-row">
-                      <span>Subtotal</span>
-                      <span>{formatOrderMoney(orderTotal, currencySymbol)}</span>
-                    </div>
-                    <div className="of-modal-total-row final">
-                      <span>Total</span>
-                      <span>{formatOrderMoney(orderTotal, currencySymbol)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="of-modal-buttons">
-              <button
-                type="button"
-                className="of-modal-btn of-modal-cancel"
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="of-modal-btn of-modal-confirm"
-                onClick={confirmOrder}
-                disabled={!customerName.trim() || savingOrder}
-              >
-                {savingOrder ? 'Saving…' : 'Confirm & Order'}
-              </button>
-            </div>
           </div>
         </div>
       )}
