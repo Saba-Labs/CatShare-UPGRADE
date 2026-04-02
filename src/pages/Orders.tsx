@@ -503,26 +503,23 @@ export default function Orders() {
           <button
             onClick={() => handleNavigate('/create-order')}
             style={{
-              padding: '10px 20px',
+              padding: '8px 14px',
               background: '#2563EB',
               color: '#fff',
               border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 700,
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
               cursor: 'pointer',
               fontFamily: 'inherit',
               marginRight: 8,
-              transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.15)',
+              transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.25)';
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.15)';
             }}
           >
             + Create Order
