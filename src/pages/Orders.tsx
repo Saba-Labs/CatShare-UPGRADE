@@ -4,7 +4,6 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
-import CreateOrderModal from '../components/CreateOrderModal';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -401,16 +400,11 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
     loadOrders();
-    // Load products from localStorage
-    const storedProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
-    setProducts(storedProducts);
   }, [user?.uid]);
 
   useEffect(() => {
@@ -507,7 +501,7 @@ export default function Orders() {
 
           {/* Create Order Button */}
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => handleNavigate('/create-order')}
             style={{
               padding: '8px 14px',
               background: '#2563EB',
@@ -733,13 +727,6 @@ export default function Orders() {
         </button>
       </nav>
 
-      {/* Create Order Modal */}
-      <CreateOrderModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={loadOrders}
-        products={products}
-      />
     </div>
   );
 }
