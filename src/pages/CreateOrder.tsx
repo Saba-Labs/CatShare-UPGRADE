@@ -52,6 +52,48 @@ function IconArrowLeft() {
   );
 }
 
+// Design tokens
+const FONT = "'DM Sans', system-ui, sans-serif";
+const COLORS = {
+  bg: '#F5F5F7',
+  surface: '#FFFFFF',
+  border: '#E8E8ED',
+  text: '#1C1C1E',
+  muted: '#6E6E73',
+  subtle: '#AEAEB2',
+  green: '#16A34A',
+  greenLight: '#F0FDF4',
+};
+
+// Row divider
+const Divider = () => (
+  <div style={{ height: 1, background: '#F2F2F7', margin: '0 0' }} />
+);
+
+// Product image thumbnail
+function ProductThumb({ url, name }: { url?: string; name: string }) {
+  const [failed, setFailed] = React.useState(false);
+  const valid = url && /^https?:\/\//i.test(url) && !failed;
+  return (
+    <div style={{
+      width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+      overflow: 'hidden', background: '#F2F2F7',
+      border: `1px solid ${COLORS.border}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {valid ? (
+        <img src={url} alt={name} onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" strokeWidth="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+        </svg>
+      )}
+    </div>
+  );
+}
+
 export default function CreateOrder() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -894,39 +936,54 @@ export default function CreateOrder() {
 
             {/* Order Summary Preview */}
             <div style={{
-              padding: 12,
-              background: '#F8FAFC',
-              borderRadius: 10,
-              border: '1px solid #E2E8F0',
+              background: COLORS.surface,
+              borderRadius: 12,
+              border: `1px solid ${COLORS.border}`,
+              overflow: 'hidden',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#64748B', marginBottom: 8 }}>
-                Order Summary
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {orderSummary.items.map((item) => (
-                  <div key={item.productId} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: 13,
-                    color: '#0F172A',
-                  }}>
-                    <span>{item.quantity}x {item.name}</span>
-                    <span style={{ fontWeight: 600 }}>₹{item.rowTotal.toLocaleString('en-IN')}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{
-                borderTop: '1px solid #CBD5E1',
-                marginTop: 8,
-                paddingTop: 8,
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: 15,
-                fontWeight: 700,
-                color: '#166534',
-              }}>
-                <span>Total</span>
-                <span>₹{orderSummary.total.toLocaleString('en-IN')}</span>
+              <div style={{ padding: '4px 16px' }}>
+                {orderSummary.items.map((item, i) => {
+                  const lineTotal = item.rowTotal;
+                  const hasCost = item.unitPrice !== undefined && item.unitPrice > 0;
+                  return (
+                    <div key={item.productId}>
+                      {i > 0 && <Divider />}
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                        <ProductThumb url={item.imageUrl} name={item.name} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
+                            {item.name}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                          {hasCost && (
+                            <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
+                              {item.quantity} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                          {hasCost && lineTotal > 0 && (
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, fontFamily: FONT }}>
+                              ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Total row */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '14px 0 10px', marginTop: 4,
+                  borderTop: `2px solid ${COLORS.border}`,
+                  fontFamily: FONT,
+                }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
+                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                    ₹{orderSummary.total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
