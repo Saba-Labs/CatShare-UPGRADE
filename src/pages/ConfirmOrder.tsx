@@ -170,6 +170,9 @@ export default function ConfirmOrder() {
         if (error) {
           console.error('Error creating order:', error);
           // Don't block WhatsApp opening even if order creation fails
+        } else {
+          // Clear the saved order quantities from sessionStorage on successful order creation
+          sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }
       } catch (err) {
         console.error('Error saving order:', err);

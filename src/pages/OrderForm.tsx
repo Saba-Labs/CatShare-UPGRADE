@@ -1116,6 +1116,8 @@ export default function OrderForm() {
     setSearchQuery('');
     setSelectedCategory('all');
     drawerHistoryDepthRef.current = 0;
+    // Clear sessionStorage for old token if switching to a new one
+    // (This will be handled naturally when token changes and new useEffect fetches new data)
   }, [token]);
 
   useEffect(() => {
@@ -1143,6 +1145,22 @@ export default function OrderForm() {
         setItems(data.items || []);
         const initial: QtyMap = {};
         (data.items || []).forEach((i) => { initial[i.productId] = 0; });
+
+        // Try to restore qty from sessionStorage
+        const savedQty = sessionStorage.getItem(`catshare_order_qty_${token}`);
+        if (savedQty) {
+          try {
+            const restored = JSON.parse(savedQty) as QtyMap;
+            // Merge restored qty with initial (in case items list changed)
+            (data.items || []).forEach((i) => {
+              if (restored[i.productId] !== undefined) {
+                initial[i.productId] = restored[i.productId];
+              }
+            });
+          } catch {
+            // If JSON parsing fails, just use initial
+          }
+        }
         setQty(initial);
 
         // Fetch seller_user_id from share_links table
@@ -1173,6 +1191,13 @@ export default function OrderForm() {
   const changeQty = (id: string, delta: number) => {
     setQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
   };
+
+  // Persist qty to sessionStorage whenever it changes
+  useEffect(() => {
+    if (token && Object.keys(qty).length > 0) {
+      sessionStorage.setItem(`catshare_order_qty_${token}`, JSON.stringify(qty));
+    }
+  }, [qty, token]);
 
   /** Number of distinct products with qty > 0 (not sum of quantities). */
   const selectedProductCount = useMemo(
