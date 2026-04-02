@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
@@ -17,6 +17,55 @@ interface ConfirmOrderState {
   customerWhatsapp: string;
   lineAmounts: Record<string, number>;
   orderTotalAmount: number;
+}
+
+// Design tokens
+const FONT = "'DM Sans', system-ui, sans-serif";
+const COLORS = {
+  bg: '#F5F5F7',
+  surface: '#FFFFFF',
+  border: '#E8E8ED',
+  text: '#1C1C1E',
+  muted: '#6E6E73',
+  subtle: '#AEAEB2',
+  green: '#16A34A',
+  greenLight: '#F0FDF4',
+};
+
+// SVG Icons
+const Ic = {
+  Img: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" strokeWidth="1.5">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+    </svg>
+  ),
+};
+
+// Row divider
+const Divider = () => (
+  <div style={{ height: 1, background: '#F2F2F7', margin: '0 0' }} />
+);
+
+// Product image thumbnail
+function ProductThumb({ url, name }: { url?: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const valid = url && /^https?:\/\//i.test(url) && !failed;
+  return (
+    <div style={{
+      width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+      overflow: 'hidden', background: '#F2F2F7',
+      border: `1px solid ${COLORS.border}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {valid ? (
+        <img src={url} alt={name} onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <Ic.Img />
+      )}
+    </div>
+  );
 }
 
 function parseItemPriceNumeric(price: ShareLinkItem['price']): number {
@@ -242,46 +291,72 @@ export default function ConfirmOrder() {
           </div>
 
           {/* Order Items Summary */}
-          <div className="of-modal-items-section">
-            <div className="of-modal-items-title">Order Items ({selectedItems.length})</div>
-            {selectedItems.map((item) => {
-              const q = qty[item.productId] ?? 0;
-              const amount = lineAmounts[item.productId] ?? 0;
-              const categories = getItemCategories(item);
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.text, marginBottom: 12, fontFamily: FONT }}>
+              Order Items ({selectedItems.length})
+            </div>
+            <div style={{
+              background: COLORS.surface,
+              borderRadius: 12,
+              border: `1px solid ${COLORS.border}`,
+              overflow: 'hidden',
+            }}>
+              <div style={{ padding: '4px 16px' }}>
+                {selectedItems.map((item, i) => {
+                  const q = qty[item.productId] ?? 0;
+                  const hasCost = item.price !== undefined && item.price !== '';
+                  const unitPrice = parseItemPriceNumeric(item.price);
+                  const lineTotal = lineAmounts[item.productId] ?? 0;
 
-              return (
-                <div key={item.productId} className="of-modal-item">
-                  <div className="of-modal-item-detail">
-                    <div className="of-modal-item-name">{item.name}</div>
-                    {item.subtitle && (
-                      <div className="of-modal-item-info">Category: {item.subtitle}</div>
-                    )}
-                    {categories.length > 0 && (
-                      <div className="of-modal-item-info">Tags: {categories.join(', ')}</div>
-                    )}
-                    {item.price && (
-                      <div className="of-modal-item-info">Price: {formatOrderMoney(parseItemPriceNumeric(item.price), currencySymbol)}</div>
-                    )}
-                    <div className="of-modal-item-qty">Qty: {q} {getOrderUnitLabel(item.priceUnit)}</div>
-                  </div>
-                  <div style={{ textAlign: 'right', minWidth: '80px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>
-                      {item.price ? formatOrderMoney(amount, currencySymbol) : '—'}
+                  return (
+                    <div key={item.productId}>
+                      {i > 0 && <Divider />}
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                        <ProductThumb url={item.imageUrl} name={item.name} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
+                            {item.name}
+                          </div>
+                          {item.subtitle && (
+                            <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT }}>
+                              {item.subtitle}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                          {hasCost && Number.isFinite(unitPrice) && (
+                            <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
+                              {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} × {q}
+                            </div>
+                          )}
+                          {(!hasCost || !Number.isFinite(unitPrice)) && (
+                            <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
+                              Qty: {q}
+                            </div>
+                          )}
+                          {hasCost && Number.isFinite(unitPrice) && lineTotal > 0 && (
+                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, fontFamily: FONT }}>
+                              {formatOrderMoney(lineTotal, currencySymbol)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
 
-            {/* Order Summary */}
-            <div className="of-modal-order-summary">
-              <div className="of-modal-total-row">
-                <span>Subtotal</span>
-                <span>{formatOrderMoney(orderTotalAmount, currencySymbol)}</span>
-              </div>
-              <div className="of-modal-total-row final">
-                <span>Total</span>
-                <span>{formatOrderMoney(orderTotalAmount, currencySymbol)}</span>
+                {/* Total row */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '14px 0 10px', marginTop: 4,
+                  borderTop: `2px solid ${COLORS.border}`,
+                  fontFamily: FONT,
+                }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                    {formatOrderMoney(orderTotalAmount, currencySymbol)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
