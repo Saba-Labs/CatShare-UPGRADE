@@ -490,7 +490,7 @@ export default function Orders() {
         background: '#fff', borderBottom: '1px solid #E2E8F0',
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
       }}>
-        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
@@ -540,9 +540,10 @@ export default function Orders() {
               opacity: showSearch ? 1 : 0,
               transform: showSearch ? 'scale(1)' : 'scale(0.95)',
               marginRight: showSearch ? 8 : 0,
+              height: 36,
             }}
           >
-            <div style={{ position: 'relative', width: '100%', height: 36 }}>
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <input
                 ref={searchInputRef}
                 type="text"
