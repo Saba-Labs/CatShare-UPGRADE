@@ -916,6 +916,47 @@ const CSS = `
     background: #cbd5e1; cursor: not-allowed; box-shadow: none;
   }
 
+  /* Order items in confirmation modal */
+  .of-modal-items-section {
+    margin: 20px 0; padding-top: 20px; border-top: 1px solid var(--border);
+  }
+
+  .of-modal-items-title {
+    font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 12px;
+  }
+
+  .of-modal-item {
+    display: flex; gap: 12px; padding: 10px; background: var(--bg); border-radius: 8px; margin-bottom: 8px;
+  }
+
+  .of-modal-item-detail {
+    flex: 1; min-width: 0;
+  }
+
+  .of-modal-item-name {
+    font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px;
+  }
+
+  .of-modal-item-info {
+    font-size: 12px; color: var(--muted); margin-bottom: 2px;
+  }
+
+  .of-modal-item-qty {
+    font-size: 12px; font-weight: 600; color: var(--green);
+  }
+
+  .of-modal-order-summary {
+    margin-top: 16px; padding: 12px; background: var(--green-light); border-radius: 8px; border: 1px solid var(--border);
+  }
+
+  .of-modal-total-row {
+    display: flex; justify-content: space-between; font-size: 13px; margin: 4px 0;
+  }
+
+  .of-modal-total-row.final {
+    font-weight: 700; font-size: 14px; color: var(--green); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;
+  }
+
   @media (max-width: 400px) {
     .of-item-name { font-size: 13px; }
     .of-item-subtitle-inline { font-size: 9px; }
@@ -1662,6 +1703,63 @@ export default function OrderForm() {
                 onChange={(e) => setCustomerWhatsapp(e.target.value)}
               />
             </div>
+
+            {/* Order Items Summary */}
+            {(() => {
+              const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
+              if (selectedItems.length === 0) return null;
+
+              let orderTotal = 0;
+              selectedItems.forEach((item) => {
+                const q = qty[item.productId] ?? 0;
+                orderTotal += (lineAmounts[item.productId] ?? 0);
+              });
+
+              return (
+                <div className="of-modal-items-section">
+                  <div className="of-modal-items-title">Order Items ({selectedItems.length})</div>
+                  {selectedItems.map((item) => {
+                    const q = qty[item.productId] ?? 0;
+                    const amount = lineAmounts[item.productId] ?? 0;
+                    const categories = getItemCategories(item);
+
+                    return (
+                      <div key={item.productId} className="of-modal-item">
+                        <div className="of-modal-item-detail">
+                          <div className="of-modal-item-name">{item.name}</div>
+                          {item.subtitle && (
+                            <div className="of-modal-item-info">Category: {item.subtitle}</div>
+                          )}
+                          {categories.length > 0 && (
+                            <div className="of-modal-item-info">Tags: {categories.join(', ')}</div>
+                          )}
+                          {item.price && (
+                            <div className="of-modal-item-info">Price: {formatUnitPrice(item.price, currencySymbol)}</div>
+                          )}
+                          <div className="of-modal-item-qty">Qty: {q} {getOrderUnitLabel(item.priceUnit)}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', minWidth: '80px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: '#16a34a' }}>
+                            {item.price ? formatOrderMoney(amount, currencySymbol) : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="of-modal-order-summary">
+                    <div className="of-modal-total-row">
+                      <span>Subtotal</span>
+                      <span>{formatOrderMoney(orderTotal, currencySymbol)}</span>
+                    </div>
+                    <div className="of-modal-total-row final">
+                      <span>Total</span>
+                      <span>{formatOrderMoney(orderTotal, currencySymbol)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="of-modal-buttons">
               <button
