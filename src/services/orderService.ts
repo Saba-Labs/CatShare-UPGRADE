@@ -58,6 +58,38 @@ export async function createOrder(
 }
 
 /**
+ * Create a new order directly (without share link - for manual seller entry)
+ */
+export async function createOrderDirectly(
+  sellerUserId: string,
+  customerName: string,
+  items: OrderItem[],
+  totalAmount: number | undefined,
+  currencyCode: string = 'INR',
+  customerWhatsapp?: string,
+  catalogueId?: string
+): Promise<{ data: Order | null; error: any }> {
+  try {
+    const client = getSupabaseClient();
+
+    const { data, error } = await client.from('orders').insert({
+      share_link_token: 'manual-order',
+      seller_user_id: sellerUserId,
+      customer_name: customerName,
+      customer_whatsapp: customerWhatsapp,
+      items: items,
+      total_amount: totalAmount,
+      currency_code: currencyCode,
+      status: 'pending',
+    });
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
+  }
+}
+
+/**
  * Fetch all orders for a seller
  */
 export async function fetchSellerOrders(
