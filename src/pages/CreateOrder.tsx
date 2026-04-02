@@ -297,7 +297,11 @@ export default function CreateOrder() {
   };
 
   const handleClose = () => {
-    navigate('/orders');
+    if (step === 'catalogue') {
+      navigate('/orders');
+    } else {
+      handleBackStep();
+    }
   };
 
   return (
