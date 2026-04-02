@@ -64,6 +64,7 @@ export default function CreateOrder() {
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const catalogues = getAllCatalogues();
   const products = safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[];
@@ -74,22 +75,50 @@ export default function CreateOrder() {
     return products.filter(p => isProductEnabledForCatalogue(p, selectedCatalogueId));
   }, [products, selectedCatalogueId]);
 
-  // Filter products by search
+  // Get all categories
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    catalogueProducts.forEach(p => {
+      if (p.category && Array.isArray(p.category)) {
+        p.category.forEach(c => {
+          if (c) cats.add(c);
+        });
+      }
+    });
+    return Array.from(cats).sort();
+  }, [catalogueProducts]);
+
+  // Filter products by search and category
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return catalogueProducts;
-    const q = searchQuery.toLowerCase();
-    return catalogueProducts.filter(p => 
-      p.name?.toLowerCase().includes(q) || 
-      p.category?.some((c: string) => c?.toLowerCase().includes(q))
-    );
-  }, [catalogueProducts, searchQuery]);
+    let result = catalogueProducts;
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      result = result.filter(p => 
+        selectedCategory === 'uncategorized' 
+          ? !p.category || p.category.length === 0
+          : p.category?.includes(selectedCategory)
+      );
+    }
+
+    // Filter by search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.name?.toLowerCase().includes(q) || 
+        p.category?.some((c: string) => c?.toLowerCase().includes(q))
+      );
+    }
+
+    return result;
+  }, [catalogueProducts, searchQuery, selectedCategory]);
 
   // Calculate order totals
   const orderSummary = useMemo(() => {
-    if (!selectedCatalogueId) return { items: [], total: 0 };
+    if (!selectedCatalogueId) return { items: [], total: 0, count: 0 };
     
     const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
-    if (!catalogue) return { items: [], total: 0 };
+    if (!catalogue) return { items: [], total: 0, count: 0 };
 
     const items: Array<{
       productId: string;
@@ -102,6 +131,7 @@ export default function CreateOrder() {
     }> = [];
 
     let total = 0;
+    let count = 0;
 
     selectedProducts.forEach((quantity, productId) => {
       const product = products.find(p => p.id === productId);
@@ -121,16 +151,18 @@ export default function CreateOrder() {
         });
         
         total += rowTotal;
+        count += quantity;
       }
     });
 
-    return { items, total };
+    return { items, total, count };
   }, [selectedCatalogueId, selectedProducts, products, catalogues]);
 
   const handleSelectCatalogue = (catId: string) => {
     setSelectedCatalogueId(catId);
     setSelectedProducts(new Map());
     setSearchQuery('');
+    setSelectedCategory('all');
     setStep('products');
   };
 
@@ -235,7 +267,7 @@ export default function CreateOrder() {
         background: '#fff',
         borderBottom: '1px solid #E2E8F0',
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-        padding: '16px',
+        padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -277,12 +309,11 @@ export default function CreateOrder() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '16px',
         marginTop: 40,
       }}>
         {/* Step: Catalogue Selection */}
         {step === 'catalogue' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px' }}>
             {catalogues.map((cat) => {
               const productCount = products.filter(p => isProductEnabledForCatalogue(p, cat.id)).length;
               return (
@@ -327,89 +358,264 @@ export default function CreateOrder() {
 
         {/* Step: Product Selection */}
         {step === 'products' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Search */}
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 36px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  transition: 'border-color 0.15s',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#2563EB';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#D1D5DB';
-                }}
-              />
+          <div>
+            {/* Summary Section */}
+            {orderSummary.items.length > 0 && (
               <div style={{
-                position: 'absolute',
-                left: 10,
-                top: '50%',
-                transform: 'translateY(-50%)',
+                background: '#fff',
+                borderBottom: '1px solid #E2E8F0',
+                padding: '16px',
+                position: 'sticky',
+                top: 0,
+                zIndex: 30,
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <div>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#64748B',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: 4,
+                    }}>
+                      Order Summary
+                    </div>
+                    <div style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#64748B',
+                    }}>
+                      {orderSummary.count} {orderSummary.count === 1 ? 'item' : 'items'} selected
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#64748B',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: 4,
+                    }}>
+                      Total
+                    </div>
+                    <div style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: '#166534',
+                    }}>
+                      ₹{orderSummary.total.toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Toolbar */}
+            <div style={{
+              padding: '16px',
+              borderBottom: '1px solid #E2E8F0',
+              background: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
                 color: '#94A3B8',
               }}>
-                <IconSearch />
+                {filteredProducts.length} of {catalogueProducts.length} product{catalogueProducts.length !== 1 ? 's' : ''} shown
               </div>
+
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 36px',
+                    border: '1.5px solid #D1D5DB',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    transition: 'border-color 0.15s',
+                    background: '#fff',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#16A34A';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,163,74,0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94A3B8',
+                  pointerEvents: 'none',
+                }}>
+                  <IconSearch />
+                </div>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9CA3AF',
+                      fontSize: 18,
+                      padding: 0,
+                      width: 24,
+                      height: 24,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#6B7280'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#9CA3AF'}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              {/* Category Chips */}
+              {allCategories.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}>
+                  <button
+                    onClick={() => setSelectedCategory('all')}
+                    style={{
+                      border: `1px solid ${selectedCategory === 'all' ? '#16A34A' : '#E2E8F0'}`,
+                      background: selectedCategory === 'all' ? '#DCFCE7' : '#fff',
+                      color: selectedCategory === 'all' ? '#166534' : '#94A3B8',
+                      borderRadius: 999,
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    All
+                  </button>
+                  {allCategories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      style={{
+                        border: `1px solid ${selectedCategory === cat ? '#16A34A' : '#E2E8F0'}`,
+                        background: selectedCategory === cat ? '#DCFCE7' : '#fff',
+                        color: selectedCategory === cat ? '#166534' : '#94A3B8',
+                        borderRadius: 999,
+                        padding: '8px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Products List */}
-            {filteredProducts.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '40px 24px',
-                color: '#64748B',
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
-                  {searchQuery ? 'No products found' : 'No products in this catalogue'}
+            <div style={{
+              padding: '0 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}>
+              {filteredProducts.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px 24px',
+                  color: '#64748B',
+                  marginTop: 20,
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    {searchQuery ? 'No products found' : 'No products in this catalogue'}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {filteredProducts.map((product) => {
+              ) : (
+                filteredProducts.map((product) => {
                   const quantity = selectedProducts.get(product.id) || 0;
                   const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
                   const hasImage = product.image && /^https?:\/\//i.test(product.image);
+                  const isSelected = quantity > 0;
+                  const lineTotal = price * quantity;
 
                   return (
                     <div
                       key={product.id}
                       style={{
-                        padding: '12px',
-                        border: '1.5px solid #E2E8F0',
-                        borderRadius: 10,
                         background: '#fff',
-                        transition: 'all 0.15s',
+                        borderRadius: 12,
+                        border: isSelected ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0',
+                        overflow: 'hidden',
                         display: 'flex',
-                        gap: 12,
                         alignItems: 'stretch',
+                        transition: 'all 0.2s',
+                        marginBottom: 8,
+                        boxShadow: isSelected ? '0 0 0 2px rgba(22,163,74,0.12), 0 1px 4px rgba(0,0,0,0.04)' : '0 1px 4px rgba(0,0,0,0.04)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.09)';
+                          (e.currentTarget as HTMLDivElement).style.borderColor = '#CBD5E1';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)';
+                          (e.currentTarget as HTMLDivElement).style.borderColor = '#E2E8F0';
+                        }
                       }}
                     >
-                      {/* Product Image */}
+                      {/* Image */}
                       <div style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 8,
+                        width: 100,
+                        height: 100,
                         flexShrink: 0,
                         overflow: 'hidden',
                         background: '#F1F5F9',
-                        border: '1px solid #E2E8F0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        position: 'relative',
                       }}>
                         {hasImage ? (
                           <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -418,93 +624,201 @@ export default function CreateOrder() {
                             <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
                           </svg>
                         )}
-                      </div>
-
-                      {/* Product Info */}
-                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
-                          {product.name}
-                        </div>
-                        {product.subtitle && (
-                          <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                            {product.subtitle}
+                        {isSelected && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 8,
+                            left: 8,
+                            background: '#16A34A',
+                            color: '#fff',
+                            fontSize: 9,
+                            fontWeight: 800,
+                            letterSpacing: '0.4px',
+                            textTransform: 'uppercase',
+                            padding: '3px 7px',
+                            borderRadius: 100,
+                          }}>
+                            ✓ Added
                           </div>
                         )}
-                        {price > 0 && (
-                          <div style={{ fontSize: 13, fontWeight: 700, color: '#166534', marginTop: 4 }}>
-                            ₹{price.toLocaleString('en-IN')}
-                          </div>
-                        )}
                       </div>
 
-                      {/* Quantity Controls - Always Visible */}
+                      {/* Body */}
                       <div style={{
+                        flex: 1,
+                        padding: '12px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 0,
-                        background: '#F1F5F9',
-                        borderRadius: 6,
-                        border: '1.5px solid #E2E8F0',
-                        flexShrink: 0,
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        minWidth: 0,
+                        gap: 6,
                       }}>
-                        <button
-                          onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
+                        {/* Top */}
+                        <div>
+                          <div style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: quantity === 0 ? '#CBD5E1' : '#374151',
-                            fontFamily: 'inherit',
-                            transition: 'color 0.15s',
-                          }}
-                          disabled={quantity === 0}
-                        >
-                          <IconMinus />
-                        </button>
-                        <span style={{
-                          minWidth: 32,
-                          textAlign: 'center',
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                            flexWrap: 'wrap',
+                            alignItems: 'baseline',
+                            gap: '4px 8px',
+                            lineHeight: 1.3,
+                            marginBottom: 4,
+                          }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                              {product.name}
+                            </span>
+                            {product.subtitle && (
+                              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
+                                ({product.subtitle})
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Categories */}
+                          {product.category && product.category.length > 0 && (
+                            <div style={{
+                              display: 'flex',
+                              gap: 6,
+                              flexWrap: 'wrap',
+                              marginTop: 4,
+                              marginBottom: 4,
+                            }}>
+                              {product.category.map((cat) => (
+                                <span
+                                  key={cat}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    borderRadius: 999,
+                                    padding: '3px 8px',
+                                    background: '#F1F5F9',
+                                    color: '#475569',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Price */}
+                          {price > 0 && (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              background: '#DCFCE7',
+                              borderRadius: 6,
+                              padding: '2px 7px',
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: '#166534',
+                            }}>
+                              ₹{price.toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
                         }}>
-                          {quantity}
-                        </span>
-                        <button
-                          onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
+                          {/* Quantity Control */}
+                          <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#374151',
-                            fontFamily: 'inherit',
-                            transition: 'color 0.15s',
-                          }}
-                        >
-                          <IconPlus />
-                        </button>
+                            gap: 0,
+                            background: '#F1F5F9',
+                            borderRadius: 6,
+                            border: '1.5px solid #E2E8F0',
+                            flexShrink: 0,
+                          }}>
+                            <button
+                              onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: quantity === 0 ? '#CBD5E1' : '#374151',
+                                fontFamily: 'inherit',
+                                transition: 'color 0.15s',
+                              }}
+                              disabled={quantity === 0}
+                            >
+                              <IconMinus />
+                            </button>
+                            <span style={{
+                              minWidth: 32,
+                              textAlign: 'center',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                            }}>
+                              {quantity}
+                            </span>
+                            <button
+                              onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#374151',
+                                fontFamily: 'inherit',
+                                transition: 'color 0.15s',
+                              }}
+                            >
+                              <IconPlus />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Subtotal */}
+                        {isSelected && (
+                          <div style={{
+                            fontSize: 12,
+                            color: '#64748B',
+                            fontWeight: 500,
+                            paddingTop: 4,
+                            borderTop: '1px solid #E2E8F0',
+                          }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                              Subtotal
+                            </span>
+                            {' · '}
+                            {quantity} × ₹{price.toLocaleString('en-IN')}
+                            {' · '}
+                            <span style={{ fontWeight: 700, color: '#166534' }}>
+                              ₹{lineTotal.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
         )}
 
         {/* Step: Customer Details */}
         {step === 'customer' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
               <label style={{
                 display: 'block',
@@ -617,7 +931,7 @@ export default function CreateOrder() {
 
         {/* Step: Review Order */}
         {step === 'review' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Customer Info */}
             <div style={{
               padding: 12,
