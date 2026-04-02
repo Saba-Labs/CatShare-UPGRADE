@@ -649,12 +649,12 @@ export default function CreateOrder() {
                         padding: '12px',
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: 'center',
+                        justifyContent: 'flex-start',
                         minWidth: 0,
                         gap: 6,
                       }}>
                         {/* Top */}
-                        <div>
+                        <div style={{ flexShrink: 0 }}>
                           <div style={{
                             display: 'flex',
                             flexWrap: 'wrap',
@@ -724,6 +724,7 @@ export default function CreateOrder() {
                         {/* Bottom */}
                         <div style={{
                           display: 'flex',
+                          flex: 1,
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: 8,
