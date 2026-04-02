@@ -185,6 +185,7 @@ export default function CreateOrder() {
       category?: string;
       imageUrl?: string;
       priceUnit?: string;
+      subtitle?: string;
     }> = [];
 
     let total = 0;
@@ -207,6 +208,7 @@ export default function CreateOrder() {
           category: product.category?.[0],
           imageUrl: product.image,
           priceUnit,
+          subtitle: product.subtitle,
         });
         
         total += rowTotal;
@@ -976,6 +978,11 @@ export default function CreateOrder() {
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
                             {item.name}
                           </div>
+                          {item.subtitle && (
+                            <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT }}>
+                              {item.subtitle}
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
