@@ -514,6 +514,7 @@ export default function Orders() {
               fontFamily: 'inherit',
               marginRight: 8,
               transition: 'all 0.15s ease',
+              display: showSearch ? 'none' : 'inline-block',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
