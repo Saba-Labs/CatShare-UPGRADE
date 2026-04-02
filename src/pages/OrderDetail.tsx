@@ -20,11 +20,26 @@ interface OrderItem {
   category?: string;
   productId?: string;
   imageUrl?: string;
+  priceUnit?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatMoney(amount: number, symbol: string) {
   return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+/** Short label from price unit (e.g. "/ piece" → "pcs"). */
+function getOrderUnitLabel(priceUnit: string | undefined): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return 'units';
+  }
+  const cleaned = String(priceUnit)
+    .replace(/^\s*\/\s*/i, '')
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return 'units';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  return cleaned;
 }
 
 function formatDate(dateStr: string) {
@@ -356,6 +371,37 @@ function ActionTile({
 
 // ─── Qty stepper ─────────────────────────────────────────────────────────────
 function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(String(value));
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Only allow numeric input
+    if (val === '' || /^\d+$/.test(val)) {
+      setInputValue(val);
+    }
+  };
+
+  const handleConfirm = () => {
+    const num = inputValue === '' ? 0 : parseInt(inputValue, 10);
+    onChange(Math.max(0, num));
+    setIsEditing(false);
+    setInputValue(String(value));
+  };
+
+  const handleBlur = () => {
+    handleConfirm();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleConfirm();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setInputValue(String(value));
+    }
+  };
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', background: '#F2F2F7', borderRadius: 100, overflow: 'hidden' }}>
       <button
@@ -364,9 +410,43 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) 
       >
         <Ic.Minus />
       </button>
-      <span style={{ minWidth: 30, textAlign: 'center', fontSize: 14, fontWeight: 700, color: COLORS.text, userSelect: 'none' }}>
-        {value}
-      </span>
+      {isEditing ? (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          style={{
+            minWidth: 30,
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            color: COLORS.text,
+            border: 'none',
+            background: 'transparent',
+            outline: 'none',
+            padding: '0 4px',
+          }}
+        />
+      ) : (
+        <span
+          onClick={() => setIsEditing(true)}
+          style={{
+            minWidth: 30,
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 700,
+            color: COLORS.text,
+            userSelect: 'none',
+            cursor: 'pointer',
+            padding: '0 4px',
+          }}
+        >
+          {value}
+        </span>
+      )}
       <button
         onClick={() => onChange(value + 1)}
         style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
@@ -808,12 +888,12 @@ export default function OrderDetail() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              {symbol}{item.unitPrice} × {item.quantity}
+                              {symbol}{item.unitPrice} × {item.quantity} {getOrderUnitLabel(item.priceUnit)}
                             </div>
                           )}
                           {!hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              Qty: {item.quantity}
+                              Qty: {item.quantity} {getOrderUnitLabel(item.priceUnit)}
                             </div>
                           )}
                           {lineTotal != null ? (

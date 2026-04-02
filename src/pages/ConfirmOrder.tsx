@@ -40,6 +40,11 @@ const Ic = {
       <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
     </svg>
   ),
+  Back: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
 };
 
 // Row divider
@@ -170,6 +175,9 @@ export default function ConfirmOrder() {
         if (error) {
           console.error('Error creating order:', error);
           // Don't block WhatsApp opening even if order creation fails
+        } else {
+          // Clear the saved order quantities from sessionStorage on successful order creation
+          sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }
       } catch (err) {
         console.error('Error saving order:', err);
@@ -243,15 +251,36 @@ export default function ConfirmOrder() {
             <button
               onClick={() => navigate(`/o/${token}`)}
               style={{
-                background: 'none',
-                border: 'none',
-                fontSize: 24,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: COLORS.bg,
+                border: `1px solid ${COLORS.border}`,
                 cursor: 'pointer',
-                padding: 8,
-                marginLeft: -8,
+                padding: 0,
+                color: COLORS.text,
+                transition: 'all 0.2s ease',
+                fontFamily: FONT,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = COLORS.border;
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = COLORS.bg;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
               }}
             >
-              ←
+              <Ic.Back />
             </button>
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div className="of-header-title">Confirm Your Order</div>
@@ -353,7 +382,7 @@ export default function ConfirmOrder() {
                   fontFamily: FONT,
                 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
                     {formatOrderMoney(orderTotalAmount, currencySymbol)}
                   </span>
                 </div>
