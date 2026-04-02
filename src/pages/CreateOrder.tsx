@@ -785,28 +785,30 @@ export default function CreateOrder() {
                               <IconPlus />
                             </button>
                           </div>
-                        </div>
 
-                        {/* Subtotal */}
-                        {isSelected && (
-                          <div style={{
-                            fontSize: 12,
-                            color: '#64748B',
-                            fontWeight: 500,
-                            paddingTop: 4,
-                            borderTop: '1px solid #E2E8F0',
-                          }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
-                              Subtotal
-                            </span>
-                            {' · '}
-                            {quantity} × ₹{price.toLocaleString('en-IN')}
-                            {' · '}
-                            <span style={{ fontWeight: 700, color: '#166534' }}>
-                              ₹{lineTotal.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        )}
+                          {/* Subtotal - Right side */}
+                          {isSelected && (
+                            <div style={{
+                              fontSize: 12,
+                              color: '#64748B',
+                              fontWeight: 500,
+                              textAlign: 'right',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 2,
+                            }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                                Subtotal
+                              </div>
+                              <div style={{ fontSize: 11, fontWeight: 600 }}>
+                                {quantity} × ₹{price.toLocaleString('en-IN')}
+                              </div>
+                              <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
+                                ₹{lineTotal.toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
