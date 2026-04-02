@@ -947,7 +947,6 @@ if (isStrictMode() && user?.uid) {
 
                             <div className="min-w-0">
                               <div className="font-semibold text-sm truncate">{p.name}</div>
-                              <div className="text-xs text-gray-500 truncate">{p.subtitle}</div>
                             </div>
                           </div>
 
