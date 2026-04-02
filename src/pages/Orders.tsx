@@ -493,7 +493,7 @@ export default function Orders() {
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>{stats.total} total · {stats.pending} pending</div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, display: showSearch ? 'none' : 'block', transition: 'opacity 0.15s ease' }}>{stats.total} total · {stats.pending} pending</div>
           </div>
 
           {/* Flexible Spacer */}
@@ -508,12 +508,13 @@ export default function Orders() {
               color: '#fff',
               border: 'none',
               borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 700,
+              fontSize: 13,
+              fontWeight: 600,
               cursor: 'pointer',
               fontFamily: 'inherit',
               marginRight: 8,
-              transition: 'all 0.15s',
+              transition: 'all 0.15s ease',
+              display: showSearch ? 'none' : 'inline-block',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
