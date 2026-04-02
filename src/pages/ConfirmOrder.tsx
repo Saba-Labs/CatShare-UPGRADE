@@ -305,6 +305,11 @@ export default function ConfirmOrder() {
               onChange={(e) => setCustomerName(e.target.value)}
               autoFocus
             />
+            {!customerName.trim() && (
+              <div style={{ fontSize: 12, color: '#EF4444', marginTop: 6, fontFamily: FONT }}>
+                Please enter your name to confirm the order
+              </div>
+            )}
           </div>
 
           {/* Customer WhatsApp Input */}
@@ -418,6 +423,7 @@ export default function ConfirmOrder() {
             className="of-modal-btn of-modal-confirm"
             onClick={confirmOrder}
             disabled={!customerName.trim() || savingOrder}
+            title={!customerName.trim() ? 'Please enter your name first' : ''}
             style={{ flex: 1 }}
           >
             {savingOrder ? 'Saving…' : 'Confirm & Order'}
