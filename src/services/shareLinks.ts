@@ -36,6 +36,17 @@ function randomToken(length = 32): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function normalizeShareLinkCategories(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+  return Array.from(
+    new Set(
+      list
+        .map((category) => String(category).trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 export type ShareLinkItem = {
   productId: string;
   name: string;
@@ -44,6 +55,7 @@ export type ShareLinkItem = {
   price?: string | number;
   priceUnit?: string;
   imageUrl?: string;
+  category?: string[];
   field1?: string;  field1Label?: string;  field1Unit?: string;
   field2?: string;  field2Label?: string;  field2Unit?: string;
   field3?: string;  field3Label?: string;  field3Unit?: string;
@@ -96,6 +108,7 @@ export function productToShareLinkItem(
 
   const step = normalizeOrderQuantityStep(catData.orderQuantityStep);
 
+  const categories = normalizeShareLinkCategories(catData.category ?? product.category);
   const subtitleRaw = catData.subtitle ?? product.subtitle;
   const subtitle =
     subtitleRaw !== undefined && subtitleRaw !== null && String(subtitleRaw).trim() !== ''
@@ -106,6 +119,7 @@ export function productToShareLinkItem(
     productId: product.id,
     name: product.name || '',
     ...(subtitle ? { subtitle } : {}),
+    ...(categories.length > 0 ? { category: categories } : {}),
     imageUrl: product.imageUrl || undefined,
     price: price !== undefined && price !== '' ? String(price) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
