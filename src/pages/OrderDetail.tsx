@@ -20,11 +20,26 @@ interface OrderItem {
   category?: string;
   productId?: string;
   imageUrl?: string;
+  priceUnit?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatMoney(amount: number, symbol: string) {
   return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+/** Short label from price unit (e.g. "/ piece" → "pcs"). */
+function getOrderUnitLabel(priceUnit: string | undefined): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return 'units';
+  }
+  const cleaned = String(priceUnit)
+    .replace(/^\s*\/\s*/i, '')
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return 'units';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  return cleaned;
 }
 
 function formatDate(dateStr: string) {
@@ -873,12 +888,12 @@ export default function OrderDetail() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              {symbol}{item.unitPrice} × {item.quantity}
+                              {symbol}{item.unitPrice} × {item.quantity} {getOrderUnitLabel(item.priceUnit)}
                             </div>
                           )}
                           {!hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              Qty: {item.quantity}
+                              Qty: {item.quantity} {getOrderUnitLabel(item.priceUnit)}
                             </div>
                           )}
                           {lineTotal != null ? (
