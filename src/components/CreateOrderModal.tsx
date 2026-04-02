@@ -41,14 +41,6 @@ function IconSearch() {
   );
 }
 
-function IconCheck() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
 function IconMinus() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -158,16 +150,6 @@ export default function CreateOrderModal({
     setStep('products');
   };
 
-  const handleToggleProduct = (productId: string) => {
-    const newSelected = new Map(selectedProducts);
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.set(productId, 1);
-    }
-    setSelectedProducts(newSelected);
-  };
-
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     const newSelected = new Map(selectedProducts);
     if (quantity <= 0) {
@@ -180,7 +162,7 @@ export default function CreateOrderModal({
 
   const handleContinueToCustomer = () => {
     if (selectedProducts.size === 0) {
-      showToast('Please select at least one product', 'error');
+      showToast('Please add at least one product to the order', 'error');
       return;
     }
     setStep('customer');
@@ -444,119 +426,121 @@ export default function CreateOrderModal({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {filteredProducts.map((product) => {
-                    const isSelected = selectedProducts.has(product.id);
                     const quantity = selectedProducts.get(product.id) || 0;
                     const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                     const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                     const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+                    const hasImage = product.image && /^https?:\/\//i.test(product.image);
 
                     return (
                       <div
                         key={product.id}
                         style={{
                           padding: '12px',
-                          border: isSelected ? '1.5px solid #2563EB' : '1.5px solid #E2E8F0',
+                          border: '1.5px solid #E2E8F0',
                           borderRadius: 10,
-                          background: isSelected ? '#EFF6FF' : '#fff',
+                          background: '#fff',
                           transition: 'all 0.15s',
+                          display: 'flex',
+                          gap: 12,
+                          alignItems: 'stretch',
                         }}
                       >
-                        <div style={{ display: 'flex', gap: 12 }}>
-                          {/* Checkbox */}
+                        {/* Product Image */}
+                        <div style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: 8,
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                          background: '#F1F5F9',
+                          border: '1px solid #E2E8F0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          {hasImage ? (
+                            <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
+                              <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                            </svg>
+                          )}
+                        </div>
+
+                        {/* Product Info */}
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
+                            {product.name}
+                          </div>
+                          {product.subtitle && (
+                            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                              {product.subtitle}
+                            </div>
+                          )}
+                          {price > 0 && (
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#166534', marginTop: 4 }}>
+                              ₹{price.toLocaleString('en-IN')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quantity Controls - Always Visible */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0,
+                          background: '#F1F5F9',
+                          borderRadius: 6,
+                          border: '1.5px solid #E2E8F0',
+                          flexShrink: 0,
+                        }}>
                           <button
-                            onClick={() => handleToggleProduct(product.id)}
+                            onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
                             style={{
-                              width: 24,
-                              height: 24,
-                              borderRadius: 6,
-                              border: isSelected ? 'none' : '1.5px solid #D1D5DB',
-                              background: isSelected ? '#2563EB' : '#fff',
-                              color: '#fff',
+                              width: 32,
+                              height: 32,
+                              border: 'none',
+                              background: 'transparent',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              flexShrink: 0,
+                              color: quantity === 0 ? '#CBD5E1' : '#374151',
                               fontFamily: 'inherit',
-                              transition: 'all 0.15s',
+                              transition: 'color 0.15s',
                             }}
+                            disabled={quantity === 0}
                           >
-                            {isSelected && <IconCheck />}
+                            <IconMinus />
                           </button>
-
-                          {/* Product Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
-                              {product.name}
-                            </div>
-                            {product.category && (
-                              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                                {product.category[0]}
-                              </div>
-                            )}
-                            {price > 0 && (
-                              <div style={{ fontSize: 14, fontWeight: 700, color: '#166534', marginTop: 4 }}>
-                                ₹{price.toLocaleString('en-IN')}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Quantity Controls */}
-                          {isSelected && (
-                            <div style={{
+                          <span style={{
+                            minWidth: 32,
+                            textAlign: 'center',
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                          }}>
+                            {quantity}
+                          </span>
+                          <button
+                            onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: 0,
-                              background: '#F1F5F9',
-                              borderRadius: 6,
-                              border: '1.5px solid #E2E8F0',
-                              flexShrink: 0,
-                            }}>
-                              <button
-                                onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
-                                style={{
-                                  width: 28,
-                                  height: 28,
-                                  border: 'none',
-                                  background: 'transparent',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#374151',
-                                  fontFamily: 'inherit',
-                                }}
-                              >
-                                <IconMinus />
-                              </button>
-                              <span style={{
-                                minWidth: 24,
-                                textAlign: 'center',
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: '#0F172A',
-                              }}>
-                                {quantity}
-                              </span>
-                              <button
-                                onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
-                                style={{
-                                  width: 28,
-                                  height: 28,
-                                  border: 'none',
-                                  background: 'transparent',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#374151',
-                                  fontFamily: 'inherit',
-                                }}
-                              >
-                                <IconPlus />
-                              </button>
-                            </div>
-                          )}
+                              justifyContent: 'center',
+                              color: '#374151',
+                              fontFamily: 'inherit',
+                              transition: 'color 0.15s',
+                            }}
+                          >
+                            <IconPlus />
+                          </button>
                         </div>
                       </div>
                     );
