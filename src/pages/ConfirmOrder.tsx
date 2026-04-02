@@ -382,7 +382,7 @@ export default function ConfirmOrder() {
                   fontFamily: FONT,
                 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
                     {formatOrderMoney(orderTotalAmount, currencySymbol)}
                   </span>
                 </div>
