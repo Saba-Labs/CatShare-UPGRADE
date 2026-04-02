@@ -649,7 +649,7 @@ export default function CreateOrder() {
                         padding: '12px',
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: 'space-between',
+                        justifyContent: 'center',
                         minWidth: 0,
                         gap: 6,
                       }}>
