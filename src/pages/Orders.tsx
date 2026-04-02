@@ -513,8 +513,11 @@ export default function Orders() {
               cursor: 'pointer',
               fontFamily: 'inherit',
               marginRight: 8,
-              transition: 'all 0.15s ease',
-              display: showSearch ? 'none' : 'inline-block',
+              transition: 'opacity 0.15s ease, visibility 0.15s ease',
+              transitionDelay: showSearch ? '0s' : '0.3s',
+              opacity: showSearch ? 0 : 1,
+              visibility: showSearch ? 'hidden' : 'visible',
+              pointerEvents: showSearch ? 'none' : 'auto',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
