@@ -121,9 +121,21 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [imageMap, setImageMap] = useState<Record<string, string>>({})
 
   const catalogues = getAllCatalogues();
   const products = safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[];
+
+  // Build imageMap from product images
+  React.useEffect(() => {
+    const map: Record<string, string> = {};
+    products.forEach(p => {
+      if (p.image && typeof p.image === 'string') {
+        map[p.id] = p.image;
+      }
+    });
+    setImageMap(map);
+  }, [products]);
 
   // Get products for selected catalogue
   const catalogueProducts = useMemo(() => {
@@ -640,7 +652,8 @@ export default function CreateOrder() {
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                  const hasImage = product.image && /^https?:\/\//i.test(product.image);
+                  const productImage = imageMap[product.id] || product.image;
+                  const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
                   const isSelected = quantity > 0;
                   const lineTotal = price * quantity;
 
@@ -684,7 +697,7 @@ export default function CreateOrder() {
                         position: 'relative',
                       }}>
                         {hasImage ? (
-                          <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          <img src={productImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         ) : (
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
