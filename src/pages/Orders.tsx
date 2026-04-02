@@ -4,6 +4,8 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
+import CreateOrderModal from '../components/CreateOrderModal';
+import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -399,11 +401,16 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
     loadOrders();
+    // Load products from localStorage
+    const storedProducts = safeGetFromStorage(getStorageKey('products', user.uid), []);
+    setProducts(storedProducts);
   }, [user?.uid]);
 
   useEffect(() => {
@@ -497,6 +504,32 @@ export default function Orders() {
 
           {/* Flexible Spacer */}
           <div style={{ flex: 1 }} />
+
+          {/* Create Order Button */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              padding: '8px 14px',
+              background: '#2563EB',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              marginRight: 8,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
+            }}
+          >
+            + Create Order
+          </button>
 
           {/* Expanding Search Box */}
           <div
@@ -699,6 +732,14 @@ export default function Orders() {
           Orders
         </button>
       </nav>
+
+      {/* Create Order Modal */}
+      <CreateOrderModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={loadOrders}
+        products={products}
+      />
     </div>
   );
 }
