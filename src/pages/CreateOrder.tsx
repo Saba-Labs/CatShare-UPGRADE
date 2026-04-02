@@ -55,14 +55,14 @@ function IconArrowLeft() {
 // Helper function to get unit label
 function getOrderUnitLabel(priceUnit: string | undefined): string {
   if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
-    return 'units';
+    return 'unit';
   }
   const cleaned = String(priceUnit)
     .replace(/^\s*\/\s*/i, '')
     .trim()
     .toLowerCase();
-  if (!cleaned) return 'units';
-  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  if (!cleaned) return 'unit';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'piece';
   return cleaned;
 }
 
