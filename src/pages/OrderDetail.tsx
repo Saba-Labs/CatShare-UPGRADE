@@ -425,7 +425,7 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
 // ─── Product image ────────────────────────────────────────────────────────────
 function ProductThumb({ url, name }: { url?: string; name: string }) {
   const [failed, setFailed] = useState(false);
-  const valid = url && /^https?:\/\//i.test(url) && !failed;
+  const valid = url && (url.startsWith('data:') || /^https?:\/\//i.test(url)) && !failed;
   return (
     <div style={{
       width: 52, height: 52, borderRadius: 12, flexShrink: 0,
