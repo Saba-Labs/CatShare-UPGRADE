@@ -731,20 +731,21 @@ export default function CreateOrder() {
                         flex: 1,
                         padding: '12px',
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-start',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 8,
                         minWidth: 0,
-                        gap: 6,
                       }}>
-                        {/* Top Row - Product Info + Subtotal */}
+                        {/* Left Column - Product Info and Quantity */}
                         <div style={{
+                          flex: 1,
                           display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          gap: 8,
+                          flexDirection: 'column',
+                          gap: 6,
+                          minWidth: 0,
                         }}>
-                          {/* Left side - Product Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Product Info */}
+                          <div>
                             <div style={{
                               display: 'flex',
                               flexWrap: 'wrap',
@@ -811,37 +812,6 @@ export default function CreateOrder() {
                             )}
                           </div>
 
-                          {/* Right side - Subtotal */}
-                          <div style={{
-                            fontSize: 12,
-                            color: '#64748B',
-                            fontWeight: 500,
-                            textAlign: 'right',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 2,
-                            minWidth: 120,
-                            visibility: isSelected ? 'visible' : 'hidden',
-                            flexShrink: 0,
-                          }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
-                              Subtotal
-                            </div>
-                            <div style={{ fontSize: 11, fontWeight: 600 }}>
-                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
-                            </div>
-                            <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
-                              ₹{lineTotal.toLocaleString('en-IN')}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Bottom Row - Quantity Control */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}>
                           {/* Quantity Control */}
                           <div style={{
                             display: 'flex',
@@ -850,7 +820,7 @@ export default function CreateOrder() {
                             background: '#F1F5F9',
                             borderRadius: 6,
                             border: '1.5px solid #E2E8F0',
-                            flexShrink: 0,
+                            width: 'fit-content',
                           }}>
                             <button
                               onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
@@ -898,6 +868,31 @@ export default function CreateOrder() {
                             >
                               <IconPlus />
                             </button>
+                          </div>
+                        </div>
+
+                        {/* Right Column - Subtotal (Centered) */}
+                        <div style={{
+                          fontSize: 12,
+                          color: '#64748B',
+                          fontWeight: 500,
+                          textAlign: 'right',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                          minWidth: 120,
+                          visibility: isSelected ? 'visible' : 'hidden',
+                          flexShrink: 0,
+                          justifyContent: 'center',
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                            Subtotal
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 600 }}>
+                            {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
+                            ₹{lineTotal.toLocaleString('en-IN')}
                           </div>
                         </div>
                       </div>
