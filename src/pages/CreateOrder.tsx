@@ -130,8 +130,12 @@ export default function CreateOrder() {
   React.useEffect(() => {
     const map: Record<string, string> = {};
     products.forEach(p => {
-      if (p.image && typeof p.image === 'string') {
-        map[p.id] = p.image;
+      // Check image field first, then imageUrl
+      const imgSrc = (p.image && typeof p.image === 'string') ? p.image :
+                     (p.imageUrl && typeof p.imageUrl === 'string') ? p.imageUrl :
+                     null;
+      if (imgSrc) {
+        map[p.id] = imgSrc;
       }
     });
     setImageMap(map);
