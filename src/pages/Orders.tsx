@@ -76,6 +76,13 @@ function IconChevronRight() {
     </svg>
   );
 }
+function IconChevronLeft() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
 function IconChevronDown() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -491,9 +498,30 @@ export default function Orders() {
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
       }}>
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 16, top: 14 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
+          <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => handleNavigate('/')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#64748B',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#0F172A'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
+              title="Back to Products"
+            >
+              <IconChevronLeft />
+            </button>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
+              <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
+            </div>
           </div>
 
           {/* Create Order Button */}
