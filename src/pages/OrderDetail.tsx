@@ -389,7 +389,14 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
         value={value > 0 ? String(value) : ''}
         onChange={(e) => {
           const digits = e.target.value.replace(/\D/g, '');
-          onChange(digits ? parseInt(digits, 10) : 0);
+          if (!digits) {
+            onChange(0);
+          } else {
+            const num = parseInt(digits, 10);
+            // Round to nearest valid step value
+            const rounded = Math.max(0, Math.round(num / normalizedStep) * normalizedStep);
+            onChange(rounded);
+          }
         }}
         aria-label="Quantity"
         style={{
