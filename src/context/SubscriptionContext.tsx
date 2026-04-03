@@ -104,8 +104,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           signal: controller.signal,
         });
 
-        clearTimeout(timeoutId);
-
         if (!resp.ok) {
           console.warn(`Subscription API returned status ${resp.status}`);
           setLoading(false);
@@ -139,12 +137,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           localStorage.removeItem(LS_TRIAL_ENDS);
         }
       } catch (fetchError) {
-        clearTimeout(timeoutId);
         // Silently fail and keep cached values - this handles network errors, CORS issues, timeouts, etc.
         if (fetchError instanceof Error && fetchError.name !== 'AbortError') {
           console.debug('Subscription fetch error (using cache):', fetchError.message);
         }
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     } catch (error) {
