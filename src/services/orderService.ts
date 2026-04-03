@@ -140,6 +140,32 @@ export async function updateOrderStatus(
 }
 
 /**
+ * Update order (items, customer details, total amount)
+ */
+export async function updateOrder(
+  orderId: string,
+  updates: {
+    items?: OrderItem[];
+    customer_name?: string;
+    customer_whatsapp?: string;
+    total_amount?: number;
+  }
+): Promise<{ data: Order | null; error: any }> {
+  try {
+    const client = getSupabaseClient();
+
+    const { data, error } = await client
+      .from('orders')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
+  }
+}
+
+/**
  * Delete an order
  */
 export async function deleteOrder(orderId: string): Promise<{ error: any }> {

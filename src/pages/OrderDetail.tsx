@@ -4,7 +4,7 @@ import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, type Order } from '../services/orderService';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
@@ -504,19 +504,36 @@ export default function OrderDetail() {
   const handleSaveEdit = async () => {
     if (!order) return;
     setSaveLoading(true);
-    await new Promise(r => setTimeout(r, 400)); // simulate async
-    const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
-    setOrder({
-      ...order,
-      items: editItems,
-      customer_name: editName,
-      customer_whatsapp: editPhone,
-      total_amount: total > 0 ? total : order.total_amount,
-    } as any);
-    setEditMode(false);
-    setSaveLoading(false);
-    showToast('Order saved', 'success');
-    // TODO: persist to backend
+    try {
+      const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
+      const { error } = await updateOrder(order.id, {
+        items: editItems,
+        customer_name: editName,
+        customer_whatsapp: editPhone,
+        total_amount: total > 0 ? total : order.total_amount,
+      });
+
+      if (error) {
+        showToast('Failed to save order', 'error');
+        setSaveLoading(false);
+        return;
+      }
+
+      setOrder({
+        ...order,
+        items: editItems,
+        customer_name: editName,
+        customer_whatsapp: editPhone,
+        total_amount: total > 0 ? total : order.total_amount,
+      } as any);
+      setEditMode(false);
+      showToast('Order saved', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save order', 'error');
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   const handleGeneratePDF = async () => {
