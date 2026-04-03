@@ -6,6 +6,7 @@ import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
 import { getSupabaseAccessToken } from "../supabaseClient";
 import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
+import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import {
   FREE_MAX_PRODUCTS,
   FREE_MAX_CATALOGUES,
@@ -34,8 +35,17 @@ export default function ProInfo() {
   const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
   const [billingFrequency, setBillingFrequency] = useState("monthly"); // "monthly", "yearly", "lifetime"
+  const [currencySymbol, setCurrencySymbol] = useState(() => getCurrentCurrencySymbol());
 
   const isAndroid = Capacitor.getPlatform() === "android";
+
+  // Listen for currency changes
+  useEffect(() => {
+    const unsubscribe = onCurrencyChange((currency, symbol) => {
+      setCurrencySymbol(symbol);
+    });
+    return unsubscribe;
+  }, []);
 
   // Load prices from Google Play
 useEffect(() => {
@@ -337,7 +347,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Price */}
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">$0</span>
+                  <span className="text-4xl font-bold text-gray-900">{currencySymbol}0</span>
                   <span className="text-gray-600 ml-2 text-lg">Forever</span>
                 </div>
 
@@ -438,7 +448,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                       )
                     ) : (
                       <>
-                        <span className="text-4xl font-bold text-gray-900">$9.99</span>
+                        <span className="text-4xl font-bold text-gray-900">{currencySymbol}9.99</span>
                         <span className="text-gray-600 ml-2">/month</span>
                       </>
                     )
