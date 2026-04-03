@@ -265,6 +265,7 @@ export default function CreateOrder() {
         const rowTotal = unitPrice * quantity;
 
         const priceUnit = catData[catalogue.priceUnitField];
+        const quantityStep = (catData as any).orderQuantityStep || 1;
         const productImage = imageMap[product.id] || product.image || product.imageUrl;
         items.push({
           productId,
@@ -276,8 +277,9 @@ export default function CreateOrder() {
           imageUrl: productImage,
           priceUnit,
           subtitle: product.subtitle,
+          quantityStep,
         });
-        
+
         total += rowTotal;
         count += quantity;
       }
