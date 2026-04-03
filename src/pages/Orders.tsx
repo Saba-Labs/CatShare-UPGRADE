@@ -523,7 +523,7 @@ export default function Orders() {
               (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
             }}
           >
-            + Create Order
+            + New Order
           </button>
 
           {/* Expanding Search Box */}
