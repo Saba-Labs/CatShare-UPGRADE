@@ -781,13 +781,6 @@ export default function Orders() {
             >
               <IconSearch />
             </button>
-
-            {stats.revenue > 0 && (
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Earned</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatMoney(stats.revenue, symbol)}</div>
-              </div>
-            )}
           </div>
         </div>
 
