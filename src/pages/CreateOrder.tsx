@@ -812,15 +812,31 @@ export default function CreateOrder() {
                             >
                               <IconMinus />
                             </button>
-                            <span style={{
-                              minWidth: 32,
-                              textAlign: 'center',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: quantity === 0 ? '#94A3B8' : '#0F172A',
-                            }}>
-                              {quantity}
-                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={quantity > 0 ? String(quantity) : ''}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, '');
+                                handleUpdateQuantity(
+                                  product.id,
+                                  digits ? parseInt(digits, 10) : 0
+                                );
+                              }}
+                              aria-label={`Quantity for ${product.name}`}
+                              style={{
+                                width: 40,
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: 'center',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                                fontFamily: 'inherit',
+                                padding: 0,
+                                outline: 'none',
+                              }}
+                            />
                             <button
                               onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
                               style={{
