@@ -427,14 +427,31 @@ export default function Orders() {
   // Handle mobile hardware back button
   useEffect(() => {
     const handleBackButton = async () => {
-      await Haptics.impact({ style: ImpactStyle.Light });
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch (e) {
+        // Haptics might not be available on web
+      }
       navigate('/');
     };
 
-    const listener = App.addListener('backButton', handleBackButton);
+    let listener: any = null;
+
+    // Only try to add listener on mobile platforms
+    const setupListener = async () => {
+      try {
+        listener = await App.addListener('backButton', handleBackButton);
+      } catch (e) {
+        // App listener not available (web browser)
+      }
+    };
+
+    setupListener();
 
     return () => {
-      listener.then(l => l.remove());
+      if (listener) {
+        listener.remove();
+      }
     };
   }, [navigate]);
 
