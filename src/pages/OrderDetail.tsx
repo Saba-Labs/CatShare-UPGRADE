@@ -5,6 +5,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
+import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
@@ -21,6 +22,7 @@ interface OrderItem {
   productId?: string;
   imageUrl?: string;
   priceUnit?: string;
+  quantityStep?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -370,11 +372,12 @@ function ActionTile({
 }
 
 // ─── Qty stepper ─────────────────────────────────────────────────────────────
-function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function QtyStepper({ value, step, onChange }: { value: number; step: number; onChange: (n: number) => void }) {
+  const normalizedStep = normalizeOrderQuantityStep(step);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F2F2F7', borderRadius: 6, border: '1.5px solid #E2E8F0', width: 'fit-content' }}>
       <button
-        onClick={() => onChange(Math.max(0, value - 1))}
+        onClick={() => onChange(Math.max(0, value - normalizedStep))}
         style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: value === 0 ? '#CBD5E1' : COLORS.text }}
         disabled={value === 0}
       >
@@ -403,7 +406,7 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) 
         }}
       />
       <button
-        onClick={() => onChange(value + 1)}
+        onClick={() => onChange(value + normalizedStep)}
         style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
       >
         <Ic.Plus />
@@ -808,7 +811,7 @@ export default function OrderDetail() {
                           <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} per unit</div>
                         ) : null}
                       </div>
-                      <QtyStepper value={it.quantity} onChange={qty => {
+                      <QtyStepper value={it.quantity} step={it.quantityStep ?? 1} onChange={qty => {
                         if (qty === 0) {
                           setEditItems(prev => prev.filter(x => x._key !== it._key));
                         } else {
