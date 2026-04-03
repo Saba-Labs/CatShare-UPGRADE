@@ -290,9 +290,9 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
             )}
           </div>
 
-          {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) */}
+          {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) — desktop only */}
           {!isPaidPro && isAndroid && (
-            <div className="flex gap-3 justify-center mb-8">
+            <div className="hidden md:flex gap-3 justify-center mb-8">
               <button
                 onClick={() => setBillingFrequency("monthly")}
                 className={`px-6 py-3 rounded-lg font-semibold transition ${
@@ -454,6 +454,37 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                 <p className="relative z-10 text-sm text-gray-600 mb-6 leading-relaxed">
                   Unlock unlimited possibilities and professional features.
                 </p>
+
+                {/* BILLING FREQUENCY SELECTOR — Mobile only inside Pro card */}
+                {!isPaidPro && isAndroid && (
+                  <div className="md:hidden flex gap-2 mb-6">
+                    <button
+                      onClick={() => setBillingFrequency("monthly")}
+                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm ${
+                        billingFrequency === "monthly"
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-300"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setBillingFrequency("yearly")}
+                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm relative ${
+                        billingFrequency === "yearly"
+                          ? "bg-purple-600 text-white shadow-lg"
+                          : "bg-white border-2 border-gray-200 text-gray-700 hover:border-purple-300"
+                      }`}
+                    >
+                      Yearly
+                      {billingFrequency !== "yearly" && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                          -20%
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {/* Button */}
                 {!isPaidPro ? (
