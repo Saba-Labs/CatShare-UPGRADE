@@ -290,7 +290,21 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         ? safeGetFromStorage(getStorageKey("products", uid), [])
         : JSON.parse(localStorage.getItem("products") || "[]");
       setProducts(updated);
-  
+
+      // Clear outdated imageMap entries to prevent displaying old cached images
+      // This ensures products with updated imageUrl will fetch from the new cloud URL
+      setImageMap((prev) => {
+        const newMap = { ...prev };
+        // Remove entries for products that might have been updated with new cloud URLs
+        for (const p of updated) {
+          // If product has a cloud imageUrl, remove local cache to force fetch from cloud
+          if (p.imageUrl) {
+            delete newMap[p.id];
+          }
+        }
+        return newMap;
+      });
+
       // Force reload thumbnails from local filesystem immediately
       // so the new image shows without waiting for R2 upload
       for (const p of updated) {
@@ -481,6 +495,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const updateProduct = (item) => {
     const freshProducts = products.map((p) => (p.id === item.id ? item : p));
     setProducts(freshProducts);
+
+    // Clear image cache for this product to force reload from updated imageUrl
+    setImageMap((prev) => {
+      const updated = { ...prev };
+      delete updated[item.id];
+      return updated;
+    });
 
     if (isStrictMode() && user?.uid) {
       syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
@@ -929,9 +950,9 @@ if (isStrictMode() && user?.uid) {
                               ☰
                             </div>
                             <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                              {imageMap[p.id] ? (
+                              {imageMap[p.id] || p.imageUrl ? (
                                 <img
-                                  src={imageMap[p.id]}
+                                  src={imageMap[p.id] || p.imageUrl}
                                   alt={p.name}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
