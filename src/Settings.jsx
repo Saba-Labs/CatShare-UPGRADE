@@ -287,9 +287,9 @@ export default function Settings({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="text-base flex-shrink-0">✨</span>
-                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">Upgrade to Pro</h3>
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">On Free Trial</h3>
                   </div>
-                  <p className="text-xs text-green-700 dark:text-green-300">Start your free trial or subscribe to unlock premium features</p>
+                  <p className="text-xs text-green-700 dark:text-green-300">Subscribe to continue using premium features</p>
                 </div>
                 <div className="flex-shrink-0">
                   <span className="bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 text-[10px] font-bold px-2 py-0.5 rounded border border-green-300 dark:border-green-700">
