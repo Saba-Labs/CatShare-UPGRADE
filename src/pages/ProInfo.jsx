@@ -316,16 +316,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   Save 20%
                 </span>
               </button>
-              <button
-                onClick={() => setBillingFrequency("lifetime")}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  billingFrequency === "lifetime"
-                    ? "bg-pink-600 text-white shadow-lg"
-                    : "bg-white border-2 border-gray-200 text-gray-700 hover:border-pink-300"
-                }`}
-              >
-                Lifetime
-              </button>
             </div>
           )}
 
@@ -443,11 +433,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.yearly]}</span>
                           <span className="text-gray-600 ml-2">/year</span>
                         </>
-                      ) : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime] ? (
-                        <>
-                          <span className="text-4xl font-bold text-gray-900">{prices[INAPP_SKUS.lifetime]}</span>
-                          <span className="text-gray-600 ml-2">one-time</span>
-                        </>
                       ) : (
                         <span className="text-lg font-semibold text-gray-500">Loading price...</span>
                       )
@@ -479,8 +464,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           handleBuySubscription(SUBSCRIPTION_SKUS.monthly);
                         } else if (billingFrequency === "yearly") {
                           handleBuySubscription(SUBSCRIPTION_SKUS.yearly);
-                        } else if (billingFrequency === "lifetime") {
-                          handleBuyLifetime();
                         }
                       }}
                       disabled={loading}
@@ -491,8 +474,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           ? ` — ${prices[SUBSCRIPTION_SKUS.monthly]}`
                           : billingFrequency === "yearly" && prices?.[SUBSCRIPTION_SKUS.yearly]
                           ? ` — ${prices[SUBSCRIPTION_SKUS.yearly]}`
-                          : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime]
-                          ? ` — ${prices[INAPP_SKUS.lifetime]}`
                           : ""
                       }`}
                     </button>
@@ -668,30 +649,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   </div>
                 </button>
 
-                {/* Lifetime */}
-                <button
-                  onClick={() => {
-                    if (!isAndroid) {
-                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
-                    } else {
-                      handleBuyLifetime();
-                    }
-                  }}
-                  disabled={loading}
-                  className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-gray-900">Lifetime Plan</p>
-                      <p className="text-sm text-gray-600">
-                        {prices?.[INAPP_SKUS.lifetime]
-                          ? `${prices[INAPP_SKUS.lifetime]} one-time`
-                          : "One-time purchase"}
-                      </p>
-                    </div>
-                    <div className="text-pink-600 font-bold text-lg">→</div>
-                  </div>
-                </button>
 
                 {/* Restore */}
                 <button
