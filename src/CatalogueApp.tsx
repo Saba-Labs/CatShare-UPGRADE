@@ -218,11 +218,21 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Load this batch in parallel
         const promises = batch.map(async (p) => {
+          // ✅ PRIORITY: Always use imageUrl (cloud URL) if available
+          // This ensures fresh data from Supabase is always displayed
+          if (p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim()) {
+            map[p.id] = p.imageUrl;
+            return;
+          }
+
+          // Fallback: Try to read local file
           const resolved = await tryReadProductSourceAsDataUrl(p);
           if (resolved) {
             map[p.id] = resolved;
             return;
           }
+
+          // Final fallback: Use base64 image
           map[p.id] = (typeof p.image === "string" && p.image ? p.image : "") || "";
         });
 
@@ -233,6 +243,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         setImageMap(prev => ({ ...prev, ...map }));
       }
     };
+    // Clear old imageMap when products change to avoid stale cache
+    setImageMap({});
     loadImages();
   }, [products]);
 
