@@ -736,80 +736,110 @@ export default function CreateOrder() {
                         minWidth: 0,
                         gap: 6,
                       }}>
-                        {/* Top */}
-                        <div style={{ flexShrink: 0 }}>
-                          <div style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            alignItems: 'baseline',
-                            gap: '4px 8px',
-                            lineHeight: 1.3,
-                            marginBottom: 4,
-                          }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                              {product.name}
-                            </span>
-                            {product.subtitle && (
-                              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
-                                ({product.subtitle})
+                        {/* Top Row - Product Info + Subtotal */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: 8,
+                        }}>
+                          {/* Left side - Product Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              alignItems: 'baseline',
+                              gap: '4px 8px',
+                              lineHeight: 1.3,
+                              marginBottom: 4,
+                            }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                                {product.name}
                               </span>
+                              {product.subtitle && (
+                                <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
+                                  ({product.subtitle})
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Categories */}
+                            {product.category && product.category.length > 0 && (
+                              <div style={{
+                                display: 'flex',
+                                gap: 6,
+                                flexWrap: 'wrap',
+                                marginTop: 4,
+                                marginBottom: 4,
+                              }}>
+                                {product.category.map((cat) => (
+                                  <span
+                                    key={cat}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      borderRadius: 999,
+                                      padding: '3px 8px',
+                                      background: '#F1F5F9',
+                                      color: '#475569',
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Price */}
+                            {price > 0 && (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                background: '#DCFCE7',
+                                borderRadius: 6,
+                                padding: '2px 7px',
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                color: '#166534',
+                              }}>
+                                ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
+                              </div>
                             )}
                           </div>
 
-                          {/* Categories */}
-                          {product.category && product.category.length > 0 && (
-                            <div style={{
-                              display: 'flex',
-                              gap: 6,
-                              flexWrap: 'wrap',
-                              marginTop: 4,
-                              marginBottom: 4,
-                            }}>
-                              {product.category.map((cat) => (
-                                <span
-                                  key={cat}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    borderRadius: 999,
-                                    padding: '3px 8px',
-                                    background: '#F1F5F9',
-                                    color: '#475569',
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {cat}
-                                </span>
-                              ))}
+                          {/* Right side - Subtotal */}
+                          <div style={{
+                            fontSize: 12,
+                            color: '#64748B',
+                            fontWeight: 500,
+                            textAlign: 'right',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                            minWidth: 120,
+                            visibility: isSelected ? 'visible' : 'hidden',
+                            flexShrink: 0,
+                          }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                              Subtotal
                             </div>
-                          )}
-
-                          {/* Price */}
-                          {price > 0 && (
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 3,
-                              background: '#DCFCE7',
-                              borderRadius: 6,
-                              padding: '2px 7px',
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              color: '#166534',
-                            }}>
-                              ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
+                            <div style={{ fontSize: 11, fontWeight: 600 }}>
+                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
                             </div>
-                          )}
+                            <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
+                              ₹{lineTotal.toLocaleString('en-IN')}
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Bottom */}
+                        {/* Bottom Row - Quantity Control */}
                         <div style={{
                           display: 'flex',
-                          flex: 1,
                           alignItems: 'center',
-                          justifyContent: 'space-between',
                           gap: 8,
                         }}>
                           {/* Quantity Control */}
@@ -868,29 +898,6 @@ export default function CreateOrder() {
                             >
                               <IconPlus />
                             </button>
-                          </div>
-
-                          {/* Subtotal - Right side */}
-                          <div style={{
-                            fontSize: 12,
-                            color: '#64748B',
-                            fontWeight: 500,
-                            textAlign: 'right',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 2,
-                            minWidth: 120,
-                            visibility: isSelected ? 'visible' : 'hidden',
-                          }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
-                              Subtotal
-                            </div>
-                            <div style={{ fontSize: 11, fontWeight: 600 }}>
-                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
-                            </div>
-                            <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
-                              ₹{lineTotal.toLocaleString('en-IN')}
-                            </div>
                           </div>
                         </div>
                       </div>
