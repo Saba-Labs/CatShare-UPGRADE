@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
 import { getAllCatalogues } from '../config/catalogueConfig';
-import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalogueProductUtils';
+import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
@@ -121,16 +121,15 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [imageMap, setImageMap] = useState<Record<string, string>>({})
 
-  const catalogues = getAllCatalogues();
-  const products = safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[];
-
-  // Build imageMap from product images
-  React.useEffect(() => {
+  const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
+  const products = useMemo(
+    () => safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[],
+    [user?.uid]
+  );
+  const imageMap = useMemo(() => {
     const map: Record<string, string> = {};
     products.forEach(p => {
-      // Check image field first, then imageUrl
       const imgSrc = (p.image && typeof p.image === 'string') ? p.image :
                      (p.imageUrl && typeof p.imageUrl === 'string') ? p.imageUrl :
                      null;
@@ -138,7 +137,7 @@ export default function CreateOrder() {
         map[p.id] = imgSrc;
       }
     });
-    setImageMap(map);
+    return map;
   }, [products]);
 
   // Get products for selected catalogue
@@ -656,6 +655,7 @@ export default function CreateOrder() {
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+                  const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
                   const productImage = imageMap[product.id] || product.image;
                   const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
                   const isSelected = quantity > 0;
@@ -765,36 +765,6 @@ export default function CreateOrder() {
                               )}
                             </div>
 
-                            {/* Categories */}
-                            {product.category && product.category.length > 0 && (
-                              <div style={{
-                                display: 'flex',
-                                gap: 6,
-                                flexWrap: 'wrap',
-                                marginTop: 4,
-                                marginBottom: 4,
-                              }}>
-                                {product.category.map((cat) => (
-                                  <span
-                                    key={cat}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      borderRadius: 999,
-                                      padding: '3px 8px',
-                                      background: '#F1F5F9',
-                                      color: '#475569',
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      lineHeight: 1.2,
-                                    }}
-                                  >
-                                    {cat}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
                             {/* Price */}
                             {price > 0 && (
                               <div style={{
@@ -824,7 +794,7 @@ export default function CreateOrder() {
                             width: 'fit-content',
                           }}>
                             <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
+                              onClick={() => handleUpdateQuantity(product.id, quantity - quantityStep)}
                               style={{
                                 width: 32,
                                 height: 32,
@@ -842,17 +812,33 @@ export default function CreateOrder() {
                             >
                               <IconMinus />
                             </button>
-                            <span style={{
-                              minWidth: 32,
-                              textAlign: 'center',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: quantity === 0 ? '#94A3B8' : '#0F172A',
-                            }}>
-                              {quantity}
-                            </span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={quantity > 0 ? String(quantity) : ''}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, '');
+                                handleUpdateQuantity(
+                                  product.id,
+                                  digits ? parseInt(digits, 10) : 0
+                                );
+                              }}
+                              aria-label={`Quantity for ${product.name}`}
+                              style={{
+                                width: 40,
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: 'center',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                                fontFamily: 'inherit',
+                                padding: 0,
+                                outline: 'none',
+                              }}
+                            />
                             <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                              onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
                               style={{
                                 width: 32,
                                 height: 32,
