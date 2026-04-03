@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,6 +74,13 @@ function IconChevronRight() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+function IconChevronLeft() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M15 18l-6-6 6-6" />
     </svg>
   );
 }
@@ -400,7 +408,10 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -412,6 +423,73 @@ export default function Orders() {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
+
+  // Handle mobile hardware back button
+  useEffect(() => {
+    const handleBackButton = async () => {
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch (e) {
+        // Haptics might not be available on web
+      }
+      navigate('/');
+    };
+
+    let listener: any = null;
+
+    // Only try to add listener on mobile platforms
+    const setupListener = async () => {
+      try {
+        listener = await App.addListener('backButton', handleBackButton);
+      } catch (e) {
+        // App listener not available (web browser)
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      if (listener) {
+        listener.remove();
+      }
+    };
+  }, [navigate]);
+
+  // Handle swipe back gesture
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setSwipeProgress(0);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+
+    // Only trigger swipe if:
+    // 1. Started from left edge (within 50px)
+    // 2. More horizontal movement than vertical
+    if (touchStartX.current < 50 && Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 0) {
+      const progress = Math.min(deltaX / 100, 1);
+      setSwipeProgress(progress);
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = async (e: React.TouchEvent) => {
+    const currentX = e.changedTouches[0].clientX;
+    const deltaX = currentX - touchStartX.current;
+
+    // Navigate back if swiped more than 80px
+    if (deltaX > 80) {
+      await Haptics.impact({ style: ImpactStyle.Light });
+      navigate('/');
+    }
+
+    setSwipeProgress(0);
+  };
 
   const loadOrders = async () => {
     if (!user?.uid) return;
@@ -437,10 +515,19 @@ export default function Orders() {
     navigate(path);
   };
 
-  const handleStatusChange = (id: string, status: StatusType) => {
+  const handleStatusChange = async (id: string, status: StatusType) => {
+    // Update local state immediately
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    showToast(`Order marked as ${status}`, 'success');
-    // TODO: persist to backend
+
+    // Persist to backend
+    const { error } = await updateOrderStatus(id, status);
+    if (error) {
+      showToast('Failed to update order status', 'error');
+      // Revert local state on error
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: o.status } : o));
+    } else {
+      showToast(`Order marked as ${status}`, 'success');
+    }
   };
 
   const tabs: { key: TabType; label: string }[] = [
@@ -473,13 +560,63 @@ export default function Orders() {
   const symbol = orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        background: '#F8FAFC',
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        position: 'relative',
+        touchAction: 'pan-y',
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         input:focus { outline: none; border-color: #16A34A !important; }
         ::-webkit-scrollbar { width: 0; }
       `}</style>
+
+      {/* Swipe back visual indicator */}
+      {swipeProgress > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.2)',
+            opacity: swipeProgress * 0.3,
+            zIndex: 35,
+            pointerEvents: 'none',
+            transition: swipeProgress === 0 ? 'opacity 0.2s ease-out' : 'none',
+          }}
+        />
+      )}
+
+      {/* Swipe back arrow indicator */}
+      {swipeProgress > 0.2 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: 30,
+            transform: `translateY(-50%) scale(${0.8 + swipeProgress * 0.4})`,
+            zIndex: 36,
+            pointerEvents: 'none',
+            opacity: Math.min(swipeProgress * 2, 1),
+            transition: 'none',
+          }}
+        >
+          <IconChevronLeft />
+        </div>
+      )}
 
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
@@ -491,9 +628,30 @@ export default function Orders() {
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
       }}>
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 16, top: 14 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
+          <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => handleNavigate('/')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#64748B',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#0F172A'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
+              title="Back to Products"
+            >
+              <IconChevronLeft />
+            </button>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
+              <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
+            </div>
           </div>
 
           {/* Create Order Button */}
@@ -523,7 +681,7 @@ export default function Orders() {
               (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
             }}
           >
-            + Create Order
+            + New Order
           </button>
 
           {/* Expanding Search Box */}
@@ -623,13 +781,6 @@ export default function Orders() {
             >
               <IconSearch />
             </button>
-
-            {stats.revenue > 0 && (
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Earned</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#166534' }}>{formatMoney(stats.revenue, symbol)}</div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -670,7 +821,7 @@ export default function Orders() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 72, paddingTop: 50 }}>
+      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 16, paddingTop: 50 }}>
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
@@ -712,22 +863,6 @@ export default function Orders() {
         )}
       </main>
 
-      {/* Bottom Nav */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30,
-        display: 'flex', background: '#fff', borderTop: '1px solid #E2E8F0',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}>
-        <button onClick={() => handleNavigate('/')} style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: '#64748B' }}>
-          Products
-        </button>
-        <button onClick={() => handleNavigate('/?tab=catalogues')} style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: '#64748B' }}>
-          Catalogues
-        </button>
-        <button style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#EFF6FF', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, color: '#2563EB' }}>
-          Orders
-        </button>
-      </nav>
 
     </div>
   );

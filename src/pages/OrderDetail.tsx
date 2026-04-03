@@ -4,7 +4,7 @@ import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, updateOrder, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, updateOrderStatus, type Order } from '../services/orderService';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
@@ -211,6 +211,11 @@ const Ic = {
       <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
     </svg>
   ),
+  MoreVertical: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+    </svg>
+  ),
 };
 
 // ─── Status Pill ──────────────────────────────────────────────────────────────
@@ -323,6 +328,81 @@ function StatusDropdown({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Actions dropdown menu ───────────────────────────────────────────────────
+function ActionsMenu({
+  onClose,
+  onWhatsApp,
+  onDownloadPDF,
+  onCopyBill,
+  onShare,
+  pdfLoading,
+  copied,
+}: {
+  onClose: () => void;
+  onWhatsApp: () => void;
+  onDownloadPDF: () => void;
+  onCopyBill: () => void;
+  onShare: () => void;
+  pdfLoading: boolean;
+  copied: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const actions = [
+    { icon: <Ic.WhatsApp size={16} />, label: 'Send Invoice', sublabel: 'WhatsApp', onClick: onWhatsApp, color: '#16A34A' },
+    { icon: <Ic.PDF />, label: 'Download PDF', sublabel: pdfLoading ? 'Generating…' : 'Invoice', onClick: onDownloadPDF, color: '#0A84FF' },
+    { icon: <Ic.Copy />, label: copied ? 'Copied!' : 'Copy Bill', sublabel: 'Plain text', onClick: onCopyBill, color: '#8B5CF6' },
+    { icon: <Ic.Share />, label: 'Share', sublabel: 'Other apps', onClick: onShare, color: '#F59E0B' },
+  ];
+
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+      background: '#FFFFFF', borderRadius: 14,
+      border: `1px solid ${COLORS.border}`,
+      boxShadow: '0 12px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+      zIndex: 300, overflow: 'hidden', minWidth: 240,
+      animation: 'dropIn 0.15s cubic-bezier(0.34,1.3,0.64,1)',
+    }}>
+      <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
+      {actions.map((action, i) => (
+        <button
+          key={i}
+          onClick={() => { action.onClick(); onClose(); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            width: '100%', padding: '12px 16px',
+            border: 'none', borderBottom: i < actions.length - 1 ? `1px solid #F2F2F7` : 'none',
+            background: 'transparent',
+            cursor: 'pointer', fontFamily: FONT,
+            fontSize: 13, fontWeight: 500,
+            color: COLORS.text,
+            transition: 'background 0.1s',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#F5F5F7'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{ color: action.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {action.icon}
+          </div>
+          <div style={{ textAlign: 'left', flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>{action.label}</div>
+            <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{action.sublabel}</div>
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
@@ -459,6 +539,7 @@ export default function OrderDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
 
@@ -495,10 +576,25 @@ export default function OrderDetail() {
   };
 
   const handleStatusChange = async (status: StatusType) => {
+    if (!order) return;
+
     await Haptics.impact({ style: ImpactStyle.Light });
+
+    // Store old status in case we need to revert
+    const oldStatus = order.status;
+
+    // Update local state immediately for optimistic UI
     setOrder(prev => prev ? { ...prev, status } : null);
-    showToast(`Marked as ${status}`, 'success');
-    // TODO: persist to backend
+
+    // Persist to backend
+    const { error } = await updateOrderStatus(order.id, status);
+    if (error) {
+      showToast('Failed to update order status', 'error');
+      // Revert on error
+      setOrder(prev => prev ? { ...prev, status: oldStatus } : null);
+    } else {
+      showToast(`Marked as ${status}`, 'success');
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -698,28 +794,58 @@ export default function OrderDetail() {
             )}
           </div>
           {!editMode && (
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => setShowStatusDrop(v => !v)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 12px 6px 10px', borderRadius: 100,
-                  background: statusCfg.bg, border: `1px solid ${statusCfg.border}`,
-                  color: statusCfg.text, fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: FONT,
-                }}
-              >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusCfg.dot }} />
-                {statusCfg.label}
-                <span style={{ opacity: 0.7 }}><Ic.ChevronDown /></span>
-              </button>
-              {showStatusDrop && (
-                <StatusDropdown
-                  current={order.status}
-                  onChange={handleStatusChange}
-                  onClose={() => setShowStatusDrop(false)}
-                />
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowStatusDrop(v => !v)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px 6px 10px', borderRadius: 100,
+                    background: statusCfg.bg, border: `1px solid ${statusCfg.border}`,
+                    color: statusCfg.text, fontSize: 12, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: FONT,
+                  }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusCfg.dot }} />
+                  {statusCfg.label}
+                  <span style={{ opacity: 0.7 }}><Ic.ChevronDown /></span>
+                </button>
+                {showStatusDrop && (
+                  <StatusDropdown
+                    current={order.status}
+                    onChange={handleStatusChange}
+                    onClose={() => setShowStatusDrop(false)}
+                  />
+                )}
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowActionsMenu(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 36, height: 36, borderRadius: 100,
+                    background: 'transparent', border: 'none',
+                    color: COLORS.muted, cursor: 'pointer', fontFamily: FONT,
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#F5F5F7'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Ic.MoreVertical />
+                </button>
+                {showActionsMenu && (
+                  <ActionsMenu
+                    onClose={() => setShowActionsMenu(false)}
+                    onWhatsApp={handleShareWhatsApp}
+                    onDownloadPDF={handleGeneratePDF}
+                    onCopyBill={handleCopy}
+                    onShare={handleNativeShare}
+                    pdfLoading={pdfLoading}
+                    copied={copied}
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -763,7 +889,7 @@ export default function OrderDetail() {
                     <input
                       value={editPhone}
                       onChange={e => setEditPhone(e.target.value)}
-                      type="tel" placeholder="+91 98765 43210"
+                      type="tel" placeholder="+91 98xxxxxxxx"
                       style={{
                         width: '100%', padding: '10px 12px',
                         borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
@@ -977,41 +1103,6 @@ export default function OrderDetail() {
                 })}
               </div>
 
-              {/* Action tiles grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <ActionTile
-                  icon={<Ic.WhatsApp size={18} />}
-                  label="Send Invoice"
-                  sublabel="Download PDF + open WhatsApp"
-                  color="#16A34A"
-                  bg="#DCFCE7"
-                  onClick={handleShareWhatsApp}
-                />
-                <ActionTile
-                  icon={<Ic.PDF />}
-                  label="Download PDF"
-                  sublabel={pdfLoading ? 'Generating…' : 'Save invoice to device'}
-                  color="#0A84FF"
-                  bg="#EFF6FF"
-                  onClick={handleGeneratePDF}
-                />
-                <ActionTile
-                  icon={<Ic.Copy />}
-                  label={copied ? 'Copied!' : 'Copy Bill'}
-                  sublabel="Plain text format"
-                  color="#8B5CF6"
-                  bg="#F5F3FF"
-                  onClick={handleCopy}
-                />
-                <ActionTile
-                  icon={<Ic.Share />}
-                  label="Share"
-                  sublabel="Via other apps"
-                  color="#F59E0B"
-                  bg="#FFFBEB"
-                  onClick={handleNativeShare}
-                />
-              </div>
 
               {/* Edit */}
               <button
