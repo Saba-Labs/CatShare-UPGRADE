@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, type Order } from '../services/orderService';
@@ -407,7 +408,10 @@ export default function Orders() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -419,6 +423,56 @@ export default function Orders() {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
+
+  // Handle mobile hardware back button
+  useEffect(() => {
+    const handleBackButton = async () => {
+      await Haptics.impact({ style: ImpactStyle.Light });
+      navigate('/');
+    };
+
+    const listener = App.addListener('backButton', handleBackButton);
+
+    return () => {
+      listener.then(l => l.remove());
+    };
+  }, [navigate]);
+
+  // Handle swipe back gesture
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setSwipeProgress(0);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+
+    // Only trigger swipe if:
+    // 1. Started from left edge (within 50px)
+    // 2. More horizontal movement than vertical
+    if (touchStartX.current < 50 && Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 0) {
+      const progress = Math.min(deltaX / 100, 1);
+      setSwipeProgress(progress);
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = async (e: React.TouchEvent) => {
+    const currentX = e.changedTouches[0].clientX;
+    const deltaX = currentX - touchStartX.current;
+
+    // Navigate back if swiped more than 80px
+    if (deltaX > 80) {
+      await Haptics.impact({ style: ImpactStyle.Light });
+      navigate('/');
+    }
+
+    setSwipeProgress(0);
+  };
 
   const loadOrders = async () => {
     if (!user?.uid) return;
@@ -480,13 +534,63 @@ export default function Orders() {
   const symbol = orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        background: '#F8FAFC',
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        position: 'relative',
+        touchAction: 'pan-y',
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; }
         input:focus { outline: none; border-color: #16A34A !important; }
         ::-webkit-scrollbar { width: 0; }
       `}</style>
+
+      {/* Swipe back visual indicator */}
+      {swipeProgress > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.2)',
+            opacity: swipeProgress * 0.3,
+            zIndex: 35,
+            pointerEvents: 'none',
+            transition: swipeProgress === 0 ? 'opacity 0.2s ease-out' : 'none',
+          }}
+        />
+      )}
+
+      {/* Swipe back arrow indicator */}
+      {swipeProgress > 0.2 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: 30,
+            transform: `translateY(-50%) scale(${0.8 + swipeProgress * 0.4})`,
+            zIndex: 36,
+            pointerEvents: 'none',
+            opacity: Math.min(swipeProgress * 2, 1),
+            transition: 'none',
+          }}
+        >
+          <IconChevronLeft />
+        </div>
+      )}
 
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
