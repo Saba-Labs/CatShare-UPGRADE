@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -121,16 +121,15 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [imageMap, setImageMap] = useState<Record<string, string>>({})
 
-  const catalogues = getAllCatalogues();
-  const products = safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[];
-
-  // Build imageMap from product images
-  React.useEffect(() => {
+  const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
+  const products = useMemo(
+    () => safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[],
+    [user?.uid]
+  );
+  const imageMap = useMemo(() => {
     const map: Record<string, string> = {};
     products.forEach(p => {
-      // Check image field first, then imageUrl
       const imgSrc = (p.image && typeof p.image === 'string') ? p.image :
                      (p.imageUrl && typeof p.imageUrl === 'string') ? p.imageUrl :
                      null;
@@ -138,7 +137,7 @@ export default function CreateOrder() {
         map[p.id] = imgSrc;
       }
     });
-    setImageMap(map);
+    return map;
   }, [products]);
 
   // Get products for selected catalogue
