@@ -87,7 +87,7 @@ const Divider = () => (
 // Product image thumbnail
 function ProductThumb({ url, name }: { url?: string; name: string }) {
   const [failed, setFailed] = React.useState(false);
-  const valid = url && /^https?:\/\//i.test(url) && !failed;
+  const valid = url && (url.startsWith('data:') || /^https?:\/\//i.test(url)) && !failed;
   return (
     <div style={{
       width: 52, height: 52, borderRadius: 12, flexShrink: 0,
@@ -104,6 +104,56 @@ function ProductThumb({ url, name }: { url?: string; name: string }) {
           <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
         </svg>
       )}
+    </div>
+  );
+}
+
+// Quantity stepper
+function QtyStepper({ value, step, onChange }: { value: number; step: number; onChange: (n: number) => void }) {
+  const normalizedStep = normalizeOrderQuantityStep(step);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F2F2F7', borderRadius: 6, border: '1.5px solid #E2E8F0', width: 'fit-content' }}>
+      <button
+        onClick={() => onChange(Math.max(0, value - normalizedStep))}
+        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: value <= 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: value <= 0 ? '#CBD5E1' : COLORS.text }}
+        disabled={value <= 0}
+      >
+        <IconMinus />
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value > 0 ? String(value) : ''}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, '');
+          if (!digits) {
+            onChange(0);
+          } else {
+            const num = parseInt(digits, 10);
+            const rounded = Math.max(0, Math.round(num / normalizedStep) * normalizedStep);
+            onChange(rounded);
+          }
+        }}
+        aria-label="Quantity"
+        style={{
+          width: 40,
+          border: 'none',
+          background: 'transparent',
+          textAlign: 'center',
+          fontSize: 14,
+          fontWeight: 700,
+          color: value === 0 ? '#94A3B8' : COLORS.text,
+          fontFamily: 'inherit',
+          padding: 0,
+          outline: 'none',
+        }}
+      />
+      <button
+        onClick={() => onChange(value + normalizedStep)}
+        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
+      >
+        <IconPlus />
+      </button>
     </div>
   );
 }
@@ -215,7 +265,7 @@ export default function CreateOrder() {
         const rowTotal = unitPrice * quantity;
 
         const priceUnit = catData[catalogue.priceUnitField];
-        const quantityStep = catData[catalogue.orderQuantityStepField];
+        const quantityStep = (catData as any).orderQuantityStep || 1;
         const productImage = imageMap[product.id] || product.image || product.imageUrl;
         items.push({
           productId,
@@ -229,7 +279,7 @@ export default function CreateOrder() {
           subtitle: product.subtitle,
           quantityStep,
         });
-        
+
         total += rowTotal;
         count += quantity;
       }
@@ -980,33 +1030,78 @@ export default function CreateOrder() {
                 {orderSummary.items.map((item, i) => {
                   const lineTotal = item.rowTotal;
                   const hasCost = item.unitPrice !== undefined && item.unitPrice > 0;
+                  const isZero = item.quantity === 0;
                   return (
                     <div key={item.productId}>
                       {i > 0 && <Divider />}
-                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
-                        <ProductThumb url={item.imageUrl} name={item.name} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
-                            {item.name}
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        padding: '12px 0',
+                        gap: 12,
+                        opacity: isZero ? 0.5 : 1,
+                        transition: 'opacity 0.2s ease',
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <ProductThumb url={item.imageUrl} name={item.name} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
+                              {item.name}
+                            </div>
+                            {item.subtitle && (
+                              <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT }}>
+                                {item.subtitle}
+                              </div>
+                            )}
                           </div>
-                          {item.subtitle && (
-                            <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT }}>
-                              {item.subtitle}
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                            {hasCost && (
+                              <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
+                                ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              </div>
+                            )}
+                            {hasCost && lineTotal > 0 && (
+                              <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, fontFamily: FONT }}>
+                                ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                          {hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              {item.quantity} {getOrderUnitLabel(item.priceUnit)} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                            </div>
-                          )}
-                          {hasCost && lineTotal > 0 && (
-                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text, fontFamily: FONT }}>
-                              ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                            </div>
-                          )}
-                        </div>
+                        {isZero ? (
+                          <button
+                            onClick={() => {
+                              const newSelected = new Map(selectedProducts);
+                              newSelected.delete(item.productId);
+                              setSelectedProducts(newSelected);
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: 8,
+                              border: `1.5px solid ${COLORS.border}`,
+                              background: COLORS.surface,
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: '#EF4444',
+                              cursor: 'pointer',
+                              fontFamily: FONT,
+                              transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLButtonElement).style.background = '#FEE2E2';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLButtonElement).style.background = COLORS.surface;
+                            }}
+                          >
+                            Remove Item
+                          </button>
+                        ) : (
+                          <QtyStepper
+                            value={item.quantity}
+                            step={item.quantityStep ?? 1}
+                            onChange={qty => handleUpdateQuantity(item.productId, qty)}
+                          />
+                        )}
                       </div>
                     </div>
                   );

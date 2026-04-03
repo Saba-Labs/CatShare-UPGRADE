@@ -425,7 +425,7 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
 // ─── Product image ────────────────────────────────────────────────────────────
 function ProductThumb({ url, name }: { url?: string; name: string }) {
   const [failed, setFailed] = useState(false);
-  const valid = url && /^https?:\/\//i.test(url) && !failed;
+  const valid = url && (url.startsWith('data:') || /^https?:\/\//i.test(url)) && !failed;
   return (
     <div style={{
       width: 52, height: 52, borderRadius: 12, flexShrink: 0,
@@ -506,8 +506,9 @@ export default function OrderDetail() {
     setSaveLoading(true);
     try {
       const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
+      const itemsToSave = editItems.map(({ _key, ...item }) => item) as any[];
       const { error } = await updateOrder(order.id, {
-        items: editItems,
+        items: itemsToSave as any,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
