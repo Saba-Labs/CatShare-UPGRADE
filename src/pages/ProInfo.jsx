@@ -6,6 +6,7 @@ import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
 import { getSupabaseAccessToken } from "../supabaseClient";
 import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
+import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import {
   FREE_MAX_PRODUCTS,
   FREE_MAX_CATALOGUES,
@@ -34,8 +35,17 @@ export default function ProInfo() {
   const [prices, setPrices] = useState({});
   const [error, setError] = useState(null);
   const [billingFrequency, setBillingFrequency] = useState("monthly"); // "monthly", "yearly", "lifetime"
+  const [currencySymbol, setCurrencySymbol] = useState(() => getCurrentCurrencySymbol());
 
   const isAndroid = Capacitor.getPlatform() === "android";
+
+  // Listen for currency changes
+  useEffect(() => {
+    const unsubscribe = onCurrencyChange((currency, symbol) => {
+      setCurrencySymbol(symbol);
+    });
+    return unsubscribe;
+  }, []);
 
   // Load prices from Google Play
 useEffect(() => {
@@ -290,9 +300,9 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
             )}
           </div>
 
-          {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) */}
+          {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) — desktop only */}
           {!isPaidPro && isAndroid && (
-            <div className="flex gap-3 justify-center mb-8">
+            <div className="hidden md:flex gap-3 justify-center mb-8">
               <button
                 onClick={() => setBillingFrequency("monthly")}
                 className={`px-6 py-3 rounded-lg font-semibold transition ${
@@ -316,16 +326,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   Save 20%
                 </span>
               </button>
-              <button
-                onClick={() => setBillingFrequency("lifetime")}
-                className={`px-6 py-3 rounded-lg font-semibold transition ${
-                  billingFrequency === "lifetime"
-                    ? "bg-pink-600 text-white shadow-lg"
-                    : "bg-white border-2 border-gray-200 text-gray-700 hover:border-pink-300"
-                }`}
-              >
-                Lifetime
-              </button>
             </div>
           )}
 
@@ -347,7 +347,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
 
                 {/* Price */}
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">$0</span>
+                  <span className="text-4xl font-bold text-gray-900">{currencySymbol}0</span>
                   <span className="text-gray-600 ml-2 text-lg">Forever</span>
                 </div>
 
@@ -443,17 +443,12 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.yearly]}</span>
                           <span className="text-gray-600 ml-2">/year</span>
                         </>
-                      ) : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime] ? (
-                        <>
-                          <span className="text-4xl font-bold text-gray-900">{prices[INAPP_SKUS.lifetime]}</span>
-                          <span className="text-gray-600 ml-2">one-time</span>
-                        </>
                       ) : (
                         <span className="text-lg font-semibold text-gray-500">Loading price...</span>
                       )
                     ) : (
                       <>
-                        <span className="text-4xl font-bold text-gray-900">$9.99</span>
+                        <span className="text-4xl font-bold text-gray-900">{currencySymbol}9.99</span>
                         <span className="text-gray-600 ml-2">/month</span>
                       </>
                     )
@@ -470,6 +465,37 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   Unlock unlimited possibilities and professional features.
                 </p>
 
+                {/* BILLING FREQUENCY SELECTOR — Mobile only inside Pro card */}
+                {!isPaidPro && isAndroid && (
+                  <div className="md:hidden flex gap-2 mb-6">
+                    <button
+                      onClick={() => setBillingFrequency("monthly")}
+                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm ${
+                        billingFrequency === "monthly"
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-300"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setBillingFrequency("yearly")}
+                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm relative ${
+                        billingFrequency === "yearly"
+                          ? "bg-purple-600 text-white shadow-lg"
+                          : "bg-white border-2 border-gray-200 text-gray-700 hover:border-purple-300"
+                      }`}
+                    >
+                      Yearly
+                      {billingFrequency !== "yearly" && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                          -20%
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 {/* Button */}
                 {!isPaidPro ? (
                   isAndroid ? (
@@ -479,8 +505,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           handleBuySubscription(SUBSCRIPTION_SKUS.monthly);
                         } else if (billingFrequency === "yearly") {
                           handleBuySubscription(SUBSCRIPTION_SKUS.yearly);
-                        } else if (billingFrequency === "lifetime") {
-                          handleBuyLifetime();
                         }
                       }}
                       disabled={loading}
@@ -491,8 +515,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                           ? ` — ${prices[SUBSCRIPTION_SKUS.monthly]}`
                           : billingFrequency === "yearly" && prices?.[SUBSCRIPTION_SKUS.yearly]
                           ? ` — ${prices[SUBSCRIPTION_SKUS.yearly]}`
-                          : billingFrequency === "lifetime" && prices?.[INAPP_SKUS.lifetime]
-                          ? ` — ${prices[INAPP_SKUS.lifetime]}`
                           : ""
                       }`}
                     </button>
@@ -668,30 +690,6 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   </div>
                 </button>
 
-                {/* Lifetime */}
-                <button
-                  onClick={() => {
-                    if (!isAndroid) {
-                      alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.");
-                    } else {
-                      handleBuyLifetime();
-                    }
-                  }}
-                  disabled={loading}
-                  className="w-full p-4 border-2 border-pink-300 bg-white hover:bg-pink-50 rounded-xl transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-gray-900">Lifetime Plan</p>
-                      <p className="text-sm text-gray-600">
-                        {prices?.[INAPP_SKUS.lifetime]
-                          ? `${prices[INAPP_SKUS.lifetime]} one-time`
-                          : "One-time purchase"}
-                      </p>
-                    </div>
-                    <div className="text-pink-600 font-bold text-lg">→</div>
-                  </div>
-                </button>
 
                 {/* Restore */}
                 <button

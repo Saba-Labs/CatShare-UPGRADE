@@ -213,9 +213,10 @@ export default function CreateOrder() {
         const catData = getCatalogueData(product, selectedCatalogueId);
         const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
         const rowTotal = unitPrice * quantity;
-        
+
         const priceUnit = catData[catalogue.priceUnitField];
         const quantityStep = catData[catalogue.orderQuantityStepField];
+        const productImage = imageMap[product.id] || product.image || product.imageUrl;
         items.push({
           productId,
           name: product.name,
@@ -223,7 +224,7 @@ export default function CreateOrder() {
           unitPrice,
           rowTotal,
           category: product.category?.[0],
-          imageUrl: product.image,
+          imageUrl: productImage,
           priceUnit,
           subtitle: product.subtitle,
           quantityStep,
