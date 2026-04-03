@@ -978,7 +978,7 @@ export default function OrderDetail() {
               </div>
 
               {/* Action tiles grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <ActionTile
                   icon={<Ic.WhatsApp size={18} />}
                   label="Send Invoice"
