@@ -115,6 +115,7 @@ export default function CreateOrderModal({
       rowTotal: number;
       category?: string;
       imageUrl?: string;
+      quantityStep?: number;
     }> = [];
 
     let total = 0;
@@ -125,7 +126,8 @@ export default function CreateOrderModal({
         const catData = getCatalogueData(product, selectedCatalogueId);
         const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
         const rowTotal = unitPrice * quantity;
-        
+        const quantityStep = catData[catalogue.orderQuantityStepField];
+
         items.push({
           productId,
           name: product.name,
@@ -134,6 +136,7 @@ export default function CreateOrderModal({
           rowTotal,
           category: product.category?.[0],
           imageUrl: product.image,
+          quantityStep,
         });
         
         total += rowTotal;
@@ -189,6 +192,7 @@ export default function CreateOrderModal({
         rowTotal: item.rowTotal,
         category: item.category,
         imageUrl: item.imageUrl,
+        quantityStep: item.quantityStep,
       }));
 
       const { error } = await createOrderDirectly(

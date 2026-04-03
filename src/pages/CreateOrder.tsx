@@ -201,6 +201,7 @@ export default function CreateOrder() {
       imageUrl?: string;
       priceUnit?: string;
       subtitle?: string;
+      quantityStep?: number;
     }> = [];
 
     let total = 0;
@@ -214,6 +215,7 @@ export default function CreateOrder() {
         const rowTotal = unitPrice * quantity;
         
         const priceUnit = catData[catalogue.priceUnitField];
+        const quantityStep = catData[catalogue.orderQuantityStepField];
         items.push({
           productId,
           name: product.name,
@@ -224,6 +226,7 @@ export default function CreateOrder() {
           imageUrl: product.image,
           priceUnit,
           subtitle: product.subtitle,
+          quantityStep,
         });
         
         total += rowTotal;
@@ -281,6 +284,7 @@ export default function CreateOrder() {
         rowTotal: item.rowTotal,
         category: item.category,
         imageUrl: item.imageUrl,
+        quantityStep: item.quantityStep,
       }));
 
       const { error } = await createOrderDirectly(
