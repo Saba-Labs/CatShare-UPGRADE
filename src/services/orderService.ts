@@ -9,6 +9,7 @@ export interface OrderItem {
   category?: string;
   priceUnit?: string;
   imageUrl?: string;
+  quantityStep?: number;
 }
 
 export interface Order {
@@ -130,6 +131,32 @@ export async function updateOrderStatus(
     const { data, error } = await client
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
+  }
+}
+
+/**
+ * Update order (items, customer details, total amount)
+ */
+export async function updateOrder(
+  orderId: string,
+  updates: {
+    items?: OrderItem[];
+    customer_name?: string;
+    customer_whatsapp?: string;
+    total_amount?: number;
+  }
+): Promise<{ data: Order | null; error: any }> {
+  try {
+    const client = getSupabaseClient();
+
+    const { data, error } = await client
+      .from('orders')
+      .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', orderId);
 
     return { data, error };

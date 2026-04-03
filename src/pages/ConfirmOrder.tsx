@@ -158,6 +158,7 @@ export default function ConfirmOrder() {
             category: (i.category || []).join(', ') || i.subtitle || '',
             priceUnit: i.priceUnit || undefined,
             imageUrl: i.imageUrl,
+            quantityStep: i.quantityStep,
           };
         });
 
