@@ -160,7 +160,7 @@ export async function createShareLink(options: {
   sellerLogoUrl?: string;
   expiresInDays?: number;
 }): Promise<{ token: string; url: string }> {
-  const token = randomToken(24);
+  const token = randomToken(16);
   const expiresInDays = options.expiresInDays ?? 1;
   const expiresAt = new Date(
     Date.now() + expiresInDays * 24 * 60 * 60 * 1000

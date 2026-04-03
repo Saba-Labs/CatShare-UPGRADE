@@ -490,14 +490,11 @@ export default function Orders() {
         background: '#fff', borderBottom: '1px solid #E2E8F0',
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
       }}>
-        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 16, top: 14 }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, display: showSearch ? 'none' : 'block', transition: 'opacity 0.15s ease' }}>{stats.total} total · {stats.pending} pending</div>
+            <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
           </div>
-
-          {/* Flexible Spacer */}
-          <div style={{ flex: 1 }} />
 
           {/* Create Order Button */}
           <button
@@ -513,8 +510,11 @@ export default function Orders() {
               cursor: 'pointer',
               fontFamily: 'inherit',
               marginRight: 8,
-              transition: 'all 0.15s ease',
-              display: showSearch ? 'none' : 'inline-block',
+              transition: 'opacity 0.15s ease, visibility 0.15s ease',
+              transitionDelay: showSearch ? '0s' : '0.3s',
+              opacity: showSearch ? 0 : 1,
+              visibility: showSearch ? 'hidden' : 'visible',
+              pointerEvents: showSearch ? 'none' : 'auto',
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
@@ -537,9 +537,10 @@ export default function Orders() {
               opacity: showSearch ? 1 : 0,
               transform: showSearch ? 'scale(1)' : 'scale(0.95)',
               marginRight: showSearch ? 8 : 0,
+              height: 36,
             }}
           >
-            <div style={{ position: 'relative', width: '100%', height: 36 }}>
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <input
                 ref={searchInputRef}
                 type="text"

@@ -55,14 +55,14 @@ function IconArrowLeft() {
 // Helper function to get unit label
 function getOrderUnitLabel(priceUnit: string | undefined): string {
   if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
-    return 'units';
+    return 'unit';
   }
   const cleaned = String(priceUnit)
     .replace(/^\s*\/\s*/i, '')
     .trim()
     .toLowerCase();
-  if (!cleaned) return 'units';
-  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  if (!cleaned) return 'unit';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'piece';
   return cleaned;
 }
 
@@ -121,9 +121,25 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [imageMap, setImageMap] = useState<Record<string, string>>({})
 
   const catalogues = getAllCatalogues();
   const products = safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[];
+
+  // Build imageMap from product images
+  React.useEffect(() => {
+    const map: Record<string, string> = {};
+    products.forEach(p => {
+      // Check image field first, then imageUrl
+      const imgSrc = (p.image && typeof p.image === 'string') ? p.image :
+                     (p.imageUrl && typeof p.imageUrl === 'string') ? p.imageUrl :
+                     null;
+      if (imgSrc) {
+        map[p.id] = imgSrc;
+      }
+    });
+    setImageMap(map);
+  }, [products]);
 
   // Get products for selected catalogue
   const catalogueProducts = useMemo(() => {
@@ -640,7 +656,8 @@ export default function CreateOrder() {
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                  const hasImage = product.image && /^https?:\/\//i.test(product.image);
+                  const productImage = imageMap[product.id] || product.image;
+                  const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
                   const isSelected = quantity > 0;
                   const lineTotal = price * quantity;
 
@@ -674,17 +691,18 @@ export default function CreateOrder() {
                       {/* Image */}
                       <div style={{
                         width: 100,
-                        height: 100,
-                        flexShrink: 0,
+                        minWidth: 100,
+                        minHeight: 100,
                         overflow: 'hidden',
                         background: '#F1F5F9',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
+                        flexShrink: 0,
                       }}>
                         {hasImage ? (
-                          <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          <img src={productImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                         ) : (
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
@@ -714,87 +732,87 @@ export default function CreateOrder() {
                         flex: 1,
                         padding: '12px',
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-start',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 8,
                         minWidth: 0,
-                        gap: 6,
                       }}>
-                        {/* Top */}
-                        <div style={{ flexShrink: 0 }}>
-                          <div style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            alignItems: 'baseline',
-                            gap: '4px 8px',
-                            lineHeight: 1.3,
-                            marginBottom: 4,
-                          }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                              {product.name}
-                            </span>
-                            {product.subtitle && (
-                              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
-                                ({product.subtitle})
+                        {/* Left Column - Product Info and Quantity */}
+                        <div style={{
+                          flex: 1,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          minWidth: 0,
+                        }}>
+                          {/* Product Info */}
+                          <div>
+                            <div style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              alignItems: 'baseline',
+                              gap: '4px 8px',
+                              lineHeight: 1.3,
+                              marginBottom: 4,
+                            }}>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                                {product.name}
                               </span>
+                              {product.subtitle && (
+                                <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
+                                  ({product.subtitle})
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Categories */}
+                            {product.category && product.category.length > 0 && (
+                              <div style={{
+                                display: 'flex',
+                                gap: 6,
+                                flexWrap: 'wrap',
+                                marginTop: 4,
+                                marginBottom: 4,
+                              }}>
+                                {product.category.map((cat) => (
+                                  <span
+                                    key={cat}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      borderRadius: 999,
+                                      padding: '3px 8px',
+                                      background: '#F1F5F9',
+                                      color: '#475569',
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {cat}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Price */}
+                            {price > 0 && (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                background: '#DCFCE7',
+                                borderRadius: 6,
+                                padding: '2px 7px',
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                color: '#166534',
+                              }}>
+                                ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
+                              </div>
                             )}
                           </div>
 
-                          {/* Categories */}
-                          {product.category && product.category.length > 0 && (
-                            <div style={{
-                              display: 'flex',
-                              gap: 6,
-                              flexWrap: 'wrap',
-                              marginTop: 4,
-                              marginBottom: 4,
-                            }}>
-                              {product.category.map((cat) => (
-                                <span
-                                  key={cat}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    borderRadius: 999,
-                                    padding: '3px 8px',
-                                    background: '#F1F5F9',
-                                    color: '#475569',
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {cat}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Price */}
-                          {price > 0 && (
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 3,
-                              background: '#DCFCE7',
-                              borderRadius: 6,
-                              padding: '2px 7px',
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              color: '#166534',
-                            }}>
-                              ₹{price.toLocaleString('en-IN')}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Bottom */}
-                        <div style={{
-                          display: 'flex',
-                          flex: 1,
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
-                        }}>
                           {/* Quantity Control */}
                           <div style={{
                             display: 'flex',
@@ -803,7 +821,7 @@ export default function CreateOrder() {
                             background: '#F1F5F9',
                             borderRadius: 6,
                             border: '1.5px solid #E2E8F0',
-                            flexShrink: 0,
+                            width: 'fit-content',
                           }}>
                             <button
                               onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
@@ -852,29 +870,31 @@ export default function CreateOrder() {
                               <IconPlus />
                             </button>
                           </div>
+                        </div>
 
-                          {/* Subtotal - Right side */}
-                          {isSelected && (
-                            <div style={{
-                              fontSize: 12,
-                              color: '#64748B',
-                              fontWeight: 500,
-                              textAlign: 'right',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 2,
-                            }}>
-                              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
-                                Subtotal
-                              </div>
-                              <div style={{ fontSize: 11, fontWeight: 600 }}>
-                                {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
-                              </div>
-                              <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
-                                ₹{lineTotal.toLocaleString('en-IN')}
-                              </div>
-                            </div>
-                          )}
+                        {/* Right Column - Subtotal (Centered) */}
+                        <div style={{
+                          fontSize: 12,
+                          color: '#64748B',
+                          fontWeight: 500,
+                          textAlign: 'right',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 2,
+                          minWidth: 120,
+                          visibility: isSelected ? 'visible' : 'hidden',
+                          flexShrink: 0,
+                          justifyContent: 'center',
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                            Subtotal
+                          </div>
+                          <div style={{ fontSize: 11, fontWeight: 600 }}>
+                            {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
+                            ₹{lineTotal.toLocaleString('en-IN')}
+                          </div>
                         </div>
                       </div>
                     </div>
