@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
 import { getAllCatalogues } from '../config/catalogueConfig';
-import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalogueProductUtils';
+import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
@@ -655,6 +655,7 @@ export default function CreateOrder() {
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+                  const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
                   const productImage = imageMap[product.id] || product.image;
                   const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
                   const isSelected = quantity > 0;
@@ -764,36 +765,6 @@ export default function CreateOrder() {
                               )}
                             </div>
 
-                            {/* Categories */}
-                            {product.category && product.category.length > 0 && (
-                              <div style={{
-                                display: 'flex',
-                                gap: 6,
-                                flexWrap: 'wrap',
-                                marginTop: 4,
-                                marginBottom: 4,
-                              }}>
-                                {product.category.map((cat) => (
-                                  <span
-                                    key={cat}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      borderRadius: 999,
-                                      padding: '3px 8px',
-                                      background: '#F1F5F9',
-                                      color: '#475569',
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      lineHeight: 1.2,
-                                    }}
-                                  >
-                                    {cat}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-
                             {/* Price */}
                             {price > 0 && (
                               <div style={{
@@ -823,7 +794,7 @@ export default function CreateOrder() {
                             width: 'fit-content',
                           }}>
                             <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
+                              onClick={() => handleUpdateQuantity(product.id, quantity - quantityStep)}
                               style={{
                                 width: 32,
                                 height: 32,
@@ -851,7 +822,7 @@ export default function CreateOrder() {
                               {quantity}
                             </span>
                             <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                              onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
                               style={{
                                 width: 32,
                                 height: 32,
