@@ -691,14 +691,15 @@ export default function CreateOrder() {
                       {/* Image */}
                       <div style={{
                         width: 100,
-                        height: 100,
-                        flexShrink: 0,
+                        minWidth: 100,
+                        minHeight: 100,
                         overflow: 'hidden',
                         background: '#F1F5F9',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
+                        flexShrink: 0,
                       }}>
                         {hasImage ? (
                           <img src={productImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
