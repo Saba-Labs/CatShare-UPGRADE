@@ -4,7 +4,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -515,10 +515,19 @@ export default function Orders() {
     navigate(path);
   };
 
-  const handleStatusChange = (id: string, status: StatusType) => {
+  const handleStatusChange = async (id: string, status: StatusType) => {
+    // Update local state immediately
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
-    showToast(`Order marked as ${status}`, 'success');
-    // TODO: persist to backend
+
+    // Persist to backend
+    const { error } = await updateOrderStatus(id, status);
+    if (error) {
+      showToast('Failed to update order status', 'error');
+      // Revert local state on error
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: o.status } : o));
+    } else {
+      showToast(`Order marked as ${status}`, 'success');
+    }
   };
 
   const tabs: { key: TabType; label: string }[] = [

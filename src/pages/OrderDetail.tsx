@@ -4,7 +4,7 @@ import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, updateOrder, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, updateOrderStatus, type Order } from '../services/orderService';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
@@ -576,10 +576,25 @@ export default function OrderDetail() {
   };
 
   const handleStatusChange = async (status: StatusType) => {
+    if (!order) return;
+
     await Haptics.impact({ style: ImpactStyle.Light });
+
+    // Store old status in case we need to revert
+    const oldStatus = order.status;
+
+    // Update local state immediately for optimistic UI
     setOrder(prev => prev ? { ...prev, status } : null);
-    showToast(`Marked as ${status}`, 'success');
-    // TODO: persist to backend
+
+    // Persist to backend
+    const { error } = await updateOrderStatus(order.id, status);
+    if (error) {
+      showToast('Failed to update order status', 'error');
+      // Revert on error
+      setOrder(prev => prev ? { ...prev, status: oldStatus } : null);
+    } else {
+      showToast(`Marked as ${status}`, 'success');
+    }
   };
 
   const handleSaveEdit = async () => {
