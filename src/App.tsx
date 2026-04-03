@@ -751,12 +751,25 @@ function AppWithBackHandler() {
           setProducts(freshProducts);
         }
       } else {
+        // Non-strict mode: load from localStorage first, then also refresh from cloud
         setProducts(freshProducts);
+        setDeletedProducts(freshDeleted);
+
+        // Also attempt to refresh from cloud in the background to get latest data
+        try {
+          const cloudData = await refreshFromCloud();
+          if (cloudData) {
+            setProducts(cloudData.products);
+            setDeletedProducts(cloudData.deletedProducts);
+          }
+        } catch (err) {
+          console.warn('⚠️ Background refresh from cloud failed (using local data):', err);
+        }
       }
     };
     window.addEventListener("product-added", handleNewProduct);
     return () => window.removeEventListener("product-added", handleNewProduct);
-  }, [user?.uid, syncProductsToCloud, isStrictMode]);
+  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode]);
 
   // ──────────────────────────────────────────────────────
   // STRICT REFRESH EVENT: child components dispatch this after
