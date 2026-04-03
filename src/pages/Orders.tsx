@@ -819,7 +819,7 @@ export default function Orders() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 72, paddingTop: 50 }}>
+      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 16, paddingTop: 50 }}>
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
@@ -861,22 +861,6 @@ export default function Orders() {
         )}
       </main>
 
-      {/* Bottom Nav */}
-      <nav style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30,
-        display: 'flex', background: '#fff', borderTop: '1px solid #E2E8F0',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}>
-        <button onClick={() => handleNavigate('/')} style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: '#64748B' }}>
-          Products
-        </button>
-        <button onClick={() => handleNavigate('/?tab=catalogues')} style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: '#64748B' }}>
-          Catalogues
-        </button>
-        <button style={{ flex: 1, padding: '14px 4px', border: 'none', background: '#EFF6FF', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, color: '#2563EB' }}>
-          Orders
-        </button>
-      </nav>
 
     </div>
   );
