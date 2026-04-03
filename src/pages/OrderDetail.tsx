@@ -506,9 +506,9 @@ export default function OrderDetail() {
     setSaveLoading(true);
     try {
       const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
-      const itemsToSave = editItems.map(({ _key, ...item }) => item);
+      const itemsToSave = editItems.map(({ _key, ...item }) => item) as any[];
       const { error } = await updateOrder(order.id, {
-        items: itemsToSave,
+        items: itemsToSave as any,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
