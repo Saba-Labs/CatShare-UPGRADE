@@ -371,82 +371,37 @@ function ActionTile({
 
 // ─── Qty stepper ─────────────────────────────────────────────────────────────
 function QtyStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [inputValue, setInputValue] = useState(String(value));
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Only allow numeric input
-    if (val === '' || /^\d+$/.test(val)) {
-      setInputValue(val);
-    }
-  };
-
-  const handleConfirm = () => {
-    const num = inputValue === '' ? 0 : parseInt(inputValue, 10);
-    onChange(Math.max(0, num));
-    setIsEditing(false);
-    setInputValue(String(value));
-  };
-
-  const handleBlur = () => {
-    handleConfirm();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleConfirm();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-      setInputValue(String(value));
-    }
-  };
-
   return (
-    <div style={{ display: 'flex', alignItems: 'center', background: '#F2F2F7', borderRadius: 100, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F2F2F7', borderRadius: 6, border: '1.5px solid #E2E8F0', width: 'fit-content' }}>
       <button
         onClick={() => onChange(Math.max(0, value - 1))}
-        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
+        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: value === 0 ? '#CBD5E1' : COLORS.text }}
+        disabled={value === 0}
       >
         <Ic.Minus />
       </button>
-      {isEditing ? (
-        <input
-          type="text"
-          value={inputValue}
-          onChange={handleInputChange}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          style={{
-            minWidth: 30,
-            textAlign: 'center',
-            fontSize: 14,
-            fontWeight: 700,
-            color: COLORS.text,
-            border: 'none',
-            background: 'transparent',
-            outline: 'none',
-            padding: '0 4px',
-          }}
-        />
-      ) : (
-        <span
-          onClick={() => setIsEditing(true)}
-          style={{
-            minWidth: 30,
-            textAlign: 'center',
-            fontSize: 14,
-            fontWeight: 700,
-            color: COLORS.text,
-            userSelect: 'none',
-            cursor: 'pointer',
-            padding: '0 4px',
-          }}
-        >
-          {value}
-        </span>
-      )}
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value > 0 ? String(value) : ''}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, '');
+          onChange(digits ? parseInt(digits, 10) : 0);
+        }}
+        aria-label="Quantity"
+        style={{
+          width: 40,
+          border: 'none',
+          background: 'transparent',
+          textAlign: 'center',
+          fontSize: 14,
+          fontWeight: 700,
+          color: value === 0 ? '#94A3B8' : COLORS.text,
+          fontFamily: 'inherit',
+          padding: 0,
+          outline: 'none',
+        }}
+      />
       <button
         onClick={() => onChange(value + 1)}
         style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
