@@ -763,7 +763,7 @@ export default function OrderDetail() {
                     <input
                       value={editPhone}
                       onChange={e => setEditPhone(e.target.value)}
-                      type="tel" placeholder="+91 98765 43210"
+                      type="tel" placeholder="+91 98xxxxxxxx"
                       style={{
                         width: '100%', padding: '10px 12px',
                         borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
