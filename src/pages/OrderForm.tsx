@@ -1360,16 +1360,127 @@ export default function OrderForm() {
     </div>
   );
 
-  // ── Error ──
-  if (error) return (
-    <div className="of-bg">
-      <div className="of-state">
-        <div className="of-state-icon">⚠️</div>
-        <div className="of-state-title">Couldn't load order form</div>
-        <div className="of-state-sub of-state-error">{error}</div>
+ // ── Error / Expired ──
+ if (error) {
+  const isExpired =
+    error.toLowerCase().includes('expir') ||
+    error.toLowerCase().includes('invalid') ||
+    error.toLowerCase().includes('not found');
+
+  return (
+    <div className="of-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 420,
+        background: '#fff',
+        borderRadius: 24,
+        border: '1.5px solid #e2e8f0',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
+        overflow: 'hidden',
+        fontFamily: 'var(--font)',
+      }}>
+        {/* Top accent strip */}
+        <div style={{
+          height: 6,
+          background: isExpired
+            ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+            : 'linear-gradient(90deg, #ef4444, #dc2626)',
+        }} />
+
+        <div style={{ padding: '36px 32px 32px', textAlign: 'center' }}>
+          {/* Icon */}
+          <div style={{
+            width: 72, height: 72,
+            borderRadius: '50%',
+            background: isExpired ? '#fef3c7' : '#fee2e2',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 20px',
+            fontSize: 32,
+          }}>
+            {isExpired ? '⏰' : '⚠️'}
+          </div>
+
+          {/* Heading */}
+          <div style={{
+            fontSize: 22, fontWeight: 800, color: '#0f172a',
+            letterSpacing: '-0.5px', marginBottom: 10, lineHeight: 1.2,
+          }}>
+            {isExpired ? 'This link has expired' : 'Link unavailable'}
+          </div>
+
+          {/* Subtext */}
+          <div style={{
+            fontSize: 14, color: '#64748b', lineHeight: 1.6,
+            marginBottom: 28,
+          }}>
+            {isExpired
+              ? 'Order links are valid for 24 hours. This one has expired or is no longer active.'
+              : error}
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: '#f1f5f9', marginBottom: 24 }} />
+
+          {/* Contact seller prompt */}
+          <div style={{
+            background: '#f0fdf4',
+            border: '1.5px solid #bbf7d0',
+            borderRadius: 14,
+            padding: '16px 18px',
+            marginBottom: 24,
+            textAlign: 'left',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>
+              What to do next
+            </div>
+            <div style={{ fontSize: 13.5, color: '#166534', lineHeight: 1.6 }}>
+              Contact the seller directly to get an updated order link or place your order via WhatsApp.
+            </div>
+          </div>
+
+          {/* WhatsApp CTA — only if seller number is known */}
+          {sellerWhatsapp ? (
+              <button
+                onClick={() => window.open(`https://wa.me/${sellerWhatsapp.replace(/[^\d]/g, '')}`, '_blank')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: '#25d366', color: '#fff',
+                  padding: '13px 20px', borderRadius: 100,
+                  fontSize: 14, fontWeight: 700, textDecoration: 'none',
+                  boxShadow: '0 4px 14px rgba(37,211,102,0.35)',
+                  border: 'none', cursor: 'pointer', width: '100%',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                <WhatsAppIcon size={16} />
+                Message Seller on WhatsApp
+              </button>
+            ) : (
+              <div style={{ fontSize: 13, color: '#94a3b8' }}>
+                Reach out to the seller for a fresh link.
+              </div>
+            )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          borderTop: '1px solid #f1f5f9',
+          padding: '14px 20px',
+          textAlign: 'center',
+          background: '#f8fafc',
+        }}>
+          
+          <button
+              onClick={() => window.open(CATSHARE_PLAY_STORE_URL, '_blank')}
+              style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)' }}
+            >
+              📲 Get CatShare on Google Play
+            </button>
+        </div>
       </div>
     </div>
   );
+}
 
   // ── Main ──
   return (
