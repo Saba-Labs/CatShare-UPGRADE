@@ -95,51 +95,52 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       try {
-        const resp = await fetch(`${baseUrl}/api/subscription`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: controller.signal,
-        });
+        try {
+          const resp = await fetch(`${baseUrl}/api/subscription`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+          });
 
-        if (!resp.ok) {
-          console.warn(`Subscription API returned status ${resp.status}`);
-          setLoading(false);
-          return;
-        }
+          if (!resp.ok) {
+            console.warn(`Subscription API returned status ${resp.status}`);
+            return;
+          }
 
-        const json = await resp.json();
-        const next = !!json?.isPro;
-        const nextPaid = !!json?.isPaidPro;
-        const nextTrial = !!json?.isTrialActive;
-        const nextTrialEnd =
-          typeof json?.trialEndsAt === 'string' && json.trialEndsAt.length > 0 ? json.trialEndsAt : null;
-        const nextTrialDays =
-          typeof json?.trialDays === 'number' && Number.isFinite(json.trialDays) && json.trialDays > 0
-            ? json.trialDays
-            : TRIAL_DAYS_UI_FALLBACK;
+          const json = await resp.json();
+          const next = !!json?.isPro;
+          const nextPaid = !!json?.isPaidPro;
+          const nextTrial = !!json?.isTrialActive;
+          const nextTrialEnd =
+            typeof json?.trialEndsAt === 'string' && json.trialEndsAt.length > 0 ? json.trialEndsAt : null;
+          const nextTrialDays =
+            typeof json?.trialDays === 'number' && Number.isFinite(json.trialDays) && json.trialDays > 0
+              ? json.trialDays
+              : TRIAL_DAYS_UI_FALLBACK;
 
-        setIsPro(next);
-        setIsPaidPro(nextPaid);
-        setIsTrialActive(nextTrial);
-        setTrialEndsAt(nextTrialEnd);
-        setTrialDays(nextTrialDays);
+          setIsPro(next);
+          setIsPaidPro(nextPaid);
+          setIsTrialActive(nextTrial);
+          setTrialEndsAt(nextTrialEnd);
+          setTrialDays(nextTrialDays);
 
-        localStorage.setItem('isPro', next ? 'true' : 'false');
-        localStorage.setItem(LS_TRIAL_DAYS, String(nextTrialDays));
-        localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
-        localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
-        if (nextTrialEnd) {
-          localStorage.setItem(LS_TRIAL_ENDS, nextTrialEnd);
-        } else {
-          localStorage.removeItem(LS_TRIAL_ENDS);
-        }
-      } catch (fetchError) {
-        // Silently fail and keep cached values - this handles network errors, CORS issues, timeouts, etc.
-        if (fetchError instanceof Error && fetchError.name !== 'AbortError') {
-          console.debug('Subscription fetch error (using cache):', fetchError.message);
+          localStorage.setItem('isPro', next ? 'true' : 'false');
+          localStorage.setItem(LS_TRIAL_DAYS, String(nextTrialDays));
+          localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
+          localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
+          if (nextTrialEnd) {
+            localStorage.setItem(LS_TRIAL_ENDS, nextTrialEnd);
+          } else {
+            localStorage.removeItem(LS_TRIAL_ENDS);
+          }
+        } catch (fetchError) {
+          // Silently fail and keep cached values - this handles network errors, CORS issues, timeouts, etc.
+          if (fetchError instanceof Error && fetchError.name !== 'AbortError') {
+            console.debug('Subscription fetch error (using cache):', fetchError.message);
+          }
         }
       } finally {
         clearTimeout(timeoutId);
