@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSwipeable } from 'react-swipeable';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
@@ -368,7 +370,8 @@ export default function CreateOrder() {
     else if (step === 'review') setStep('customer');
   };
 
-  const handleClose = () => {
+  const handleBack = async () => {
+    await Haptics.impact({ style: ImpactStyle.Light });
     if (step === 'catalogue') {
       navigate('/orders');
     } else {
@@ -376,8 +379,14 @@ export default function CreateOrder() {
     }
   };
 
+  const swipeHandlers = useSwipeable({
+    onSwipedRight: handleBack,
+    trackMouse: false,
+    delta: 50,
+  });
+
   return (
-    <div style={{
+    <div {...swipeHandlers} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -413,7 +422,7 @@ export default function CreateOrder() {
           gap: 12,
         }}>
           <button
-            onClick={handleClose}
+            onClick={handleBack}
             style={{
               background: 'none',
               border: 'none',
@@ -1215,7 +1224,7 @@ export default function CreateOrder() {
       }}>
         {step !== 'catalogue' && (
           <button
-            onClick={handleBackStep}
+            onClick={handleBack}
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -1245,7 +1254,7 @@ export default function CreateOrder() {
         <button
           onClick={() => {
             if (step === 'catalogue') {
-              handleClose();
+              navigate('/orders');
             } else if (step === 'products') {
               handleContinueToCustomer();
             } else if (step === 'customer') {
