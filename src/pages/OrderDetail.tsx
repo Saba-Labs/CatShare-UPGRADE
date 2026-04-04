@@ -1071,7 +1071,7 @@ useEffect(() => {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
                         {it.unitPrice ? (
-                          <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} per unit</div>
+                          <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
                         ) : null}
                       </div>
                       <QtyStepper value={it.quantity} step={it.quantityStep ?? 1} onChange={qty => {
