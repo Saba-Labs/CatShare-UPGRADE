@@ -1,0 +1,3 @@
+* { box-sizing: border-box; }
+input:focus { outline: none; }
+::-webkit-scrollbar { width: 0; }

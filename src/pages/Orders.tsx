@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import './Orders.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -579,13 +580,6 @@ export default function Orders() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; }
-        input:focus { outline: none; border-color: #16A34A !important; }
-        ::-webkit-scrollbar { width: 0; }
-      `}</style>
-
       {/* Swipe back visual indicator */}
       {swipeProgress > 0 && (
         <div

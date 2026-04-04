@@ -10,6 +10,7 @@ import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityS
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import './CreateOrder.css';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
 
@@ -424,13 +425,6 @@ export default function CreateOrder() {
       background: '#F8FAFC',
       fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
     }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; }
-        input:focus { outline: none; }
-        ::-webkit-scrollbar { width: 0; }
-      `}</style>
-
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
 

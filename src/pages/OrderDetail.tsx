@@ -10,6 +10,7 @@ import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
+import './OrderDetail.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = 'pending' | 'completed' | 'cancelled';
@@ -856,17 +857,6 @@ useEffect(() => {
 
   return (
     <div {...swipeHandlers} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
-        * { box-sizing: border-box; }
-        input, textarea { font-family: inherit; }
-        input:focus { outline: none; border-color: ${COLORS.green} !important; box-shadow: 0 0 0 3px ${COLORS.green}14 !important; }
-        ::-webkit-scrollbar { display: none; }
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
-        @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
-      `}</style>
-
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto', height: 44, background: '#1C1C1E', zIndex: 100 }} />
 
