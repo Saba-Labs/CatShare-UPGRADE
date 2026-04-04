@@ -4,7 +4,7 @@ import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, updateOrder, updateOrderStatus, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
@@ -715,10 +715,20 @@ export default function OrderDetail() {
     }
   };
 
-  const handleDelete = () => {
-    navigate('/orders');
-    showToast('Order deleted', 'success');
-    // TODO: persist to backend
+  const handleDelete = async () => {
+    if (!order) return;
+    try {
+      const { error } = await deleteOrder(order.id);
+      if (error) {
+        showToast('Failed to delete order', 'error');
+        return;
+      }
+      showToast('Order deleted', 'success');
+      navigate('/orders');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete order', 'error');
+    }
   };
 
   // ── Loading ──
