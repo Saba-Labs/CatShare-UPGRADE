@@ -562,7 +562,7 @@ export default function OrderDetail() {
       await Haptics.impact({ style: ImpactStyle.Light });
 
       if (wasInEditMode) {
-        setEditMode(false);
+        setEditModeSync(false);
       } else {
         navigate('/orders');
       }
@@ -596,7 +596,7 @@ export default function OrderDetail() {
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
     if (editMode) {
-      setEditMode(false);
+      setEditModeSync(false);
     } else {
       navigate('/orders');
     }
@@ -650,7 +650,7 @@ export default function OrderDetail() {
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
       } as any);
-      setEditMode(false);
+      setEditModeSync(false);
       showToast('Order saved', 'success');
     } catch (err) {
       console.error(err);
@@ -1143,7 +1143,7 @@ export default function OrderDetail() {
           {editMode ? (
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => setEditMode(false)}
+                onClick={() => setEditModeSync(false)}
                 style={{
                   flex: 1, padding: '14px', borderRadius: 14,
                   border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,
@@ -1202,7 +1202,7 @@ export default function OrderDetail() {
 
               {/* Edit */}
               <button
-                onClick={() => setEditMode(true)}
+                onClick={() => setEditModeSync(true)}
                 style={{
                   width: '100%', padding: '14px', borderRadius: 14,
                   border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,
