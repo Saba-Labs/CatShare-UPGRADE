@@ -912,39 +912,27 @@ export default function CreateOrder() {
                           </button>
                         </div>
 
-                        {/* Subtotal - Below Quantity */}
+                        {/* Subtotal - Below Quantity (Compact Single Line) */}
                         {quantity > 0 && (
                           <div style={{
-                            background: '#F0FDF4',
-                            border: '1px solid #BBF7D0',
-                            borderRadius: 8,
-                            padding: '10px 12px',
                             display: 'flex',
-                            flexDirection: 'column',
-                            gap: 4,
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 12,
+                            color: '#64748B',
+                            marginTop: 2,
                           }}>
-                            <div style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                              color: '#166534',
-                              letterSpacing: '0.3px',
-                            }}>
-                              Subtotal
-                            </div>
-                            <div style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: '#64748B',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}>
-                              <span>{quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}</span>
-                              <span style={{ color: '#166534', fontWeight: 700, fontSize: 14 }}>
-                                ₹{lineTotal.toLocaleString('en-IN')}
-                              </span>
-                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
+                              subtotal
+                            </span>
+                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                            <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
+                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
+                            </span>
+                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
+                              ₹{lineTotal.toLocaleString('en-IN')}
+                            </span>
                           </div>
                         )}
                       </div>
