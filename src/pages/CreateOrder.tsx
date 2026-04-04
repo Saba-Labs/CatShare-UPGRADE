@@ -947,7 +947,8 @@ export default function CreateOrder() {
                         {quantity > 0 && (
                           <div style={{
                             display: 'flex',
-                            alignItems: 'right',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
                             gap: 6,
                             fontSize: 12,
                             color: '#64748B',
