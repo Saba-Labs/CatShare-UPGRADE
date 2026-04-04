@@ -547,10 +547,25 @@ export default function OrderDetail() {
   const editModeRef = useRef(editMode);
 
   const setEditModeSync = (val: boolean) => {
-  editModeRef.current = val;  // update ref immediately, synchronously
+  editModeRef.current = val;
   setEditMode(val);
+  if (val) {
+    window.history.pushState({ editMode: true }, '');
+  }
 };
 
+useEffect(() => {
+  const onPopState = (e: PopStateEvent) => {
+    if (editModeRef.current) {
+      // Native back was triggered while in edit mode — just exit edit mode
+      editModeRef.current = false;
+      setEditMode(false);
+      // Don't navigate away
+    }
+  };
+  window.addEventListener('popstate', onPopState);
+  return () => window.removeEventListener('popstate', onPopState);
+}, []);
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
       if (isSwipeProcessingRef.current) return;
