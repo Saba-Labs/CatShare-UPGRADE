@@ -553,19 +553,20 @@ export default function OrderDetail() {
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
-      // Prevent multiple swipes from being processed simultaneously
       if (isSwipeProcessingRef.current) return;
+
+      // Capture synchronously before any awaits
+      const wasInEditMode = editModeRef.current;
 
       isSwipeProcessingRef.current = true;
       await Haptics.impact({ style: ImpactStyle.Light });
 
-      if (editModeRef.current) {
+      if (wasInEditMode) {
         setEditMode(false);
       } else {
         navigate('/orders');
       }
 
-      // Clear the flag after a delay to prevent rapid consecutive swipes
       setTimeout(() => {
         isSwipeProcessingRef.current = false;
       }, 400);
