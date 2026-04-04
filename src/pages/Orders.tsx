@@ -307,7 +307,7 @@ function OrderRow({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94A3B8', fontSize: 11 }}>
             <IconCalendar />
-            {formatDate(order.created_at)} · {formatTime(order.created_at)}
+            {formatDate(order.created_at)}
           </div>
 
           {/* Status chip — clickable, stops propagation */}
@@ -648,10 +648,7 @@ export default function Orders() {
             >
               <IconChevronLeft />
             </button>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 1, transition: 'opacity 0.15s ease, visibility 0.15s ease', transitionDelay: showSearch ? '0s' : '0.3s', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>{stats.total} total · {stats.pending} pending</div>
-            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
           </div>
 
           {/* Create Order Button */}

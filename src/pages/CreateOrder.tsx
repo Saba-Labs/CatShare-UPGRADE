@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSwipeable } from 'react-swipeable';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
@@ -368,7 +370,8 @@ export default function CreateOrder() {
     else if (step === 'review') setStep('customer');
   };
 
-  const handleClose = () => {
+  const handleBack = async () => {
+    await Haptics.impact({ style: ImpactStyle.Light });
     if (step === 'catalogue') {
       navigate('/orders');
     } else {
@@ -376,8 +379,14 @@ export default function CreateOrder() {
     }
   };
 
+  const swipeHandlers = useSwipeable({
+    onSwipedRight: handleBack,
+    trackMouse: false,
+    delta: 50,
+  });
+
   return (
-    <div style={{
+    <div {...swipeHandlers} style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
@@ -413,7 +422,7 @@ export default function CreateOrder() {
           gap: 12,
         }}>
           <button
-            onClick={handleClose}
+            onClick={handleBack}
             style={{
               background: 'none',
               border: 'none',
@@ -787,156 +796,145 @@ export default function CreateOrder() {
                         flex: 1,
                         padding: '12px',
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 8,
+                        flexDirection: 'column',
+                        gap: 10,
                         minWidth: 0,
                       }}>
-                        {/* Left Column - Product Info and Quantity */}
-                        <div style={{
-                          flex: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 6,
-                          minWidth: 0,
-                        }}>
-                          {/* Product Info */}
-                          <div>
-                            <div style={{
-                              display: 'flex',
-                              flexWrap: 'wrap',
-                              alignItems: 'baseline',
-                              gap: '4px 8px',
-                              lineHeight: 1.3,
-                              marginBottom: 4,
-                            }}>
-                              <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
-                                {product.name}
+                        {/* Product Info */}
+                        <div>
+                          <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'baseline',
+                            gap: '4px 8px',
+                            lineHeight: 1.3,
+                            marginBottom: 4,
+                          }}>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                              {product.name}
+                            </span>
+                            {product.subtitle && (
+                              <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
+                                ({product.subtitle})
                               </span>
-                              {product.subtitle && (
-                                <span style={{ fontSize: 12, fontWeight: 400, color: '#64748B' }}>
-                                  ({product.subtitle})
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Price */}
-                            {price > 0 && (
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 3,
-                                background: '#DCFCE7',
-                                borderRadius: 6,
-                                padding: '2px 7px',
-                                fontSize: 11.5,
-                                fontWeight: 700,
-                                color: '#166534',
-                              }}>
-                                ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
-                              </div>
                             )}
                           </div>
 
-                          {/* Quantity Control */}
+                          {/* Price */}
+                          {price > 0 && (
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                              background: '#DCFCE7',
+                              borderRadius: 6,
+                              padding: '2px 7px',
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: '#166534',
+                            }}>
+                              ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Quantity Control */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0,
+                          background: '#F1F5F9',
+                          borderRadius: 6,
+                          border: '1.5px solid #E2E8F0',
+                          width: 'fit-content',
+                        }}>
+                          <button
+                            onClick={() => handleUpdateQuantity(product.id, quantity - quantityStep)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: quantity === 0 ? '#CBD5E1' : '#374151',
+                              fontFamily: 'inherit',
+                              transition: 'color 0.15s',
+                            }}
+                            disabled={quantity === 0}
+                          >
+                            <IconMinus />
+                          </button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={quantity > 0 ? String(quantity) : ''}
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, '');
+                              handleUpdateQuantity(
+                                product.id,
+                                digits ? parseInt(digits, 10) : 0
+                              );
+                            }}
+                            aria-label={`Quantity for ${product.name}`}
+                            style={{
+                              width: 40,
+                              border: 'none',
+                              background: 'transparent',
+                              textAlign: 'center',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                              fontFamily: 'inherit',
+                              padding: 0,
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#374151',
+                              fontFamily: 'inherit',
+                              transition: 'color 0.15s',
+                            }}
+                          >
+                            <IconPlus />
+                          </button>
+                        </div>
+
+                        {/* Subtotal - Below Quantity (Compact Single Line) */}
+                        {quantity > 0 && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 0,
-                            background: '#F1F5F9',
-                            borderRadius: 6,
-                            border: '1.5px solid #E2E8F0',
-                            width: 'fit-content',
+                            gap: 6,
+                            fontSize: 12,
+                            color: '#64748B',
+                            marginTop: 2,
                           }}>
-                            <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity - quantityStep)}
-                              style={{
-                                width: 32,
-                                height: 32,
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: quantity === 0 ? '#CBD5E1' : '#374151',
-                                fontFamily: 'inherit',
-                                transition: 'color 0.15s',
-                              }}
-                              disabled={quantity === 0}
-                            >
-                              <IconMinus />
-                            </button>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={quantity > 0 ? String(quantity) : ''}
-                              onChange={(e) => {
-                                const digits = e.target.value.replace(/\D/g, '');
-                                handleUpdateQuantity(
-                                  product.id,
-                                  digits ? parseInt(digits, 10) : 0
-                                );
-                              }}
-                              aria-label={`Quantity for ${product.name}`}
-                              style={{
-                                width: 40,
-                                border: 'none',
-                                background: 'transparent',
-                                textAlign: 'center',
-                                fontSize: 14,
-                                fontWeight: 700,
-                                color: quantity === 0 ? '#94A3B8' : '#0F172A',
-                                fontFamily: 'inherit',
-                                padding: 0,
-                                outline: 'none',
-                              }}
-                            />
-                            <button
-                              onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
-                              style={{
-                                width: 32,
-                                height: 32,
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#374151',
-                                fontFamily: 'inherit',
-                                transition: 'color 0.15s',
-                              }}
-                            >
-                              <IconPlus />
-                            </button>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
+                              subtotal
+                            </span>
+                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                            <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
+                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
+                            </span>
+                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
+                              ₹{lineTotal.toLocaleString('en-IN')}
+                            </span>
                           </div>
-                        </div>
-
-                        {/* Right Column - Subtotal (Centered) */}
-                        <div style={{
-                          fontSize: 12,
-                          color: '#64748B',
-                          fontWeight: 500,
-                          textAlign: 'right',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 2,
-                          minWidth: 120,
-                          visibility: isSelected ? 'visible' : 'hidden',
-                          flexShrink: 0,
-                          justifyContent: 'center',
-                        }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
-                            Subtotal
-                          </div>
-                          <div style={{ fontSize: 11, fontWeight: 600 }}>
-                            {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
-                          </div>
-                          <div style={{ fontWeight: 700, color: '#166534', fontSize: 14 }}>
-                            ₹{lineTotal.toLocaleString('en-IN')}
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -1215,7 +1213,7 @@ export default function CreateOrder() {
       }}>
         {step !== 'catalogue' && (
           <button
-            onClick={handleBackStep}
+            onClick={handleBack}
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -1245,7 +1243,7 @@ export default function CreateOrder() {
         <button
           onClick={() => {
             if (step === 'catalogue') {
-              handleClose();
+              navigate('/orders');
             } else if (step === 'products') {
               handleContinueToCustomer();
             } else if (step === 'customer') {

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, updateOrder, updateOrderStatus, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
@@ -546,7 +547,11 @@ export default function OrderDetail() {
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
       await Haptics.impact({ style: ImpactStyle.Light });
-      navigate('/orders');
+      if (editMode) {
+        setEditMode(false);
+      } else {
+        navigate('/orders');
+      }
     },
     trackMouse: false,
     delta: 50,
@@ -572,7 +577,11 @@ export default function OrderDetail() {
 
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
-    navigate('/orders');
+    if (editMode) {
+      setEditMode(false);
+    } else {
+      navigate('/orders');
+    }
   };
 
   const handleStatusChange = async (status: StatusType) => {
@@ -640,16 +649,55 @@ export default function OrderDetail() {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
-      const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-      showToast('Invoice downloaded!', 'success');
+
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use Capacitor's Filesystem API for mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Documents,
+            recursive: true,
+          });
+
+          showToast(`Invoice saved to ${result.uri}`, 'success');
+        } catch (fsErr) {
+          console.error('Filesystem error:', fsErr);
+          // Fallback: try native share
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            if (navigator.share) {
+              await navigator.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Invoice for ${order.customer_name}`,
+                files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+              });
+            }
+            showToast('Invoice generated!', 'success');
+          } catch (shareErr) {
+            showToast('Failed to save invoice', 'error');
+          }
+        }
+      } else {
+        // Web: Use standard download
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+        showToast('Invoice downloaded!', 'success');
+      }
     } catch (err) {
       console.error(err);
       showToast('Failed to generate PDF', 'error');
@@ -664,8 +712,26 @@ export default function OrderDetail() {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
-      const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
+
+      // Try to use native share API if available (works on mobile)
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: `Invoice - ${order.customer_name}`,
+            text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+            files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+          });
+          showToast('Invoice shared!', 'success');
+          setPdfLoading(false);
+          return;
+        }
+      } catch (shareErr) {
+        // Share API failed or not supported, continue with fallback
+      }
+
+      // Fallback: Download PDF and open WhatsApp with message
+      const pdfUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.download = fileName;
@@ -678,12 +744,14 @@ export default function OrderDetail() {
       const message = encodeURIComponent(`Hi ${order.customer_name}, please find your invoice attached. 📎`);
       const cleaned = phone.replace(/[^\d]/g, '');
       window.open(cleaned ? `https://wa.me/${cleaned}?text=${message}` : `https://wa.me/?text=${message}`, '_blank');
-      showToast('Invoice downloaded. Attach in WhatsApp.', 'success');
+      showToast('Invoice downloaded. You can now attach it in WhatsApp.', 'success');
     } catch {
+      // Fallback: Send bill as text if PDF generation fails
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
       const text = encodeURIComponent(billText(order, symbol));
       window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+      showToast('Sent bill details to WhatsApp', 'info');
     }
     setPdfLoading(false);
   };
@@ -707,10 +775,20 @@ export default function OrderDetail() {
     }
   };
 
-  const handleDelete = () => {
-    navigate('/orders');
-    showToast('Order deleted', 'success');
-    // TODO: persist to backend
+  const handleDelete = async () => {
+    if (!order) return;
+    try {
+      const { error } = await deleteOrder(order.id);
+      if (error) {
+        showToast('Failed to delete order', 'error');
+        return;
+      }
+      showToast('Order deleted', 'success');
+      navigate('/orders');
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to delete order', 'error');
+    }
   };
 
   // ── Loading ──
