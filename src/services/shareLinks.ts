@@ -271,3 +271,19 @@ export async function fetchShareLinkForCustomer(token: string): Promise<ShareLin
     sellerCustomCurrencies,
   };
 }
+
+export async function fetchSellerUserIdForToken(token: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_seller_user_id', {
+      p_token: token,
+    });
+    if (error) {
+      console.warn('Failed to fetch seller user ID:', error.message);
+      return null;
+    }
+    return data as string | null;
+  } catch (err) {
+    console.warn('Error fetching seller user ID:', err);
+    return null;
+  }
+}

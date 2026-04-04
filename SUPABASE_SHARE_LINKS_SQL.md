@@ -233,3 +233,31 @@ grant execute on function public.get_share_link(text) to anon, authenticated;
 
 4. **`user_settings` access** — `get_share_link` must be able to `SELECT` from `public.user_settings` (same schema). If your policies block the definer role, grant `SELECT` to the function owner or adjust policies; typical Supabase projects allow the `postgres` role full access.
 
+## Additional: Public RPC for Seller User ID
+
+If customers cannot read `seller_user_id` from the `share_links` table due to RLS restrictions, use this public RPC function:
+
+```sql
+create or replace function public.get_seller_user_id(p_token text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  seller_id text;
+begin
+  select seller_user_id into seller_id
+  from public.share_links
+  where token = p_token
+    and expires_at > now()
+  limit 1;
+
+  return seller_id;
+end;
+$$;
+
+revoke all on function public.get_seller_user_id(text) from public;
+grant execute on function public.get_seller_user_id(text) to anon, authenticated;
+```
+
