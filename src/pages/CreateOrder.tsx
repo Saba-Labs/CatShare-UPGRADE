@@ -948,10 +948,6 @@ export default function CreateOrder() {
                             color: '#64748B',
                             marginTop: 2,
                           }}>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#94A3B8' }}>
-                              subtotal
-                            </span>
-                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
                             <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
                               {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
                             </span>
