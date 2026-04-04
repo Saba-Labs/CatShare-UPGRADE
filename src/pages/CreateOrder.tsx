@@ -1028,7 +1028,7 @@ export default function CreateOrder() {
                 type="text"
                 value={customerWhatsapp}
                 onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                placeholder="e.g. +91 98765 43210"
+                placeholder="e.g. +91 98xxxxxxxx"
                 style={{
                   width: '100%',
                   padding: '10px 12px',
