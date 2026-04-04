@@ -54,6 +54,7 @@ const CreateOrder = lazy(() => import("./pages/CreateOrder"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const OrderForm = lazy(() => import("./pages/OrderForm"));
 const ConfirmOrder = lazy(() => import("./pages/ConfirmOrder"));
+const StoreView = lazy(() => import("./pages/StoreView"));
 const PrivacyPolicy = lazy(() => import("./PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./TermsOfService"));
 const Website = lazy(() => import("./Website"));
@@ -1482,6 +1483,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
         {/* Public Routes */}
         <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
+        <Route path="/store/:slug" element={<StoreView />} />
+        <Route path="/store/:slug/confirm" element={<ConfirmOrder />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />
