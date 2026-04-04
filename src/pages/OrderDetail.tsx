@@ -566,6 +566,7 @@ useEffect(() => {
   window.addEventListener('popstate', onPopState);
   return () => window.removeEventListener('popstate', onPopState);
 }, []);
+
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
       if (isSwipeProcessingRef.current) return;
