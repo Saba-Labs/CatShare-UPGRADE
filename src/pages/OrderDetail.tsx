@@ -543,15 +543,49 @@ export default function OrderDetail() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const isSwipeProcessingRef = useRef(false);
+  const editModeRef = useRef(editMode);
+
+  const setEditModeSync = (val: boolean) => {
+  editModeRef.current = val;
+  setEditMode(val);
+  if (val) {
+    window.history.pushState({ editMode: true }, '');
+  }
+};
+
+useEffect(() => {
+  const onPopState = (e: PopStateEvent) => {
+    if (editModeRef.current) {
+      // Native back was triggered while in edit mode — just exit edit mode
+      editModeRef.current = false;
+      setEditMode(false);
+      // Don't navigate away
+    }
+  };
+  window.addEventListener('popstate', onPopState);
+  return () => window.removeEventListener('popstate', onPopState);
+}, []);
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
+      if (isSwipeProcessingRef.current) return;
+
+      // Capture synchronously before any awaits
+      const wasInEditMode = editModeRef.current;
+
+      isSwipeProcessingRef.current = true;
       await Haptics.impact({ style: ImpactStyle.Light });
-      if (editMode) {
-        setEditMode(false);
+
+      if (wasInEditMode) {
+        setEditModeSync(false);
       } else {
         navigate('/orders');
       }
+
+      setTimeout(() => {
+        isSwipeProcessingRef.current = false;
+      }, 400);
     },
     trackMouse: false,
     delta: 50,
@@ -578,7 +612,7 @@ export default function OrderDetail() {
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
     if (editMode) {
-      setEditMode(false);
+      setEditModeSync(false);
     } else {
       navigate('/orders');
     }
@@ -632,7 +666,7 @@ export default function OrderDetail() {
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
       } as any);
-      setEditMode(false);
+      setEditModeSync(false);
       showToast('Order saved', 'success');
     } catch (err) {
       console.error(err);
@@ -1125,7 +1159,7 @@ export default function OrderDetail() {
           {editMode ? (
             <div style={{ display: 'flex', gap: 10 }}>
               <button
-                onClick={() => setEditMode(false)}
+                onClick={() => setEditModeSync(false)}
                 style={{
                   flex: 1, padding: '14px', borderRadius: 14,
                   border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,
@@ -1184,7 +1218,7 @@ export default function OrderDetail() {
 
               {/* Edit */}
               <button
-                onClick={() => setEditMode(true)}
+                onClick={() => setEditModeSync(true)}
                 style={{
                   width: '100%', padding: '14px', borderRadius: 14,
                   border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,

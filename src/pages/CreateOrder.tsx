@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -173,6 +173,35 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const isSwipeProcessingRef = useRef(false);
+  const stepRef = useRef<Step>('catalogue');
+
+  const setStepSync = (val: Step) => {
+    stepRef.current = val;
+    setStep(val);
+    if (val !== 'catalogue') {
+      window.history.pushState({ step: val }, '');
+    }
+  };
+
+  React.useEffect(() => {
+    const onPopState = () => {
+      if (stepRef.current === 'products') {
+        stepRef.current = 'catalogue';
+        setStep('catalogue');
+      } else if (stepRef.current === 'customer') {
+        stepRef.current = 'products';
+        setStep('products');
+      } else if (stepRef.current === 'review') {
+        stepRef.current = 'customer';
+        setStep('customer');
+      } else {
+        navigate('/orders');
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
   const products = useMemo(
@@ -295,7 +324,7 @@ export default function CreateOrder() {
     setSelectedProducts(new Map());
     setSearchQuery('');
     setSelectedCategory('all');
-    setStep('products');
+    setStepSync('products');
   };
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
@@ -313,7 +342,7 @@ export default function CreateOrder() {
       showToast('Please add at least one product to the order', 'error');
       return;
     }
-    setStep('customer');
+    setStepSync('customer');
   };
 
   const handleContinueToReview = () => {
@@ -321,7 +350,7 @@ export default function CreateOrder() {
       showToast('Please enter customer name', 'error');
       return;
     }
-    setStep('review');
+    setStepSync('review');
   };
 
   const handleCreateOrder = async () => {
@@ -365,22 +394,24 @@ export default function CreateOrder() {
   };
 
   const handleBackStep = () => {
-    if (step === 'products') setStep('catalogue');
-    else if (step === 'customer') setStep('products');
-    else if (step === 'review') setStep('customer');
+    window.history.back();
   };
 
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
-    if (step === 'catalogue') {
-      navigate('/orders');
-    } else {
-      handleBackStep();
-    }
+    window.history.back();
   };
 
   const swipeHandlers = useSwipeable({
-    onSwipedRight: handleBack,
+    onSwipedRight: async () => {
+      if (isSwipeProcessingRef.current) return;
+      isSwipeProcessingRef.current = true;
+      await Haptics.impact({ style: ImpactStyle.Light });
+      window.history.back();
+      setTimeout(() => {
+        isSwipeProcessingRef.current = false;
+      }, 400);
+    },
     trackMouse: false,
     delta: 50,
   });
@@ -917,6 +948,7 @@ export default function CreateOrder() {
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
+                            justifyContent: 'flex-end',
                             gap: 6,
                             fontSize: 12,
                             color: '#64748B',
