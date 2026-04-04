@@ -672,8 +672,26 @@ export default function OrderDetail() {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
-      const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
+
+      // Try to use native share API if available (works on mobile)
+      try {
+        if (navigator.share) {
+          await navigator.share({
+            title: `Invoice - ${order.customer_name}`,
+            text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+            files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+          });
+          showToast('Invoice shared!', 'success');
+          setPdfLoading(false);
+          return;
+        }
+      } catch (shareErr) {
+        // Share API failed or not supported, continue with fallback
+      }
+
+      // Fallback: Download PDF and open WhatsApp with message
+      const pdfUrl = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.download = fileName;
@@ -686,12 +704,14 @@ export default function OrderDetail() {
       const message = encodeURIComponent(`Hi ${order.customer_name}, please find your invoice attached. 📎`);
       const cleaned = phone.replace(/[^\d]/g, '');
       window.open(cleaned ? `https://wa.me/${cleaned}?text=${message}` : `https://wa.me/?text=${message}`, '_blank');
-      showToast('Invoice downloaded. Attach in WhatsApp.', 'success');
+      showToast('Invoice downloaded. You can now attach it in WhatsApp.', 'success');
     } catch {
+      // Fallback: Send bill as text if PDF generation fails
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
       const text = encodeURIComponent(billText(order, symbol));
       window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+      showToast('Sent bill details to WhatsApp', 'info');
     }
     setPdfLoading(false);
   };
