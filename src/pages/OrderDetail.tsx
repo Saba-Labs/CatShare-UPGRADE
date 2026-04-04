@@ -1109,7 +1109,7 @@ useEffect(() => {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && (
                             <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              {symbol}{item.unitPrice} × {item.quantity} {getOrderUnitLabel(item.priceUnit)}
+                              {item.quantity} {getOrderUnitLabel(item.priceUnit)} × {symbol}{item.unitPrice}
                             </div>
                           )}
                           {!hasCost && (
