@@ -313,7 +313,11 @@ function OrderRow({
           {/* Status chip — clickable, stops propagation */}
           <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
             <button
-              onClick={() => setShowStatusDrop(v => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowStatusDrop(v => !v);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 background: statusCfg.bg, color: statusCfg.text,
