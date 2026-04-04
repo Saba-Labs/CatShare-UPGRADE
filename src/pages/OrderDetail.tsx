@@ -901,7 +901,7 @@ useEffect(() => {
             </div>
             {!editMode && (
               <div style={{ fontSize: 12, color: COLORS.subtle, marginTop: 1 }}>
-                {formatDate(order.created_at)} · {formatTime(order.created_at)}
+                {formatDate(order.created_at)}
               </div>
             )}
           </div>
