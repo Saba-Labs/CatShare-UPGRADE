@@ -1028,7 +1028,7 @@ export default function CreateOrder() {
                 type="text"
                 value={customerWhatsapp}
                 onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                placeholder="e.g. +91 98765 43210"
+                placeholder="e.g. +91 98xxxxxxxx"
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -1087,7 +1087,7 @@ export default function CreateOrder() {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                             {hasCost && (
                               <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                                ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                               </div>
                             )}
                             {hasCost && lineTotal > 0 && (
@@ -1139,15 +1139,18 @@ export default function CreateOrder() {
 
                 {/* Total row */}
                 <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '14px 0 10px', marginTop: 4,
-                  borderTop: `2px solid ${COLORS.border}`,
-                  fontFamily: FONT,
+                  padding: 12,
+                  background: '#DCFCE7',
+                  borderRadius: 10,
+                  border: '1px solid #86EFAC',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>Order Total</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
                     ₹{orderSummary.total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>

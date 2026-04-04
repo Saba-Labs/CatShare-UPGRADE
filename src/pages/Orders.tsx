@@ -652,7 +652,7 @@ export default function Orders() {
             >
               <IconChevronLeft />
             </button>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px' }}>Orders</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
           </div>
 
           {/* Create Order Button */}
