@@ -1146,7 +1146,6 @@ export default function CreateOrder() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  fontFamily: FONT,
                 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>Order Total</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
