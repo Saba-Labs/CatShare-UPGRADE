@@ -1375,15 +1375,15 @@ if (isStrictMode() && user?.uid) {
           Catalogues
         </button>
 
-        {/* Orders tab */}
+        {/* Store tab */}
         <button
           onClick={async () => {
             await Haptics.impact({ style: ImpactStyle.Light });
             navigate("/orders");
           }}
-          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600 flex items-center justify-center"
+          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600"
         >
-          <FiList size={20} />
+          Store
         </button>
       </nav>
 
