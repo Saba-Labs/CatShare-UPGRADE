@@ -1383,7 +1383,7 @@ if (isStrictMode() && user?.uid) {
           }}
           className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600"
         >
-          Store
+          Orders
         </button>
       </nav>
 
