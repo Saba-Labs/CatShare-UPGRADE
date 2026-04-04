@@ -546,10 +546,10 @@ export default function OrderDetail() {
   const isSwipeProcessingRef = useRef(false);
   const editModeRef = useRef(editMode);
 
-  // Keep editModeRef in sync with editMode
-  useEffect(() => {
-    editModeRef.current = editMode;
-  }, [editMode]);
+  const setEditModeSync = (val: boolean) => {
+  editModeRef.current = val;  // update ref immediately, synchronously
+  setEditMode(val);
+};
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
