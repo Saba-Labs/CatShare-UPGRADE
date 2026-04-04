@@ -174,6 +174,7 @@ export default function CreateOrder() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const isSwipeProcessingRef = useRef(false);
+  const stepRef = useRef<Step>('catalogue');
 
   const setStepSync = (val: Step) => {
     stepRef.current = val;
