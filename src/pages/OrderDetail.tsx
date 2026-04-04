@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
@@ -648,16 +649,55 @@ export default function OrderDetail() {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
       const symbol = getSymbolForCurrencyCode(order.currency_code);
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
-      const pdfUrl = URL.createObjectURL(pdfBlob);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-      showToast('Invoice downloaded!', 'success');
+
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use Capacitor's Filesystem API for mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Documents,
+            recursive: true,
+          });
+
+          showToast(`Invoice saved to ${result.uri}`, 'success');
+        } catch (fsErr) {
+          console.error('Filesystem error:', fsErr);
+          // Fallback: try native share
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            if (navigator.share) {
+              await navigator.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Invoice for ${order.customer_name}`,
+                files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+              });
+            }
+            showToast('Invoice generated!', 'success');
+          } catch (shareErr) {
+            showToast('Failed to save invoice', 'error');
+          }
+        }
+      } else {
+        // Web: Use standard download
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+        showToast('Invoice downloaded!', 'success');
+      }
     } catch (err) {
       console.error(err);
       showToast('Failed to generate PDF', 'error');
