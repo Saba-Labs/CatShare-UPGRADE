@@ -1139,15 +1139,19 @@ export default function CreateOrder() {
 
                 {/* Total row */}
                 <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '14px 0 10px', marginTop: 4,
-                  borderTop: `2px solid ${COLORS.border}`,
+                  padding: 12,
+                  background: '#DCFCE7',
+                  borderRadius: 10,
+                  border: '1px solid #86EFAC',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   fontFamily: FONT,
                 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>Order Total</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
                     ₹{orderSummary.total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                  </span>
+                  </div>
                 </div>
               </div>
             </div>
