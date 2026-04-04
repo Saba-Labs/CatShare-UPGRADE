@@ -1270,47 +1270,6 @@ export default function CreateOrder() {
             Back
           </button>
         )}
-
-        <button
-          onClick={() => {
-            if (step === 'catalogue') {
-              navigate('/orders');
-            } else if (step === 'products') {
-              handleContinueToCustomer();
-            } else if (step === 'customer') {
-              handleContinueToReview();
-            } else if (step === 'review') {
-              handleCreateOrder();
-            }
-          }}
-          disabled={isSubmitting}
-          style={{
-            flex: 1,
-            padding: '12px 16px',
-            border: 'none',
-            borderRadius: 8,
-            background: isSubmitting ? '#9CA3AF' : '#2563EB',
-            color: '#fff',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            fontFamily: 'inherit',
-            transition: 'all 0.15s',
-            opacity: isSubmitting ? 0.7 : 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!isSubmitting) {
-              (e.currentTarget as HTMLButtonElement).style.background = '#1D4ED8';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isSubmitting) {
-              (e.currentTarget as HTMLButtonElement).style.background = '#2563EB';
-            }
-          }}
-        >
-          {isSubmitting ? 'Creating...' : step === 'review' ? 'Create Order' : 'Continue'}
-        </button>
       </div>
     </div>
   );
