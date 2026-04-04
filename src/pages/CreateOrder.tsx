@@ -174,12 +174,33 @@ export default function CreateOrder() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const isSwipeProcessingRef = useRef(false);
-  const stepRef = useRef<Step>(step);
 
-  // Keep stepRef in sync with step
+  const setStepSync = (val: Step) => {
+    stepRef.current = val;
+    setStep(val);
+    if (val !== 'catalogue') {
+      window.history.pushState({ step: val }, '');
+    }
+  };
+
   React.useEffect(() => {
-    stepRef.current = step;
-  }, [step]);
+    const onPopState = () => {
+      if (stepRef.current === 'products') {
+        stepRef.current = 'catalogue';
+        setStep('catalogue');
+      } else if (stepRef.current === 'customer') {
+        stepRef.current = 'products';
+        setStep('products');
+      } else if (stepRef.current === 'review') {
+        stepRef.current = 'customer';
+        setStep('customer');
+      } else {
+        navigate('/orders');
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
   const products = useMemo(
@@ -302,7 +323,7 @@ export default function CreateOrder() {
     setSelectedProducts(new Map());
     setSearchQuery('');
     setSelectedCategory('all');
-    setStep('products');
+    setStepSync('products');
   };
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
@@ -320,7 +341,7 @@ export default function CreateOrder() {
       showToast('Please add at least one product to the order', 'error');
       return;
     }
-    setStep('customer');
+    setStepSync('customer');
   };
 
   const handleContinueToReview = () => {
@@ -328,7 +349,7 @@ export default function CreateOrder() {
       showToast('Please enter customer name', 'error');
       return;
     }
-    setStep('review');
+    setStepSync('review');
   };
 
   const handleCreateOrder = async () => {
@@ -372,42 +393,20 @@ export default function CreateOrder() {
   };
 
   const handleBackStep = () => {
-    if (stepRef.current === 'products') setStep('catalogue');
-    else if (stepRef.current === 'customer') setStep('products');
-    else if (stepRef.current === 'review') setStep('customer');
+    window.history.back();
   };
 
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
-    if (stepRef.current === 'catalogue') {
-      navigate('/orders');
-    } else {
-      handleBackStep();
-    }
+    window.history.back();
   };
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
-      // Prevent multiple swipes from being processed simultaneously
       if (isSwipeProcessingRef.current) return;
-
       isSwipeProcessingRef.current = true;
-
-      // Use stepRef to check current step synchronously
-      const currentStep = stepRef.current;
       await Haptics.impact({ style: ImpactStyle.Light });
-
-      if (currentStep === 'catalogue') {
-        navigate('/orders');
-      } else if (currentStep === 'products') {
-        setStep('catalogue');
-      } else if (currentStep === 'customer') {
-        setStep('products');
-      } else if (currentStep === 'review') {
-        setStep('customer');
-      }
-
-      // Clear the flag after a delay to prevent rapid consecutive swipes
+      window.history.back();
       setTimeout(() => {
         isSwipeProcessingRef.current = false;
       }, 400);
