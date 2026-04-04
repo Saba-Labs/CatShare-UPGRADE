@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchShareLinkForCustomer, type ShareLinkItem } from '../services/shareLinks';
+import { fetchShareLinkForCustomer, fetchSellerUserIdForToken, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
-import { getSupabaseClient } from '../supabaseClient';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
@@ -1163,16 +1162,11 @@ export default function OrderForm() {
         }
         setQty(initial);
 
-        // Fetch seller_user_id from share_links table
+        // Fetch seller_user_id using public RPC function
         if (token) {
-          const client = getSupabaseClient();
-          const { data: linkData } = await client
-            .from('share_links')
-            .select('seller_user_id')
-            .eq('token', token)
-            .single();
-          if (linkData) {
-            setSellerUserId(linkData.seller_user_id);
+          const sellerId = await fetchSellerUserIdForToken(token);
+          if (sellerId) {
+            setSellerUserId(sellerId);
           }
         }
       } catch (e: any) {

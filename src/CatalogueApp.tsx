@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiShoppingCart } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -1375,15 +1375,15 @@ if (isStrictMode() && user?.uid) {
           Catalogues
         </button>
 
-        {/* Orders tab */}
+        {/* Store tab */}
         <button
           onClick={async () => {
             await Haptics.impact({ style: ImpactStyle.Light });
             navigate("/orders");
           }}
-          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600 flex items-center justify-center"
+          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600"
         >
-          <FiShoppingCart size={20} />
+          Orders
         </button>
       </nav>
 
