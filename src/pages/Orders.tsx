@@ -307,7 +307,7 @@ function OrderRow({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94A3B8', fontSize: 11 }}>
             <IconCalendar />
-            {formatDate(order.created_at)} · {formatTime(order.created_at)}
+            {formatDate(order.created_at)}
           </div>
 
           {/* Status chip — clickable, stops propagation */}
