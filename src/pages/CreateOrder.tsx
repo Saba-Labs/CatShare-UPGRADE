@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -173,7 +173,7 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isSwipeProcessing, setIsSwipeProcessing] = useState(false);
+  const isSwipeProcessingRef = useRef(false);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
   const products = useMemo(
@@ -383,13 +383,15 @@ export default function CreateOrder() {
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
       // Prevent multiple swipes from being processed simultaneously
-      if (isSwipeProcessing) return;
+      if (isSwipeProcessingRef.current) return;
 
-      setIsSwipeProcessing(true);
+      isSwipeProcessingRef.current = true;
       await handleBack();
 
-      // Clear the flag after a short delay to prevent rapid consecutive swipes
-      setTimeout(() => setIsSwipeProcessing(false), 300);
+      // Clear the flag after a delay to prevent rapid consecutive swipes
+      setTimeout(() => {
+        isSwipeProcessingRef.current = false;
+      }, 400);
     },
     trackMouse: false,
     delta: 50,
