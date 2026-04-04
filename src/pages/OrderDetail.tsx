@@ -543,15 +543,24 @@ export default function OrderDetail() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [isSwipeProcessing, setIsSwipeProcessing] = useState(false);
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
+      // Prevent multiple swipes from being processed simultaneously
+      if (isSwipeProcessing) return;
+
+      setIsSwipeProcessing(true);
       await Haptics.impact({ style: ImpactStyle.Light });
+
       if (editMode) {
         setEditMode(false);
       } else {
         navigate('/orders');
       }
+
+      // Clear the flag after a short delay to prevent rapid consecutive swipes
+      setTimeout(() => setIsSwipeProcessing(false), 300);
     },
     trackMouse: false,
     delta: 50,
