@@ -544,6 +544,12 @@ export default function OrderDetail() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const isSwipeProcessingRef = useRef(false);
+  const editModeRef = useRef(editMode);
+
+  // Keep editModeRef in sync with editMode
+  useEffect(() => {
+    editModeRef.current = editMode;
+  }, [editMode]);
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
@@ -553,7 +559,7 @@ export default function OrderDetail() {
       isSwipeProcessingRef.current = true;
       await Haptics.impact({ style: ImpactStyle.Light });
 
-      if (editMode) {
+      if (editModeRef.current) {
         setEditMode(false);
       } else {
         navigate('/orders');

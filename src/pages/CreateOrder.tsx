@@ -174,6 +174,12 @@ export default function CreateOrder() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const isSwipeProcessingRef = useRef(false);
+  const stepRef = useRef<Step>(step);
+
+  // Keep stepRef in sync with step
+  React.useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
   const products = useMemo(
@@ -366,14 +372,14 @@ export default function CreateOrder() {
   };
 
   const handleBackStep = () => {
-    if (step === 'products') setStep('catalogue');
-    else if (step === 'customer') setStep('products');
-    else if (step === 'review') setStep('customer');
+    if (stepRef.current === 'products') setStep('catalogue');
+    else if (stepRef.current === 'customer') setStep('products');
+    else if (stepRef.current === 'review') setStep('customer');
   };
 
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
-    if (step === 'catalogue') {
+    if (stepRef.current === 'catalogue') {
       navigate('/orders');
     } else {
       handleBackStep();
@@ -386,7 +392,20 @@ export default function CreateOrder() {
       if (isSwipeProcessingRef.current) return;
 
       isSwipeProcessingRef.current = true;
-      await handleBack();
+
+      // Use stepRef to check current step synchronously
+      const currentStep = stepRef.current;
+      await Haptics.impact({ style: ImpactStyle.Light });
+
+      if (currentStep === 'catalogue') {
+        navigate('/orders');
+      } else if (currentStep === 'products') {
+        setStep('catalogue');
+      } else if (currentStep === 'customer') {
+        setStep('products');
+      } else if (currentStep === 'review') {
+        setStep('customer');
+      }
 
       // Clear the flag after a delay to prevent rapid consecutive swipes
       setTimeout(() => {
