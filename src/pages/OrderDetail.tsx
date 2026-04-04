@@ -546,7 +546,11 @@ export default function OrderDetail() {
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
       await Haptics.impact({ style: ImpactStyle.Light });
-      navigate('/orders');
+      if (editMode) {
+        setEditMode(false);
+      } else {
+        navigate('/orders');
+      }
     },
     trackMouse: false,
     delta: 50,
@@ -572,7 +576,11 @@ export default function OrderDetail() {
 
   const handleBack = async () => {
     await Haptics.impact({ style: ImpactStyle.Light });
-    navigate('/orders');
+    if (editMode) {
+      setEditMode(false);
+    } else {
+      navigate('/orders');
+    }
   };
 
   const handleStatusChange = async (status: StatusType) => {
