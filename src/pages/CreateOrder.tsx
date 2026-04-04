@@ -173,6 +173,7 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isSwipeProcessing, setIsSwipeProcessing] = useState(false);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
   const products = useMemo(
@@ -380,7 +381,16 @@ export default function CreateOrder() {
   };
 
   const swipeHandlers = useSwipeable({
-    onSwipedRight: handleBack,
+    onSwipedRight: async () => {
+      // Prevent multiple swipes from being processed simultaneously
+      if (isSwipeProcessing) return;
+
+      setIsSwipeProcessing(true);
+      await handleBack();
+
+      // Clear the flag after a short delay to prevent rapid consecutive swipes
+      setTimeout(() => setIsSwipeProcessing(false), 300);
+    },
     trackMouse: false,
     delta: 50,
   });
