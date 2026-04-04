@@ -509,36 +509,39 @@ const CSS = `
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
-    margin-top: 4px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding: 0;
+    border: none;
+    font-size: 12px;
+    color: #64748B;
   }
   .of-line-calc {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
-    color: #94a3b8;
-    line-height: 1.2;
+    color: #64748B;
+    line-height: 1;
     margin: 0;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     min-width: 0;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .of-line-sep {
-    color: #cbd5e1;
-    font-weight: 700;
+    color: #CBD5E1;
+    font-weight: 400;
     flex-shrink: 0;
     user-select: none;
     line-height: 1;
+    font-size: 11px;
   }
   .of-line-total-val {
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--green-dark);
+    font-size: 13px;
+    font-weight: 700;
+    color: #166534;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -549,9 +552,9 @@ const CSS = `
     flex-shrink: 0;
   }
   .of-subtotal-label {
-    font-size: 10px;
-    color: #94a3b8;
-    font-weight: 600;
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 500;
     text-transform: lowercase;
     white-space: nowrap;
     flex-shrink: 0;
