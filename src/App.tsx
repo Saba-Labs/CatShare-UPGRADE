@@ -49,6 +49,7 @@ const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Account = lazy(() => import("./pages/Account"));
 const Orders = lazy(() => import("./pages/Orders"));
+const Store = lazy(() => import("./pages/Store"));
 const CreateOrder = lazy(() => import("./pages/CreateOrder"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const OrderForm = lazy(() => import("./pages/OrderForm"));
@@ -1632,6 +1633,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <Orders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store"
+          element={
+            <ProtectedRoute>
+              <Store />
             </ProtectedRoute>
           }
         />
