@@ -1361,7 +1361,8 @@ const handleTouchEnd = useCallback(() => {
       {showToolsMenu && (
         <div className="absolute right-0 top-10 z-50 bg-white rounded-lg shadow-xl border border-gray-200 min-w-max py-1">
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setShowBulkEdit(true);
               setShowToolsMenu(false);
             }}
@@ -1373,7 +1374,8 @@ const handleTouchEnd = useCallback(() => {
           </button>
 
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setShowFilters(true);
               setShowToolsMenu(false);
             }}
@@ -1394,7 +1396,8 @@ const handleTouchEnd = useCallback(() => {
 
           <div className="border-t border-gray-200 my-1" />
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setShowEdit((prev) => !prev);
               setShowToolsMenu(false);
             }}
@@ -1409,7 +1412,8 @@ const handleTouchEnd = useCallback(() => {
             <>
               <div className="border-t border-gray-200 my-1" />
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
@@ -1428,7 +1432,8 @@ const handleTouchEnd = useCallback(() => {
               </button>
 
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
