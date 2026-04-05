@@ -1,16 +1,6 @@
-/**
- * StoreView - Public store view (no auth required)
- * 
- * Displays all products from a seller's linked catalogue in their store.
- * Products are fetched live (not snapshots), so they always reflect current data.
- * 
- * URL: /store/:slug
- */
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getStoreBySlug } from '../services/storeService';
-import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
@@ -112,6 +102,8 @@ export default function StoreView() {
   const [store, setStore] = useState<any>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
+  const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
@@ -140,13 +132,52 @@ export default function StoreView() {
     
     loadStore();
   }, [slug]);
+
+  // Fetch products for the store from Supabase
+  useEffect(() => {
+    const loadStoreProducts = async () => {
+      if (!store?.sellerUserId) return;
+      
+      setProductsLoading(true);
+      try {
+        const client = getSupabaseClient();
+        
+        // Fetch products for this seller
+        const { data: products, error } = await client
+          .from('products')
+          .select('*')
+          .eq('user_id', store.sellerUserId)
+          .order('position', { ascending: true });
+        
+        if (error) {
+          console.error('Error fetching products:', error);
+          setAllProducts([]);
+        } else if (products) {
+          // Transform products to match ProductWithCatalogueData type
+          const transformed = products.map((p: any) => ({
+            id: p.product_id,
+            name: p.name,
+            subtitle: p.data?.subtitle || '',
+            category: p.data?.category || [],
+            image: p.data?.image,
+            imageUrl: p.data?.image,
+            ...p.data,
+          }));
+          setAllProducts(transformed);
+        }
+      } catch (err) {
+        console.error('Exception loading products:', err);
+        setAllProducts([]);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    
+    loadStoreProducts();
+  }, [store?.sellerUserId]);
   
-  // Get all catalogues and products
+  // Get all catalogues
   const catalogues = useMemo(() => getAllCatalogues(null), []);
-  const allProducts = useMemo(
-    () => safeGetFromStorage('', []) as ProductWithCatalogueData[],
-    []
-  );
   
   // Filter products for this store's catalogue
   const storeProducts = useMemo(() => {
@@ -210,7 +241,11 @@ export default function StoreView() {
   };
   
   const handleBack = () => {
-    window.history.back();
+    if (step !== 'products') {
+      setStep('products');
+    } else {
+      window.history.back();
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -268,7 +303,7 @@ export default function StoreView() {
         customerName.trim(),
         orderItems,
         orderSummary.total,
-        store.sellerCurrencyCode,
+        store.sellerCurrencyCode || 'INR',
         customerWhatsapp.trim() || undefined
       );
 
@@ -393,7 +428,12 @@ export default function StoreView() {
       <div style={{ flex: 1, overflowY: 'auto', marginTop: 40, paddingBottom: 80 }}>
         {step === 'products' && (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {storeProducts.length === 0 ? (
+            {productsLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 24px', color: '#64748B' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>⏳</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>Loading products...</div>
+              </div>
+            ) : storeProducts.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 24px', color: '#64748B' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>No products in this store</div>
