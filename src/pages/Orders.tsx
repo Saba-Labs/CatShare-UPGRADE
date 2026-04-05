@@ -816,7 +816,7 @@ export default function Orders() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 16, paddingTop: 50 }}>
+      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 70, paddingTop: 50 }}>
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
@@ -858,7 +858,64 @@ export default function Orders() {
         )}
       </main>
 
-
+      {/* Bottom Navigation */}
+      <nav style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 30,
+        display: 'flex',
+        justifyContent: 'space-around',
+        fontSize: 14,
+        fontWeight: 500,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        background: '#fff',
+        borderTop: '1px solid #E2E8F0',
+      }}>
+        <button
+          onClick={() => handleNavigate('/orders')}
+          style={{
+            flex: 1,
+            padding: '14px 16px',
+            textAlign: 'center',
+            transition: 'all 0.15s',
+            background: '#2563EB',
+            color: '#fff',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+        >
+          Orders
+        </button>
+        <button
+          onClick={() => handleNavigate('/store')}
+          style={{
+            flex: 1,
+            padding: '14px 16px',
+            textAlign: 'center',
+            transition: 'all 0.15s',
+            background: '#fff',
+            color: '#4B5563',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#F8FAFC';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#fff';
+          }}
+        >
+          Store
+        </button>
+      </nav>
     </div>
   );
 }
