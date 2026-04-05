@@ -13,6 +13,16 @@ interface SyncResult {
   data?: any;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 /**
  * Sync products to Supabase
  * @param syncOptions.skipImageUrlAssertion — set true only for rare callers (e.g. raw backup JSON) that have not run the R2 upload step yet.
@@ -100,13 +110,17 @@ export async function removeFromProductsTable(
   productIds: string[]
 ): Promise<void> {
   if (!userId || productIds.length === 0) return;
-  const { error } = await getSupabaseClient()
-    .from('products')
-    .delete()
-    .eq('user_id', userId)
-    .in('product_id', productIds);
-  if (error) {
-    console.warn('⚠️ removeFromProductsTable error:', error.message);
+  try {
+    const { error } = await getSupabaseClient()
+      .from('products')
+      .delete()
+      .eq('user_id', userId)
+      .in('product_id', productIds);
+    if (error) {
+      console.warn('⚠️ removeFromProductsTable error:', error.message);
+    }
+  } catch (err) {
+    console.warn('⚠️ removeFromProductsTable request failed:', getErrorMessage(err));
   }
 }
 
@@ -118,13 +132,17 @@ export async function removeFromDeletedProductsTable(
   productIds: string[]
 ): Promise<void> {
   if (!userId || productIds.length === 0) return;
-  const { error } = await getSupabaseClient()
-    .from('deleted_products')
-    .delete()
-    .eq('user_id', userId)
-    .in('product_id', productIds);
-  if (error) {
-    console.warn('⚠️ removeFromDeletedProductsTable error:', error.message);
+  try {
+    const { error } = await getSupabaseClient()
+      .from('deleted_products')
+      .delete()
+      .eq('user_id', userId)
+      .in('product_id', productIds);
+    if (error) {
+      console.warn('⚠️ removeFromDeletedProductsTable error:', error.message);
+    }
+  } catch (err) {
+    console.warn('⚠️ removeFromDeletedProductsTable request failed:', getErrorMessage(err));
   }
 }
 
@@ -496,31 +514,62 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
 
     const client = getSupabaseClient();
 
+    const settle = async <T,>(label: string, request: Promise<T>): Promise<T | null> => {
+      try {
+        return await request;
+      } catch (err) {
+        console.warn(`⚠️ ${label} request failed:`, getErrorMessage(err));
+        return null;
+      }
+    };
+
     const [
-      { data: products, error: productsError },
-      { data: deletedProducts, error: deletedError },
-      { data: categories, error: categoriesError },
-      { data: cataloguesDef, error: cataloguesError },
-      { data: fieldsDef, error: fieldsError },
-      { data: settings, error: settingsError },
+      productsResult,
+      deletedProductsResult,
+      categoriesResult,
+      cataloguesDefResult,
+      fieldsDefResult,
+      settingsResult,
     ] = await Promise.all([
-      client.from('products').select('*').eq('user_id', userId).order('position', { ascending: true }),
-      client.from('deleted_products').select('*').eq('user_id', userId),
-      client.from('categories').select('*').eq('user_id', userId),
-      client.from('catalogues_definition').select('*').eq('user_id', userId),
-      client.from('fields_definition').select('*').eq('user_id', userId),
-      client.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
+      settle('products fetch', client.from('products').select('*').eq('user_id', userId).order('position', { ascending: true })),
+      settle('deleted products fetch', client.from('deleted_products').select('*').eq('user_id', userId)),
+      settle('categories fetch', client.from('categories').select('*').eq('user_id', userId)),
+      settle('catalogues definition fetch', client.from('catalogues_definition').select('*').eq('user_id', userId)),
+      settle('fields definition fetch', client.from('fields_definition').select('*').eq('user_id', userId)),
+      settle('user settings fetch', client.from('user_settings').select('*').eq('user_id', userId).maybeSingle()),
     ]);
 
+    const products = productsResult?.data;
+    const deletedProducts = deletedProductsResult?.data;
+    const categories = categoriesResult?.data;
+    const cataloguesDef = cataloguesDefResult?.data;
+    const fieldsDef = fieldsDefResult?.data;
+    const settings = settingsResult?.data;
+
+    const productsError = productsResult?.error;
+    const deletedError = deletedProductsResult?.error;
+    const categoriesError = categoriesResult?.error;
+    const cataloguesError = cataloguesDefResult?.error;
+    const fieldsError = fieldsDefResult?.error;
+    const settingsError = settingsResult?.error;
+
+    if (!productsResult) {
+      return { success: false, error: 'Failed to fetch products' };
+    }
     if (productsError && productsError.code !== 'PGRST116') {
-      console.error('❌ Error fetching products:', productsError);
+      console.warn('⚠️ Error fetching products:', getErrorMessage(productsError));
       return { success: false, error: productsError.message };
     }
-    if (deletedError && deletedError.code !== 'PGRST116') console.error('❌ Error fetching deleted products:', deletedError);
-    if (categoriesError && categoriesError.code !== 'PGRST116') console.error('❌ Error fetching categories:', categoriesError);
-    if (cataloguesError && cataloguesError.code !== 'PGRST116') console.error('❌ Error fetching catalogues definition:', cataloguesError);
-    if (fieldsError && fieldsError.code !== 'PGRST116') console.error('❌ Error fetching fields definition:', fieldsError);
-    if (settingsError && settingsError.code !== 'PGRST116') console.error('❌ Error fetching user settings:', settingsError);
+    if (!deletedProductsResult) console.warn('⚠️ deleted products fetch returned no result');
+    if (!categoriesResult) console.warn('⚠️ categories fetch returned no result');
+    if (!cataloguesDefResult) console.warn('⚠️ catalogues definition fetch returned no result');
+    if (!fieldsDefResult) console.warn('⚠️ fields definition fetch returned no result');
+    if (!settingsResult) console.warn('⚠️ user settings fetch returned no result');
+    if (deletedError && deletedError.code !== 'PGRST116') console.warn('⚠️ Error fetching deleted products:', getErrorMessage(deletedError));
+    if (categoriesError && categoriesError.code !== 'PGRST116') console.warn('⚠️ Error fetching categories:', getErrorMessage(categoriesError));
+    if (cataloguesError && cataloguesError.code !== 'PGRST116') console.warn('⚠️ Error fetching catalogues definition:', getErrorMessage(cataloguesError));
+    if (fieldsError && fieldsError.code !== 'PGRST116') console.warn('⚠️ Error fetching fields definition:', getErrorMessage(fieldsError));
+    if (settingsError && settingsError.code !== 'PGRST116') console.warn('⚠️ Error fetching user settings:', getErrorMessage(settingsError));
 
     // deleted_products now stores full product data in the `data` column.
     // No cross-referencing with the products table needed.
@@ -553,8 +602,8 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
     });
     return { success: true, data: userData };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('❌ Exception in fetchAllUserData:', errorMessage);
+    const errorMessage = getErrorMessage(err);
+    console.warn('⚠️ Exception in fetchAllUserData:', errorMessage);
     return { success: false, error: errorMessage };
   }
 }
@@ -703,14 +752,18 @@ export async function isSyncNeeded(
  * Queue a failed R2 image deletion for later retry.
  */
 export async function queueR2Cleanup(userId: string, imageUrl: string): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from('r2_cleanup_queue')
-    .insert({ user_id: userId, image_url: imageUrl });
+  try {
+    const { error } = await getSupabaseClient()
+      .from('r2_cleanup_queue')
+      .insert({ user_id: userId, image_url: imageUrl });
 
-  if (error) {
-    console.error('❌ Failed to queue R2 cleanup:', error.message);
-  } else {
-    console.log('📋 Queued R2 cleanup for:', imageUrl);
+    if (error) {
+      console.warn('⚠️ Failed to queue R2 cleanup:', error.message);
+    } else {
+      console.log('📋 Queued R2 cleanup for:', imageUrl);
+    }
+  } catch (err) {
+    console.warn('⚠️ Failed to queue R2 cleanup request:', getErrorMessage(err));
   }
 }
 

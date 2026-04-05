@@ -77,14 +77,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
   const refreshSupabaseData = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const uid = session?.user?.id;
-    if (!uid || authService.isOfflineGuest()) return;
+    if (authService.isOfflineGuest()) return;
 
     setSupabaseDataLoading(true);
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return;
+
       const result = await fetchAllUserData(uid);
       const {
         data: { session: latest },
@@ -97,7 +99,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn('⚠️ refreshSupabaseData failed:', result.error);
       }
     } catch (e) {
-      console.error('❌ refreshSupabaseData:', e);
+      console.warn('⚠️ refreshSupabaseData:', e instanceof Error ? e.message : String(e));
     } finally {
       setSupabaseDataLoading(false);
     }
@@ -166,10 +168,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         } catch (err) {
           if (!cancelled) {
-            console.error('❌ Error fetching Supabase data:', err);
-            const { data: { session: latest } } = await supabase.auth.getSession();
-            if (latest?.user?.id === uid) {
-              setSupabaseData(defaultSupabaseData);
+            console.warn('⚠️ Error fetching Supabase data:', err instanceof Error ? err.message : String(err));
+            try {
+              const { data: { session: latest } } = await supabase.auth.getSession();
+              if (latest?.user?.id === uid) {
+                setSupabaseData(defaultSupabaseData);
+              }
+            } catch (sessionErr) {
+              console.warn(
+                '⚠️ Error checking latest session after Supabase fetch failure:',
+                sessionErr instanceof Error ? sessionErr.message : String(sessionErr)
+              );
             }
           }
         } finally {
@@ -186,18 +195,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (cancelled) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
 
-      if (session?.user) {
-        const appUser = mapSupabaseUserToApp(session.user);
-        setUser(appUser);
-        persistAuthUserIdsForStorage(session.user.id);
-        setSupabaseRlsUserId(session.user.id);
-        // Unblock UI immediately; profile loads in background (startup still gates on supabaseDataLoading)
-        setLoading(false);
-        void loadUserData(session.user.id);
-      } else {
+        if (session?.user) {
+          const appUser = mapSupabaseUserToApp(session.user);
+          setUser(appUser);
+          persistAuthUserIdsForStorage(session.user.id);
+          setSupabaseRlsUserId(session.user.id);
+          // Unblock UI immediately; profile loads in background (startup still gates on supabaseDataLoading)
+          setLoading(false);
+          void loadUserData(session.user.id);
+        } else {
+          setUser(null);
+          clearAuthUserIdsFromStorage();
+          setSupabaseRlsUserId(null);
+          setSupabaseData(null);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('⚠️ initSession failed:', err instanceof Error ? err.message : String(err));
         setUser(null);
         clearAuthUserIdsFromStorage();
         setSupabaseRlsUserId(null);
