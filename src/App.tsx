@@ -1484,7 +1484,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
         <Route path="/store/:slug" element={<StoreView />} />
-        <Route path="/store/:slug/confirm" element={<ConfirmOrder />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />

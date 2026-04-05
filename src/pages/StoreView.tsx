@@ -13,6 +13,8 @@ import { getStoreBySlug } from '../services/storeService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { getAllCatalogues } from '../config/catalogueConfig';
+import { createOrder, type OrderItem } from '../services/orderService';
+import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 
 type Step = 'products' | 'customer' | 'review';
@@ -113,7 +115,8 @@ export default function StoreView() {
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Fetch store on mount
   useEffect(() => {
     const loadStore = async () => {
@@ -208,6 +211,81 @@ export default function StoreView() {
   
   const handleBack = () => {
     window.history.back();
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!customerName.trim()) {
+      alert('Please enter your name');
+      return;
+    }
+
+    if (!store) {
+      alert('Store information not available');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Build order items from selectedProducts
+      const orderItems: OrderItem[] = [];
+      const catalogue = catalogues.find(c => c.id === store.catalogueId);
+
+      if (catalogue) {
+        selectedProducts.forEach((quantity, productId) => {
+          const product = allProducts.find(p => p.id === productId);
+          if (product) {
+            const catData = getCatalogueData(product, store.catalogueId);
+            const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+            const rowTotal = unitPrice * quantity;
+
+            orderItems.push({
+              productId,
+              name: product.name,
+              quantity,
+              unitPrice,
+              rowTotal,
+              category: product.category?.[0],
+              priceUnit: catData[catalogue.priceUnitField],
+              imageUrl: product.image || product.imageUrl,
+              quantityStep: catData.orderQuantityStep,
+            });
+          }
+        });
+      }
+
+      if (orderItems.length === 0) {
+        alert('No products selected');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Save order to Supabase
+      setSupabaseRlsUserId(store.sellerUserId);
+
+      const { error } = await createOrder(
+        store.sellerUserId,
+        '', // No share_link_token for store orders
+        customerName.trim(),
+        orderItems,
+        orderSummary.total,
+        store.sellerCurrencyCode,
+        customerWhatsapp.trim() || undefined
+      );
+
+      if (error) {
+        console.error('Error creating order:', error);
+        alert('Failed to save order. Please try again.');
+      } else {
+        alert('Order placed successfully! The seller will contact you soon.');
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('Error placing order:', err);
+      alert('Error placing order. Please try again.');
+    } finally {
+      setSupabaseRlsUserId(null);
+      setIsSubmitting(false);
+    }
   };
   
   if (storeLoading) {
@@ -557,18 +635,8 @@ export default function StoreView() {
         
         {step === 'review' && (
           <button
-            onClick={() => {
-              // Navigate to confirm page with store slug
-              navigate(`/store/${slug}/confirm`, {
-                state: {
-                  selectedProducts: Array.from(selectedProducts.entries()),
-                  customerName,
-                  customerWhatsapp,
-                  storeSlug: slug,
-                  orderTotal: orderSummary.total,
-                },
-              });
-            }}
+            onClick={handlePlaceOrder}
+            disabled={isSubmitting}
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -578,11 +646,12 @@ export default function StoreView() {
               color: '#fff',
               fontSize: 14,
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
+              opacity: isSubmitting ? 0.7 : 1,
             }}
           >
-            Place Order
+            {isSubmitting ? 'Placing Order…' : 'Place Order'}
           </button>
         )}
       </div>
