@@ -120,7 +120,7 @@ begin
   select u.currency, u.data
   into us_data
   from public.user_settings u
-  where u.user_id = rec.seller_user_id
+  where u.user_id = rec.seller_user_id::uuid
   limit 1;
 
   -- Use seller's current currency from user_settings, default to INR
