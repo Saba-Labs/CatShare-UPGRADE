@@ -1,13 +1,13 @@
 /**
  * Store Service
- * 
+ *
  * Handles all operations for persistent seller stores:
  * - Create, read, update, delete stores
  * - Slug validation and uniqueness checks
  * - Public access via RPC for customer views
  */
 
-import { getSupabaseClient } from '../supabaseClient';
+import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 
 export interface Store {
   id: string;
@@ -99,10 +99,13 @@ export async function createStore(
     if (!validation.valid) {
       return { success: false, error: validation.error };
     }
-    
+
     const client = getSupabaseClient();
     const normalizedSlug = storeSlug.toLowerCase().trim();
-    
+
+    // Set RLS user ID for the request
+    setSupabaseRlsUserId(sellerUserId);
+
     // Check if seller already has a store
     const { data: existingStore, error: fetchError } = await client
       .from('stores')
@@ -162,6 +165,8 @@ export async function createStore(
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in createStore:', errorMessage);
     return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
   }
 }
 
@@ -202,7 +207,10 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
 export async function getSellerStore(sellerUserId: string): Promise<{ success: boolean; data?: Store; error?: string }> {
   try {
     const client = getSupabaseClient();
-    
+
+    // Set RLS user ID for the request
+    setSupabaseRlsUserId(sellerUserId);
+
     const { data, error } = await client
       .from('stores')
       .select('*')
@@ -234,6 +242,8 @@ export async function getSellerStore(sellerUserId: string): Promise<{ success: b
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in getSellerStore:', errorMessage);
     return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
   }
 }
 
@@ -249,9 +259,12 @@ export async function updateStoreSlug(
     if (!validation.valid) {
       return { success: false, error: validation.error };
     }
-    
+
     const client = getSupabaseClient();
     const normalizedSlug = newSlug.toLowerCase().trim();
+
+    // Set RLS user ID for the request
+    setSupabaseRlsUserId(sellerUserId);
     
     const { data, error } = await client
       .from('stores')
@@ -294,6 +307,8 @@ export async function updateStoreSlug(
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreSlug:', errorMessage);
     return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
   }
 }
 
@@ -306,6 +321,9 @@ export async function updateStoreCatalogue(
 ): Promise<{ success: boolean; data?: Store; error?: string }> {
   try {
     const client = getSupabaseClient();
+
+    // Set RLS user ID for the request
+    setSupabaseRlsUserId(sellerUserId);
     
     const { data, error } = await client
       .from('stores')
@@ -347,6 +365,9 @@ export async function updateStoreCatalogue(
 export async function deleteStore(sellerUserId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const client = getSupabaseClient();
+
+    // Set RLS user ID for the request
+    setSupabaseRlsUserId(sellerUserId);
     
     const { error } = await client
       .from('stores')
