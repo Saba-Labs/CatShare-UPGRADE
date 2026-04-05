@@ -94,10 +94,20 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
   );
 }
 
+function StoreIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <path d="M16 10a4 4 0 01-8 0" />
+    </svg>
+  );
+}
+
 export default function StoreView() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
-  
+
   const [step, setStep] = useState<Step>('products');
   const [store, setStore] = useState<any>(null);
   const [storeLoading, setStoreLoading] = useState(true);
@@ -108,6 +118,7 @@ export default function StoreView() {
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   // Fetch store on mount
   useEffect(() => {
@@ -388,7 +399,7 @@ export default function StoreView() {
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
       
-      {/* Header */}
+      {/* Business Header */}
       <div style={{
         position: 'sticky',
         top: 40,
@@ -396,7 +407,7 @@ export default function StoreView() {
         background: '#fff',
         borderBottom: '1px solid #E2E8F0',
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-        padding: '14px 16px',
+        padding: '16px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -412,16 +423,58 @@ export default function StoreView() {
               display: 'flex',
               alignItems: 'center',
               padding: 0,
+              fontSize: 20,
             }}
           >
-            <IconArrowLeft />
+            ←
           </button>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', margin: 0 }}>
-            {step === 'products' && 'Products'}
-            {step === 'customer' && 'Your Details'}
-            {step === 'review' && 'Review Order'}
-          </h2>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 10,
+            background: '#16A34A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            overflow: 'hidden',
+            color: '#fff',
+          }}>
+            {store?.sellerLogoUrl && !logoFailed ? (
+              <img
+                src={store.sellerLogoUrl}
+                alt="Store Logo"
+                onError={() => setLogoFailed(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : (
+              <StoreIcon />
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', margin: 0, letterSpacing: '-0.3px' }}>
+              {store?.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'Store'}
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: 500 }}>
+              {step === 'products' && storeProducts.length > 0 && `${storeProducts.length} products`}
+              {step === 'products' && storeProducts.length === 0 && 'No products'}
+              {step === 'customer' && 'Your Details'}
+              {step === 'review' && 'Review Order'}
+            </div>
+          </div>
         </div>
+        {step === 'products' && selectedProducts.size > 0 && (
+          <div style={{
+            background: '#16A34A',
+            color: '#fff',
+            borderRadius: 100,
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 700,
+          }}>
+            {selectedProducts.size} items
+          </div>
+        )}
       </div>
       
       {/* Content */}
