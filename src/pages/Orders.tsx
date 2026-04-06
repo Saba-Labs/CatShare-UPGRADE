@@ -528,6 +528,7 @@ export default function Orders() {
   const loadOrders = async () => {
     if (!user?.uid || user.uid.trim() === '') {
       setError('User authentication required');
+      setLoading(false);
       return;
     }
 
@@ -535,6 +536,7 @@ export default function Orders() {
     if (user.isAnonymous) {
       setError('Please sign in to view orders');
       showToast('Sign in required to view orders', 'error');
+      setLoading(false);
       return;
     }
 

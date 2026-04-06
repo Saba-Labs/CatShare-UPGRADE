@@ -1,13 +1,18 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getStoreBySlug, getStoreProducts } from '../services/storeService';
-import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
-import { getAllCatalogues } from '../config/catalogueConfig';
+import {
+  isProductEnabledForCatalogue,
+  getCatalogueData,
+  normalizeOrderQuantityStep,
+  type CatalogueData,
+  type ProductWithCatalogueData,
+} from '../config/catalogueProductUtils';
+import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition } from '../config/fieldConfig';
-import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    INLINE STYLES — clean, professional light storefront
@@ -269,6 +274,83 @@ function isPublicUrl(url?: string): boolean {
   if (!url) return false;
   try { const p = new URL(url.trim()); return p.protocol === 'http:' || p.protocol === 'https:'; } catch { return false; }
 }
+
+/** Storefront can show synced data: URLs; grid uses <img> with https or data:image only. */
+function isDisplayableImageUrl(url?: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const t = url.trim();
+  if (!t) return false;
+  if (t.startsWith('data:image/')) return true;
+  return isPublicUrl(t);
+}
+
+/**
+ * Prefer cloud HTTPS URL (imageUrl) over `image`, which may be a local filesystem path after sync.
+ */
+function pickProductImageSrc(p: ProductWithCatalogueData | Record<string, unknown>): string | undefined {
+  const r = p as Record<string, unknown>;
+  const asSrc = (v: unknown): string | undefined => {
+    if (typeof v !== 'string') return undefined;
+    const s = v.trim();
+    if (!s) return undefined;
+    if (/^https?:\/\//i.test(s) || s.startsWith('data:image/')) return s;
+    return undefined;
+  };
+  for (const k of ['imageUrl', 'image_url', 'thumbnailUrl', 'thumbnail_url', 'image'] as const) {
+    const u = asSrc(r[k]);
+    if (u) return u;
+  }
+  return undefined;
+}
+
+/**
+ * Public store visitors may not have the seller's custom catalogue in localStorage.
+ * When catalogue config is missing, still read price from product.catalogueData using price1…price10.
+ * If merged catalogue row has empty prices but the product still has top-level price fields (legacy), use those.
+ */
+function getStorefrontPriceAndUnit(
+  catData: CatalogueData | null | undefined,
+  catalogue: Catalogue | null,
+  product?: ProductWithCatalogueData | null
+): { price: number; priceUnit?: string } {
+  const fromCat = (): { price: number; priceUnit?: string } => {
+    if (!catData) return { price: 0 };
+    if (catalogue) {
+      const raw = catData[catalogue.priceField as keyof CatalogueData];
+      const price = parseFloat(String(raw ?? '')) || 0;
+      const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
+      return { price, priceUnit };
+    }
+    for (let n = 1; n <= 10; n++) {
+      const pk = `price${n}` as keyof CatalogueData;
+      const price = parseFloat(String(catData[pk] ?? '')) || 0;
+      if (price > 0) {
+        const uk = `price${n}Unit` as keyof CatalogueData;
+        return { price, priceUnit: catData[uk] as string | undefined };
+      }
+    }
+    return { price: 0 };
+  };
+
+  const r = fromCat();
+  if (r.price > 0 || !product) return r;
+
+  const pr = product as Record<string, unknown>;
+  if (catalogue) {
+    const top = pr[catalogue.priceField];
+    const price = parseFloat(String(top ?? '')) || 0;
+    if (price > 0) {
+      return { price, priceUnit: pr[catalogue.priceUnitField] as string | undefined };
+    }
+  }
+  for (let n = 1; n <= 10; n++) {
+    const price = parseFloat(String(pr[`price${n}`] ?? '')) || 0;
+    if (price > 0) {
+      return { price, priceUnit: pr[`price${n}Unit`] as string | undefined };
+    }
+  }
+  return r;
+}
 function getCats(p: ProductWithCatalogueData): string[] {
   return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
 }
@@ -395,16 +477,7 @@ export default function StoreView() {
     setProductsLoading(true);
     getStoreProducts(store.sellerUserId).then((result) => {
       if (result.success && result.products) {
-        const products = result.products.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          subtitle: p.subtitle || '',
-          category: p.category || [],
-          image: p.image,
-          imageUrl: p.image || p.imageUrl,
-          ...p,
-        }));
-        setAllProducts(products);
+        setAllProducts(result.products);
       }
       setProductsLoading(false);
     });
@@ -438,14 +511,23 @@ export default function StoreView() {
   }, [searchQuery, selectedCategory, storeProducts]);
 
   const orderSummary = useMemo(() => {
-    if (!store || !catalogue) return { items: [] as any[], total: 0 };
+    if (!store?.catalogueId) return { items: [] as any[], total: 0 };
     const items: any[] = []; let total = 0;
     selectedProducts.forEach((quantity, productId) => {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
-      const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+      const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
       const rowTotal = unitPrice * quantity;
-      items.push({ productId, name: product.name, quantity, unitPrice, rowTotal, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, subtitle: product.subtitle });
+      items.push({
+        productId,
+        name: product.name,
+        quantity,
+        unitPrice,
+        rowTotal,
+        priceUnit,
+        imageUrl: pickProductImageSrc(product),
+        subtitle: product.subtitle,
+      });
       total += rowTotal;
     });
     return { items, total };
@@ -469,22 +551,39 @@ export default function StoreView() {
   }, [drawerProduct, step]);
 
   const handlePlaceOrder = async () => {
-    if (!store || !catalogue) return;
+    if (!store?.catalogueId) return;
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
       selectedProducts.forEach((quantity, productId) => {
         const product = allProducts.find((p) => p.id === productId); if (!product) return;
         const catData = getCatalogueData(product, store.catalogueId);
-        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
-        orderItems.push({ productId, name: product.name, quantity, unitPrice, rowTotal: unitPrice * quantity, category: product.category?.[0], subtitle: product.subtitle, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, quantityStep: catData.orderQuantityStep });
+        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
+        orderItems.push({
+          productId,
+          name: product.name,
+          quantity,
+          unitPrice,
+          rowTotal: unitPrice * quantity,
+          category: product.category?.[0],
+          subtitle: product.subtitle,
+          priceUnit,
+          imageUrl: pickProductImageSrc(product),
+          quantityStep: catData.orderQuantityStep,
+        });
       });
       setSupabaseRlsUserId(store.sellerUserId);
       const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, orderSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
       if (error) alert('Failed to place order. Please try again.');
       else { alert('Order placed! The seller will contact you soon.'); navigate('/'); }
     } catch { alert('Error placing order. Please try again.'); }
-    finally { setSupabaseRlsUserId(null); setIsSubmitting(false); }
+    finally {
+      setSupabaseRlsUserId(null);
+      void getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.id) setSupabaseRlsUserId(session.user.id);
+      });
+      setIsSubmitting(false);
+    }
   };
 
   const handlePanelAction = () => {
@@ -637,16 +736,15 @@ export default function StoreView() {
             {!productsLoading && filteredProducts.map((product) => {
               const quantity = selectedProducts.get(product.id) || 0;
               const isSelected = quantity > 0;
-              const catData = catalogue ? getCatalogueData(product, store.catalogueId) : null;
-              const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
-              const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+              const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+              const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-              const imgUrl = product.image || product.imageUrl;
+              const imgUrl = pickProductImageSrc(product);
               const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
               return (
                 <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
                   <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
-                    {isPublicUrl(imgUrl)
+                    {isDisplayableImageUrl(imgUrl)
                       ? <img src={String(imgUrl)} alt={product.name} />
                       : <div className="sv-pcard-img-ph"><IconImg size={32} /></div>}
                     {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
@@ -741,7 +839,7 @@ export default function StoreView() {
                     return (
                       <div key={item.productId} className="sv-rcard">
                         <div className="sv-rcard-img">
-                          {isPublicUrl(item.imageUrl)
+                          {isDisplayableImageUrl(item.imageUrl)
                             ? <img src={item.imageUrl} alt={item.name} />
                             : <div className="sv-rcard-img-ph"><IconImg size={24} /></div>}
                         </div>
@@ -772,9 +870,8 @@ export default function StoreView() {
 
         {/* ══ PRODUCT DETAIL DRAWER ══ */}
         {drawerProduct && (() => {
-          const catData = catalogue ? getCatalogueData(drawerProduct, store.catalogueId) : null;
-          const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
-          const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+          const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
+          const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
@@ -784,13 +881,13 @@ export default function StoreView() {
             const { label, unitSuffix } = fieldLU(drawerProduct, n);
             return { label, value: unitSuffix ? `${String(value)} ${unitSuffix}` : String(value) };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
-          const imgUrl = drawerProduct.image || drawerProduct.imageUrl;
+          const imgUrl = pickProductImageSrc(drawerProduct);
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className="sv-drawer-img-wrap">
-                  {isPublicUrl(imgUrl)
+                  {isDisplayableImageUrl(imgUrl)
                     ? <img src={String(imgUrl)} alt={drawerProduct.name} />
                     : <div className="sv-drawer-img-ph"><IconImg size={48} /></div>}
                   <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>

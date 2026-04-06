@@ -186,6 +186,9 @@ export default function ConfirmOrder() {
         // Don't block WhatsApp opening on error
       } finally {
         setSupabaseRlsUserId(null);
+        void getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
+          if (session?.user?.id) setSupabaseRlsUserId(session.user.id);
+        });
         setSavingOrder(false);
       }
     }

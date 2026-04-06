@@ -1,4 +1,10 @@
-import { getSupabaseClient } from '../supabaseClient';
+import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+
+/** Orders RLS (see SUPABASE_ORDERS_SQL.md) uses `x-user-id`. Restore from session before seller mutations when header was cleared (e.g. after StoreView order). */
+async function ensureOrdersRlsHeaderFromSession(): Promise<void> {
+  const { data: { session } } = await getSupabaseClient().auth.getSession();
+  if (session?.user?.id) setSupabaseRlsUserId(session.user.id);
+}
 
 export interface OrderItem {
   productId: string;
@@ -121,12 +127,16 @@ export async function fetchSellerOrders(
       };
     }
 
+    const trimmed = sellerUserId.trim();
+    // RLS matches seller_user_id to x-user-id; customer flows clear the header after insert — restore for seller reads.
+    setSupabaseRlsUserId(trimmed);
+
     const client = getSupabaseClient();
 
     let query = client
       .from('orders')
       .select('*')
-      .eq('seller_user_id', sellerUserId)
+      .eq('seller_user_id', trimmed)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -149,6 +159,7 @@ export async function updateOrderStatus(
   status: 'pending' | 'completed' | 'cancelled'
 ): Promise<{ data: Order | null; error: any }> {
   try {
+    await ensureOrdersRlsHeaderFromSession();
     const client = getSupabaseClient();
 
     const { data, error } = await client
@@ -175,6 +186,7 @@ export async function updateOrder(
   }
 ): Promise<{ data: Order | null; error: any }> {
   try {
+    await ensureOrdersRlsHeaderFromSession();
     const client = getSupabaseClient();
 
     const { data, error } = await client
@@ -193,6 +205,7 @@ export async function updateOrder(
  */
 export async function deleteOrder(orderId: string): Promise<{ error: any }> {
   try {
+    await ensureOrdersRlsHeaderFromSession();
     const client = getSupabaseClient();
 
     const { error } = await client.from('orders').delete().eq('id', orderId);

@@ -8,6 +8,88 @@
  */
 
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+
+/**
+ * RPC may return jsonb as object or string; unwrap common shapes.
+ */
+function parseStoreProductsRpcPayload(raw: unknown): unknown[] {
+  let v: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (v == null) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v !== 'object') return [];
+  const o = v as Record<string, unknown>;
+  if (Array.isArray(o.products)) return o.products;
+  if (Array.isArray(o.Products)) return o.Products;
+  if (Array.isArray(o.items)) return o.items;
+  return [];
+}
+
+function parseCatalogueDataField(value: unknown): ProductWithCatalogueData['catalogueData'] | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'string') {
+    const t = value.trim();
+    if (!t) return undefined;
+    try {
+      const p = JSON.parse(t);
+      return typeof p === 'object' && p !== null && !Array.isArray(p) ? (p as ProductWithCatalogueData['catalogueData']) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as ProductWithCatalogueData['catalogueData'];
+  }
+  return undefined;
+}
+
+/**
+ * Public store reads products from `get_store_products` (merged `p.data` + row fields).
+ * Normalize nested `data`, snake_case keys, and stable `id` so catalogueData / prices / imageUrl match the app.
+ */
+function normalizePublicStoreProduct(raw: Record<string, unknown>): ProductWithCatalogueData {
+  const inner =
+    typeof raw.data === 'object' && raw.data !== null && !Array.isArray(raw.data)
+      ? (raw.data as Record<string, unknown>)
+      : {};
+  const merged: Record<string, unknown> = { ...inner, ...raw };
+  delete merged.data;
+
+  const catalogueData =
+    parseCatalogueDataField(merged.catalogueData) ??
+    parseCatalogueDataField(merged.catalogue_data);
+
+  const pid = merged.product_id ?? merged.productId;
+  const id = pid != null ? String(pid) : merged.id != null ? String(merged.id) : '';
+
+  const imageUrlRaw =
+    (typeof merged.imageUrl === 'string' && merged.imageUrl.trim()) ||
+    (typeof merged.image_url === 'string' && merged.image_url.trim()) ||
+    '';
+
+  let category: string[] = [];
+  if (Array.isArray(merged.category)) {
+    category = merged.category.map((c) => String(c).trim()).filter(Boolean);
+  } else if (merged.category != null && String(merged.category).trim() !== '') {
+    category = [String(merged.category).trim()];
+  }
+
+  const base = { ...(merged as unknown as ProductWithCatalogueData) };
+  return {
+    ...base,
+    id,
+    catalogueData: catalogueData ?? base.catalogueData,
+    imageUrl: imageUrlRaw || base.imageUrl,
+    category,
+  };
+}
 
 export interface Store {
   id: string;
@@ -409,11 +491,16 @@ export async function getStoreProducts(
       return { success: false, error: error.message };
     }
 
-    if (!data) {
+    if (data == null) {
       return { success: true, products: [] };
     }
 
-    return { success: true, products: data.products || [] };
+    const list = parseStoreProductsRpcPayload(data);
+    const products = list
+      .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
+      .map((row) => normalizePublicStoreProduct(row));
+
+    return { success: true, products };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in getStoreProducts:', errorMessage);
