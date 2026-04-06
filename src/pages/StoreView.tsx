@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getStoreBySlug } from '../services/storeService';
+import { getStoreBySlug, getStoreProducts } from '../services/storeService';
 import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
@@ -376,11 +376,21 @@ export default function StoreView() {
   useEffect(() => {
     if (!store?.sellerUserId) return;
     setProductsLoading(true);
-    getSupabaseClient().from('products').select('*').eq('user_id', store.sellerUserId).order('position', { ascending: true })
-      .then(({ data, error }) => {
-        if (!error && data) setAllProducts(data.map((p: any) => ({ id: p.product_id, name: p.name, subtitle: p.data?.subtitle || '', category: p.data?.category || [], image: p.data?.image, imageUrl: p.data?.image, ...p.data })));
-        setProductsLoading(false);
-      });
+    getStoreProducts(store.sellerUserId).then((result) => {
+      if (result.success && result.products) {
+        const products = result.products.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          subtitle: p.data?.subtitle || '',
+          category: p.data?.category || [],
+          image: p.data?.image,
+          imageUrl: p.data?.image || p.data?.imageUrl,
+          ...p.data,
+        }));
+        setAllProducts(products);
+      }
+      setProductsLoading(false);
+    });
   }, [store?.sellerUserId]);
 
   const catalogues = useMemo(() => getAllCatalogues(null), []);
