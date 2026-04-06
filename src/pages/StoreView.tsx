@@ -8,1059 +8,300 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 
-/* ─── Inlined styles ──────────────────────────────────────────────────────── */
-const inlineStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+/* ─────────────────────────────────────────────────────────────────────────────
+   INLINE STYLES — bold modern D2C storefront
+───────────────────────────────────────────────────────────────────────────── */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 
-  :root {
-    --font: 'DM Sans', system-ui, sans-serif;
-    --font-display: 'DM Serif Display', Georgia, serif;
-    --ink: #0a0a0a;
-    --ink-2: #3d3d3d;
-    --ink-3: #767676;
-    --ink-4: #a3a3a3;
-    --surface: #ffffff;
-    --surface-2: #f7f6f3;
-    --surface-3: #f0ede7;
-    --border: #e8e4dd;
-    --border-strong: #ccc8c0;
-    --accent: #1a1a1a;
-    --accent-green: #1a6b3a;
-    --accent-green-bg: #e8f5ed;
-    --accent-green-text: #0f4525;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 18px;
-    --radius-xl: 24px;
-    --radius-full: 999px;
-    --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-    --shadow-float: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
-    --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+:root {
+  --f-head: 'Syne', system-ui, sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
+  --c-bg: #0a0a0a;
+  --c-surface: #111111;
+  --c-surface2: #1a1a1a;
+  --c-surface3: #222222;
+  --c-border: rgba(255,255,255,0.08);
+  --c-border2: rgba(255,255,255,0.14);
+  --c-text: #f5f5f5;
+  --c-text2: #a0a0a0;
+  --c-text3: #666666;
+  --c-accent: #e8ff47;
+  --c-accent-dark: #c4d900;
+  --c-white: #ffffff;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+  --trans: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
 
-  .sv-root {
-    font-family: var(--font);
-    background: var(--surface-2);
-    min-height: 100vh;
-    color: var(--ink);
-    -webkit-font-smoothing: antialiased;
-  }
+.sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; }
 
-  /* ── Page shell ── */
-  .sv-page {
-    max-width: 520px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
+.sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
 
-  /* ── Header ── */
-  .sv-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 14px 16px;
-  }
-  .sv-header-inner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .sv-back-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--ink);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background var(--transition), border-color var(--transition);
-  }
-  .sv-back-btn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+/* ── Hero ── */
+.sv-hero { position: relative; background: var(--c-surface); border-bottom: 1px solid var(--c-border); overflow: hidden; }
+.sv-hero-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px);
+}
+.sv-hero-inner { position: relative; padding: 28px 20px 24px; }
+.sv-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.sv-logo { width: 56px; height: 56px; border-radius: var(--r-md); background: var(--c-surface2); border: 1px solid var(--c-border2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.sv-logo img { width: 100%; height: 100%; object-fit: cover; }
+.sv-open-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(232,255,71,0.1); border: 1px solid rgba(232,255,71,0.25); border-radius: var(--r-full); padding: 5px 12px; font-size: 11px; font-weight: 600; color: var(--c-accent); font-family: var(--f-head); letter-spacing: 0.5px; }
+.sv-open-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent); animation: sv-pulse 2s infinite; }
+@keyframes sv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }
+.sv-store-name { font-family: var(--f-head); font-size: 32px; font-weight: 800; color: var(--c-white); line-height: 1.05; letter-spacing: -1px; margin-bottom: 6px; }
+.sv-store-tagline { font-size: 13.5px; color: var(--c-text2); line-height: 1.5; max-width: 300px; }
+.sv-biz-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.sv-biz-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-full); padding: 5px 11px; font-size: 12px; color: var(--c-text2); font-family: var(--f-body); text-decoration: none; transition: border-color var(--trans), color var(--trans); }
+.sv-biz-chip:hover { border-color: var(--c-border2); color: var(--c-text); }
+.sv-socials { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.sv-social-btn { width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--c-surface2); border: 1px solid var(--c-border); display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--c-text2); transition: all var(--trans); cursor: pointer; font-size: 13px; font-weight: 700; font-style: normal; font-family: var(--f-head); }
+.sv-social-btn:hover { background: var(--c-surface3); border-color: var(--c-border2); color: var(--c-text); }
 
-  .sv-store-identity {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 0;
-  }
-  .sv-logo-wrap {
-    width: 38px;
-    height: 38px;
-    border-radius: var(--radius-sm);
-    background: var(--ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-  .sv-logo-wrap img { width: 100%; height: 100%; object-fit: cover; }
-  .sv-store-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    letter-spacing: -0.2px;
-  }
-  .sv-store-step {
-    font-size: 12px;
-    color: var(--ink-3);
-    font-weight: 400;
-    letter-spacing: 0.1px;
-  }
-  .sv-header-cta {
-    flex-shrink: 0;
-    height: 36px;
-    padding: 0 18px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font);
-    letter-spacing: 0.1px;
-    transition: opacity var(--transition), transform var(--transition);
-    white-space: nowrap;
-  }
-  .sv-header-cta:hover:not(:disabled) { opacity: 0.85; }
-  .sv-header-cta:active:not(:disabled) { transform: scale(0.97); }
-  .sv-header-cta:disabled { opacity: 0.38; cursor: not-allowed; }
+/* ── Sticky nav ── */
+.sv-nav { position: sticky; top: 0; z-index: 80; background: rgba(10,10,10,0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--c-border); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.sv-nav-row { display: flex; align-items: center; gap: 10px; }
+.sv-count-label { flex: 1; font-size: 12px; color: var(--c-text3); font-weight: 500; }
+.sv-search-wrap { position: relative; }
+.sv-search-input { width: 100%; height: 38px; background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-full); color: var(--c-text); font-size: 13px; font-family: var(--f-body); padding: 0 34px 0 36px; outline: none; transition: border-color var(--trans); }
+.sv-search-input:focus { border-color: var(--c-border2); }
+.sv-search-input::placeholder { color: var(--c-text3); }
+.sv-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--c-text3); pointer-events: none; }
+.sv-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; background: var(--c-surface3); border: none; cursor: pointer; font-size: 12px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; }
+.sv-cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+.sv-cats::-webkit-scrollbar { display: none; }
+.sv-cat { flex-shrink: 0; height: 28px; padding: 0 14px; border-radius: var(--r-full); border: 1px solid var(--c-border); background: transparent; color: var(--c-text2); font-size: 12px; font-weight: 500; font-family: var(--f-body); cursor: pointer; transition: all var(--trans); white-space: nowrap; }
+.sv-cat:hover { border-color: var(--c-border2); color: var(--c-text); }
+.sv-cat.active { background: var(--c-accent); border-color: var(--c-accent); color: #0a0a0a; font-weight: 600; }
 
-  /* ── Store hero strip ── */
-  .sv-hero {
-    background: var(--ink);
-    color: #fff;
-    padding: 22px 20px 18px;
-  }
-  .sv-hero-label {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.45);
-    margin-bottom: 6px;
-  }
-  .sv-hero-title {
-    font-family: var(--font-display);
-    font-size: 28px;
-    line-height: 1.1;
-    color: #fff;
-    letter-spacing: -0.5px;
-  }
-  .sv-hero-title em { font-style: italic; color: rgba(255,255,255,0.65); }
+/* ── 2-col grid ── */
+.sv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 12px 140px; }
 
-  /* ── Toolbar ── */
-  .sv-toolbar {
-    padding: 16px 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .sv-count-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .sv-count-label {
-    font-size: 12px;
-    color: var(--ink-3);
-    font-weight: 500;
-    letter-spacing: 0.2px;
-  }
+/* ── Product card ── */
+.sv-pcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column; transition: border-color var(--trans), transform var(--trans); position: relative; }
+.sv-pcard:hover { border-color: var(--c-border2); transform: translateY(-1px); }
+.sv-pcard.selected { border-color: var(--c-accent); box-shadow: 0 0 0 1px var(--c-accent); }
 
-  /* ── Search ── */
-  .sv-search-wrap {
-    position: relative;
-  }
-  .sv-search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 16px;
-    color: var(--ink-4);
-    pointer-events: none;
-    line-height: 1;
-  }
-  .sv-search-input {
-    width: 100%;
-    height: 40px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full);
-    background: var(--surface-2);
-    color: var(--ink);
-    font-size: 13.5px;
-    font-family: var(--font);
-    padding: 0 36px 0 36px;
-    outline: none;
-    transition: border-color var(--transition), background var(--transition);
-  }
-  .sv-search-input:focus { border-color: var(--border-strong); background: var(--surface); }
-  .sv-search-clear {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 20px;
-    height: 20px;
-    border-radius: var(--radius-full);
-    background: var(--surface-3);
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--ink-3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
+/* Image — square aspect ratio, full width */
+.sv-pcard-img-wrap { width: 100%; aspect-ratio: 1/1; background: var(--c-surface2); position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
+.sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; display: block; }
+.sv-pcard-img-wrap:hover img { transform: scale(1.04); }
+.sv-pcard-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.sv-pcard-sel { position: absolute; top: 8px; left: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--c-accent); display: flex; align-items: center; justify-content: center; z-index: 2; }
 
-  /* ── Category pills ── */
-  .sv-cats {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-  .sv-cats::-webkit-scrollbar { display: none; }
-  .sv-cat-pill {
-    flex-shrink: 0;
-    height: 30px;
-    padding: 0 14px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--ink-2);
-    font-size: 12.5px;
-    font-weight: 500;
-    font-family: var(--font);
-    cursor: pointer;
-    transition: all var(--transition);
-    white-space: nowrap;
-  }
-  .sv-cat-pill:hover { border-color: var(--border-strong); background: var(--surface-2); }
-  .sv-cat-pill.is-active {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: #fff;
-  }
+.sv-pcard-body { padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 2px; }
+.sv-pcard-name { font-family: var(--f-head); font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.25; letter-spacing: -0.2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.sv-pcard-price { font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--c-white); letter-spacing: -0.4px; margin-top: 5px; }
+.sv-pcard-price-unit { font-size: 10px; font-weight: 400; color: var(--c-text3); margin-left: 2px; }
 
-  /* ── Product list ── */
-  .sv-items {
-    padding: 0 16px 120px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
+.sv-pcard-footer { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sv-pcard-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sv-details-btn { font-size: 11px; color: var(--c-text3); background: none; border: none; cursor: pointer; font-family: var(--f-body); padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.sv-details-btn:hover { color: var(--c-text2); }
 
-  /* ── Product card ── */
-  .sv-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    display: flex;
-    overflow: hidden;
-    transition: border-color var(--transition), box-shadow var(--transition);
-    position: relative;
-  }
-  .sv-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
-  .sv-card.is-selected {
-    border-color: var(--ink);
-    box-shadow: 0 0 0 1px var(--ink);
-  }
+.sv-pcard-subtotal { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: rgba(232,255,71,0.06); border-radius: var(--r-sm); border: 1px solid rgba(232,255,71,0.14); margin: 0 10px 10px; }
+.sv-pcard-subtotal-calc { font-size: 10.5px; color: var(--c-text3); }
+.sv-pcard-subtotal-val { font-size: 13px; font-weight: 700; color: var(--c-accent); font-family: var(--f-head); }
 
-  .sv-card-img-wrap {
-    width: 110px;
-    min-height: 110px;
-    flex-shrink: 0;
-    position: relative;
-    background: var(--surface-2);
-    cursor: pointer;
-  }
-  .sv-card-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .sv-card-img-ph {
-    width: 100%;
-    height: 100%;
-    min-height: 110px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface-3);
-  }
-  .sv-added-badge {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: var(--ink);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: var(--radius-full);
-    letter-spacing: 0.3px;
-  }
+/* ── Qty ── */
+.sv-qty { display: inline-flex; align-items: center; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-full); overflow: hidden; }
+.sv-qty-btn { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 16px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; transition: background var(--trans), color var(--trans); font-family: var(--f-body); line-height: 1; }
+.sv-qty-btn:hover { background: var(--c-surface3); color: var(--c-text); }
+.sv-qty-val { min-width: 28px; text-align: center; font-size: 13px; font-weight: 600; color: var(--c-text); font-family: var(--f-head); }
+.sv-qty.accent { background: var(--c-accent); border-color: var(--c-accent); }
+.sv-qty.accent .sv-qty-btn { color: #0a0a0a; }
+.sv-qty.accent .sv-qty-btn:hover { background: rgba(0,0,0,0.1); }
+.sv-qty.accent .sv-qty-val { color: #0a0a0a; }
 
-  .sv-card-body {
-    flex: 1;
-    padding: 14px 14px 12px;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .sv-card-name {
-    font-size: 14.5px;
-    font-weight: 600;
-    color: var(--ink);
-    line-height: 1.3;
-    letter-spacing: -0.2px;
-  }
-  .sv-card-sub {
-    font-size: 12px;
-    color: var(--ink-3);
-    font-weight: 400;
-    margin-top: 1px;
-  }
-  .sv-card-price {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-top: 6px;
-    letter-spacing: -0.3px;
-  }
-  .sv-card-price-unit {
-    font-size: 11.5px;
-    font-weight: 400;
-    color: var(--ink-3);
-    margin-left: 2px;
-  }
+.sv-pack-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: #d4a017; background: rgba(212,160,23,0.1); border: 1px solid rgba(212,160,23,0.2); border-radius: var(--r-full); padding: 3px 8px; }
 
-  .sv-card-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 10px;
-    gap: 8px;
-  }
-  .sv-details-btn {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink-3);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font);
-    padding: 4px 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    white-space: nowrap;
-  }
-  .sv-details-btn:hover { color: var(--ink); }
+/* ── Floating cart ── */
+.sv-cart { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 14px 24px; pointer-events: none; z-index: 200; }
+.sv-cart-inner { display: flex; align-items: center; justify-content: space-between; background: var(--c-white); border-radius: var(--r-xl); padding: 10px 10px 10px 18px; box-shadow: 0 8px 40px rgba(0,0,0,0.6); pointer-events: all; gap: 12px; cursor: pointer; animation: sv-cart-in 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes sv-cart-in { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sv-cart-info { display: flex; flex-direction: column; gap: 1px; }
+.sv-cart-count { font-size: 11.5px; color: #888; font-weight: 500; }
+.sv-cart-total { font-family: var(--f-head); font-size: 20px; font-weight: 800; color: #0a0a0a; letter-spacing: -0.6px; }
+.sv-cart-cta { flex-shrink: 0; height: 42px; padding: 0 20px; border-radius: var(--r-full); background: #0a0a0a; color: #fff; font-size: 13.5px; font-weight: 700; font-family: var(--f-head); border: none; cursor: pointer; letter-spacing: 0.2px; transition: opacity var(--trans); white-space: nowrap; }
+.sv-cart-cta:hover { opacity: 0.85; }
 
-  /* ── Qty control ── */
-  .sv-qty {
-    display: inline-flex;
-    align-items: center;
-    gap: 0;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .sv-qty-btn {
-    width: 30px;
-    height: 30px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    font-size: 17px;
-    color: var(--ink-2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background var(--transition);
-    font-family: var(--font);
-    line-height: 1;
-  }
-  .sv-qty-btn:hover { background: var(--surface-2); }
-  .sv-qty-val {
-    min-width: 30px;
-    text-align: center;
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--ink);
-    padding: 0 2px;
-  }
+/* ── Morphing panel ── */
+.sv-panel { position: fixed; inset: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--c-bg); z-index: 120; display: flex; flex-direction: column; animation: sv-panel-in 0.32s cubic-bezier(0.32,0.72,0,1); overflow-y: auto; }
+@keyframes sv-panel-in { from{transform:translateX(-50%) translateY(100%)} to{transform:translateX(-50%) translateY(0)} }
 
-  /* ── Subtotal strip ── */
-  .sv-subtotal {
-    margin-top: 10px;
-    padding-top: 9px;
-    border-top: 1px dashed var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .sv-subtotal-calc {
-    font-size: 11.5px;
-    color: var(--ink-3);
-  }
-  .sv-subtotal-val {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.3px;
-  }
+.sv-panel-header { position: sticky; top: 0; z-index: 10; background: rgba(10,10,10,0.94); backdrop-filter: blur(16px); border-bottom: 1px solid var(--c-border); padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+.sv-panel-back { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--c-border2); background: var(--c-surface2); color: var(--c-text2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all var(--trans); }
+.sv-panel-back:hover { background: var(--c-surface3); color: var(--c-text); }
+.sv-panel-title-wrap { flex: 1; }
+.sv-panel-title { font-family: var(--f-head); font-size: 16px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
+.sv-panel-subtitle { font-size: 11.5px; color: var(--c-text3); margin-top: 1px; }
+.sv-panel-cta { flex-shrink: 0; height: 38px; padding: 0 18px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; font-size: 13px; font-weight: 700; font-family: var(--f-head); border: none; cursor: pointer; transition: opacity var(--trans), transform var(--trans); white-space: nowrap; }
+.sv-panel-cta:hover:not(:disabled) { opacity: 0.88; }
+.sv-panel-cta:active:not(:disabled) { transform: scale(0.97); }
+.sv-panel-cta:disabled { opacity: 0.35; cursor: not-allowed; }
 
-  /* ── Pack hint ── */
-  .sv-pack-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #7c5f00;
-    background: #fef9ec;
-    border: 1px solid #f5e49e;
-    border-radius: var(--radius-full);
-    padding: 3px 9px;
-    margin-top: 6px;
-  }
+/* ── Step bar ── */
+.sv-steps { display: flex; align-items: center; padding: 16px 16px 0; }
+.sv-step-item { display: flex; align-items: center; gap: 7px; }
+.sv-step-num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--f-head); flex-shrink: 0; transition: all var(--trans); }
+.sv-step-num.done { background: var(--c-accent); color: #0a0a0a; }
+.sv-step-num.active { background: var(--c-white); color: #0a0a0a; }
+.sv-step-num.idle { background: var(--c-surface3); color: var(--c-text3); }
+.sv-step-label { font-size: 11px; font-weight: 500; }
+.sv-step-label.done,.sv-step-label.active { color: var(--c-text); }
+.sv-step-label.idle { color: var(--c-text3); }
+.sv-step-line { flex: 1; height: 1px; background: var(--c-border2); margin: 0 8px; }
+.sv-step-line.done { background: var(--c-accent); }
 
-  /* ── Empty states ── */
-  .sv-empty {
-    text-align: center;
-    padding: 48px 24px;
-    color: var(--ink-3);
-  }
-  .sv-empty-icon {
-    font-size: 36px;
-    margin-bottom: 12px;
-    opacity: 0.5;
-  }
-  .sv-empty strong {
-    display: block;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink-2);
-    margin-bottom: 6px;
-  }
-  .sv-empty p { font-size: 13px; line-height: 1.5; }
+/* ── Form ── */
+.sv-form-body { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 14px; }
+.sv-field label { display: block; font-size: 11px; font-weight: 600; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 7px; font-family: var(--f-head); }
+.sv-field input { width: 100%; height: 48px; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans); }
+.sv-field input:focus { border-color: rgba(232,255,71,0.5); }
+.sv-field input::placeholder { color: var(--c-text3); }
+.sv-order-pill { background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sv-order-pill-label { font-size: 11.5px; color: var(--c-text3); margin-bottom: 2px; }
+.sv-order-pill-detail { font-size: 13px; color: var(--c-text2); }
+.sv-order-pill-total { font-family: var(--f-head); font-size: 26px; font-weight: 800; color: var(--c-accent); letter-spacing: -1px; }
 
-  /* ── Skeleton ── */
-  @keyframes sv-shimmer {
-    0% { background-position: -400px 0; }
-    100% { background-position: 400px 0; }
-  }
-  .sv-skel {
-    background: linear-gradient(90deg, var(--surface-3) 25%, var(--border) 50%, var(--surface-3) 75%);
-    background-size: 800px 100%;
-    animation: sv-shimmer 1.4s infinite linear;
-    border-radius: 6px;
-  }
-  .sv-skel-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    display: flex;
-    overflow: hidden;
-    min-height: 110px;
-  }
+/* ── Review ── */
+.sv-review-list { padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; }
+.sv-rcard-img { width: 80px; height: 80px; flex-shrink: 0; background: var(--c-surface2); overflow: hidden; position: relative; }
+.sv-rcard-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sv-rcard-img-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.sv-rcard-body { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; }
+.sv-rcard-name { font-family: var(--f-head); font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; }
+.sv-rcard-sub { font-size: 11px; color: var(--c-text3); margin-top: 2px; }
+.sv-rcard-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.sv-rcard-calc { font-size: 11.5px; color: var(--c-text3); }
+.sv-rcard-total { font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--c-accent); letter-spacing: -0.3px; }
+.sv-review-customer { margin: 0 16px 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; }
+.sv-review-customer-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--c-text3); margin-bottom: 10px; font-family: var(--f-head); }
+.sv-review-customer-name { font-family: var(--f-head); font-size: 18px; font-weight: 700; color: var(--c-text); letter-spacing: -0.4px; }
+.sv-review-customer-phone { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-review-total-bar { margin: 0 16px 32px; background: var(--c-accent); border-radius: var(--r-xl); padding: 20px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sv-review-total-label { font-size: 12px; font-weight: 600; color: rgba(0,0,0,0.5); margin-bottom: 3px; font-family: var(--f-head); }
+.sv-review-total-val { font-family: var(--f-head); font-size: 30px; font-weight: 800; color: #0a0a0a; letter-spacing: -1.5px; }
+.sv-edit-btn { flex-shrink: 0; height: 36px; padding: 0 16px; border-radius: var(--r-full); background: rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.12); color: #0a0a0a; font-size: 12.5px; font-weight: 700; font-family: var(--f-head); cursor: pointer; transition: background var(--trans); white-space: nowrap; }
+.sv-edit-btn:hover { background: rgba(0,0,0,0.25); }
 
-  /* ── Floating cart bar ── */
-  .sv-cart-bar {
-    position: fixed;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 520px;
-    padding: 12px 16px 20px;
-    background: transparent;
-    pointer-events: none;
-    z-index: 200;
-  }
-  .sv-cart-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--ink);
-    border-radius: var(--radius-xl);
-    padding: 12px 12px 12px 18px;
-    box-shadow: var(--shadow-float);
-    pointer-events: all;
-    gap: 12px;
-    cursor: pointer;
-  }
-  .sv-cart-left {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .sv-cart-count {
-    font-size: 12px;
-    color: rgba(255,255,255,0.55);
-    font-weight: 500;
-  }
-  .sv-cart-total {
-    font-size: 18px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.5px;
-  }
-  .sv-cart-btn {
-    flex-shrink: 0;
-    height: 38px;
-    padding: 0 20px;
-    border-radius: var(--radius-full);
-    background: #fff;
-    color: var(--ink);
-    font-size: 13.5px;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-    font-family: var(--font);
-    letter-spacing: 0.1px;
-    transition: opacity var(--transition);
-  }
-  .sv-cart-btn:hover { opacity: 0.88; }
-  .sv-cart-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* ── Drawer ── */
+.sv-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: flex-end; justify-content: center; }
+.sv-drawer { background: var(--c-surface); border-radius: var(--r-xl) var(--r-xl) 0 0; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; animation: sv-drawer-up 0.28s cubic-bezier(0.32,0.72,0,1); }
+@keyframes sv-drawer-up { from{transform:translateY(50px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sv-drawer-handle { width: 36px; height: 4px; background: var(--c-surface3); border-radius: var(--r-full); margin: 12px auto 0; }
+.sv-drawer-img-wrap { width: 100%; aspect-ratio: 16/9; background: var(--c-surface2); overflow: hidden; position: relative; margin-top: 14px; }
+.sv-drawer-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sv-drawer-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.sv-drawer-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(10,10,10,0.7); border: 1px solid var(--c-border2); cursor: pointer; color: var(--c-text); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.sv-drawer-body { padding: 18px 20px 36px; }
+.sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 800; color: var(--c-text); letter-spacing: -0.6px; line-height: 1.15; }
+.sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-surface2); border: 1px solid var(--c-border); font-size: 11px; color: var(--c-text2); font-weight: 500; display: inline-flex; align-items: center; }
+.sv-drawer-price { font-family: var(--f-head); font-size: 26px; font-weight: 800; color: var(--c-white); letter-spacing: -0.8px; margin-top: 14px; }
+.sv-drawer-price span { font-size: 13px; font-weight: 400; color: var(--c-text3); margin-left: 4px; }
+.sv-detail-table { margin-top: 18px; border: 1px solid var(--c-border); border-radius: var(--r-md); overflow: hidden; }
+.sv-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 13px; gap: 16px; }
+.sv-detail-row:not(:last-child) { border-bottom: 1px solid var(--c-border); }
+.sv-detail-row:nth-child(even) { background: var(--c-surface2); }
+.sv-detail-lbl { color: var(--c-text3); font-weight: 500; }
+.sv-detail-val { color: var(--c-text); font-weight: 600; text-align: right; }
+.sv-drawer-qty-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border); }
+.sv-drawer-qty-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--c-text3); margin-bottom: 12px; font-family: var(--f-head); }
+.sv-drawer-qty-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sv-drawer-total-wrap { text-align: right; }
+.sv-drawer-calc { font-size: 12px; color: var(--c-text3); margin-bottom: 3px; }
+.sv-drawer-total { font-family: var(--f-head); font-size: 24px; font-weight: 800; color: var(--c-accent); letter-spacing: -0.8px; }
+.sv-drawer-done { width: 100%; height: 50px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; border: none; font-size: 15px; font-weight: 700; font-family: var(--f-head); cursor: pointer; margin-top: 20px; transition: opacity var(--trans); }
+.sv-drawer-done:hover { opacity: 0.88; }
 
-  /* ── Customer step ── */
-  .sv-form-section {
-    padding: 0 16px;
-  }
-  .sv-form-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-  }
-  .sv-field label {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink-3);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 7px;
-  }
-  .sv-field input {
-    width: 100%;
-    height: 46px;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    color: var(--ink);
-    font-size: 15px;
-    font-family: var(--font);
-    padding: 0 14px;
-    outline: none;
-    transition: border-color var(--transition);
-  }
-  .sv-field input:focus { border-color: var(--ink); }
-  .sv-field input::placeholder { color: var(--ink-4); }
+/* ── Empty ── */
+.sv-empty { grid-column: 1/-1; text-align: center; padding: 48px 24px; }
+.sv-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+.sv-empty strong { display: block; font-family: var(--f-head); font-size: 16px; font-weight: 700; color: var(--c-text2); margin-bottom: 6px; }
+.sv-empty p { font-size: 13px; color: var(--c-text3); line-height: 1.5; }
 
-  .sv-order-summary-box {
-    background: var(--surface-2);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    padding: 14px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .sv-order-summary-label {
-    font-size: 11.5px;
-    color: var(--ink-3);
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    margin-bottom: 2px;
-  }
-  .sv-order-summary-detail {
-    font-size: 13px;
-    color: var(--ink-2);
-  }
-  .sv-order-summary-total {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.8px;
-  }
+/* ── Skeleton ── */
+@keyframes sv-shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+.sv-skel { background: linear-gradient(90deg,var(--c-surface2) 25%,var(--c-surface3) 50%,var(--c-surface2) 75%); background-size: 800px 100%; animation: sv-shimmer 1.5s infinite linear; border-radius: 6px; }
+.sv-skel-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; }
 
-  /* ── Review step ── */
-  .sv-review-items {
-    padding: 0 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .sv-review-info-card {
-    margin: 0 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 16px 18px;
-    margin-bottom: 10px;
-  }
-  .sv-review-info-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink-3);
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    margin-bottom: 8px;
-  }
-  .sv-review-name {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.3px;
-  }
-  .sv-review-phone {
-    font-size: 13px;
-    color: var(--ink-3);
-    margin-top: 3px;
-  }
-  .sv-review-total-bar {
-    margin: 0 16px 120px;
-    background: var(--ink);
-    border-radius: var(--radius-lg);
-    padding: 18px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: var(--shadow-float);
-  }
-  .sv-review-total-label {
-    font-size: 12px;
-    color: rgba(255,255,255,0.5);
-    font-weight: 500;
-    margin-bottom: 3px;
-  }
-  .sv-review-total-val {
-    font-size: 26px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -1px;
-  }
-  .sv-edit-items-btn {
-    height: 36px;
-    padding: 0 16px;
-    border-radius: var(--radius-full);
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #fff;
-    font-size: 12.5px;
-    font-weight: 600;
-    font-family: var(--font);
-    cursor: pointer;
-    transition: background var(--transition);
-    white-space: nowrap;
-  }
-  .sv-edit-items-btn:hover { background: rgba(255,255,255,0.2); }
-
-  /* ── Drawer overlay ── */
-  .sv-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 300;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-  }
-  .sv-drawer {
-    background: var(--surface);
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    width: 100%;
-    max-width: 520px;
-    max-height: 90vh;
-    overflow-y: auto;
-    animation: sv-drawer-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-  @keyframes sv-drawer-up {
-    from { transform: translateY(60px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-  .sv-drawer-handle {
-    width: 40px;
-    height: 4px;
-    background: var(--border-strong);
-    border-radius: var(--radius-full);
-    margin: 10px auto 0;
-  }
-  .sv-drawer-img-wrap {
-    position: relative;
-    width: 100%;
-    height: 220px;
-    background: var(--surface-2);
-    margin-top: 12px;
-    overflow: hidden;
-  }
-  .sv-drawer-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .sv-drawer-img-ph {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--surface-3);
-  }
-  .sv-drawer-close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    background: rgba(255,255,255,0.9);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    font-size: 14px;
-    color: var(--ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-  }
-  .sv-drawer-body {
-    padding: 18px 20px 32px;
-  }
-  .sv-drawer-name {
-    font-size: 21px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.5px;
-    line-height: 1.2;
-  }
-  .sv-drawer-subtitle {
-    font-size: 13.5px;
-    color: var(--ink-3);
-    margin-top: 3px;
-  }
-  .sv-drawer-cat-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-  }
-  .sv-drawer-cat-pill {
-    height: 24px;
-    padding: 0 10px;
-    border-radius: var(--radius-full);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    font-size: 11.5px;
-    color: var(--ink-2);
-    font-weight: 500;
-  }
-  .sv-drawer-price {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.7px;
-    margin-top: 14px;
-  }
-  .sv-drawer-price span {
-    font-size: 14px;
-    font-weight: 400;
-    color: var(--ink-3);
-    margin-left: 4px;
-  }
-
-  .sv-detail-table {
-    margin-top: 18px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-  .sv-detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    font-size: 13px;
-    gap: 16px;
-  }
-  .sv-detail-row:not(:last-child) { border-bottom: 1px solid var(--border); }
-  .sv-detail-row:nth-child(even) { background: var(--surface-2); }
-  .sv-detail-label { color: var(--ink-3); font-weight: 500; }
-  .sv-detail-val { color: var(--ink); font-weight: 600; text-align: right; }
-
-  .sv-drawer-qty-section {
-    margin-top: 22px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-  }
-  .sv-drawer-qty-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ink-3);
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    margin-bottom: 12px;
-  }
-  .sv-drawer-qty-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  .sv-drawer-total-wrap {
-    text-align: right;
-  }
-  .sv-drawer-calc {
-    font-size: 12px;
-    color: var(--ink-3);
-    margin-bottom: 2px;
-  }
-  .sv-drawer-total {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.6px;
-  }
-  .sv-drawer-done {
-    width: 100%;
-    height: 48px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    color: #fff;
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: var(--font);
-    cursor: pointer;
-    margin-top: 18px;
-    transition: opacity var(--transition);
-    letter-spacing: 0.1px;
-  }
-  .sv-drawer-done:hover { opacity: 0.87; }
-
-  /* ── Section heading ── */
-  .sv-section-head {
-    padding: 18px 16px 4px;
-  }
-  .sv-section-head h2 {
-    font-family: var(--font-display);
-    font-size: 22px;
-    color: var(--ink);
-    letter-spacing: -0.3px;
-    font-weight: 400;
-  }
-
-  /* ── Page footer ── */
-  .sv-footer {
-    padding: 24px 20px 40px;
-    text-align: center;
-    border-top: 1px solid var(--border);
-    margin-top: 8px;
-  }
-  .sv-footer-text {
-    font-size: 12px;
-    color: var(--ink-4);
-    line-height: 1.6;
-  }
-
-  /* ── Error / loading screens ── */
-  .sv-fullscreen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: var(--surface-2);
-    font-family: var(--font);
-  }
-  .sv-error-card {
-    background: var(--surface);
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border);
-    overflow: hidden;
-    max-width: 400px;
-    width: 100%;
-  }
-  .sv-error-stripe {
-    height: 5px;
-    background: linear-gradient(90deg, #e8c840, #e84040);
-  }
-  .sv-error-body {
-    padding: 36px 28px 28px;
-    text-align: center;
-  }
-  .sv-error-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--radius-full);
-    background: #fef2f2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 18px;
-    font-size: 28px;
-  }
-  .sv-error-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--ink);
-    letter-spacing: -0.4px;
-    margin-bottom: 8px;
-  }
-  .sv-error-desc {
-    font-size: 13.5px;
-    color: var(--ink-3);
-    line-height: 1.6;
-    margin-bottom: 24px;
-  }
-  .sv-go-home-btn {
-    width: 100%;
-    height: 46px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    color: #fff;
-    border: none;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: var(--font);
-    cursor: pointer;
-    transition: opacity var(--transition);
-  }
-  .sv-go-home-btn:hover { opacity: 0.85; }
+/* ── Error/loading ── */
+.sv-fullscreen { min-height: 100vh; background: var(--c-bg); display: flex; align-items: center; justify-content: center; padding: 24px; font-family: var(--f-body); }
+.sv-error-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); overflow: hidden; max-width: 380px; width: 100%; }
+.sv-error-stripe { height: 4px; background: linear-gradient(90deg,#e8ff47,#ff4747); }
+.sv-error-body { padding: 36px 28px 28px; text-align: center; }
+.sv-error-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,71,71,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 28px; }
+.sv-error-title { font-family: var(--f-head); font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.4px; margin-bottom: 8px; }
+.sv-error-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
+.sv-error-btn { width: 100%; height: 48px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; border: none; font-size: 14px; font-weight: 700; font-family: var(--f-head); cursor: pointer; transition: opacity var(--trans); }
+.sv-error-btn:hover { opacity: 0.88; }
 `;
 
-/* ─── Types ───────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────────────────────────── */
 type Step = 'products' | 'customer' | 'review';
 
-/* ─── Icons ──────────────────────────────────────────────────────────────── */
-function IconArrowLeft() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <path d="M19 12H5M12 19l-7-7 7-7" />
-    </svg>
-  );
+function unitLabel(u?: string): string {
+  if (!u || String(u).trim() === '' || u === 'None') return 'unit';
+  const c = String(u).replace(/^\s*\/\s*/i, '').trim().toLowerCase();
+  if (!c) return 'unit';
+  if (c === 'piece' || c === 'pieces' || c === 'pc') return 'pc';
+  return c;
 }
-
-function StoreIconSvg() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <path d="M16 10a4 4 0 01-8 0" />
-    </svg>
-  );
-}
-
-function ImgPhIcon({ size = 32 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#c8c4bc" strokeWidth="1.5">
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  );
-}
-
-function PackIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-      <rect x="2" y="7" width="20" height="14" rx="2" />
-      <path d="M16 7V5a2 2 0 00-4 0v2M8 7V5a2 2 0 00-4 0v2" />
-    </svg>
-  );
-}
-
-/* ─── Helpers ────────────────────────────────────────────────────────────── */
-function getOrderUnitLabel(priceUnit: string | undefined): string {
-  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') return 'unit';
-  const cleaned = String(priceUnit).replace(/^\s*\/\s*/i, '').trim().toLowerCase();
-  if (!cleaned) return 'unit';
-  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pc';
-  return cleaned;
-}
-
-function formatMoney(amount: number, symbol: string): string {
-  return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-function formatCalc(qty: number, price: number, priceUnit: string | undefined, symbol: string): string | null {
+function fmt(n: number, sym: string) { return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`; }
+function fmtCalc(qty: number, price: number, u: string | undefined, sym: string): string | null {
   if (qty <= 0 || !Number.isFinite(price)) return null;
-  return `${qty} ${getOrderUnitLabel(priceUnit)} × ${formatMoney(price, symbol)}`;
+  return `${qty} ${unitLabel(u)} × ${fmt(price, sym)}`;
 }
-
-function isPublicUrl(url: string | undefined): boolean {
+function isPublicUrl(url?: string): boolean {
   if (!url) return false;
-  try {
-    const parsed = new URL(url.trim());
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch { return false; }
+  try { const p = new URL(url.trim()); return p.protocol === 'http:' || p.protocol === 'https:'; } catch { return false; }
 }
-
-function getCategories(p: ProductWithCatalogueData): string[] {
+function getCats(p: ProductWithCatalogueData): string[] {
   return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
 }
-
-function getSearchText(p: ProductWithCatalogueData): string {
-  const extras = Array.from({ length: 10 }, (_, i) => {
-    const n = i + 1;
-    const row = p as unknown as Record<string, string | undefined>;
-    return [row[`field${n}`], row[`field${n}Label`], row[`field${n}Unit`]].filter(Boolean).join(' ');
-  });
-  return [p.name, p.subtitle, ...(p.category || []), ...extras].filter(Boolean).join(' ').toLowerCase();
+function srchText(p: ProductWithCatalogueData): string {
+  const ex = Array.from({ length: 10 }, (_, i) => { const n = i + 1; const r = p as unknown as Record<string, string | undefined>; return [r[`field${n}`], r[`field${n}Label`], r[`field${n}Unit`]].filter(Boolean).join(' '); });
+  return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
-
-function getFieldLabelUnit(p: ProductWithCatalogueData, n: number): { label: string; unitSuffix: string } {
-  const row = p as unknown as Record<string, string | undefined>;
-  const explicitUnit = row[`field${n}Unit`];
-  const rawLabel = row[`field${n}Label`];
-  if (explicitUnit != null && String(explicitUnit).trim() !== '') {
-    return { label: (rawLabel || `Field ${n}`).trim(), unitSuffix: String(explicitUnit).trim() };
-  }
-  if (rawLabel) {
-    const m = rawLabel.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-    if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() };
-    return { label: rawLabel.trim(), unitSuffix: '' };
-  }
+function fieldLU(p: ProductWithCatalogueData, n: number): { label: string; unitSuffix: string } {
+  const r = p as unknown as Record<string, string | undefined>; const eu = r[`field${n}Unit`]; const rl = r[`field${n}Label`];
+  if (eu != null && String(eu).trim() !== '') return { label: (rl || `Field ${n}`).trim(), unitSuffix: String(eu).trim() };
+  if (rl) { const m = rl.match(/^(.+?)\s*\(([^)]+)\)\s*$/); if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() }; return { label: rl.trim(), unitSuffix: '' }; }
   return { label: `Field ${n}`, unitSuffix: '' };
 }
 
-/* ─── Sub-components ─────────────────────────────────────────────────────── */
-function QtyControl({ value, step, onChange }: { value: number; step: number; onChange: (d: number) => void }) {
+/* ─────────────────────────────────────────────────────────────────────────────
+   ICONS
+───────────────────────────────────────────────────────────────────────────── */
+const IconBack = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>;
+const IconStore = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: '#666' }}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>;
+const IconImg = ({ size = 28 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>;
+const IconCheck = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
+const IconLoc = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>;
+const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 010 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z" /></svg>;
+const IconLink = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
+const IconWA = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SUB-COMPONENTS
+───────────────────────────────────────────────────────────────────────────── */
+function QtyControl({ value, step, onChange, accent = false }: { value: number; step: number; onChange: (d: number) => void; accent?: boolean }) {
   const s = normalizeOrderQuantityStep(step);
   return (
-    <div className="sv-qty">
+    <div className={`sv-qty${accent ? ' accent' : ''}`}>
       <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>−</button>
       <span className="sv-qty-val">{value}</span>
       <button type="button" className="sv-qty-btn" onClick={() => onChange(s)}>+</button>
@@ -1068,24 +309,45 @@ function QtyControl({ value, step, onChange }: { value: number; step: number; on
   );
 }
 
-function SkeletonCard() {
+function StepBar({ current }: { current: 'customer' | 'review' }) {
+  const done = current === 'review';
   return (
-    <div className="sv-skel-card">
-      <div className="sv-skel" style={{ width: 110, minHeight: 110, flexShrink: 0, borderRadius: 0 }} />
-      <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div className="sv-skel" style={{ height: 14, width: '60%' }} />
-        <div className="sv-skel" style={{ height: 11, width: '40%' }} />
-        <div className="sv-skel" style={{ height: 20, width: '28%', marginTop: 4 }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <div className="sv-skel" style={{ height: 30, width: 100, borderRadius: 999 }} />
-          <div className="sv-skel" style={{ height: 18, width: 55 }} />
-        </div>
+    <div className="sv-steps">
+      <div className="sv-step-item">
+        <div className="sv-step-num done"><IconCheck /></div>
+        <span className="sv-step-label done">Items</span>
+      </div>
+      <div className="sv-step-line done" />
+      <div className="sv-step-item">
+        <div className={`sv-step-num ${done ? 'done' : 'active'}`}>{done ? <IconCheck /> : '2'}</div>
+        <span className={`sv-step-label ${done ? 'done' : 'active'}`}>Details</span>
+      </div>
+      <div className={`sv-step-line ${done ? 'done' : ''}`} />
+      <div className="sv-step-item">
+        <div className={`sv-step-num ${done ? 'active' : 'idle'}`}>3</div>
+        <span className={`sv-step-label ${done ? 'active' : 'idle'}`}>Review</span>
       </div>
     </div>
   );
 }
 
-/* ─── Main component ─────────────────────────────────────────────────────── */
+function SkeletonCard() {
+  return (
+    <div className="sv-skel-card">
+      <div className="sv-skel" style={{ width: '100%', aspectRatio: '1/1', borderRadius: 0 }} />
+      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="sv-skel" style={{ height: 13, width: '70%' }} />
+        <div className="sv-skel" style={{ height: 11, width: '45%' }} />
+        <div className="sv-skel" style={{ height: 17, width: '55%', marginTop: 4 }} />
+        <div className="sv-skel" style={{ height: 28, width: '80%', borderRadius: 999, marginTop: 4 }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────────────────────────────────────── */
 export default function StoreView() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
@@ -1106,201 +368,131 @@ export default function StoreView() {
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  /* ── Data loading ── */
   useEffect(() => {
-    const loadStore = async () => {
-      if (!slug) { setStoreError('Store slug not found'); setStoreLoading(false); return; }
-      setStoreLoading(true);
-      const result = await getStoreBySlug(slug);
-      if (!result.success || !result.data) {
-        setStoreError(result.error || 'Store not found');
-      } else {
-        setStore(result.data);
-      }
-      setStoreLoading(false);
-    };
-    loadStore();
+    if (!slug) { setStoreError('Store not found'); setStoreLoading(false); return; }
+    setStoreLoading(true);
+    getStoreBySlug(slug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
   }, [slug]);
 
   useEffect(() => {
-    const loadProducts = async () => {
-      if (!store?.sellerUserId) return;
-      setProductsLoading(true);
-      try {
-        const client = getSupabaseClient();
-        const { data: products, error } = await client
-          .from('products').select('*').eq('user_id', store.sellerUserId).order('position', { ascending: true });
-        if (error) { setAllProducts([]); }
-        else if (products) {
-          setAllProducts(products.map((p: any) => ({
-            id: p.product_id,
-            name: p.name,
-            subtitle: p.data?.subtitle || '',
-            category: p.data?.category || [],
-            image: p.data?.image,
-            imageUrl: p.data?.image,
-            ...p.data,
-          })));
-        }
-      } catch { setAllProducts([]); }
-      finally { setProductsLoading(false); }
-    };
-    loadProducts();
+    if (!store?.sellerUserId) return;
+    setProductsLoading(true);
+    getSupabaseClient().from('products').select('*').eq('user_id', store.sellerUserId).order('position', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setAllProducts(data.map((p: any) => ({ id: p.product_id, name: p.name, subtitle: p.data?.subtitle || '', category: p.data?.category || [], image: p.data?.image, imageUrl: p.data?.image, ...p.data })));
+        setProductsLoading(false);
+      });
   }, [store?.sellerUserId]);
 
-  /* ── Derived data ── */
   const catalogues = useMemo(() => getAllCatalogues(null), []);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
-
-  const storeProducts = useMemo(() => {
-    if (!store?.catalogueId) return [];
-    return allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
-  }, [store, allProducts]);
-
-  const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCategories))), [storeProducts]);
-  const hasUncategorized = useMemo(() => storeProducts.some((p) => getCategories(p).length === 0), [storeProducts]);
-
+  const storeProducts = useMemo(() => !store?.catalogueId ? [] : allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId)), [store, allProducts]);
+  const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
+  const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return storeProducts.filter((p) => {
-      const matchSearch = !q || getSearchText(p).includes(q);
-      const cats = getCategories(p);
-      const matchCat = selectedCategory === 'all' ||
-        (selectedCategory === 'uncategorized' ? cats.length === 0 : cats.includes(selectedCategory));
-      return matchSearch && matchCat;
+      const cats = getCats(p);
+      return (!q || srchText(p).includes(q)) && (selectedCategory === 'all' || (selectedCategory === 'uncategorized' ? cats.length === 0 : cats.includes(selectedCategory)));
     });
   }, [searchQuery, selectedCategory, storeProducts]);
 
   const orderSummary = useMemo(() => {
-    if (!store || !catalogue) return { items: [], total: 0 };
-    const items: any[] = [];
-    let total = 0;
+    if (!store || !catalogue) return { items: [] as any[], total: 0 };
+    const items: any[] = []; let total = 0;
     selectedProducts.forEach((quantity, productId) => {
-      const product = allProducts.find((p) => p.id === productId);
-      if (!product) return;
+      const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
       const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
       const rowTotal = unitPrice * quantity;
-      items.push({ productId, name: product.name, quantity, unitPrice, rowTotal, priceUnit: catData[catalogue.priceUnitField], category: product.category?.[0], imageUrl: product.image || product.imageUrl, quantityStep: catData.orderQuantityStep, subtitle: product.subtitle });
+      items.push({ productId, name: product.name, quantity, unitPrice, rowTotal, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, subtitle: product.subtitle });
       total += rowTotal;
     });
     return { items, total };
   }, [selectedProducts, store, catalogue, allProducts]);
 
-  const selectedProductCount = useMemo(
-    () => Array.from(selectedProducts.values()).filter((q) => q > 0).length,
-    [selectedProducts]
-  );
+  const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
 
-  /* ── Handlers ── */
-  const changeQty = (productId: string, delta: number, step: number) => {
-    const s = normalizeOrderQuantityStep(step);
+  const changeQty = (productId: string, delta: number, qstep: number) => {
+    const s = normalizeOrderQuantityStep(qstep);
     const current = selectedProducts.get(productId) || 0;
-    const next = Math.max(0, current + delta);
-    const rounded = Math.round(next / s) * s;
+    const rounded = Math.round(Math.max(0, current + delta) / s) * s;
     const map = new Map(selectedProducts);
-    if (rounded <= 0) map.delete(productId);
-    else map.set(productId, rounded);
+    if (rounded <= 0) map.delete(productId); else map.set(productId, rounded);
     setSelectedProducts(map);
   };
 
   const handleBack = useCallback(() => {
     if (drawerProduct) { setDrawerProduct(null); return; }
-    if (step === 'review') { setStep('customer'); return; }
-    if (step === 'customer') { setStep('products'); return; }
+    if (step !== 'products') { setStep(step === 'review' ? 'customer' : 'products'); return; }
     window.history.back();
   }, [drawerProduct, step]);
 
-  const handlePrimaryAction = () => {
-    if (step === 'products') {
-      if (selectedProducts.size === 0) { alert('Please add at least one product'); return; }
-      setStep('customer'); return;
-    }
-    if (step === 'customer') {
-      if (!customerName.trim()) { alert('Please enter your name'); return; }
-      setStep('review'); return;
-    }
-    void handlePlaceOrder();
-  };
-
   const handlePlaceOrder = async () => {
-    if (!customerName.trim()) { alert('Please enter your name'); return; }
-    if (!store) { alert('Store information not available'); return; }
+    if (!store || !catalogue) return;
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
-      if (catalogue) {
-        selectedProducts.forEach((quantity, productId) => {
-          const product = allProducts.find((p) => p.id === productId);
-          if (product) {
-            const catData = getCatalogueData(product, store.catalogueId);
-            const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
-            orderItems.push({ productId, name: product.name, quantity, unitPrice, rowTotal: unitPrice * quantity, category: product.category?.[0], subtitle: product.subtitle, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, quantityStep: catData.orderQuantityStep });
-          }
-        });
-      }
-      if (orderItems.length === 0) { alert('No products selected'); setIsSubmitting(false); return; }
+      selectedProducts.forEach((quantity, productId) => {
+        const product = allProducts.find((p) => p.id === productId); if (!product) return;
+        const catData = getCatalogueData(product, store.catalogueId);
+        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+        orderItems.push({ productId, name: product.name, quantity, unitPrice, rowTotal: unitPrice * quantity, category: product.category?.[0], subtitle: product.subtitle, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, quantityStep: catData.orderQuantityStep });
+      });
       setSupabaseRlsUserId(store.sellerUserId);
       const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, orderSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
-      if (error) { alert('Failed to save order. Please try again.'); }
-      else { alert('Order placed successfully! The seller will contact you soon.'); navigate('/'); }
+      if (error) alert('Failed to place order. Please try again.');
+      else { alert('Order placed! The seller will contact you soon.'); navigate('/'); }
     } catch { alert('Error placing order. Please try again.'); }
     finally { setSupabaseRlsUserId(null); setIsSubmitting(false); }
   };
 
-  const primaryButtonLabel = step === 'products' ? 'Continue' : step === 'customer' ? 'Review Order' : isSubmitting ? 'Placing…' : 'Place Order';
-  const primaryButtonDisabled = step === 'products' ? selectedProductCount === 0 : step === 'customer' ? !customerName.trim() : isSubmitting;
+  const handlePanelAction = () => {
+    if (step === 'customer') { if (!customerName.trim()) { alert('Please enter your name'); return; } setStep('review'); }
+    else void handlePlaceOrder();
+  };
+
   const storeDisplayName = store?.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'Store';
 
-  /* ── Loading screen ── */
+  /* ── Loading ── */
   if (storeLoading) {
     return (
       <>
-        <style>{inlineStyles}</style>
-        <div className="sv-root">
-          <div className="sv-page">
-            <div className="sv-header">
-              <div className="sv-header-inner">
-                <div className="sv-skel" style={{ width: 36, height: 36, borderRadius: 999 }} />
-                <div className="sv-store-identity">
-                  <div className="sv-skel" style={{ width: 38, height: 38, borderRadius: 8 }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div className="sv-skel" style={{ height: 13, width: 110 }} />
-                    <div className="sv-skel" style={{ height: 10, width: 70 }} />
-                  </div>
-                </div>
-                <div className="sv-skel" style={{ height: 36, width: 90, borderRadius: 999 }} />
-              </div>
+        <style>{CSS}</style>
+        <div className="sv"><div className="sv-page">
+          <div className="sv-hero"><div className="sv-hero-bg" /><div className="sv-hero-inner">
+            <div className="sv-hero-top">
+              <div className="sv-skel" style={{ width: 56, height: 56, borderRadius: 14 }} />
+              <div className="sv-skel" style={{ width: 90, height: 28, borderRadius: 999 }} />
             </div>
-            <div className="sv-skel" style={{ height: 88, borderRadius: 0 }} />
-            <div style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="sv-skel" style={{ height: 40, borderRadius: 999 }} />
+            <div className="sv-skel" style={{ height: 36, width: '55%', marginBottom: 8 }} />
+            <div className="sv-skel" style={{ height: 14, width: '75%' }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <div className="sv-skel" style={{ height: 30, width: 100, borderRadius: 999 }} />
+              <div className="sv-skel" style={{ height: 30, width: 130, borderRadius: 999 }} />
             </div>
-            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
-          </div>
-        </div>
+          </div></div>
+          <div className="sv-nav"><div className="sv-skel" style={{ height: 38, borderRadius: 999 }} /></div>
+          <div className="sv-grid"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
+        </div></div>
       </>
     );
   }
 
-  /* ── Error screen ── */
+  /* ── Error ── */
   if (storeError || !store) {
     return (
       <>
-        <style>{inlineStyles}</style>
-        <div className="sv-fullscreen">
+        <style>{CSS}</style>
+        <div className="sv sv-fullscreen">
           <div className="sv-error-card">
             <div className="sv-error-stripe" />
             <div className="sv-error-body">
               <div className="sv-error-icon">⚠️</div>
               <div className="sv-error-title">Store unavailable</div>
               <div className="sv-error-desc">{storeError || 'This store could not be found.'}</div>
-              <button className="sv-go-home-btn" onClick={() => navigate('/')}>Back to home</button>
+              <button className="sv-error-btn" onClick={() => navigate('/')}>Go home</button>
             </div>
           </div>
         </div>
@@ -1308,337 +500,291 @@ export default function StoreView() {
     );
   }
 
+  /* ── Social links ── */
+  type SocialLink = { label: string; url: string; icon: React.ReactNode };
+  const socialLinks: SocialLink[] = [
+    store.instagram && { label: 'Instagram', url: store.instagram, icon: 'IG' },
+    store.twitter && { label: 'Twitter/X', url: store.twitter, icon: '𝕏' },
+    store.facebook && { label: 'Facebook', url: store.facebook, icon: 'FB' },
+    store.website && { label: 'Website', url: store.website, icon: <IconLink /> },
+  ].filter(Boolean) as SocialLink[];
+
   /* ── Main render ── */
   return (
     <>
-      <style>{inlineStyles}</style>
-      <div className="sv-root">
+      <style>{CSS}</style>
+      <div className="sv">
         <div className="sv-page">
 
-          {/* Header */}
-          <div className="sv-header">
-            <div className="sv-header-inner">
-              <button type="button" className="sv-back-btn" onClick={handleBack} aria-label="Go back">
-                <IconArrowLeft />
-              </button>
-              <div className="sv-store-identity">
-                <div className="sv-logo-wrap">
+          {/* ══ STORE HERO — no back button here ══ */}
+          <div className="sv-hero">
+            <div className="sv-hero-bg" />
+            <div className="sv-hero-inner">
+              <div className="sv-hero-top">
+                <div className="sv-logo">
                   {store?.sellerLogoUrl && !logoFailed && isPublicUrl(store.sellerLogoUrl)
-                    ? <img src={store.sellerLogoUrl} alt="" onError={() => setLogoFailed(true)} />
-                    : <StoreIconSvg />}
+                    ? <img src={store.sellerLogoUrl} alt={storeDisplayName} onError={() => setLogoFailed(true)} />
+                    : <IconStore />}
                 </div>
-                <div>
-                  <div className="sv-store-name">{storeDisplayName}</div>
-                  <div className="sv-store-step">
-                    {step === 'products' ? 'Browse & select' : step === 'customer' ? 'Your details' : 'Review order'}
-                  </div>
+                <div className="sv-open-badge">
+                  <div className="sv-open-dot" />
+                  Open now
                 </div>
               </div>
-              <button className="sv-header-cta" onClick={handlePrimaryAction} disabled={primaryButtonDisabled}>
-                {primaryButtonLabel}
-              </button>
+
+              <div className="sv-store-name">{storeDisplayName}</div>
+              {store.tagline && <div className="sv-store-tagline">{store.tagline}</div>}
+
+              <div className="sv-biz-chips">
+                {store.location && <span className="sv-biz-chip"><IconLoc />{store.location}</span>}
+                {store.phone && <a className="sv-biz-chip" href={`tel:${store.phone}`}><IconPhone />{store.phone}</a>}
+                {store.whatsapp && (
+                  <a className="sv-biz-chip" href={`https://wa.me/${store.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                    <IconWA />WhatsApp
+                  </a>
+                )}
+              </div>
+
+              {socialLinks.length > 0 && (
+                <div className="sv-socials">
+                  {socialLinks.map((s) => (
+                    <a key={s.label} className="sv-social-btn" href={s.url} target="_blank" rel="noreferrer" title={s.label}>
+                      {s.icon}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Hero strip — only on products step */}
-          {step === 'products' && (
-            <div className="sv-hero">
-              <div className="sv-hero-label">Order Form</div>
-              <div className="sv-hero-title">{storeDisplayName}<em>'s Store</em></div>
+          {/* ══ STICKY SEARCH + FILTER NAV ══ */}
+          <div className="sv-nav">
+            <div className="sv-nav-row">
+              <span className="sv-count-label">
+                {searchQuery.trim() || selectedCategory !== 'all'
+                  ? `${filteredProducts.length} of ${storeProducts.length} items`
+                  : `${storeProducts.length} item${storeProducts.length === 1 ? '' : 's'}`}
+              </span>
             </div>
-          )}
+            {storeProducts.length > 0 && (
+              <div className="sv-search-wrap">
+                <span className="sv-search-icon">⌕</span>
+                <input className="sv-search-input" type="text" placeholder="Search items…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                {searchQuery && <button className="sv-search-clear" onClick={() => setSearchQuery('')}>×</button>}
+              </div>
+            )}
+            {availableCategories.length > 0 && (
+              <div className="sv-cats">
+                <button className={`sv-cat${selectedCategory === 'all' ? ' active' : ''}`} onClick={() => setSelectedCategory('all')}>All</button>
+                {availableCategories.map((cat) => (
+                  <button key={cat} className={`sv-cat${selectedCategory === cat ? ' active' : ''}`} onClick={() => setSelectedCategory(cat)}>{cat}</button>
+                ))}
+                {hasUncategorized && (
+                  <button className={`sv-cat${selectedCategory === 'uncategorized' ? ' active' : ''}`} onClick={() => setSelectedCategory('uncategorized')}>Other</button>
+                )}
+              </div>
+            )}
+          </div>
 
-          {/* ── Products step ── */}
-          {step === 'products' && (
-            <>
-              <div className="sv-toolbar">
-                <div className="sv-count-row">
-                  <span className="sv-count-label">
-                    {searchQuery.trim() || selectedCategory !== 'all'
-                      ? `${filteredProducts.length} of ${storeProducts.length} items shown`
-                      : `${storeProducts.length} item${storeProducts.length === 1 ? '' : 's'} available`}
-                  </span>
-                </div>
-                {storeProducts.length > 0 && (
-                  <div className="sv-search-wrap">
-                    <span className="sv-search-icon" aria-hidden>⌕</span>
-                    <input
-                      type="text"
-                      className="sv-search-input"
-                      placeholder="Search items…"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    {searchQuery && (
-                      <button type="button" className="sv-search-clear" onClick={() => setSearchQuery('')} aria-label="Clear">×</button>
+          {/* ══ 2-COL PRODUCT GRID ══ */}
+          <div className="sv-grid">
+            {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
+            {!productsLoading && storeProducts.length === 0 && (
+              <div className="sv-empty"><div className="sv-empty-icon">🛍️</div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
+            )}
+            {!productsLoading && storeProducts.length > 0 && filteredProducts.length === 0 && (
+              <div className="sv-empty"><div className="sv-empty-icon">🔍</div><strong>Nothing found</strong><p>Try a different search or category.</p></div>
+            )}
+            {!productsLoading && filteredProducts.map((product) => {
+              const quantity = selectedProducts.get(product.id) || 0;
+              const isSelected = quantity > 0;
+              const catData = catalogue ? getCatalogueData(product, store.catalogueId) : null;
+              const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+              const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+              const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+              const imgUrl = product.image || product.imageUrl;
+              const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
+              return (
+                <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
+                  {/* Square image — correct aspect ratio, no distortion */}
+                  <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
+                    {isPublicUrl(imgUrl)
+                      ? <img src={String(imgUrl)} alt={product.name} />
+                      : <div className="sv-pcard-img-ph"><IconImg size={32} /></div>}
+                    {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
+                  </div>
+                  <div className="sv-pcard-body">
+                    <div className="sv-pcard-name">{product.name}</div>
+                    {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
+                    {price > 0 && (
+                      <div className="sv-pcard-price">
+                        {fmt(price, currencySymbol)}
+                        {priceUnit && <span className="sv-pcard-price-unit">/{unitLabel(priceUnit)}</span>}
+                      </div>
                     )}
                   </div>
-                )}
-                {availableCategories.length > 0 && (
-                  <div className="sv-cats">
-                    <button type="button" className={`sv-cat-pill${selectedCategory === 'all' ? ' is-active' : ''}`} onClick={() => setSelectedCategory('all')}>All</button>
-                    {availableCategories.map((cat) => (
-                      <button key={cat} type="button" className={`sv-cat-pill${selectedCategory === cat ? ' is-active' : ''}`} onClick={() => setSelectedCategory(cat)}>{cat}</button>
-                    ))}
-                    {hasUncategorized && (
-                      <button type="button" className={`sv-cat-pill${selectedCategory === 'uncategorized' ? ' is-active' : ''}`} onClick={() => setSelectedCategory('uncategorized')}>Other</button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="sv-items">
-                {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
-
-                {!productsLoading && storeProducts.length === 0 && (
-                  <div className="sv-empty">
-                    <div className="sv-empty-icon">🛍️</div>
-                    <strong>No items yet</strong>
-                    <p>Products will appear here once the seller adds them.</p>
-                  </div>
-                )}
-
-                {!productsLoading && storeProducts.length > 0 && filteredProducts.length === 0 && (
-                  <div className="sv-empty">
-                    <div className="sv-empty-icon">🔍</div>
-                    <strong>No matches found</strong>
-                    <p>Try a different search term or category.</p>
-                  </div>
-                )}
-
-                {!productsLoading && filteredProducts.map((product) => {
-                  const quantity = selectedProducts.get(product.id) || 0;
-                  const isSelected = quantity > 0;
-                  const catData = catalogue ? getCatalogueData(product, store.catalogueId) : null;
-                  const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
-                  const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                  const qStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-                  const lineTotal = price * quantity;
-                  const calcDetail = quantity > 0 ? formatCalc(quantity, price, priceUnit, currencySymbol) : null;
-
-                  return (
-                    <div key={product.id} className={`sv-card${isSelected ? ' is-selected' : ''}`}>
-                      <div className="sv-card-img-wrap" onClick={() => setDrawerProduct(product)}>
-                        {isPublicUrl(product.image || product.imageUrl)
-                          ? <img src={String(product.image || product.imageUrl)} alt={product.name} className="sv-card-img" />
-                          : <div className="sv-card-img-ph"><ImgPhIcon /></div>}
-                        {isSelected && <div className="sv-added-badge">✓ Added</div>}
-                      </div>
-
-                      <div className="sv-card-body">
-                        <div className="sv-card-name">{product.name}</div>
-                        {product.subtitle && <div className="sv-card-sub">({product.subtitle})</div>}
-                        {price > 0 && (
-                          <div className="sv-card-price">
-                            {formatMoney(price, currencySymbol)}
-                            {priceUnit && <span className="sv-card-price-unit">/ {getOrderUnitLabel(priceUnit)}</span>}
-                          </div>
-                        )}
-
-                        <div className="sv-card-actions">
-                          <QtyControl value={quantity} step={qStep} onChange={(d) => changeQty(product.id, d, qStep)} />
-                          <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details ›</button>
-                        </div>
-
-                        {qStep > 1 && (
-                          <div className="sv-pack-hint">
-                            <PackIcon /> Pack of {qStep}
-                          </div>
-                        )}
-
-                        {isSelected && (
-                          <div className="sv-subtotal">
-                            {calcDetail && <span className="sv-subtotal-calc">{calcDetail}</span>}
-                            <span className="sv-subtotal-val">{formatMoney(lineTotal, currencySymbol)}</span>
-                          </div>
-                        )}
-                      </div>
+                  <div className="sv-pcard-footer">
+                    <div className="sv-pcard-actions">
+                      <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(product.id, d, qstep)} accent={isSelected} />
+                      <button className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
-                  );
-                })}
-              </div>
-
-              <div className="sv-footer">
-                <p className="sv-footer-text">Add the items you want, then tap Continue to proceed with your order.</p>
-              </div>
-            </>
-          )}
-
-          {/* ── Customer step ── */}
-          {step === 'customer' && (
-            <>
-              <div className="sv-section-head"><h2>Your details</h2></div>
-              <div style={{ height: 12 }} />
-              <div className="sv-form-section">
-                <div className="sv-form-card">
-                  <div className="sv-field">
-                    <label>Your Name *</label>
-                    <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
+                    {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
                   </div>
-                  <div className="sv-field">
-                    <label>WhatsApp Number</label>
-                    <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
-                  </div>
-                  <div className="sv-order-summary-box">
-                    <div>
-                      <div className="sv-order-summary-label">Order summary</div>
-                      <div className="sv-order-summary-detail">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected</div>
+                  {isSelected && (
+                    <div className="sv-pcard-subtotal">
+                      {calcDetail && <span className="sv-pcard-subtotal-calc">{calcDetail}</span>}
+                      <span className="sv-pcard-subtotal-val">{fmt(price * quantity, currencySymbol)}</span>
                     </div>
-                    <div className="sv-order-summary-total">{formatMoney(orderSummary.total, currencySymbol)}</div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            </>
-          )}
+              );
+            })}
+          </div>
 
-          {/* ── Review step ── */}
-          {step === 'review' && (
-            <>
-              <div className="sv-section-head"><h2>Review order</h2></div>
-              <div style={{ height: 12 }} />
-              <div className="sv-review-items">
-                {orderSummary.items.map((item: any) => {
-                  const calcDetail = formatCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
-                  return (
-                    <div key={item.productId} className="sv-card is-selected">
-                      <div className="sv-card-img-wrap">
-                        {isPublicUrl(item.imageUrl)
-                          ? <img src={item.imageUrl} alt={item.name} className="sv-card-img" />
-                          : <div className="sv-card-img-ph"><ImgPhIcon /></div>}
-                      </div>
-                      <div className="sv-card-body">
-                        <div className="sv-card-name">{item.name}</div>
-                        {item.subtitle && <div className="sv-card-sub">({item.subtitle})</div>}
-                        {item.unitPrice > 0 && (
-                          <div className="sv-card-price">
-                            {formatMoney(item.unitPrice, currencySymbol)}
-                            {item.priceUnit && <span className="sv-card-price-unit">/ {getOrderUnitLabel(item.priceUnit)}</span>}
-                          </div>
-                        )}
-                        <div className="sv-subtotal" style={{ marginTop: 12 }}>
-                          {calcDetail && <span className="sv-subtotal-calc">{calcDetail}</span>}
-                          <span className="sv-subtotal-val">{formatMoney(item.rowTotal, currencySymbol)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="sv-review-info-card">
-                <div className="sv-review-info-label">Customer details</div>
-                <div className="sv-review-name">{customerName}</div>
-                {customerWhatsapp && <div className="sv-review-phone">{customerWhatsapp}</div>}
-              </div>
-
-              <div className="sv-review-total-bar">
-                <div>
-                  <div className="sv-review-total-label">Total amount</div>
-                  <div className="sv-review-total-val">{formatMoney(orderSummary.total, currencySymbol)}</div>
+          {/* ══ FLOATING CART BAR (products step only) ══ */}
+          {selectedProductCount > 0 && step === 'products' && (
+            <div className="sv-cart">
+              <div className="sv-cart-inner" onClick={() => setStep('customer')}>
+                <div className="sv-cart-info">
+                  <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected</span>
+                  <span className="sv-cart-total">{fmt(orderSummary.total, currencySymbol)}</span>
                 </div>
-                <button type="button" className="sv-edit-items-btn" onClick={() => setStep('products')}>Edit items</button>
+                <button type="button" className="sv-cart-cta">Place Order →</button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* ── Floating cart bar ── */}
-        {step === 'products' && selectedProductCount > 0 && (
-          <div className="sv-cart-bar">
-            <div className="sv-cart-inner" onClick={handlePrimaryAction}>
-              <div className="sv-cart-left">
-                <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</span>
-                <span className="sv-cart-total">{formatMoney(orderSummary.total, currencySymbol)}</span>
-              </div>
-              <button type="button" className="sv-cart-btn">Continue →</button>
-            </div>
-          </div>
-        )}
-
+        {/* ══════════════════════════════════════════════════════════
+            MORPHING PANEL — slides up from bottom for steps 2 & 3
+            Back button ONLY appears here, never on the store home.
+        ══════════════════════════════════════════════════════════ */}
         {(step === 'customer' || step === 'review') && (
-          <div className="sv-cart-bar">
-            <div className="sv-cart-inner">
-              <div className="sv-cart-left">
-                <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</span>
-                <span className="sv-cart-total">{formatMoney(orderSummary.total, currencySymbol)}</span>
+          <div className="sv-panel">
+            <div className="sv-panel-header">
+              <button type="button" className="sv-panel-back" onClick={handleBack} aria-label="Go back">
+                <IconBack />
+              </button>
+              <div className="sv-panel-title-wrap">
+                <div className="sv-panel-title">{step === 'customer' ? 'Your details' : 'Review order'}</div>
+                <div className="sv-panel-subtitle">{step === 'customer' ? 'Almost there — just a few details' : 'Confirm everything looks right'}</div>
               </div>
-              <button type="button" className="sv-cart-btn" onClick={handlePrimaryAction} disabled={primaryButtonDisabled}>{primaryButtonLabel}</button>
+              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() : isSubmitting}>
+                {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
+              </button>
             </div>
+
+            <div style={{ padding: '16px 16px 0' }}>
+              <StepBar current={step} />
+            </div>
+
+            {step === 'customer' && (
+              <div className="sv-form-body">
+                <div className="sv-field">
+                  <label>Your Name *</label>
+                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
+                </div>
+                <div className="sv-field">
+                  <label>WhatsApp Number</label>
+                  <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
+                </div>
+                <div className="sv-order-pill">
+                  <div>
+                    <div className="sv-order-pill-label">Your selection</div>
+                    <div className="sv-order-pill-detail">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</div>
+                  </div>
+                  <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
+                </div>
+              </div>
+            )}
+
+            {step === 'review' && (
+              <>
+                <div className="sv-review-list">
+                  {orderSummary.items.map((item: any) => {
+                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
+                    return (
+                      <div key={item.productId} className="sv-rcard">
+                        <div className="sv-rcard-img">
+                          {isPublicUrl(item.imageUrl)
+                            ? <img src={item.imageUrl} alt={item.name} />
+                            : <div className="sv-rcard-img-ph"><IconImg size={24} /></div>}
+                        </div>
+                        <div className="sv-rcard-body">
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
+                          <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="sv-review-customer">
+                  <div className="sv-review-customer-label">Ordering as</div>
+                  <div className="sv-review-customer-name">{customerName}</div>
+                  {customerWhatsapp && <div className="sv-review-customer-phone">{customerWhatsapp}</div>}
+                </div>
+                <div className="sv-review-total-bar">
+                  <div>
+                    <div className="sv-review-total-label">Total</div>
+                    <div className="sv-review-total-val">{fmt(orderSummary.total, currencySymbol)}</div>
+                  </div>
+                  <button type="button" className="sv-edit-btn" onClick={() => setStep('products')}>Edit items</button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
-        {/* ── Product detail drawer ── */}
+        {/* ══ PRODUCT DETAIL DRAWER ══ */}
         {drawerProduct && (() => {
           const catData = catalogue ? getCatalogueData(drawerProduct, store.catalogueId) : null;
           const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
           const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-          const qStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+          const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
-          const lineTotal = price * quantity;
-          const calcDetail = quantity > 0 ? formatCalc(quantity, price, priceUnit, currencySymbol) : null;
+          const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             const value = (drawerProduct as Record<string, unknown>)[`field${n}`];
             if (value == null || String(value).trim() === '') return null;
-            const { label, unitSuffix } = getFieldLabelUnit(drawerProduct, n);
+            const { label, unitSuffix } = fieldLU(drawerProduct, n);
             return { label, value: unitSuffix ? `${String(value)} ${unitSuffix}` : String(value) };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
-
+          const imgUrl = drawerProduct.image || drawerProduct.imageUrl;
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
               <div className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className="sv-drawer-img-wrap">
-                  {isPublicUrl(drawerProduct.image || drawerProduct.imageUrl)
-                    ? <img src={String(drawerProduct.image || drawerProduct.imageUrl)} alt={drawerProduct.name} className="sv-drawer-img" />
-                    : <div className="sv-drawer-img-ph"><ImgPhIcon size={48} /></div>}
-                  <button type="button" className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
+                  {isPublicUrl(imgUrl)
+                    ? <img src={String(imgUrl)} alt={drawerProduct.name} />
+                    : <div className="sv-drawer-img-ph"><IconImg size={48} /></div>}
+                  <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
                 </div>
-
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
-                  {drawerProduct.subtitle && <div className="sv-drawer-subtitle">({drawerProduct.subtitle})</div>}
-
-                  {getCategories(drawerProduct).length > 0 && (
-                    <div className="sv-drawer-cat-row">
-                      {getCategories(drawerProduct).map((cat) => (
-                        <span key={cat} className="sv-drawer-cat-pill">{cat}</span>
-                      ))}
-                    </div>
+                  {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
+                  {getCats(drawerProduct).length > 0 && (
+                    <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
-
-                  {price > 0 && (
-                    <div className="sv-drawer-price">
-                      {formatMoney(price, currencySymbol)}
-                      {priceUnit && <span>/ {getOrderUnitLabel(priceUnit)}</span>}
-                    </div>
-                  )}
-
+                  {price > 0 && <div className="sv-drawer-price">{fmt(price, currencySymbol)}{priceUnit && <span>/ {unitLabel(priceUnit)}</span>}</div>}
                   {fields.length > 0 && (
                     <div className="sv-detail-table">
-                      {fields.map((f) => (
-                        <div key={`${f.label}-${f.value}`} className="sv-detail-row">
-                          <span className="sv-detail-label">{f.label}</span>
-                          <span className="sv-detail-val">{f.value}</span>
-                        </div>
-                      ))}
+                      {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}
                     </div>
                   )}
-
                   <div className="sv-drawer-qty-section">
                     <div className="sv-drawer-qty-label">Quantity</div>
                     <div className="sv-drawer-qty-row">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <QtyControl value={quantity} step={qStep} onChange={(d) => changeQty(drawerProduct.id, d, qStep)} />
-                        {qStep > 1 && (
-                          <div className="sv-pack-hint"><PackIcon /> Pack of {qStep}</div>
-                        )}
+                        <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
+                        {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
                       </div>
                       <div className="sv-drawer-total-wrap">
                         {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}
-                        <div className="sv-drawer-total">{formatMoney(lineTotal, currencySymbol)}</div>
+                        <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
                       </div>
                     </div>
-                    <button type="button" className="sv-drawer-done" onClick={() => setDrawerProduct(null)}>Done</button>
+                    <button className="sv-drawer-done" onClick={() => setDrawerProduct(null)}>Done</button>
                   </div>
                 </div>
               </div>
