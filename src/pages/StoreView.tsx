@@ -716,6 +716,49 @@ export default function StoreView() {
               )}
             </div>
 
+            {/* Business Info Banner */}
+            {(businessProfile.address || businessProfile.phone || businessProfile.email || businessProfile.website || businessProfile.description) && (
+              <div className="of-business-info">
+                {businessProfile.description && (
+                  <div className="of-business-section">
+                    <p className="of-business-text">{businessProfile.description}</p>
+                  </div>
+                )}
+                <div className="of-business-details">
+                  {businessProfile.address && (
+                    <div className="of-detail-item">
+                      <span className="of-detail-label">📍 Address</span>
+                      <span className="of-detail-value">{businessProfile.address}</span>
+                    </div>
+                  )}
+                  {businessProfile.phone && (
+                    <div className="of-detail-item">
+                      <span className="of-detail-label">📞 Phone</span>
+                      <a href={`tel:${businessProfile.phone}`} className="of-detail-value of-detail-link">
+                        {businessProfile.phone}
+                      </a>
+                    </div>
+                  )}
+                  {businessProfile.email && (
+                    <div className="of-detail-item">
+                      <span className="of-detail-label">✉️ Email</span>
+                      <a href={`mailto:${businessProfile.email}`} className="of-detail-value of-detail-link">
+                        {businessProfile.email}
+                      </a>
+                    </div>
+                  )}
+                  {businessProfile.website && (
+                    <div className="of-detail-item">
+                      <span className="of-detail-label">🌐 Website</span>
+                      <a href={businessProfile.website} target="_blank" rel="noopener noreferrer" className="of-detail-value of-detail-link">
+                        {businessProfile.website.replace(/^https?:\/\//i, '')}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="of-items">
               {productsLoading && (
                 <>
