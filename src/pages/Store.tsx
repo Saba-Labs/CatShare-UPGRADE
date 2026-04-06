@@ -107,7 +107,7 @@ const CSS = `
     top: 44px;
     z-index: 50;
     background: #fff;
-    padding: 14px 16px 0;
+    padding: 0 16px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -121,6 +121,9 @@ const CSS = `
     color: #0F172A;
     letter-spacing: -0.4px;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    height: 100%;
   }
   .header-badge {
     display: flex;
@@ -134,6 +137,7 @@ const CSS = `
     letter-spacing: 0.2px;
     transition: all 0.2s;
     margin-left: auto;
+    height: 100%;
   }
   .header-badge.live {
     background: rgba(21,128,61,0.15);
