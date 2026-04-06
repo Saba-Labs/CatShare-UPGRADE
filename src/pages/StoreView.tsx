@@ -7,174 +7,347 @@ import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
-import './OrderForm.css';
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   INLINE STYLES — bold modern D2C storefront
+───────────────────────────────────────────────────────────────────────────── */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+:root {
+  --f-head: 'Syne', system-ui, sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
+  --c-bg: #0a0a0a;
+  --c-surface: #111111;
+  --c-surface2: #1a1a1a;
+  --c-surface3: #222222;
+  --c-border: rgba(255,255,255,0.08);
+  --c-border2: rgba(255,255,255,0.14);
+  --c-text: #f5f5f5;
+  --c-text2: #a0a0a0;
+  --c-text3: #666666;
+  --c-accent: #e8ff47;
+  --c-accent-dark: #c4d900;
+  --c-white: #ffffff;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 999px;
+  --trans: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+.sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; }
+
+.sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
+
+/* ── Hero ── */
+.sv-hero { position: relative; background: var(--c-surface); border-bottom: 1px solid var(--c-border); overflow: hidden; }
+.sv-hero-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,0.03) 39px,rgba(255,255,255,0.03) 40px);
+}
+.sv-hero-inner { position: relative; padding: 28px 20px 24px; }
+.sv-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.sv-logo { width: 56px; height: 56px; border-radius: var(--r-md); background: var(--c-surface2); border: 1px solid var(--c-border2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+.sv-logo img { width: 100%; height: 100%; object-fit: cover; }
+.sv-open-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(232,255,71,0.1); border: 1px solid rgba(232,255,71,0.25); border-radius: var(--r-full); padding: 5px 12px; font-size: 11px; font-weight: 600; color: var(--c-accent); font-family: var(--f-head); letter-spacing: 0.5px; }
+.sv-open-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent); animation: sv-pulse 2s infinite; }
+@keyframes sv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.7)} }
+.sv-store-name { font-family: var(--f-head); font-size: 32px; font-weight: 800; color: var(--c-white); line-height: 1.05; letter-spacing: -1px; margin-bottom: 6px; }
+.sv-store-tagline { font-size: 13.5px; color: var(--c-text2); line-height: 1.5; max-width: 300px; }
+.sv-biz-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.sv-biz-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-full); padding: 5px 11px; font-size: 12px; color: var(--c-text2); font-family: var(--f-body); text-decoration: none; transition: border-color var(--trans), color var(--trans); }
+.sv-biz-chip:hover { border-color: var(--c-border2); color: var(--c-text); }
+.sv-socials { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.sv-social-btn { width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--c-surface2); border: 1px solid var(--c-border); display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--c-text2); transition: all var(--trans); cursor: pointer; font-size: 13px; font-weight: 700; font-style: normal; font-family: var(--f-head); }
+.sv-social-btn:hover { background: var(--c-surface3); border-color: var(--c-border2); color: var(--c-text); }
+
+/* ── Sticky nav ── */
+.sv-nav { position: sticky; top: 0; z-index: 80; background: rgba(10,10,10,0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--c-border); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.sv-nav-row { display: flex; align-items: center; gap: 10px; }
+.sv-count-label { flex: 1; font-size: 12px; color: var(--c-text3); font-weight: 500; }
+.sv-search-wrap { position: relative; }
+.sv-search-input { width: 100%; height: 38px; background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-full); color: var(--c-text); font-size: 13px; font-family: var(--f-body); padding: 0 34px 0 36px; outline: none; transition: border-color var(--trans); }
+.sv-search-input:focus { border-color: var(--c-border2); }
+.sv-search-input::placeholder { color: var(--c-text3); }
+.sv-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--c-text3); pointer-events: none; }
+.sv-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; background: var(--c-surface3); border: none; cursor: pointer; font-size: 12px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; }
+.sv-cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
+.sv-cats::-webkit-scrollbar { display: none; }
+.sv-cat { flex-shrink: 0; height: 28px; padding: 0 14px; border-radius: var(--r-full); border: 1px solid var(--c-border); background: transparent; color: var(--c-text2); font-size: 12px; font-weight: 500; font-family: var(--f-body); cursor: pointer; transition: all var(--trans); white-space: nowrap; }
+.sv-cat:hover { border-color: var(--c-border2); color: var(--c-text); }
+.sv-cat.active { background: var(--c-accent); border-color: var(--c-accent); color: #0a0a0a; font-weight: 600; }
+
+/* ── 2-col grid ── */
+.sv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 12px 140px; }
+
+/* ── Product card ── */
+.sv-pcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column; transition: border-color var(--trans), transform var(--trans); position: relative; }
+.sv-pcard:hover { border-color: var(--c-border2); transform: translateY(-1px); }
+.sv-pcard.selected { border-color: var(--c-accent); box-shadow: 0 0 0 1px var(--c-accent); }
+
+/* Image — square aspect ratio, full width */
+.sv-pcard-img-wrap { width: 100%; aspect-ratio: 1/1; background: var(--c-surface2); position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
+.sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; display: block; }
+.sv-pcard-img-wrap:hover img { transform: scale(1.04); }
+.sv-pcard-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.sv-pcard-sel { position: absolute; top: 8px; left: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--c-accent); display: flex; align-items: center; justify-content: center; z-index: 2; }
+
+.sv-pcard-body { padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 2px; }
+.sv-pcard-name { font-family: var(--f-head); font-size: 13px; font-weight: 700; color: var(--c-text); line-height: 1.25; letter-spacing: -0.2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.sv-pcard-price { font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--c-white); letter-spacing: -0.4px; margin-top: 5px; }
+.sv-pcard-price-unit { font-size: 10px; font-weight: 400; color: var(--c-text3); margin-left: 2px; }
+
+.sv-pcard-footer { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+.sv-pcard-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sv-details-btn { font-size: 11px; color: var(--c-text3); background: none; border: none; cursor: pointer; font-family: var(--f-body); padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+.sv-details-btn:hover { color: var(--c-text2); }
+
+.sv-pcard-subtotal { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: rgba(232,255,71,0.06); border-radius: var(--r-sm); border: 1px solid rgba(232,255,71,0.14); margin: 0 10px 10px; }
+.sv-pcard-subtotal-calc { font-size: 10.5px; color: var(--c-text3); }
+.sv-pcard-subtotal-val { font-size: 13px; font-weight: 700; color: var(--c-accent); font-family: var(--f-head); }
+
+/* ── Qty ── */
+.sv-qty { display: inline-flex; align-items: center; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-full); overflow: hidden; }
+.sv-qty-btn { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 16px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; transition: background var(--trans), color var(--trans); font-family: var(--f-body); line-height: 1; }
+.sv-qty-btn:hover { background: var(--c-surface3); color: var(--c-text); }
+.sv-qty-val { min-width: 28px; text-align: center; font-size: 13px; font-weight: 600; color: var(--c-text); font-family: var(--f-head); }
+.sv-qty.accent { background: var(--c-accent); border-color: var(--c-accent); }
+.sv-qty.accent .sv-qty-btn { color: #0a0a0a; }
+.sv-qty.accent .sv-qty-btn:hover { background: rgba(0,0,0,0.1); }
+.sv-qty.accent .sv-qty-val { color: #0a0a0a; }
+
+.sv-pack-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: #d4a017; background: rgba(212,160,23,0.1); border: 1px solid rgba(212,160,23,0.2); border-radius: var(--r-full); padding: 3px 8px; }
+
+/* ── Floating cart ── */
+.sv-cart { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 14px 24px; pointer-events: none; z-index: 200; }
+.sv-cart-inner { display: flex; align-items: center; justify-content: space-between; background: var(--c-white); border-radius: var(--r-xl); padding: 10px 10px 10px 18px; box-shadow: 0 8px 40px rgba(0,0,0,0.6); pointer-events: all; gap: 12px; cursor: pointer; animation: sv-cart-in 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes sv-cart-in { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sv-cart-info { display: flex; flex-direction: column; gap: 1px; }
+.sv-cart-count { font-size: 11.5px; color: #888; font-weight: 500; }
+.sv-cart-total { font-family: var(--f-head); font-size: 20px; font-weight: 800; color: #0a0a0a; letter-spacing: -0.6px; }
+.sv-cart-cta { flex-shrink: 0; height: 42px; padding: 0 20px; border-radius: var(--r-full); background: #0a0a0a; color: #fff; font-size: 13.5px; font-weight: 700; font-family: var(--f-head); border: none; cursor: pointer; letter-spacing: 0.2px; transition: opacity var(--trans); white-space: nowrap; }
+.sv-cart-cta:hover { opacity: 0.85; }
+
+/* ── Morphing panel ── */
+.sv-panel { position: fixed; inset: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--c-bg); z-index: 120; display: flex; flex-direction: column; animation: sv-panel-in 0.32s cubic-bezier(0.32,0.72,0,1); overflow-y: auto; }
+@keyframes sv-panel-in { from{transform:translateX(-50%) translateY(100%)} to{transform:translateX(-50%) translateY(0)} }
+
+.sv-panel-header { position: sticky; top: 0; z-index: 10; background: rgba(10,10,10,0.94); backdrop-filter: blur(16px); border-bottom: 1px solid var(--c-border); padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+.sv-panel-back { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--c-border2); background: var(--c-surface2); color: var(--c-text2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all var(--trans); }
+.sv-panel-back:hover { background: var(--c-surface3); color: var(--c-text); }
+.sv-panel-title-wrap { flex: 1; }
+.sv-panel-title { font-family: var(--f-head); font-size: 16px; font-weight: 700; color: var(--c-text); letter-spacing: -0.3px; }
+.sv-panel-subtitle { font-size: 11.5px; color: var(--c-text3); margin-top: 1px; }
+.sv-panel-cta { flex-shrink: 0; height: 38px; padding: 0 18px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; font-size: 13px; font-weight: 700; font-family: var(--f-head); border: none; cursor: pointer; transition: opacity var(--trans), transform var(--trans); white-space: nowrap; }
+.sv-panel-cta:hover:not(:disabled) { opacity: 0.88; }
+.sv-panel-cta:active:not(:disabled) { transform: scale(0.97); }
+.sv-panel-cta:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Step bar ── */
+.sv-steps { display: flex; align-items: center; padding: 16px 16px 0; }
+.sv-step-item { display: flex; align-items: center; gap: 7px; }
+.sv-step-num { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--f-head); flex-shrink: 0; transition: all var(--trans); }
+.sv-step-num.done { background: var(--c-accent); color: #0a0a0a; }
+.sv-step-num.active { background: var(--c-white); color: #0a0a0a; }
+.sv-step-num.idle { background: var(--c-surface3); color: var(--c-text3); }
+.sv-step-label { font-size: 11px; font-weight: 500; }
+.sv-step-label.done,.sv-step-label.active { color: var(--c-text); }
+.sv-step-label.idle { color: var(--c-text3); }
+.sv-step-line { flex: 1; height: 1px; background: var(--c-border2); margin: 0 8px; }
+.sv-step-line.done { background: var(--c-accent); }
+
+/* ── Form ── */
+.sv-form-body { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 14px; }
+.sv-field label { display: block; font-size: 11px; font-weight: 600; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 7px; font-family: var(--f-head); }
+.sv-field input { width: 100%; height: 48px; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans); }
+.sv-field input:focus { border-color: rgba(232,255,71,0.5); }
+.sv-field input::placeholder { color: var(--c-text3); }
+.sv-order-pill { background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sv-order-pill-label { font-size: 11.5px; color: var(--c-text3); margin-bottom: 2px; }
+.sv-order-pill-detail { font-size: 13px; color: var(--c-text2); }
+.sv-order-pill-total { font-family: var(--f-head); font-size: 26px; font-weight: 800; color: var(--c-accent); letter-spacing: -1px; }
+
+/* ── Review ── */
+.sv-review-list { padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; }
+.sv-rcard-img { width: 80px; height: 80px; flex-shrink: 0; background: var(--c-surface2); overflow: hidden; position: relative; }
+.sv-rcard-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sv-rcard-img-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.sv-rcard-body { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; }
+.sv-rcard-name { font-family: var(--f-head); font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; }
+.sv-rcard-sub { font-size: 11px; color: var(--c-text3); margin-top: 2px; }
+.sv-rcard-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.sv-rcard-calc { font-size: 11.5px; color: var(--c-text3); }
+.sv-rcard-total { font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--c-accent); letter-spacing: -0.3px; }
+.sv-review-customer { margin: 0 16px 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; }
+.sv-review-customer-label { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--c-text3); margin-bottom: 10px; font-family: var(--f-head); }
+.sv-review-customer-name { font-family: var(--f-head); font-size: 18px; font-weight: 700; color: var(--c-text); letter-spacing: -0.4px; }
+.sv-review-customer-phone { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-review-total-bar { margin: 0 16px 32px; background: var(--c-accent); border-radius: var(--r-xl); padding: 20px 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sv-review-total-label { font-size: 12px; font-weight: 600; color: rgba(0,0,0,0.5); margin-bottom: 3px; font-family: var(--f-head); }
+.sv-review-total-val { font-family: var(--f-head); font-size: 30px; font-weight: 800; color: #0a0a0a; letter-spacing: -1.5px; }
+.sv-edit-btn { flex-shrink: 0; height: 36px; padding: 0 16px; border-radius: var(--r-full); background: rgba(0,0,0,0.15); border: 1px solid rgba(0,0,0,0.12); color: #0a0a0a; font-size: 12.5px; font-weight: 700; font-family: var(--f-head); cursor: pointer; transition: background var(--trans); white-space: nowrap; }
+.sv-edit-btn:hover { background: rgba(0,0,0,0.25); }
+
+/* ── Drawer ── */
+.sv-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: flex-end; justify-content: center; }
+.sv-drawer { background: var(--c-surface); border-radius: var(--r-xl) var(--r-xl) 0 0; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; animation: sv-drawer-up 0.28s cubic-bezier(0.32,0.72,0,1); }
+@keyframes sv-drawer-up { from{transform:translateY(50px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sv-drawer-handle { width: 36px; height: 4px; background: var(--c-surface3); border-radius: var(--r-full); margin: 12px auto 0; }
+.sv-drawer-img-wrap { width: 100%; aspect-ratio: 16/9; background: var(--c-surface2); overflow: hidden; position: relative; margin-top: 14px; }
+.sv-drawer-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sv-drawer-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.sv-drawer-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(10,10,10,0.7); border: 1px solid var(--c-border2); cursor: pointer; color: var(--c-text); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.sv-drawer-body { padding: 18px 20px 36px; }
+.sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 800; color: var(--c-text); letter-spacing: -0.6px; line-height: 1.15; }
+.sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-surface2); border: 1px solid var(--c-border); font-size: 11px; color: var(--c-text2); font-weight: 500; display: inline-flex; align-items: center; }
+.sv-drawer-price { font-family: var(--f-head); font-size: 26px; font-weight: 800; color: var(--c-white); letter-spacing: -0.8px; margin-top: 14px; }
+.sv-drawer-price span { font-size: 13px; font-weight: 400; color: var(--c-text3); margin-left: 4px; }
+.sv-detail-table { margin-top: 18px; border: 1px solid var(--c-border); border-radius: var(--r-md); overflow: hidden; }
+.sv-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 13px; gap: 16px; }
+.sv-detail-row:not(:last-child) { border-bottom: 1px solid var(--c-border); }
+.sv-detail-row:nth-child(even) { background: var(--c-surface2); }
+.sv-detail-lbl { color: var(--c-text3); font-weight: 500; }
+.sv-detail-val { color: var(--c-text); font-weight: 600; text-align: right; }
+.sv-drawer-qty-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border); }
+.sv-drawer-qty-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--c-text3); margin-bottom: 12px; font-family: var(--f-head); }
+.sv-drawer-qty-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sv-drawer-total-wrap { text-align: right; }
+.sv-drawer-calc { font-size: 12px; color: var(--c-text3); margin-bottom: 3px; }
+.sv-drawer-total { font-family: var(--f-head); font-size: 24px; font-weight: 800; color: var(--c-accent); letter-spacing: -0.8px; }
+.sv-drawer-done { width: 100%; height: 50px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; border: none; font-size: 15px; font-weight: 700; font-family: var(--f-head); cursor: pointer; margin-top: 20px; transition: opacity var(--trans); }
+.sv-drawer-done:hover { opacity: 0.88; }
+
+/* ── Empty ── */
+.sv-empty { grid-column: 1/-1; text-align: center; padding: 48px 24px; }
+.sv-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+.sv-empty strong { display: block; font-family: var(--f-head); font-size: 16px; font-weight: 700; color: var(--c-text2); margin-bottom: 6px; }
+.sv-empty p { font-size: 13px; color: var(--c-text3); line-height: 1.5; }
+
+/* ── Skeleton ── */
+@keyframes sv-shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+.sv-skel { background: linear-gradient(90deg,var(--c-surface2) 25%,var(--c-surface3) 50%,var(--c-surface2) 75%); background-size: 800px 100%; animation: sv-shimmer 1.5s infinite linear; border-radius: 6px; }
+.sv-skel-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; }
+
+/* ── Error/loading ── */
+.sv-fullscreen { min-height: 100vh; background: var(--c-bg); display: flex; align-items: center; justify-content: center; padding: 24px; font-family: var(--f-body); }
+.sv-error-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); overflow: hidden; max-width: 380px; width: 100%; }
+.sv-error-stripe { height: 4px; background: linear-gradient(90deg,#e8ff47,#ff4747); }
+.sv-error-body { padding: 36px 28px 28px; text-align: center; }
+.sv-error-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,71,71,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 28px; }
+.sv-error-title { font-family: var(--f-head); font-size: 20px; font-weight: 800; color: var(--c-text); letter-spacing: -0.4px; margin-bottom: 8px; }
+.sv-error-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
+.sv-error-btn { width: 100%; height: 48px; border-radius: var(--r-full); background: var(--c-accent); color: #0a0a0a; border: none; font-size: 14px; font-weight: 700; font-family: var(--f-head); cursor: pointer; transition: opacity var(--trans); }
+.sv-error-btn:hover { opacity: 0.88; }
+`;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────────────────────────────── */
 type Step = 'products' | 'customer' | 'review';
 
-function IconArrowLeft() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M19 12H5M12 19l-7-7 7-7" />
-    </svg>
-  );
+function unitLabel(u?: string): string {
+  if (!u || String(u).trim() === '' || u === 'None') return 'unit';
+  const c = String(u).replace(/^\s*\/\s*/i, '').trim().toLowerCase();
+  if (!c) return 'unit';
+  if (c === 'piece' || c === 'pieces' || c === 'pc') return 'pc';
+  return c;
 }
-
-function StoreIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-      <line x1="3" y1="6" x2="21" y2="6" />
-      <path d="M16 10a4 4 0 01-8 0" />
-    </svg>
-  );
+function fmt(n: number, sym: string) { return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`; }
+function fmtCalc(qty: number, price: number, u: string | undefined, sym: string): string | null {
+  if (qty <= 0 || !Number.isFinite(price)) return null;
+  return `${qty} ${unitLabel(u)} × ${fmt(price, sym)}`;
 }
-
-function ImgIcon({ size = 32 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-}
-
-function getOrderUnitLabel(priceUnit: string | undefined): string {
-  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
-    return 'units';
-  }
-  const cleaned = String(priceUnit)
-    .replace(/^\s*\/\s*/i, '')
-    .trim()
-    .toLowerCase();
-  if (!cleaned) return 'units';
-  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
-  return cleaned;
-}
-
-function formatStoreMoney(amount: number, symbol: string): string {
-  return `${symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-function formatLineCalculationDetail(quantity: number, price: number, priceUnit: string | undefined, symbol: string): string | null {
-  if (quantity <= 0 || !Number.isFinite(price)) return null;
-  return `${quantity} ${getOrderUnitLabel(priceUnit)} × ${formatStoreMoney(price, symbol)}`;
-}
-
-function isPublicHttpUrl(url: string | undefined): boolean {
+function isPublicUrl(url?: string): boolean {
   if (!url) return false;
-  const value = url.trim();
-  if (!/^https?:\/\//i.test(value)) return false;
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  try { const p = new URL(url.trim()); return p.protocol === 'http:' || p.protocol === 'https:'; } catch { return false; }
 }
-
-function getProductCategories(product: ProductWithCatalogueData): string[] {
-  return Array.from(
-    new Set(
-      (product.category || [])
-        .map((category) => String(category).trim())
-        .filter(Boolean)
-    )
-  );
+function getCats(p: ProductWithCatalogueData): string[] {
+  return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
 }
-
-function getProductSearchText(product: ProductWithCatalogueData): string {
-  const extraFields = Array.from({ length: 10 }, (_, index) => {
-    const fieldNumber = index + 1;
-    const row = product as unknown as Record<string, string | undefined>;
-    return [
-      row[`field${fieldNumber}`],
-      row[`field${fieldNumber}Label`],
-      row[`field${fieldNumber}Unit`],
-    ]
-      .filter(Boolean)
-      .join(' ');
-  });
-
-  return [product.name, product.subtitle, ...(product.category || []), ...extraFields]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
+function srchText(p: ProductWithCatalogueData): string {
+  const ex = Array.from({ length: 10 }, (_, i) => { const n = i + 1; const r = p as unknown as Record<string, string | undefined>; return [r[`field${n}`], r[`field${n}Label`], r[`field${n}Unit`]].filter(Boolean).join(' '); });
+  return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
-
-function getFieldLabelAndUnitSuffix(
-  product: ProductWithCatalogueData,
-  n: number
-): { label: string; unitSuffix: string } {
-  const row = product as unknown as Record<string, string | undefined>;
-  const explicitUnit = row[`field${n}Unit`];
-  const rawLabel = row[`field${n}Label`];
-  if (explicitUnit != null && String(explicitUnit).trim() !== '') {
-    return { label: (rawLabel || `Field ${n}`).trim(), unitSuffix: String(explicitUnit).trim() };
-  }
-  if (rawLabel) {
-    const match = rawLabel.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-    if (match) return { label: match[1].trim(), unitSuffix: match[2].trim() };
-    return { label: rawLabel.trim(), unitSuffix: '' };
-  }
+function fieldLU(p: ProductWithCatalogueData, n: number): { label: string; unitSuffix: string } {
+  const r = p as unknown as Record<string, string | undefined>; const eu = r[`field${n}Unit`]; const rl = r[`field${n}Label`];
+  if (eu != null && String(eu).trim() !== '') return { label: (rl || `Field ${n}`).trim(), unitSuffix: String(eu).trim() };
+  if (rl) { const m = rl.match(/^(.+?)\s*\(([^)]+)\)\s*$/); if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() }; return { label: rl.trim(), unitSuffix: '' }; }
   return { label: `Field ${n}`, unitSuffix: '' };
 }
 
-function QtyControl({
-  value,
-  step,
-  onChange,
-}: {
-  value: number;
-  step: number;
-  onChange: (delta: number) => void;
-}) {
-  const normalizedStep = normalizeOrderQuantityStep(step);
+/* ─────────────────────────────────────────────────────────────────────────────
+   ICONS
+───────────────────────────────────────────────────────────────────────────── */
+const IconBack = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>;
+const IconStore = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: '#666' }}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>;
+const IconImg = ({ size = 28 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>;
+const IconCheck = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
+const IconLoc = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>;
+const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 010 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z" /></svg>;
+const IconLink = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
+const IconWA = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SUB-COMPONENTS
+───────────────────────────────────────────────────────────────────────────── */
+function QtyControl({ value, step, onChange, accent = false }: { value: number; step: number; onChange: (d: number) => void; accent?: boolean }) {
+  const s = normalizeOrderQuantityStep(step);
   return (
-    <div className="of-qty">
-      <button type="button" className="of-qty-btn" onClick={() => onChange(-normalizedStep)}>−</button>
-      <span className="of-qty-val">{value}</span>
-      <button type="button" className="of-qty-btn" onClick={() => onChange(normalizedStep)}>+</button>
+    <div className={`sv-qty${accent ? ' accent' : ''}`}>
+      <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>−</button>
+      <span className="sv-qty-val">{value}</span>
+      <button type="button" className="sv-qty-btn" onClick={() => onChange(s)}>+</button>
+    </div>
+  );
+}
+
+function StepBar({ current }: { current: 'customer' | 'review' }) {
+  const done = current === 'review';
+  return (
+    <div className="sv-steps">
+      <div className="sv-step-item">
+        <div className="sv-step-num done"><IconCheck /></div>
+        <span className="sv-step-label done">Items</span>
+      </div>
+      <div className="sv-step-line done" />
+      <div className="sv-step-item">
+        <div className={`sv-step-num ${done ? 'done' : 'active'}`}>{done ? <IconCheck /> : '2'}</div>
+        <span className={`sv-step-label ${done ? 'done' : 'active'}`}>Details</span>
+      </div>
+      <div className={`sv-step-line ${done ? 'done' : ''}`} />
+      <div className="sv-step-item">
+        <div className={`sv-step-num ${done ? 'active' : 'idle'}`}>3</div>
+        <span className={`sv-step-label ${done ? 'active' : 'idle'}`}>Review</span>
+      </div>
     </div>
   );
 }
 
 function SkeletonCard() {
   return (
-    <div
-      style={{
-        background: '#fff',
-        borderRadius: 16,
-        border: '1.5px solid #e2e8f0',
-        display: 'flex',
-        overflow: 'hidden',
-        marginBottom: 8,
-      }}
-    >
-      <div className="of-skeleton" style={{ width: 100, minHeight: 100, flexShrink: 0 }} />
-      <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div className="of-skeleton" style={{ height: 14, width: '65%', borderRadius: 6 }} />
-        <div className="of-skeleton" style={{ height: 11, width: '45%', borderRadius: 6 }} />
-        <div className="of-skeleton" style={{ height: 22, width: '30%', borderRadius: 6, marginTop: 4 }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-          <div className="of-skeleton" style={{ height: 32, width: 100, borderRadius: 100 }} />
-          <div className="of-skeleton" style={{ height: 22, width: 60, borderRadius: 6 }} />
-        </div>
+    <div className="sv-skel-card">
+      <div className="sv-skel" style={{ width: '100%', aspectRatio: '1/1', borderRadius: 0 }} />
+      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="sv-skel" style={{ height: 13, width: '70%' }} />
+        <div className="sv-skel" style={{ height: 11, width: '45%' }} />
+        <div className="sv-skel" style={{ height: 17, width: '55%', marginTop: 4 }} />
+        <div className="sv-skel" style={{ height: 28, width: '80%', borderRadius: 999, marginTop: 4 }} />
       </div>
     </div>
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────────────────────────────────────── */
 export default function StoreView() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
@@ -196,971 +369,429 @@ export default function StoreView() {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loadStore = async () => {
-      if (!slug) {
-        setStoreError('Store slug not found');
-        setStoreLoading(false);
-        return;
-      }
-
-      setStoreLoading(true);
-      const result = await getStoreBySlug(slug);
-
-      if (!result.success || !result.data) {
-        setStoreError(result.error || 'Store not found');
-      } else {
-        setStore(result.data);
-      }
-
-      setStoreLoading(false);
-    };
-
-    loadStore();
+    if (!slug) { setStoreError('Store not found'); setStoreLoading(false); return; }
+    setStoreLoading(true);
+    getStoreBySlug(slug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
   }, [slug]);
 
   useEffect(() => {
-    const loadStoreProducts = async () => {
-      if (!store?.sellerUserId) return;
-
-      setProductsLoading(true);
-      try {
-        const client = getSupabaseClient();
-        const { data: products, error } = await client
-          .from('products')
-          .select('*')
-          .eq('user_id', store.sellerUserId)
-          .order('position', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching products:', error);
-          setAllProducts([]);
-        } else if (products) {
-          const transformed = products.map((p: any) => ({
-            id: p.product_id,
-            name: p.name,
-            subtitle: p.data?.subtitle || '',
-            category: p.data?.category || [],
-            image: p.data?.image,
-            imageUrl: p.data?.image,
-            ...p.data,
-          }));
-          setAllProducts(transformed);
-        }
-      } catch (err) {
-        console.error('Exception loading products:', err);
-        setAllProducts([]);
-      } finally {
+    if (!store?.sellerUserId) return;
+    setProductsLoading(true);
+    getSupabaseClient().from('products').select('*').eq('user_id', store.sellerUserId).order('position', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setAllProducts(data.map((p: any) => ({ id: p.product_id, name: p.name, subtitle: p.data?.subtitle || '', category: p.data?.category || [], image: p.data?.image, imageUrl: p.data?.image, ...p.data })));
         setProductsLoading(false);
-      }
-    };
-
-    loadStoreProducts();
+      });
   }, [store?.sellerUserId]);
 
   const catalogues = useMemo(() => getAllCatalogues(null), []);
-
-  const currencySymbol = useMemo(
-    () => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'),
-    [store?.sellerCurrencyCode]
-  );
-
-  const catalogue = useMemo(
-    () => catalogues.find((item) => item.id === store?.catalogueId) || null,
-    [catalogues, store?.catalogueId]
-  );
-
-  const storeProducts = useMemo(() => {
-    if (!store?.catalogueId) return [];
-    return allProducts.filter((product) => isProductEnabledForCatalogue(product, store.catalogueId));
-  }, [store, allProducts]);
-
-  const availableCategories = useMemo(() => {
-    const categories = storeProducts.flatMap((product) => getProductCategories(product));
-    return Array.from(new Set(categories));
-  }, [storeProducts]);
-
-  const hasUncategorizedItems = useMemo(
-    () => storeProducts.some((product) => getProductCategories(product).length === 0),
-    [storeProducts]
-  );
-
+  const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
+  const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
+  const storeProducts = useMemo(() => !store?.catalogueId ? [] : allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId)), [store, allProducts]);
+  const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
+  const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return storeProducts.filter((product) => {
-      const matchesSearch = !query || getProductSearchText(product).includes(query);
-      const categories = getProductCategories(product);
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        (selectedCategory === 'uncategorized' ? categories.length === 0 : categories.includes(selectedCategory));
-      return matchesSearch && matchesCategory;
+    const q = searchQuery.trim().toLowerCase();
+    return storeProducts.filter((p) => {
+      const cats = getCats(p);
+      return (!q || srchText(p).includes(q)) && (selectedCategory === 'all' || (selectedCategory === 'uncategorized' ? cats.length === 0 : cats.includes(selectedCategory)));
     });
   }, [searchQuery, selectedCategory, storeProducts]);
 
   const orderSummary = useMemo(() => {
-    if (!store || !catalogue) return { items: [], total: 0, count: 0 };
-
-    const items: Array<{
-      productId: string;
-      name: string;
-      quantity: number;
-      unitPrice: number;
-      rowTotal: number;
-      category: string | undefined;
-      priceUnit: string | undefined;
-      imageUrl: string | undefined;
-      quantityStep: number | undefined;
-      subtitle: string | undefined;
-    }> = [];
-    let total = 0;
-    let count = 0;
-
+    if (!store || !catalogue) return { items: [] as any[], total: 0 };
+    const items: any[] = []; let total = 0;
     selectedProducts.forEach((quantity, productId) => {
-      const product = allProducts.find((item) => item.id === productId);
-      if (!product) return;
+      const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
       const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
       const rowTotal = unitPrice * quantity;
-      const priceUnit = catData[catalogue.priceUnitField];
-      items.push({
-        productId,
-        name: product.name,
-        quantity,
-        unitPrice,
-        rowTotal,
-        category: product.category?.[0],
-        priceUnit,
-        imageUrl: product.image || product.imageUrl,
-        quantityStep: catData.orderQuantityStep,
-        subtitle: product.subtitle,
-      });
+      items.push({ productId, name: product.name, quantity, unitPrice, rowTotal, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, subtitle: product.subtitle });
       total += rowTotal;
-      count += quantity;
     });
-
-    return { items, total, count };
+    return { items, total };
   }, [selectedProducts, store, catalogue, allProducts]);
 
-  const selectedProductCount = useMemo(
-    () => Array.from(selectedProducts.values()).filter((quantity) => quantity > 0).length,
-    [selectedProducts]
-  );
+  const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
 
-  const changeQty = (productId: string, delta: number, step: number) => {
-    const normalizedStep = normalizeOrderQuantityStep(step);
+  const changeQty = (productId: string, delta: number, qstep: number) => {
+    const s = normalizeOrderQuantityStep(qstep);
     const current = selectedProducts.get(productId) || 0;
-    const next = Math.max(0, current + delta);
-    const rounded = Math.round(next / normalizedStep) * normalizedStep;
-    const newSelected = new Map(selectedProducts);
-    if (rounded <= 0) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.set(productId, rounded);
-    }
-    setSelectedProducts(newSelected);
-  };
-
-  const handleContinueToCustomer = () => {
-    if (selectedProducts.size === 0) {
-      alert('Please add at least one product');
-      return;
-    }
-    setStep('customer');
+    const rounded = Math.round(Math.max(0, current + delta) / s) * s;
+    const map = new Map(selectedProducts);
+    if (rounded <= 0) map.delete(productId); else map.set(productId, rounded);
+    setSelectedProducts(map);
   };
 
   const handleBack = useCallback(() => {
-    if (drawerProduct) {
-      setDrawerProduct(null);
-      return;
-    }
-    if (step === 'review') {
-      setStep('customer');
-      return;
-    }
-    if (step === 'customer') {
-      setStep('products');
-      return;
-    }
+    if (drawerProduct) { setDrawerProduct(null); return; }
+    if (step !== 'products') { setStep(step === 'review' ? 'customer' : 'products'); return; }
     window.history.back();
   }, [drawerProduct, step]);
 
   const handlePlaceOrder = async () => {
-    if (!customerName.trim()) {
-      alert('Please enter your name');
-      return;
-    }
-
-    if (!store) {
-      alert('Store information not available');
-      return;
-    }
-
+    if (!store || !catalogue) return;
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
-
-      if (catalogue) {
-        selectedProducts.forEach((quantity, productId) => {
-          const product = allProducts.find((item) => item.id === productId);
-          if (product) {
-            const catData = getCatalogueData(product, store.catalogueId);
-            const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
-            const rowTotal = unitPrice * quantity;
-
-            orderItems.push({
-              productId,
-              name: product.name,
-              quantity,
-              unitPrice,
-              rowTotal,
-              category: product.category?.[0],
-              subtitle: product.subtitle,
-              priceUnit: catData[catalogue.priceUnitField],
-              imageUrl: product.image || product.imageUrl,
-              quantityStep: catData.orderQuantityStep,
-            });
-          }
-        });
-      }
-
-      if (orderItems.length === 0) {
-        alert('No products selected');
-        setIsSubmitting(false);
-        return;
-      }
-
+      selectedProducts.forEach((quantity, productId) => {
+        const product = allProducts.find((p) => p.id === productId); if (!product) return;
+        const catData = getCatalogueData(product, store.catalogueId);
+        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+        orderItems.push({ productId, name: product.name, quantity, unitPrice, rowTotal: unitPrice * quantity, category: product.category?.[0], subtitle: product.subtitle, priceUnit: catData[catalogue.priceUnitField], imageUrl: product.image || product.imageUrl, quantityStep: catData.orderQuantityStep });
+      });
       setSupabaseRlsUserId(store.sellerUserId);
-
-      const { error } = await createOrder(
-        store.sellerUserId,
-        '',
-        customerName.trim(),
-        orderItems,
-        orderSummary.total,
-        store.sellerCurrencyCode || 'INR',
-        customerWhatsapp.trim() || undefined,
-        'store'
-      );
-
-      if (error) {
-        console.error('Error creating order:', error);
-        alert('Failed to save order. Please try again.');
-      } else {
-        alert('Order placed successfully! The seller will contact you soon.');
-        navigate('/');
-      }
-    } catch (err) {
-      console.error('Error placing order:', err);
-      alert('Error placing order. Please try again.');
-    } finally {
-      setSupabaseRlsUserId(null);
-      setIsSubmitting(false);
-    }
+      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, orderSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
+      if (error) alert('Failed to place order. Please try again.');
+      else { alert('Order placed! The seller will contact you soon.'); navigate('/'); }
+    } catch { alert('Error placing order. Please try again.'); }
+    finally { setSupabaseRlsUserId(null); setIsSubmitting(false); }
   };
 
-  const handlePrimaryAction = () => {
-    if (step === 'products') {
-      handleContinueToCustomer();
-      return;
-    }
-    if (step === 'customer') {
-      if (!customerName.trim()) {
-        alert('Please enter your name');
-        return;
-      }
-      setStep('review');
-      return;
-    }
-    void handlePlaceOrder();
+  const handlePanelAction = () => {
+    if (step === 'customer') { if (!customerName.trim()) { alert('Please enter your name'); return; } setStep('review'); }
+    else void handlePlaceOrder();
   };
 
-  const primaryButtonLabel =
-    step === 'products'
-      ? 'Continue'
-      : step === 'customer'
-        ? 'Review Order'
-        : isSubmitting
-          ? 'Placing Order…'
-          : 'Place Order';
+  const storeDisplayName = store?.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'Store';
 
-  const primaryButtonDisabled =
-    step === 'products' ? selectedProductCount === 0 : step === 'customer' ? !customerName.trim() : isSubmitting;
-
-  const storeDisplayName = store?.storeSlug
-    ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1)
-    : 'Store';
-
+  /* ── Loading ── */
   if (storeLoading) {
     return (
-      <div className="of-bg">
-        <div className="of-page">
-          <div className="of-header">
-            <div className="of-header-inner">
-              <div className="of-store-row">
-                <div className="of-store-icon">
-                  <StoreIcon />
-                </div>
-                <div>
-                  <div className="of-skeleton" style={{ height: 14, width: 120, borderRadius: 6 }} />
-                  <div className="of-skeleton" style={{ height: 10, width: 80, borderRadius: 6, marginTop: 5 }} />
-                </div>
-              </div>
-              <div className="of-skeleton" style={{ height: 38, width: 110, borderRadius: 100 }} />
+      <>
+        <style>{CSS}</style>
+        <div className="sv"><div className="sv-page">
+          <div className="sv-hero"><div className="sv-hero-bg" /><div className="sv-hero-inner">
+            <div className="sv-hero-top">
+              <div className="sv-skel" style={{ width: 56, height: 56, borderRadius: 14 }} />
+              <div className="sv-skel" style={{ width: 90, height: 28, borderRadius: 999 }} />
             </div>
-          </div>
-          <div style={{ padding: '12px 12px 0' }}>
-            <div className="of-skeleton" style={{ height: 11, width: 80, borderRadius: 6, margin: '16px 8px 10px' }} />
-          </div>
-          <div className="of-skeleton-wrap">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        </div>
-      </div>
+            <div className="sv-skel" style={{ height: 36, width: '55%', marginBottom: 8 }} />
+            <div className="sv-skel" style={{ height: 14, width: '75%' }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <div className="sv-skel" style={{ height: 30, width: 100, borderRadius: 999 }} />
+              <div className="sv-skel" style={{ height: 30, width: 130, borderRadius: 999 }} />
+            </div>
+          </div></div>
+          <div className="sv-nav"><div className="sv-skel" style={{ height: 38, borderRadius: 999 }} /></div>
+          <div className="sv-grid"><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
+        </div></div>
+      </>
     );
   }
 
+  /* ── Error ── */
   if (storeError || !store) {
     return (
-      <div className="of-bg" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 420,
-            background: '#fff',
-            borderRadius: 24,
-            border: '1.5px solid #e2e8f0',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
-            overflow: 'hidden',
-            fontFamily: 'var(--font)',
-          }}
-        >
-          <div style={{ height: 6, background: 'linear-gradient(90deg, #f59e0b, #ef4444)' }} />
-          <div style={{ padding: '36px 32px 32px', textAlign: 'center' }}>
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: '50%',
-                background: '#fee2e2',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px',
-                fontSize: 32,
-              }}
-            >
-              ⚠️
+      <>
+        <style>{CSS}</style>
+        <div className="sv sv-fullscreen">
+          <div className="sv-error-card">
+            <div className="sv-error-stripe" />
+            <div className="sv-error-body">
+              <div className="sv-error-icon">⚠️</div>
+              <div className="sv-error-title">Store unavailable</div>
+              <div className="sv-error-desc">{storeError || 'This store could not be found.'}</div>
+              <button className="sv-error-btn" onClick={() => navigate('/')}>Go home</button>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px', marginBottom: 10 }}>
-              Store unavailable
-            </div>
-            <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6, marginBottom: 28 }}>
-              {storeError || 'Store not found'}
-            </div>
-            <button
-              onClick={() => navigate('/')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: '#16a34a',
-                color: '#fff',
-                padding: '13px 20px',
-                borderRadius: 100,
-                fontSize: 14,
-                fontWeight: 700,
-                border: 'none',
-                cursor: 'pointer',
-                width: '100%',
-                fontFamily: 'var(--font)',
-              }}
-            >
-              Back to home
-            </button>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
+  /* ── Social links ── */
+  type SocialLink = { label: string; url: string; icon: React.ReactNode };
+  const socialLinks: SocialLink[] = [
+    store.instagram && { label: 'Instagram', url: store.instagram, icon: 'IG' },
+    store.twitter && { label: 'Twitter/X', url: store.twitter, icon: '𝕏' },
+    store.facebook && { label: 'Facebook', url: store.facebook, icon: 'FB' },
+    store.website && { label: 'Website', url: store.website, icon: <IconLink /> },
+  ].filter(Boolean) as SocialLink[];
+
+  /* ── Main render ── */
   return (
-    <div className="of-bg">
-      <div className="of-page">
-        <div className="of-header">
-          <div className="of-header-inner">
-            <div className="of-store-row" style={{ minWidth: 0, flex: 1 }}>
-              <button
-                type="button"
-                onClick={handleBack}
-                aria-label={drawerProduct ? 'Close details' : 'Go back'}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 999,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  color: '#0f172a',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                <IconArrowLeft />
-              </button>
-              <div className="of-store-icon">
-                {store?.sellerLogoUrl && !logoFailed && isPublicHttpUrl(store.sellerLogoUrl) ? (
-                  <img
-                    src={store.sellerLogoUrl}
-                    alt=""
-                    className="of-store-logo-img"
-                    onError={() => setLogoFailed(true)}
-                  />
-                ) : (
-                  <StoreIcon />
+    <>
+      <style>{CSS}</style>
+      <div className="sv">
+        <div className="sv-page">
+
+          {/* ══ STORE HERO — no back button here ══ */}
+          <div className="sv-hero">
+            <div className="sv-hero-bg" />
+            <div className="sv-hero-inner">
+              <div className="sv-hero-top">
+                <div className="sv-logo">
+                  {store?.sellerLogoUrl && !logoFailed && isPublicUrl(store.sellerLogoUrl)
+                    ? <img src={store.sellerLogoUrl} alt={storeDisplayName} onError={() => setLogoFailed(true)} />
+                    : <IconStore />}
+                </div>
+                <div className="sv-open-badge">
+                  <div className="sv-open-dot" />
+                  Open now
+                </div>
+              </div>
+
+              <div className="sv-store-name">{storeDisplayName}</div>
+              {store.tagline && <div className="sv-store-tagline">{store.tagline}</div>}
+
+              <div className="sv-biz-chips">
+                {store.location && <span className="sv-biz-chip"><IconLoc />{store.location}</span>}
+                {store.phone && <a className="sv-biz-chip" href={`tel:${store.phone}`}><IconPhone />{store.phone}</a>}
+                {store.whatsapp && (
+                  <a className="sv-biz-chip" href={`https://wa.me/${store.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
+                    <IconWA />WhatsApp
+                  </a>
                 )}
               </div>
-              <div className="of-store-meta" style={{ minWidth: 0 }}>
-                <div className="of-store-name">{storeDisplayName}</div>
-                <div className="of-store-sub">
-                  {step === 'products'
-                    ? 'Order Form'
-                    : step === 'customer'
-                      ? 'Your details'
-                      : 'Review your order'}
-                </div>
-              </div>
-            </div>
-            <button className="of-confirm-btn" onClick={handlePrimaryAction} disabled={primaryButtonDisabled}>
-              <span className="btn-label">{primaryButtonLabel}</span>
-            </button>
-          </div>
-        </div>
 
-        {step === 'products' && (
-          <>
-            <div className="of-toolbar">
-              <div className="of-section-head">
-                {searchQuery.trim() || selectedCategory !== 'all'
-                  ? `${filteredProducts.length} of ${storeProducts.length} item${storeProducts.length === 1 ? '' : 's'} shown`
-                  : `${storeProducts.length} item${storeProducts.length === 1 ? '' : 's'} available`}
-              </div>
-
-              {storeProducts.length > 0 && (
-                <div className="of-search">
-                  <span className="of-search-icon" aria-hidden="true">⌕</span>
-                  <input
-                    type="text"
-                    className="of-search-input"
-                    placeholder="Search items"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    aria-label="Search items"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      className="of-search-clear"
-                      onClick={() => setSearchQuery('')}
-                      aria-label="Clear search"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {availableCategories.length > 0 && (
-                <div className="of-category-filters" role="tablist" aria-label="Filter by category">
-                  <button
-                    type="button"
-                    className={`of-category-chip${selectedCategory === 'all' ? ' is-active' : ''}`}
-                    onClick={() => setSelectedCategory('all')}
-                  >
-                    All
-                  </button>
-                  {availableCategories.map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      className={`of-category-chip${selectedCategory === category ? ' is-active' : ''}`}
-                      onClick={() => setSelectedCategory(category)}
-                    >
-                      {category}
-                    </button>
+              {socialLinks.length > 0 && (
+                <div className="sv-socials">
+                  {socialLinks.map((s) => (
+                    <a key={s.label} className="sv-social-btn" href={s.url} target="_blank" rel="noreferrer" title={s.label}>
+                      {s.icon}
+                    </a>
                   ))}
-                  {hasUncategorizedItems && (
-                    <button
-                      type="button"
-                      className={`of-category-chip${selectedCategory === 'uncategorized' ? ' is-active' : ''}`}
-                      onClick={() => setSelectedCategory('uncategorized')}
-                    >
-                      Uncategorized
-                    </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ══ STICKY SEARCH + FILTER NAV ══ */}
+          <div className="sv-nav">
+            <div className="sv-nav-row">
+              <span className="sv-count-label">
+                {searchQuery.trim() || selectedCategory !== 'all'
+                  ? `${filteredProducts.length} of ${storeProducts.length} items`
+                  : `${storeProducts.length} item${storeProducts.length === 1 ? '' : 's'}`}
+              </span>
+            </div>
+            {storeProducts.length > 0 && (
+              <div className="sv-search-wrap">
+                <span className="sv-search-icon">⌕</span>
+                <input className="sv-search-input" type="text" placeholder="Search items…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                {searchQuery && <button className="sv-search-clear" onClick={() => setSearchQuery('')}>×</button>}
+              </div>
+            )}
+            {availableCategories.length > 0 && (
+              <div className="sv-cats">
+                <button className={`sv-cat${selectedCategory === 'all' ? ' active' : ''}`} onClick={() => setSelectedCategory('all')}>All</button>
+                {availableCategories.map((cat) => (
+                  <button key={cat} className={`sv-cat${selectedCategory === cat ? ' active' : ''}`} onClick={() => setSelectedCategory(cat)}>{cat}</button>
+                ))}
+                {hasUncategorized && (
+                  <button className={`sv-cat${selectedCategory === 'uncategorized' ? ' active' : ''}`} onClick={() => setSelectedCategory('uncategorized')}>Other</button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ══ 2-COL PRODUCT GRID ══ */}
+          <div className="sv-grid">
+            {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
+            {!productsLoading && storeProducts.length === 0 && (
+              <div className="sv-empty"><div className="sv-empty-icon">🛍️</div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
+            )}
+            {!productsLoading && storeProducts.length > 0 && filteredProducts.length === 0 && (
+              <div className="sv-empty"><div className="sv-empty-icon">🔍</div><strong>Nothing found</strong><p>Try a different search or category.</p></div>
+            )}
+            {!productsLoading && filteredProducts.map((product) => {
+              const quantity = selectedProducts.get(product.id) || 0;
+              const isSelected = quantity > 0;
+              const catData = catalogue ? getCatalogueData(product, store.catalogueId) : null;
+              const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+              const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+              const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+              const imgUrl = product.image || product.imageUrl;
+              const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
+              return (
+                <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
+                  {/* Square image — correct aspect ratio, no distortion */}
+                  <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
+                    {isPublicUrl(imgUrl)
+                      ? <img src={String(imgUrl)} alt={product.name} />
+                      : <div className="sv-pcard-img-ph"><IconImg size={32} /></div>}
+                    {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
+                  </div>
+                  <div className="sv-pcard-body">
+                    <div className="sv-pcard-name">{product.name}</div>
+                    {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
+                    {price > 0 && (
+                      <div className="sv-pcard-price">
+                        {fmt(price, currencySymbol)}
+                        {priceUnit && <span className="sv-pcard-price-unit">/{unitLabel(priceUnit)}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <div className="sv-pcard-footer">
+                    <div className="sv-pcard-actions">
+                      <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(product.id, d, qstep)} accent={isSelected} />
+                      <button className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
+                    </div>
+                    {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
+                  </div>
+                  {isSelected && (
+                    <div className="sv-pcard-subtotal">
+                      {calcDetail && <span className="sv-pcard-subtotal-calc">{calcDetail}</span>}
+                      <span className="sv-pcard-subtotal-val">{fmt(price * quantity, currencySymbol)}</span>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              );
+            })}
+          </div>
 
-            <div className="of-items">
-              {productsLoading && (
-                <>
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
-                </>
-              )}
-
-              {!productsLoading && storeProducts.length === 0 && (
-                <div className="of-empty">
-                  <strong>No items in this store</strong>
-                  Products will appear here when the seller adds them.
+          {/* ══ FLOATING CART BAR (products step only) ══ */}
+          {selectedProductCount > 0 && step === 'products' && (
+            <div className="sv-cart">
+              <div className="sv-cart-inner" onClick={() => setStep('customer')}>
+                <div className="sv-cart-info">
+                  <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected</span>
+                  <span className="sv-cart-total">{fmt(orderSummary.total, currencySymbol)}</span>
                 </div>
-              )}
-
-              {!productsLoading && storeProducts.length > 0 && filteredProducts.length === 0 && (
-                <div className="of-empty">
-                  <strong>No matching items</strong>
-                  Try a different name or category.
-                </div>
-              )}
-
-              {!productsLoading && filteredProducts.map((product) => {
-                const quantity = selectedProducts.get(product.id) || 0;
-                const isSelected = quantity > 0;
-                const catData = catalogue ? getCatalogueData(product, store.catalogueId) : null;
-                const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
-                const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-                const lineTotal = price * quantity;
-                const lineCalcDetail = quantity > 0 ? formatLineCalculationDetail(quantity, price, priceUnit, currencySymbol) : null;
-
-                return (
-                  <div key={product.id} className={`of-item-card${isSelected ? ' is-selected' : ''}`}>
-                    <div className="of-img-wrap" onClick={() => setDrawerProduct(product)}>
-                      {isPublicHttpUrl(product.image || product.imageUrl) ? (
-                        <img src={String(product.image || product.imageUrl)} alt={product.name} className="of-img" />
-                      ) : (
-                        <div className="of-img-ph"><ImgIcon /></div>
-                      )}
-                      {isSelected && <div className="of-selected-badge">✓ Added</div>}
-                    </div>
-
-                    <div className="of-item-body">
-                      <div className="of-item-top">
-                        <div className="of-item-text">
-                          <div className="of-item-title-line">
-                            <span className="of-item-name">{product.name}</span>
-                            {product.subtitle ? (
-                              <span className="of-item-subtitle-inline">({product.subtitle})</span>
-                            ) : null}
-                          </div>
-                          <div className="of-item-price-row">
-                            {price > 0 && (
-                              <div className="of-price-tag">
-                                {formatStoreMoney(price, currencySymbol)}
-                                {priceUnit ? ` / ${getOrderUnitLabel(priceUnit)}` : ''}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="of-item-bottom">
-                        <div className="of-item-qty-cluster">
-                          <div className="of-qty-inline-row">
-                            <QtyControl
-                              value={quantity}
-                              step={quantityStep}
-                              onChange={(delta) => changeQty(product.id, delta, quantityStep)}
-                            />
-                            {quantityStep > 1 ? (
-                              <div className="of-step-hint of-step-hint--next-to-qty">
-                                <AlertIcon />
-                                Pack of {quantityStep}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                        <button type="button" className="of-view-btn" onClick={() => setDrawerProduct(product)}>
-                          Details ›
-                        </button>
-                      </div>
-
-                      {isSelected && (
-                        <div className="of-line-total-below" aria-live="polite">
-                          <span className="of-subtotal-label">subtotal</span>
-                          <span className="of-line-sep" aria-hidden>·</span>
-                          {lineCalcDetail ? (
-                            <>
-                              <span className="of-line-calc" title={lineCalcDetail}>{lineCalcDetail}</span>
-                              <span className="of-line-sep" aria-hidden>·</span>
-                            </>
-                          ) : null}
-                          <span className="of-line-total-val">{formatStoreMoney(lineTotal, currencySymbol)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="of-footer">
-              <div className="of-footer-app-row">
-                <span className="of-footer-link" style={{ cursor: 'default', textDecoration: 'none' }}>
-                  Ready to place an order?
-                </span>
+                <button type="button" className="sv-cart-cta">Place Order →</button>
               </div>
-              <p className="of-footer-desc">
-                Add the products you want, then continue to enter your details and submit the order.
-              </p>
             </div>
-          </>
-        )}
+          )}
+        </div>
 
-        {step === 'customer' && (
-          <>
-            <div className="of-toolbar">
-              <div className="of-section-head">Customer details</div>
+        {/* ══════════════════════════════════════════════════════════
+            MORPHING PANEL — slides up from bottom for steps 2 & 3
+            Back button ONLY appears here, never on the store home.
+        ══════════════════════════════════════════════════════════ */}
+        {(step === 'customer' || step === 'review') && (
+          <div className="sv-panel">
+            <div className="sv-panel-header">
+              <button type="button" className="sv-panel-back" onClick={handleBack} aria-label="Go back">
+                <IconBack />
+              </button>
+              <div className="sv-panel-title-wrap">
+                <div className="sv-panel-title">{step === 'customer' ? 'Your details' : 'Review order'}</div>
+                <div className="sv-panel-subtitle">{step === 'customer' ? 'Almost there — just a few details' : 'Confirm everything looks right'}</div>
+              </div>
+              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() : isSubmitting}>
+                {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
+              </button>
             </div>
-            <div style={{ padding: '0 12px' }}>
-              <div
-                style={{
-                  background: '#fff',
-                  borderRadius: 16,
-                  border: '1.5px solid #e2e8f0',
-                  padding: 16,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 16,
-                }}
-              >
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                    Your Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Enter your name"
-                    style={{
-                      width: '100%',
-                      minHeight: 44,
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: 12,
-                      background: '#fff',
-                      color: '#0f172a',
-                      fontSize: 14,
-                      fontFamily: 'var(--font)',
-                      padding: '0 14px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                    WhatsApp Number
-                  </label>
-                  <input
-                    type="text"
-                    value={customerWhatsapp}
-                    onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                    placeholder="e.g. +91 98xxxxxxxx"
-                    style={{
-                      width: '100%',
-                      minHeight: 44,
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: 12,
-                      background: '#fff',
-                      color: '#0f172a',
-                      fontSize: 14,
-                      fontFamily: 'var(--font)',
-                      padding: '0 14px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
+            <div style={{ padding: '16px 16px 0' }}>
+              <StepBar current={step} />
+            </div>
 
-                <div
-                  style={{
-                    padding: 16,
-                    background: '#f0fdf4',
-                    borderRadius: 14,
-                    border: '1.5px solid #bbf7d0',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 16,
-                  }}
-                >
+            {step === 'customer' && (
+              <div className="sv-form-body">
+                <div className="sv-field">
+                  <label>Your Name *</label>
+                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
+                </div>
+                <div className="sv-field">
+                  <label>WhatsApp Number</label>
+                  <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
+                </div>
+                <div className="sv-order-pill">
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 4 }}>
-                      Order total
-                    </div>
-                    <div style={{ fontSize: 13.5, color: '#166534', lineHeight: 1.5 }}>
-                      {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
-                    </div>
+                    <div className="sv-order-pill-label">Your selection</div>
+                    <div className="sv-order-pill-detail">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</div>
                   </div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#14532d', letterSpacing: '-0.5px' }}>
-                    {formatStoreMoney(orderSummary.total, currencySymbol)}
-                  </div>
+                  <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
                 </div>
               </div>
-            </div>
-          </>
-        )}
+            )}
 
-        {step === 'review' && (
-          <>
-            <div className="of-toolbar">
-              <div className="of-section-head">Review your order</div>
-            </div>
-            <div className="of-items">
-              {orderSummary.items.map((item) => {
-                const lineCalcDetail = formatLineCalculationDetail(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
-                return (
-                  <div key={item.productId} className="of-item-card is-selected">
-                    <div className="of-img-wrap">
-                      {isPublicHttpUrl(item.imageUrl) ? (
-                        <img src={item.imageUrl} alt={item.name} className="of-img" />
-                      ) : (
-                        <div className="of-img-ph"><ImgIcon /></div>
-                      )}
-                    </div>
-                    <div className="of-item-body">
-                      <div className="of-item-top">
-                        <div className="of-item-text">
-                          <div className="of-item-title-line">
-                            <span className="of-item-name">{item.name}</span>
-                            {item.subtitle ? <span className="of-item-subtitle-inline">({item.subtitle})</span> : null}
-                          </div>
-                          <div className="of-item-price-row">
-                            <div className="of-price-tag">
-                              {formatStoreMoney(item.unitPrice, currencySymbol)}
-                              {item.priceUnit ? ` / ${getOrderUnitLabel(item.priceUnit)}` : ''}
-                            </div>
-                          </div>
+            {step === 'review' && (
+              <>
+                <div className="sv-review-list">
+                  {orderSummary.items.map((item: any) => {
+                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
+                    return (
+                      <div key={item.productId} className="sv-rcard">
+                        <div className="sv-rcard-img">
+                          {isPublicUrl(item.imageUrl)
+                            ? <img src={item.imageUrl} alt={item.name} />
+                            : <div className="sv-rcard-img-ph"><IconImg size={24} /></div>}
+                        </div>
+                        <div className="sv-rcard-body">
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
+                          <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
                         </div>
                       </div>
-                      <div className="of-line-total-below">
-                        <span className="of-subtotal-label">subtotal</span>
-                        <span className="of-line-sep" aria-hidden>·</span>
-                        {lineCalcDetail ? (
-                          <>
-                            <span className="of-line-calc">{lineCalcDetail}</span>
-                            <span className="of-line-sep" aria-hidden>·</span>
-                          </>
-                        ) : null}
-                        <span className="of-line-total-val">{formatStoreMoney(item.rowTotal, currencySymbol)}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div
-                style={{
-                  background: '#fff',
-                  borderRadius: 16,
-                  border: '1.5px solid #e2e8f0',
-                  padding: 16,
-                }}
-              >
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                  Customer details
+                    );
+                  })}
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{customerName}</div>
-                {customerWhatsapp && (
-                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{customerWhatsapp}</div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  padding: 16,
-                  background: '#0f172a',
-                  borderRadius: 16,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 16,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.22)',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Total amount</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px' }}>
-                    {formatStoreMoney(orderSummary.total, currencySymbol)}
-                  </div>
+                <div className="sv-review-customer">
+                  <div className="sv-review-customer-label">Ordering as</div>
+                  <div className="sv-review-customer-name">{customerName}</div>
+                  {customerWhatsapp && <div className="sv-review-customer-phone">{customerWhatsapp}</div>}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setStep('products')}
-                  style={{
-                    border: 'none',
-                    borderRadius: 999,
-                    background: '#1e293b',
-                    color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: '10px 14px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font)',
-                  }}
-                >
-                  Edit Items
-                </button>
-              </div>
-            </div>
-          </>
+                <div className="sv-review-total-bar">
+                  <div>
+                    <div className="sv-review-total-label">Total</div>
+                    <div className="sv-review-total-val">{fmt(orderSummary.total, currencySymbol)}</div>
+                  </div>
+                  <button type="button" className="sv-edit-btn" onClick={() => setStep('products')}>Edit items</button>
+                </div>
+              </>
+            )}
+          </div>
         )}
-      </div>
 
-      {step === 'products' && selectedProductCount > 0 && (
-        <div className="of-summary">
-          <div className="of-summary-card" onClick={handleContinueToCustomer}>
-            <div className="of-summary-left">
-              <span className="of-summary-count">
-                {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
-              </span>
-              <span className="of-summary-total">{formatStoreMoney(orderSummary.total, currencySymbol)}</span>
-            </div>
-            <button type="button" className="of-summary-cta" onClick={handleContinueToCustomer}>
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
-
-      {(step === 'customer' || step === 'review') && (
-        <div className="of-summary">
-          <div className="of-summary-card">
-            <div className="of-summary-left">
-              <span className="of-summary-count">
-                {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
-              </span>
-              <span className="of-summary-total">{formatStoreMoney(orderSummary.total, currencySymbol)}</span>
-            </div>
-            <button
-              type="button"
-              className="of-summary-cta"
-              onClick={handlePrimaryAction}
-              disabled={primaryButtonDisabled}
-            >
-              {primaryButtonLabel}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {drawerProduct && (() => {
-        const catData = catalogue ? getCatalogueData(drawerProduct, store.catalogueId) : null;
-        const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
-        const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-        const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-        const quantity = selectedProducts.get(drawerProduct.id) || 0;
-        const lineTotal = price * quantity;
-        const drawerCalcDetail = quantity > 0 ? formatLineCalculationDetail(quantity, price, priceUnit, currencySymbol) : null;
-        const fields = Array.from({ length: 10 }, (_, index) => index + 1)
-          .map((n) => {
+        {/* ══ PRODUCT DETAIL DRAWER ══ */}
+        {drawerProduct && (() => {
+          const catData = catalogue ? getCatalogueData(drawerProduct, store.catalogueId) : null;
+          const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+          const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
+          const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+          const quantity = selectedProducts.get(drawerProduct.id) || 0;
+          const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
+          const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             const value = (drawerProduct as Record<string, unknown>)[`field${n}`];
-            if (value === undefined || value === null || String(value).trim() === '') return null;
-            const { label, unitSuffix } = getFieldLabelAndUnitSuffix(drawerProduct, n);
+            if (value == null || String(value).trim() === '') return null;
+            const { label, unitSuffix } = fieldLU(drawerProduct, n);
             return { label, value: unitSuffix ? `${String(value)} ${unitSuffix}` : String(value) };
-          })
-          .filter(Boolean) as Array<{ label: string; value: string }>;
-
-        return (
-          <div
-            ref={overlayRef}
-            className="of-overlay"
-            onClick={(e) => {
-              if (e.target === overlayRef.current) {
-                setDrawerProduct(null);
-              }
-            }}
-          >
-            <div className="of-drawer">
-              <div className="of-drawer-handle" />
-              <div className="of-drawer-img-wrap">
-                {isPublicHttpUrl(drawerProduct.image || drawerProduct.imageUrl) ? (
-                  <img src={String(drawerProduct.image || drawerProduct.imageUrl)} alt={drawerProduct.name} className="of-drawer-img" />
-                ) : (
-                  <div className="of-drawer-img-ph"><ImgIcon size={48} /></div>
-                )}
-                <button type="button" className="of-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
-              </div>
-
-              <div className="of-drawer-body">
-                <div className="of-drawer-name">{drawerProduct.name}</div>
-                {drawerProduct.subtitle && <div className="of-drawer-sub">({drawerProduct.subtitle})</div>}
-
-                {getProductCategories(drawerProduct).length > 0 && (
-                  <div className="of-category-row">
-                    {getProductCategories(drawerProduct).map((category) => (
-                      <span key={category} className="of-category-pill">{category}</span>
-                    ))}
-                  </div>
-                )}
-
-                {price > 0 && (
-                  <div className="of-drawer-price-row" style={{ marginTop: 14 }}>
-                    <div className="of-drawer-price">
-                      {formatStoreMoney(price, currencySymbol)}
-                      {priceUnit ? ` / ${getOrderUnitLabel(priceUnit)}` : ''}
+          }).filter(Boolean) as Array<{ label: string; value: string }>;
+          const imgUrl = drawerProduct.image || drawerProduct.imageUrl;
+          return (
+            <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
+              <div className="sv-drawer">
+                <div className="sv-drawer-handle" />
+                <div className="sv-drawer-img-wrap">
+                  {isPublicUrl(imgUrl)
+                    ? <img src={String(imgUrl)} alt={drawerProduct.name} />
+                    : <div className="sv-drawer-img-ph"><IconImg size={48} /></div>}
+                  <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
+                </div>
+                <div className="sv-drawer-body">
+                  <div className="sv-drawer-name">{drawerProduct.name}</div>
+                  {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
+                  {getCats(drawerProduct).length > 0 && (
+                    <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
+                  )}
+                  {price > 0 && <div className="sv-drawer-price">{fmt(price, currencySymbol)}{priceUnit && <span>/ {unitLabel(priceUnit)}</span>}</div>}
+                  {fields.length > 0 && (
+                    <div className="sv-detail-table">
+                      {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}
                     </div>
-                  </div>
-                )}
-
-                {fields.length > 0 && (
-                  <div className="of-detail-table">
-                    {fields.map((field) => (
-                      <div key={`${field.label}-${field.value}`} className="of-detail-row">
-                        <span className="of-detail-label">{field.label}</span>
-                        <span className="of-detail-val">{field.value}</span>
+                  )}
+                  <div className="sv-drawer-qty-section">
+                    <div className="sv-drawer-qty-label">Quantity</div>
+                    <div className="sv-drawer-qty-row">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
+                        {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="of-drawer-qty-section">
-                  <div className="of-drawer-qty-label">Quantity</div>
-                  <div className="of-drawer-qty-row">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <QtyControl
-                        value={quantity}
-                        step={quantityStep}
-                        onChange={(delta) => changeQty(drawerProduct.id, delta, quantityStep)}
-                      />
-                      {quantityStep > 1 ? (
-                        <div className="of-step-hint">
-                          <AlertIcon />
-                          Pack of {quantityStep}
-                        </div>
-                      ) : null}
+                      <div className="sv-drawer-total-wrap">
+                        {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}
+                        <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
+                      </div>
                     </div>
-                    <div className="of-drawer-line-total-wrap">
-                      {drawerCalcDetail ? <div className="of-drawer-line-calc">{drawerCalcDetail}</div> : null}
-                      <span className="of-drawer-line-total">{formatStoreMoney(lineTotal, currencySymbol)}</span>
-                    </div>
+                    <button className="sv-drawer-done" onClick={() => setDrawerProduct(null)}>Done</button>
                   </div>
-                  <button type="button" className="of-drawer-done" onClick={() => setDrawerProduct(null)}>
-                    Done
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
-    </div>
+          );
+        })()}
+      </div>
+    </>
   );
 }
