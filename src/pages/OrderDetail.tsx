@@ -21,6 +21,7 @@ interface OrderItem {
   unitPrice?: number;
   rowTotal?: number;
   category?: string;
+  subtitle?: string;
   productId?: string;
   imageUrl?: string;
   priceUnit?: string;
