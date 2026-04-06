@@ -7,6 +7,7 @@ import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { businessProfileFromUserSettings, type BusinessProfile, EMPTY_BUSINESS_PROFILE } from '../config/businessProfile';
 import './OrderForm.css';
 
 type Step = 'products' | 'customer' | 'review';
@@ -183,6 +184,7 @@ export default function StoreView() {
   const [store, setStore] = useState<any>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(EMPTY_BUSINESS_PROFILE);
   const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
@@ -255,6 +257,35 @@ export default function StoreView() {
     };
 
     loadStoreProducts();
+  }, [store?.sellerUserId]);
+
+  // Load business profile for the seller
+  useEffect(() => {
+    const loadBusinessProfile = async () => {
+      if (!store?.sellerUserId) return;
+
+      try {
+        const client = getSupabaseClient();
+        const { data: userSettings, error } = await client
+          .from('user_settings')
+          .select('data')
+          .eq('user_id', store.sellerUserId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching business profile:', error);
+          setBusinessProfile(EMPTY_BUSINESS_PROFILE);
+        } else if (userSettings) {
+          const profile = businessProfileFromUserSettings(userSettings);
+          setBusinessProfile(profile);
+        }
+      } catch (err) {
+        console.error('Exception loading business profile:', err);
+        setBusinessProfile(EMPTY_BUSINESS_PROFILE);
+      }
+    };
+
+    loadBusinessProfile();
   }, [store?.sellerUserId]);
 
   const catalogues = useMemo(() => getAllCatalogues(null), []);
@@ -485,9 +516,9 @@ export default function StoreView() {
   const primaryButtonDisabled =
     step === 'products' ? selectedProductCount === 0 : step === 'customer' ? !customerName.trim() : isSubmitting;
 
-  const storeDisplayName = store?.storeSlug
+  const storeDisplayName = businessProfile.businessName || (store?.storeSlug
     ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1)
-    : 'Store';
+    : 'Store');
 
   if (storeLoading) {
     return (
@@ -591,26 +622,6 @@ export default function StoreView() {
         <div className="of-header">
           <div className="of-header-inner">
             <div className="of-store-row" style={{ minWidth: 0, flex: 1 }}>
-              <button
-                type="button"
-                onClick={handleBack}
-                aria-label={drawerProduct ? 'Close details' : 'Go back'}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 999,
-                  border: '1px solid #e2e8f0',
-                  background: '#fff',
-                  color: '#0f172a',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                <IconArrowLeft />
-              </button>
               <div className="of-store-icon">
                 {store?.sellerLogoUrl && !logoFailed && isPublicHttpUrl(store.sellerLogoUrl) ? (
                   <img
@@ -626,11 +637,11 @@ export default function StoreView() {
               <div className="of-store-meta" style={{ minWidth: 0 }}>
                 <div className="of-store-name">{storeDisplayName}</div>
                 <div className="of-store-sub">
-                  {step === 'products'
-                    ? 'Order Form'
+                  {businessProfile.about ? businessProfile.about : (step === 'products'
+                    ? 'Shop Now'
                     : step === 'customer'
                       ? 'Your details'
-                      : 'Review your order'}
+                      : 'Review your order')}
                 </div>
               </div>
             </div>
