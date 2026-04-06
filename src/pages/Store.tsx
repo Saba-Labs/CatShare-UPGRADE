@@ -137,7 +137,6 @@ const CSS = `
     letter-spacing: 0.2px;
     transition: all 0.2s;
     margin-left: auto;
-    height: 100%;
   }
   .header-badge.live {
     background: rgba(21,128,61,0.15);
