@@ -1422,7 +1422,9 @@ const handleTouchEnd = useCallback(() => {
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
-                  localStorage.setItem('products', JSON.stringify(updated));
+                  // Use user-scoped key if logged in, otherwise use default key
+                  const storageKey = user?.uid ? `products::${user.uid}` : 'products';
+                  localStorage.setItem(storageKey, JSON.stringify(updated));
                   // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
                   window.dispatchEvent(new CustomEvent("product-added"));
                   window.dispatchEvent(new CustomEvent("sync-to-supabase"));
@@ -1449,7 +1451,9 @@ const handleTouchEnd = useCallback(() => {
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
-                  localStorage.setItem('products', JSON.stringify(updated));
+                  // Use user-scoped key if logged in, otherwise use default key
+                  const storageKey = user?.uid ? `products::${user.uid}` : 'products';
+                  localStorage.setItem(storageKey, JSON.stringify(updated));
                   // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
                   window.dispatchEvent(new CustomEvent("product-added"));
                   window.dispatchEvent(new CustomEvent("sync-to-supabase"));
