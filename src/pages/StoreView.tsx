@@ -788,7 +788,16 @@ export default function StoreView() {
                   {getCats(drawerProduct).length > 0 && (
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
-                  {price > 0 && <div className="sv-drawer-price">{fmt(price, currencySymbol)}{priceUnit && <span>/ {unitLabel(priceUnit)}</span>}</div>}
+                  <div className="sv-drawer-price">
+                    {price > 0 ? (
+                      <>
+                        {fmt(price, currencySymbol)}
+                        {priceUnit && <span>/ {unitLabel(priceUnit)}</span>}
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
+                    )}
+                  </div>
                   {fields.length > 0 && (
                     <div className="sv-detail-table">
                       {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}
