@@ -375,6 +375,14 @@ export default function StoreView() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll drawer to top when product is selected
+  useEffect(() => {
+    if (drawerProduct && drawerRef.current) {
+      drawerRef.current.scrollTop = 0;
+    }
+  }, [drawerProduct]);
 
   useEffect(() => {
     if (!slug) { setStoreError('Store not found'); setStoreLoading(false); return; }
@@ -766,7 +774,7 @@ export default function StoreView() {
           const imgUrl = drawerProduct.image || drawerProduct.imageUrl;
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
-              <div className="sv-drawer">
+              <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className="sv-drawer-img-wrap">
                   {isPublicUrl(imgUrl)
