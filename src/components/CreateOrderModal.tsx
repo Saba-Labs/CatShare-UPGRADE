@@ -114,6 +114,7 @@ export default function CreateOrderModal({
       unitPrice: number;
       rowTotal: number;
       category?: string;
+      subtitle?: string;
       imageUrl?: string;
       quantityStep?: number;
     }> = [];
@@ -134,9 +135,10 @@ export default function CreateOrderModal({
           unitPrice,
           rowTotal,
           category: product.category?.[0],
+          subtitle: product.subtitle,
           imageUrl: product.image,
         });
-        
+
         total += rowTotal;
       }
     });
@@ -189,6 +191,7 @@ export default function CreateOrderModal({
         unitPrice: item.unitPrice,
         rowTotal: item.rowTotal,
         category: item.category,
+        subtitle: item.subtitle,
         imageUrl: item.imageUrl,
         quantityStep: item.quantityStep,
       }));

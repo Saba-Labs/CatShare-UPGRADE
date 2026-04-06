@@ -531,12 +531,12 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       fieldsDefResult,
       settingsResult,
     ] = await Promise.all([
-      settle('products fetch', client.from('products').select('*').eq('user_id', userId).order('position', { ascending: true })),
-      settle('deleted products fetch', client.from('deleted_products').select('*').eq('user_id', userId)),
-      settle('categories fetch', client.from('categories').select('*').eq('user_id', userId)),
-      settle('catalogues definition fetch', client.from('catalogues_definition').select('*').eq('user_id', userId)),
-      settle('fields definition fetch', client.from('fields_definition').select('*').eq('user_id', userId)),
-      settle('user settings fetch', client.from('user_settings').select('*').eq('user_id', userId).maybeSingle()),
+      settle('products fetch', (client.from('products').select('*').eq('user_id', userId).order('position', { ascending: true })) as unknown as Promise<any>),
+      settle('deleted products fetch', (client.from('deleted_products').select('*').eq('user_id', userId)) as unknown as Promise<any>),
+      settle('categories fetch', (client.from('categories').select('*').eq('user_id', userId)) as unknown as Promise<any>),
+      settle('catalogues definition fetch', (client.from('catalogues_definition').select('*').eq('user_id', userId)) as unknown as Promise<any>),
+      settle('fields definition fetch', (client.from('fields_definition').select('*').eq('user_id', userId)) as unknown as Promise<any>),
+      settle('user settings fetch', (client.from('user_settings').select('*').eq('user_id', userId).maybeSingle()) as unknown as Promise<any>),
     ]);
 
     const products = productsResult?.data;

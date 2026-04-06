@@ -413,6 +413,7 @@ export default function StoreView() {
               unitPrice,
               rowTotal,
               category: product.category?.[0],
+              subtitle: product.subtitle,
               priceUnit: catData[catalogue.priceUnitField],
               imageUrl: product.image || product.imageUrl,
               quantityStep: catData.orderQuantityStep,
@@ -436,7 +437,8 @@ export default function StoreView() {
         orderItems,
         orderSummary.total,
         store.sellerCurrencyCode || 'INR',
-        customerWhatsapp.trim() || undefined
+        customerWhatsapp.trim() || undefined,
+        'store'
       );
 
       if (error) {
@@ -1040,7 +1042,7 @@ export default function StoreView() {
 
       {(step === 'customer' || step === 'review') && (
         <div className="of-summary">
-          <div className="of-summary-card" onClick={handlePrimaryAction}>
+          <div className="of-summary-card">
             <div className="of-summary-left">
               <span className="of-summary-count">
                 {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
