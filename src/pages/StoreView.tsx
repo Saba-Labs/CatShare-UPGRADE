@@ -1041,7 +1041,7 @@ export default function StoreView() {
 
       {(step === 'customer' || step === 'review') && (
         <div className="of-summary">
-          <div className="of-summary-card" onClick={handlePrimaryAction}>
+          <div className="of-summary-card">
             <div className="of-summary-left">
               <span className="of-summary-count">
                 {selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected
