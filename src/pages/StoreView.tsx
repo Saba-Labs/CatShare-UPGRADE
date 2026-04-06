@@ -413,7 +413,20 @@ export default function StoreView() {
   const catalogues = useMemo(() => getAllCatalogues(null), []);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
-  const storeProducts = useMemo(() => !store?.catalogueId ? [] : allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId)), [store, allProducts]);
+  const storeProducts = useMemo(() => {
+    if (!store?.catalogueId) return [];
+
+    // Filter products enabled for this catalogue
+    const enabledProducts = allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
+
+    // If no products are explicitly enabled for this catalogue, show all products as fallback
+    // This ensures stores don't appear empty when a new catalogue is selected
+    if (enabledProducts.length === 0 && allProducts.length > 0) {
+      return allProducts;
+    }
+
+    return enabledProducts;
+  }, [store?.catalogueId, allProducts]);
   const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
   const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
