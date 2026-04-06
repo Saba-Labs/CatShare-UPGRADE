@@ -161,6 +161,7 @@ const CSS = `
   .main {
     flex: 1;
     padding: 20px 16px 100px;
+    padding-top: 80px;
     max-width: 520px;
     margin: 0 auto;
     width: 100%;
