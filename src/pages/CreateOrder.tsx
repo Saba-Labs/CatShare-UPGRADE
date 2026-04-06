@@ -479,6 +479,7 @@ export default function CreateOrder() {
         flex: 1,
         overflowY: 'auto',
         marginTop: 40,
+        paddingBottom: 80,
       }}>
         {/* Step: Catalogue Selection */}
         {step === 'catalogue' && (
@@ -1226,6 +1227,115 @@ export default function CreateOrder() {
         )}
       </div>
 
+      {/* Footer */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 40,
+        background: '#fff',
+        borderTop: '1px solid #E2E8F0',
+        padding: '12px 16px',
+        display: 'flex',
+        gap: 12,
+        boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
+      }}>
+        {/* Back Button */}
+        <button
+          onClick={handleBack}
+          style={{
+            padding: '10px 16px',
+            border: '1.5px solid #E2E8F0',
+            borderRadius: 8,
+            background: '#fff',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#64748B',
+            transition: 'all 0.15s',
+            minWidth: 80,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = '#F8FAFC';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = '#CBD5E1';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = '#fff';
+            (e.currentTarget as HTMLButtonElement).style.borderColor = '#E2E8F0';
+          }}
+        >
+          Back
+        </button>
+
+        {/* Continue/Submit Button */}
+        <button
+          onClick={() => {
+            if (step === 'products') {
+              handleContinueToCustomer();
+            } else if (step === 'customer') {
+              handleContinueToReview();
+            } else if (step === 'review') {
+              handleCreateOrder();
+            }
+          }}
+          disabled={isSubmitting || (step === 'customer' && !customerName.trim())}
+          style={{
+            flex: 1,
+            padding: '10px 16px',
+            background: (step === 'customer' && !customerName.trim()) || (step === 'review' && isSubmitting) ? '#CBD5E1' : '#16A34A',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            cursor: (step === 'customer' && !customerName.trim()) || isSubmitting ? 'not-allowed' : 'pointer',
+            fontFamily: 'inherit',
+            fontSize: 13,
+            fontWeight: 600,
+            transition: 'all 0.15s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+          onMouseEnter={(e) => {
+            if (!((step === 'customer' && !customerName.trim()) || isSubmitting)) {
+              (e.currentTarget as HTMLButtonElement).style.background = '#15803D';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!((step === 'customer' && !customerName.trim()) || isSubmitting)) {
+              (e.currentTarget as HTMLButtonElement).style.background = '#16A34A';
+            }
+          }}
+        >
+          {isSubmitting ? (
+            <>
+              <div style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,0.3)',
+                borderTopColor: '#fff',
+                animation: 'spin 0.8s linear infinite',
+              }} />
+              Creating...
+            </>
+          ) : (
+            <>
+              {step === 'products' && 'Continue'}
+              {step === 'customer' && 'Review'}
+              {step === 'review' && 'Create Order'}
+            </>
+          )}
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg) }
+        }
+      `}</style>
     </div>
   );
 }
