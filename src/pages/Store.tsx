@@ -106,19 +106,20 @@ const CSS = `
     position: sticky;
     top: 44px;
     z-index: 50;
-    background: #18160F;
-    padding: 0 20px 16px;
+    background: #fff;
+    padding: 14px 16px 0;
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    min-height: 64px;
+    align-items: center;
+    justify-content: flex-start;
+    height: 52px;
+    border-bottom: 1px solid #E2E8F0;
+    box-shadow: 0 1px 8px rgba(0,0,0,0.05);
   }
   .header-title {
-    font-family: var(--font-head);
-    font-size: 26px;
+    font-size: 20px;
     font-weight: 800;
-    color: #F4F3EF;
-    letter-spacing: -0.5px;
+    color: #0F172A;
+    letter-spacing: -0.4px;
     line-height: 1;
   }
   .header-badge {
@@ -132,16 +133,17 @@ const CSS = `
     font-family: var(--font-body);
     letter-spacing: 0.2px;
     transition: all 0.2s;
+    margin-left: auto;
   }
   .header-badge.live {
-    background: rgba(21,128,61,0.25);
-    color: #4ADE80;
-    border: 1px solid rgba(74,222,128,0.3);
+    background: rgba(21,128,61,0.15);
+    color: #15803D;
+    border: 1px solid rgba(21,128,61,0.3);
   }
   .header-badge.offline {
-    background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.45);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #E2E8F0;
   }
   .badge-dot {
     width: 7px;
@@ -500,24 +502,27 @@ const CSS = `
   .bottom-nav {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    z-index: 50;
-    background: #18160F;
+    z-index: 30;
+    background: #fff;
     display: flex;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid #E2E8F0;
   }
   .nav-btn {
     flex: 1; padding: 14px 16px;
-    background: transparent; border: none;
-    font-family: var(--font-head);
-    font-size: 14px; font-weight: 600;
+    background: #fff; border: none;
+    font-family: inherit;
+    font-size: 14px; font-weight: 500;
     cursor: pointer;
-    color: rgba(255,255,255,0.35);
-    letter-spacing: 0.3px;
-    transition: color 0.15s;
+    color: #4B5563;
+    transition: all 0.15s;
+    text-align: center;
   }
-  .nav-btn.active { color: #F4F3EF; }
-  .nav-btn:not(.active):hover { color: rgba(255,255,255,0.6); }
+  .nav-btn.active {
+    background: #2563EB;
+    color: #fff;
+  }
+  .nav-btn:not(.active):hover { background: #F8FAFC; }
 
   /* section divider */
   .section-gap { margin-bottom: 12px; }
