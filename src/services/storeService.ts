@@ -368,22 +368,55 @@ export async function deleteStore(sellerUserId: string): Promise<{ success: bool
 
     // Set RLS user ID for the request
     setSupabaseRlsUserId(sellerUserId);
-    
+
     const { error } = await client
       .from('stores')
       .delete()
       .eq('seller_user_id', sellerUserId);
-    
+
     if (error) {
       console.error('❌ Error deleting store:', error);
       return { success: false, error: error.message };
     }
-    
+
     console.log('✅ Store deleted');
     return { success: true };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in deleteStore:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Get products for a store (public, no auth required)
+ * Called by guests to view products from a specific store
+ * Requires the RPC function get_store_products() in Supabase
+ */
+export async function getStoreProducts(
+  sellerUserId: string
+): Promise<{ success: boolean; products?: any[]; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+
+    // Call the public RPC function
+    const { data, error } = await client.rpc('get_store_products', {
+      p_seller_user_id: sellerUserId,
+    });
+
+    if (error) {
+      console.error('❌ Error fetching store products:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: true, products: [] };
+    }
+
+    return { success: true, products: data.products || [] };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in getStoreProducts:', errorMessage);
     return { success: false, error: errorMessage };
   }
 }
