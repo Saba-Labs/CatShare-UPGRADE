@@ -149,9 +149,48 @@ $$;
 
 revoke all on function public.get_store_by_slug(text) from public;
 grant execute on function public.get_store_by_slug(text) to anon, authenticated;
+
+### 4) Public RPC to Get Store Products
+
+This RPC is called by unauthenticated users to fetch all products for a store. It returns the products array.
+
+```sql
+create or replace function public.get_store_products(p_seller_user_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  products_array jsonb;
+begin
+  select jsonb_agg(
+    -- Merge product metadata with full data object
+    p.data || jsonb_build_object(
+      'id', p.id,
+      'product_id', p.product_id,
+      'name', coalesce(p.name, p.data->>'name', 'Unnamed Product'),
+      'sku', p.sku,
+      'category_id', p.category_id,
+      'created_at', p.created_at,
+      'updated_at', p.updated_at
+    )
+  ) into products_array
+  from public.products p
+  where p.user_id = p_seller_user_id::uuid
+  and p.deleted_at is null;
+
+  return jsonb_build_object(
+    'products', coalesce(products_array, '[]'::jsonb)
+  );
+end;
+$$;
+
+revoke all on function public.get_store_products(text) from public;
+grant execute on function public.get_store_products(text) to anon, authenticated;
 ```
 
-### 4) Extend Orders Table (Optional: Track Store-sourced Orders)
+### 5) Extend Orders Table (Optional: Track Store-sourced Orders)
 
 If you want to distinguish orders from stores vs. share links, add an optional column:
 

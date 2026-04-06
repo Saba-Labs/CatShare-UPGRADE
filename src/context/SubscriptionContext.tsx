@@ -85,7 +85,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      const accessToken = await getSupabaseAccessToken();
+      let accessToken: string | null = null;
+      try {
+        accessToken = await getSupabaseAccessToken();
+      } catch (err) {
+        console.debug('Failed to get access token:', err instanceof Error ? err.message : String(err));
+        setLoading(false);
+        return;
+      }
+
       if (!accessToken) {
         setLoading(false);
         return;
@@ -96,14 +104,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       try {
-        const resp = await fetch(`${baseUrl}/api/subscription`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: controller.signal,
-        });
+        let resp: Response;
+        try {
+          resp = await fetch(`${baseUrl}/api/subscription`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+          });
+        } catch (fetchErr) {
+          console.debug('Subscription fetch failed:', fetchErr instanceof Error ? fetchErr.message : String(fetchErr));
+          return;
+        }
 
         if (!resp.ok) {
           console.debug(`Subscription API returned status ${resp.status}`);

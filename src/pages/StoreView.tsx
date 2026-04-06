@@ -6,6 +6,7 @@ import { getAllCatalogues } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
+import { getFieldsDefinition } from '../config/fieldConfig';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -276,10 +277,18 @@ function srchText(p: ProductWithCatalogueData): string {
   return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
 function fieldLU(p: ProductWithCatalogueData, n: number): { label: string; unitSuffix: string } {
-  const r = p as unknown as Record<string, string | undefined>; const eu = r[`field${n}Unit`]; const rl = r[`field${n}Label`];
-  if (eu != null && String(eu).trim() !== '') return { label: (rl || `Field ${n}`).trim(), unitSuffix: String(eu).trim() };
-  if (rl) { const m = rl.match(/^(.+?)\s*\(([^)]+)\)\s*$/); if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() }; return { label: rl.trim(), unitSuffix: '' }; }
-  return { label: `Field ${n}`, unitSuffix: '' };
+  const r = p as unknown as Record<string, string | undefined>;
+  const eu = r[`field${n}Unit`];
+
+  // Get field label from fieldsDefinition
+  const fieldDefinition = getFieldsDefinition();
+  const fieldConfig = fieldDefinition.fields.find(f => f.key === `field${n}`);
+  const label = fieldConfig?.label || `Field ${n}`;
+
+  // Get unit suffix - exclude "None" and empty strings
+  const unitSuffix = eu && String(eu).trim() !== '' && String(eu).trim() !== 'None' ? String(eu).trim() : '';
+
+  return { label, unitSuffix };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -381,11 +390,11 @@ export default function StoreView() {
         const products = result.products.map((p: any) => ({
           id: p.id,
           name: p.name,
-          subtitle: p.data?.subtitle || '',
-          category: p.data?.category || [],
-          image: p.data?.image,
-          imageUrl: p.data?.image || p.data?.imageUrl,
-          ...p.data,
+          subtitle: p.subtitle || '',
+          category: p.category || [],
+          image: p.image,
+          imageUrl: p.image || p.imageUrl,
+          ...p,
         }));
         setAllProducts(products);
       }
