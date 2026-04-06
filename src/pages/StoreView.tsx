@@ -436,7 +436,8 @@ export default function StoreView() {
         orderItems,
         orderSummary.total,
         store.sellerCurrencyCode || 'INR',
-        customerWhatsapp.trim() || undefined
+        customerWhatsapp.trim() || undefined,
+        'store'
       );
 
       if (error) {
