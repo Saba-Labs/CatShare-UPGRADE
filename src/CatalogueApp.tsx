@@ -43,6 +43,24 @@ export function openPreviewHtml(id, tab = null) {
   window.dispatchEvent(evt);
 }
 
+/** Indices are for the list before the move (@hello-pangea/dnd / react-beautiful-dnd semantics). */
+function reorderList<T>(list: T[], startIndex: number, endIndex: number): T[] {
+  const result = [...list];
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+  return result;
+}
+
+/** Apply a reordered visible subset onto the full products array (supports search/filter). */
+function applyVisibleOrderToProducts(products: any[], visibleBefore: any[], visibleAfter: any[]): any[] {
+  const queue = [...visibleAfter];
+  const visSet = new Set(visibleBefore.map((p) => p.id));
+  return products.map((p) => {
+    if (!visSet.has(p.id)) return p;
+    return queue.shift() ?? p;
+  });
+}
+
 export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>> }) {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -782,7 +800,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       {tab === "products" && (
         <>
           <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50"></div>
-          <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+          <div className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+          <header className="relative h-14 flex items-center gap-3 px-4">
         
           {/* Menu Button */}
           <button
@@ -902,6 +921,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             </button>
           </div>
         </header>
+          </div>
         </>
       )}
 
@@ -914,30 +934,20 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         {tab === "products" && visible.length > 0 && (
           <DragDropContext onDragEnd={({ source, destination }) => {
             if (!destination) return;
-            // Map visible indices to actual product indices by ID
-            const movedProductId = visible[source.index]?.id;
-            const targetProductId = visible[destination.index]?.id;
+            if (source.droppableId !== destination.droppableId) return;
+            if (source.index === destination.index) return;
 
-            if (!movedProductId || !targetProductId) return;
+            const newVisible = reorderList(visible, source.index, destination.index);
+            const copy = applyVisibleOrderToProducts(products, visible, newVisible);
+            setProducts(copy);
+            window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
-            const movedProductIndex = products.findIndex(p => p.id === movedProductId);
-            const targetProductIndex = products.findIndex(p => p.id === targetProductId);
-
-            if (movedProductIndex === -1 || targetProductIndex === -1) return;
-
-            const copy = [...products];
-const [removed] = copy.splice(movedProductIndex, 1);
-const adjustedTargetIndex = movedProductIndex < targetProductIndex ? targetProductIndex - 1 : targetProductIndex;
-copy.splice(adjustedTargetIndex, 0, removed);
-setProducts(copy);
-window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-
-if (isStrictMode() && user?.uid) {
-  syncProductsToCloud(copy, deletedProducts).then(cloudData => {
-    setProducts(cloudData.products);
-    setDeletedProducts(cloudData.deletedProducts);
-  }).catch(err => console.error('Strict sync failed:', err));
-}
+            if (isStrictMode() && user?.uid) {
+              syncProductsToCloud(copy, deletedProducts).then(cloudData => {
+                setProducts(cloudData.products);
+                setDeletedProducts(cloudData.deletedProducts);
+              }).catch(err => console.error('Strict sync failed:', err));
+            }
           }}>
             <Droppable droppableId="product-list">
               {(provided) => (

@@ -5,7 +5,7 @@
  * while keeping image, name, and basic info common across all catalogues.
  */
 
-import { getAllCatalogues } from './catalogueConfig';
+import { getAllCatalogues, type Catalogue } from './catalogueConfig';
 
 /** Clamp order step for catalogue data (1 = no restriction). */
 export function normalizeOrderQuantityStep(raw: unknown): number {
@@ -220,6 +220,50 @@ export function setCatalogueData(
 export function isProductEnabledForCatalogue(product: ProductWithCatalogueData, catalogueId: string): boolean {
   if (!product.catalogueData) return catalogueId === 'cat1';
   return product.catalogueData[catalogueId]?.enabled || false;
+}
+
+/**
+ * Guess stock field name when the visitor has no local {@link Catalogue} row for this id (e.g. public store).
+ */
+function inferStockFieldFromCatalogueRow(
+  product: ProductWithCatalogueData,
+  catalogueId: string
+): string | null {
+  const raw = product.catalogueData?.[catalogueId];
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const stockKeys = Object.keys(r).filter((k) => /stock$/i.test(k) && typeof r[k] === 'boolean');
+  if (stockKeys.length === 1) return stockKeys[0];
+  if (stockKeys.length > 1) {
+    const priceKeys = Object.keys(r).filter((k) => /^price\d+$/.test(k));
+    for (const pk of priceKeys) {
+      const candidate = `${pk}Stock`;
+      if (stockKeys.includes(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * In-stock for this catalogue's stock field (same semantics as the seller grid: `p[stockField]`).
+ * Used by the public store to hide out-of-stock items.
+ */
+export function isProductInStockForCatalogue(
+  product: ProductWithCatalogueData,
+  catalogueId: string,
+  catalogue: Catalogue | null
+): boolean {
+  const catData = getCatalogueData(product, catalogueId);
+  const stockField = catalogue?.stockField ?? inferStockFieldFromCatalogueRow(product, catalogueId);
+  if (!stockField) return true;
+
+  const fromCat = catData[stockField as keyof CatalogueData];
+  const fromTop = (product as Record<string, unknown>)[stockField];
+  // The seller UI often toggles top-level `wholesaleStock` (etc.) without rewriting
+  // `catalogueData[catId]`, so merged catData can still be `true`. Treat either side as authoritative for OOS.
+  if (typeof fromCat === 'boolean' && !fromCat) return false;
+  if (typeof fromTop === 'boolean' && !fromTop) return false;
+  return true;
 }
 
 /**

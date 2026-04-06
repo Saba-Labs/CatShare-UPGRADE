@@ -82,13 +82,60 @@ function normalizePublicStoreProduct(raw: Record<string, unknown>): ProductWithC
   }
 
   const base = { ...(merged as unknown as ProductWithCatalogueData) };
+
+  /** `products.position` (int8) must win over any `position` inside `p.data`. */
+  const rowPositionRaw = raw.position ?? raw.table_position;
+  const position =
+    tryCoerceProductTablePosition(rowPositionRaw) ??
+    tryCoerceProductTablePosition(merged.position ?? merged.table_position);
+
   return {
     ...base,
     id,
     catalogueData: catalogueData ?? base.catalogueData,
     imageUrl: imageUrlRaw || base.imageUrl,
     category,
+    ...(position !== undefined ? { position } : {}),
   };
+}
+
+/** Parse `products.position` (int8 / bigint / string) for sorting. */
+function tryCoerceProductTablePosition(v: unknown): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v === 'bigint') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s = String(v).trim();
+  if (s === '') return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Match `public.products.position` (drag / sync order). Call after normalizing store RPC rows.
+ * Products without `position` sort last, then by `created_at`.
+ */
+export function sortProductsBySupabaseRowOrder(products: ProductWithCatalogueData[]): ProductWithCatalogueData[] {
+  const pos = (p: ProductWithCatalogueData): number => {
+    const n = tryCoerceProductTablePosition((p as Record<string, unknown>).position);
+    return n ?? Number.MAX_SAFE_INTEGER;
+  };
+  const created = (p: ProductWithCatalogueData): number => {
+    const r = p as Record<string, unknown>;
+    const t = r.created_at ?? r.createdAt;
+    if (typeof t === 'string') {
+      const ms = Date.parse(t);
+      return Number.isFinite(ms) ? ms : 0;
+    }
+    return 0;
+  };
+  return [...products].sort((a, b) => {
+    const d = pos(a) - pos(b);
+    if (d !== 0) return d;
+    return created(a) - created(b);
+  });
 }
 
 export interface Store {
@@ -108,6 +155,23 @@ export interface StorePublic {
   sellerCurrencyCode: string;
   sellerLogoUrl: string;
   createdAt: string;
+  /** From `user_settings.data.businessProfile` via `get_store_by_slug` (public). */
+  sellerBusinessName?: string | null;
+  sellerAbout?: string | null;
+  sellerPhone?: string | null;
+  sellerEmail?: string | null;
+  sellerWebsite?: string | null;
+  sellerAddress?: string | null;
+  sellerDescription?: string | null;
+  /** Optional extras if RPC or client merge supplies them */
+  tagline?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  whatsapp?: string | null;
+  instagram?: string | null;
+  twitter?: string | null;
+  facebook?: string | null;
+  website?: string | null;
 }
 
 /**
@@ -496,9 +560,11 @@ export async function getStoreProducts(
     }
 
     const list = parseStoreProductsRpcPayload(data);
-    const products = list
-      .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
-      .map((row) => normalizePublicStoreProduct(row));
+    const products = sortProductsBySupabaseRowOrder(
+      list
+        .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
+        .map((row) => normalizePublicStoreProduct(row))
+    );
 
     return { success: true, products };
   } catch (err) {

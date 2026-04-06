@@ -86,7 +86,9 @@ using (true);
 
 ### 3) Public RPC to Get Store by Slug
 
-This RPC is called by unauthenticated users to view a store. It merges live seller data from `user_settings`.
+This RPC is called by unauthenticated users to view a store. It merges live seller data from `user_settings` (currency, logo, and business profile fields for the public store header).
+
+If you already deployed an older version, run the `create or replace function` block below again so the response includes `sellerBusinessName`, `sellerAbout`, contact fields, etc.
 
 ```sql
 create or replace function public.get_store_by_slug(p_slug text)
@@ -97,9 +99,11 @@ set search_path = public
 as $$
 declare
   rec record;
+  us_currency text;
   us_data jsonb;
   eff_currency text;
   eff_logo text;
+  bp jsonb;
 begin
   select
     s.id,
@@ -116,22 +120,24 @@ begin
     return null;
   end if;
 
-  -- Fetch seller's current settings for currency and logo
-  select u.currency, u.data
-  into us_data
+  -- Fetch seller's current settings (currency + JSON data for business profile)
+  select u.currency, coalesce(u.data, '{}'::jsonb)
+  into us_currency, us_data
   from public.user_settings u
   where u.user_id = rec.seller_user_id::uuid
   limit 1;
 
   -- Use seller's current currency from user_settings, default to INR
   eff_currency := coalesce(
-    nullif(trim(upper((us_data->>'currency'))), ''),
+    nullif(trim(upper(us_currency)), ''),
     'INR'
   );
 
+  bp := coalesce(us_data -> 'businessProfile', '{}'::jsonb);
+
   -- Use seller's current logo from user_settings, fallback to empty string
   eff_logo := coalesce(
-    nullif(trim(us_data -> 'businessProfile' ->> 'logoUrl'), ''),
+    nullif(trim(bp ->> 'logoUrl'), ''),
     ''
   );
 
@@ -142,6 +148,13 @@ begin
     'catalogueId', rec.catalogue_id,
     'sellerCurrencyCode', eff_currency,
     'sellerLogoUrl', eff_logo,
+    'sellerBusinessName', nullif(trim(bp ->> 'businessName'), ''),
+    'sellerAbout', nullif(trim(bp ->> 'about'), ''),
+    'sellerPhone', nullif(trim(bp ->> 'phone'), ''),
+    'sellerEmail', nullif(trim(bp ->> 'email'), ''),
+    'sellerWebsite', nullif(trim(bp ->> 'website'), ''),
+    'sellerAddress', nullif(trim(bp ->> 'address'), ''),
+    'sellerDescription', nullif(trim(bp ->> 'description'), ''),
     'createdAt', rec.created_at
   );
 end;
@@ -164,21 +177,27 @@ as $$
 declare
   products_array jsonb;
 begin
-  select jsonb_agg(
-    -- Merge product metadata with full data object
-    p.data || jsonb_build_object(
+  -- `products.position` (int8) = drag order in the app; subquery ORDER BY ensures stable array order.
+  select coalesce(
+    jsonb_agg(q.m),
+    '[]'::jsonb
+  ) into products_array
+  from (
+    select (p.data || jsonb_build_object(
       'id', p.id,
       'product_id', p.product_id,
       'name', coalesce(p.name, p.data->>'name', 'Unnamed Product'),
       'sku', p.sku,
       'category_id', p.category_id,
+      'position', p.position,
       'created_at', p.created_at,
       'updated_at', p.updated_at
-    )
-  ) into products_array
-  from public.products p
-  where p.user_id = p_seller_user_id::uuid
-  and p.deleted_at is null;
+    )) as m
+    from public.products p
+    where p.user_id = p_seller_user_id::uuid
+    and p.deleted_at is null
+    order by p.position asc nulls last, p.created_at asc
+  ) q;
 
   return jsonb_build_object(
     'products', coalesce(products_array, '[]'::jsonb)

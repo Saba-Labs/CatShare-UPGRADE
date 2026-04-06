@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getStoreBySlug, getStoreProducts } from '../services/storeService';
+import { getStoreBySlug, getStoreProducts, sortProductsBySupabaseRowOrder, type StorePublic } from '../services/storeService';
 import {
   isProductEnabledForCatalogue,
+  isProductInStockForCatalogue,
   getCatalogueData,
   normalizeOrderQuantityStep,
   type CatalogueData,
@@ -64,6 +65,7 @@ const CSS = `
 @keyframes sv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
 .sv-store-name { font-family: var(--f-head); font-size: 28px; font-weight: 400; color: var(--c-text); line-height: 1.1; letter-spacing: -0.3px; margin-bottom: 5px; }
 .sv-store-tagline { font-size: 13.5px; color: var(--c-text2); line-height: 1.55; max-width: 300px; font-weight: 400; }
+.sv-store-desc { font-size: 12px; color: var(--c-text3); line-height: 1.5; max-width: 320px; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-biz-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .sv-biz-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-full); padding: 5px 11px; font-size: 12px; color: var(--c-text2); font-family: var(--f-body); text-decoration: none; transition: border-color var(--trans), color var(--trans), background var(--trans); font-weight: 500; }
 .sv-biz-chip:hover { border-color: var(--c-border2); color: var(--c-text); background: var(--c-surface3); }
@@ -275,6 +277,11 @@ function isPublicUrl(url?: string): boolean {
   try { const p = new URL(url.trim()); return p.protocol === 'http:' || p.protocol === 'https:'; } catch { return false; }
 }
 
+function webHref(raw: string): string {
+  const t = raw.trim();
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+}
+
 /** Storefront can show synced data: URLs; grid uses <img> with https or data:image only. */
 function isDisplayableImageUrl(url?: string): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -382,6 +389,7 @@ const IconImg = ({ size = 28 }: { size?: number }) => <svg width={size} height={
 const IconCheck = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
 const IconLoc = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>;
 const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 010 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z" /></svg>;
+const IconMail = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
 const IconLink = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
 const IconWA = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
 
@@ -443,7 +451,7 @@ export default function StoreView() {
   const { slug } = useParams<{ slug: string }>();
 
   const [step, setStep] = useState<Step>('products');
-  const [store, setStore] = useState<any>(null);
+  const [store, setStore] = useState<StorePublic | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
@@ -473,6 +481,10 @@ export default function StoreView() {
   }, [slug]);
 
   useEffect(() => {
+    setLogoFailed(false);
+  }, [store?.sellerLogoUrl]);
+
+  useEffect(() => {
     if (!store?.sellerUserId) return;
     setProductsLoading(true);
     getStoreProducts(store.sellerUserId).then((result) => {
@@ -486,20 +498,31 @@ export default function StoreView() {
   const catalogues = useMemo(() => getAllCatalogues(null), []);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
+
+  /** Same order as `public.products.position` (int8), even if RPC returns rows out of order. */
+  const productsInTableOrder = useMemo(
+    () => sortProductsBySupabaseRowOrder(allProducts),
+    [allProducts]
+  );
+
   const storeProducts = useMemo(() => {
     if (!store?.catalogueId) return [];
 
-    // Filter products enabled for this catalogue
-    const enabledProducts = allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
+    const inStock = (p: ProductWithCatalogueData) =>
+      isProductInStockForCatalogue(p, store.catalogueId, catalogue);
 
-    // If no products are explicitly enabled for this catalogue, show all products as fallback
-    // This ensures stores don't appear empty when a new catalogue is selected
-    if (enabledProducts.length === 0 && allProducts.length > 0) {
-      return allProducts;
+    const enabledProducts = productsInTableOrder.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
+
+    const enabledInStock = enabledProducts.filter(inStock);
+
+    if (enabledInStock.length > 0) return enabledInStock;
+
+    if (enabledProducts.length === 0 && productsInTableOrder.length > 0) {
+      return productsInTableOrder.filter(inStock);
     }
 
-    return enabledProducts;
-  }, [store?.catalogueId, allProducts]);
+    return enabledInStock;
+  }, [store?.catalogueId, productsInTableOrder, catalogue]);
   const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
   const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
@@ -575,7 +598,17 @@ export default function StoreView() {
       setSupabaseRlsUserId(store.sellerUserId);
       const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, orderSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
       if (error) alert('Failed to place order. Please try again.');
-      else { alert('Order placed! The seller will contact you soon.'); navigate('/'); }
+      else {
+        alert('Order placed! The seller will contact you soon.');
+        setStep('products');
+        setSelectedProducts(new Map());
+        setCustomerName('');
+        setCustomerWhatsapp('');
+        setDrawerProduct(null);
+        setSearchQuery('');
+        setSelectedCategory('all');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } catch { alert('Error placing order. Please try again.'); }
     finally {
       setSupabaseRlsUserId(null);
@@ -591,7 +624,27 @@ export default function StoreView() {
     else void handlePlaceOrder();
   };
 
-  const storeDisplayName = store?.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'Store';
+  const storeDisplayName = useMemo(() => {
+    const slugTitle = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const name = store?.sellerBusinessName?.trim();
+    if (name) return name;
+    return store?.storeSlug ? slugTitle(store.storeSlug) : 'Store';
+  }, [store?.sellerBusinessName, store?.storeSlug]);
+
+  const heroSubtitle = useMemo(() => {
+    if (!store) return { primary: null as string | null, secondary: null as string | null };
+    const a = store.sellerAbout?.trim() || '';
+    const t = store.tagline?.trim() || '';
+    const d = store.sellerDescription?.trim() || '';
+    if (a) return { primary: a, secondary: d && d !== a ? d : null };
+    if (t) return { primary: t, secondary: d && d !== t ? d : null };
+    if (d) return { primary: d, secondary: null };
+    return { primary: null, secondary: null };
+  }, [store]);
+
+  const displayPhone = store?.sellerPhone?.trim() || store?.phone?.trim();
+  const displayLocation = store?.sellerAddress?.trim() || store?.location?.trim();
+  const displayEmail = store?.sellerEmail?.trim();
 
   /* ── Loading ── */
   if (storeLoading) {
@@ -640,11 +693,12 @@ export default function StoreView() {
 
   /* ── Social links ── */
   type SocialLink = { label: string; url: string; icon: React.ReactNode };
+  const siteWeb = (store.sellerWebsite || store.website)?.trim();
   const socialLinks: SocialLink[] = [
     store.instagram && { label: 'Instagram', url: store.instagram, icon: 'IG' },
     store.twitter && { label: 'Twitter/X', url: store.twitter, icon: '𝕏' },
     store.facebook && { label: 'Facebook', url: store.facebook, icon: 'FB' },
-    store.website && { label: 'Website', url: store.website, icon: <IconLink /> },
+    siteWeb && { label: 'Website', url: webHref(siteWeb), icon: <IconLink /> },
   ].filter(Boolean) as SocialLink[];
 
   /* ── Main render ── */
@@ -671,11 +725,15 @@ export default function StoreView() {
               </div>
 
               <div className="sv-store-name">{storeDisplayName}</div>
-              {store.tagline && <div className="sv-store-tagline">{store.tagline}</div>}
+              {heroSubtitle.primary ? <div className="sv-store-tagline">{heroSubtitle.primary}</div> : null}
+              {heroSubtitle.secondary ? <div className="sv-store-desc">{heroSubtitle.secondary}</div> : null}
 
               <div className="sv-biz-chips">
-                {store.location && <span className="sv-biz-chip"><IconLoc />{store.location}</span>}
-                {store.phone && <a className="sv-biz-chip" href={`tel:${store.phone}`}><IconPhone />{store.phone}</a>}
+                {displayLocation ? <span className="sv-biz-chip"><IconLoc />{displayLocation}</span> : null}
+                {displayPhone ? <a className="sv-biz-chip" href={`tel:${displayPhone}`}><IconPhone />{displayPhone}</a> : null}
+                {displayEmail ? (
+                  <a className="sv-biz-chip" href={`mailto:${displayEmail}`}><IconMail />{displayEmail}</a>
+                ) : null}
                 {store.whatsapp && (
                   <a className="sv-biz-chip" href={`https://wa.me/${store.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
                     <IconWA />WhatsApp
