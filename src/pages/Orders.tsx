@@ -448,7 +448,7 @@ export default function Orders() {
   const touchStartY = useRef(0);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || user.uid.trim() === '') return;
     loadOrders();
   }, [user?.uid]);
 
@@ -526,12 +526,24 @@ export default function Orders() {
   };
 
   const loadOrders = async () => {
-    if (!user?.uid) return;
+    if (!user?.uid || user.uid.trim() === '') {
+      setError('User authentication required');
+      return;
+    }
+
+    // Prevent guest users from loading orders (guest IDs are not valid UUIDs)
+    if (user.isAnonymous) {
+      setError('Please sign in to view orders');
+      showToast('Sign in required to view orders', 'error');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const { data, error } = await fetchSellerOrders(user.uid);
     if (error) {
-      setError('Failed to load orders');
+      console.error('Failed to load orders:', error);
+      setError('Failed to load orders. Please try again.');
       showToast('Error loading orders', 'error');
     } else {
       setOrders(data || []);
@@ -856,10 +868,17 @@ export default function Orders() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12, padding: 24 }}>
             <div style={{ fontSize: 32 }}>⚠️</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: '#DC2626' }}>{error}</div>
-            <button onClick={loadOrders} style={{
-              padding: '10px 20px', borderRadius: 100, border: 'none',
-              background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-            }}>Retry</button>
+            {user?.isAnonymous ? (
+              <button onClick={() => handleNavigate('/login')} style={{
+                padding: '10px 20px', borderRadius: 100, border: 'none',
+                background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Sign In</button>
+            ) : (
+              <button onClick={loadOrders} style={{
+                padding: '10px 20px', borderRadius: 100, border: 'none',
+                background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>Retry</button>
+            )}
           </div>
         ) : filteredOrders.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, padding: 24 }}>
