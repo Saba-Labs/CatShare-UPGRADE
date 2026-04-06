@@ -56,6 +56,19 @@ function getStatusConfig(status: string) {
   }
 }
 
+function getOrderSourceConfig(source?: string) {
+  switch (source) {
+    case 'link':
+      return { bg: '#DDD6FE', text: '#4C1D95', label: 'Link' };
+    case 'manual':
+      return { bg: '#E0E7FF', text: '#3730A3', label: 'Manual' };
+    case 'store':
+      return { bg: '#DBEAFE', text: '#0C4A6E', label: 'Store' };
+    default:
+      return { bg: '#F3F4F6', text: '#374151', label: 'Unknown' };
+  }
+}
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
 function IconSearch() {
   return (
@@ -304,40 +317,55 @@ function OrderRow({
           </div>
         </div>
 
-        {/* Row 2: Date + Status */}
+        {/* Row 2: Date + Pills */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94A3B8', fontSize: 11 }}>
             <IconCalendar />
             {formatDate(order.created_at)}
           </div>
 
-          {/* Status chip — clickable, stops propagation */}
-          <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowStatusDrop(v => !v);
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
+          {/* Pills container */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+            {/* Order source pill */}
+            {order.order_source && (
+              <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: statusCfg.bg, color: statusCfg.text,
+                background: getOrderSourceConfig(order.order_source).bg, color: getOrderSourceConfig(order.order_source).text,
                 fontSize: 11, fontWeight: 700,
                 padding: '4px 9px', borderRadius: 100, border: 'none',
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusCfg.dot, display: 'inline-block' }} />
-              {statusCfg.label}
-              <IconChevronDown />
-            </button>
-            {showStatusDrop && (
-              <StatusSelector
-                current={order.status}
-                onChange={(s) => { onStatusChange(order.id, s); setShowStatusDrop(false); }}
-                onClose={() => setShowStatusDrop(false)}
-              />
+              }}>
+                {getOrderSourceConfig(order.order_source).label}
+              </span>
             )}
+
+            {/* Status chip — clickable, stops propagation */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowStatusDrop(v => !v);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  background: statusCfg.bg, color: statusCfg.text,
+                  fontSize: 11, fontWeight: 700,
+                  padding: '4px 9px', borderRadius: 100, border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusCfg.dot, display: 'inline-block' }} />
+                {statusCfg.label}
+                <IconChevronDown />
+              </button>
+              {showStatusDrop && (
+                <StatusSelector
+                  current={order.status}
+                  onChange={(s) => { onStatusChange(order.id, s); setShowStatusDrop(false); }}
+                  onClose={() => setShowStatusDrop(false)}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

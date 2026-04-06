@@ -22,6 +22,7 @@ export interface Order {
   total_amount?: number;
   currency_code: string;
   status: 'pending' | 'completed' | 'cancelled';
+  order_source?: 'link' | 'manual' | 'store';
   created_at: string;
   updated_at: string;
 }
@@ -36,7 +37,8 @@ export async function createOrder(
   items: OrderItem[],
   totalAmount: number | undefined,
   currencyCode: string = 'INR',
-  customerWhatsapp?: string
+  customerWhatsapp?: string,
+  orderSource: 'link' | 'manual' | 'store' = 'link'
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
@@ -50,6 +52,7 @@ export async function createOrder(
       total_amount: totalAmount,
       currency_code: currencyCode,
       status: 'pending',
+      order_source: orderSource,
     });
 
     return { data, error };
@@ -68,7 +71,8 @@ export async function createOrderDirectly(
   totalAmount: number | undefined,
   currencyCode: string = 'INR',
   customerWhatsapp?: string,
-  catalogueId?: string
+  catalogueId?: string,
+  orderSource: 'link' | 'manual' | 'store' = 'manual'
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
@@ -82,6 +86,7 @@ export async function createOrderDirectly(
       total_amount: totalAmount,
       currency_code: currencyCode,
       status: 'pending',
+      order_source: orderSource,
     });
 
     return { data, error };
