@@ -390,11 +390,11 @@ export default function StoreView() {
         const products = result.products.map((p: any) => ({
           id: p.id,
           name: p.name,
-          subtitle: p.data?.subtitle || '',
-          category: p.data?.category || [],
-          image: p.data?.image,
-          imageUrl: p.data?.image || p.data?.imageUrl,
-          ...p.data,
+          subtitle: p.subtitle || '',
+          category: p.category || [],
+          image: p.image,
+          imageUrl: p.image || p.imageUrl,
+          ...p,
         }));
         setAllProducts(products);
       }

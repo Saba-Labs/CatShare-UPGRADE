@@ -165,14 +165,13 @@ declare
   products_array jsonb;
 begin
   select jsonb_agg(
-    jsonb_build_object(
+    -- Merge product metadata with full data object
+    p.data || jsonb_build_object(
       'id', p.id,
-      'user_id', p.user_id,
       'product_id', p.product_id,
-      'name', p.name,
+      'name', coalesce(p.name, p.data->>'name', 'Unnamed Product'),
       'sku', p.sku,
       'category_id', p.category_id,
-      'data', p.data,
       'created_at', p.created_at,
       'updated_at', p.updated_at
     )
