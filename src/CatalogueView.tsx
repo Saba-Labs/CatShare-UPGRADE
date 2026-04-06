@@ -1419,6 +1419,8 @@ const handleTouchEnd = useCallback(() => {
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
                   );
                   setProducts(updated);
+                  // Save to localStorage before dispatching event to prevent listener from restoring stale data
+                  localStorage.setItem('products', JSON.stringify(updated));
                   window.dispatchEvent(new CustomEvent("product-added"));
                   setShowToolsMenu(false);
                 }}
@@ -1439,6 +1441,8 @@ const handleTouchEnd = useCallback(() => {
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
                   );
                   setProducts(updated);
+                  // Save to localStorage before dispatching event to prevent listener from restoring stale data
+                  localStorage.setItem('products', JSON.stringify(updated));
                   window.dispatchEvent(new CustomEvent("product-added"));
                   setShowToolsMenu(false);
                 }}
