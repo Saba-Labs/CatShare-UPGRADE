@@ -375,6 +375,14 @@ export default function StoreView() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll drawer to top when product is selected
+  useEffect(() => {
+    if (drawerProduct && drawerRef.current) {
+      drawerRef.current.scrollTop = 0;
+    }
+  }, [drawerProduct]);
 
   useEffect(() => {
     if (!slug) { setStoreError('Store not found'); setStoreLoading(false); return; }
@@ -405,7 +413,20 @@ export default function StoreView() {
   const catalogues = useMemo(() => getAllCatalogues(null), []);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
-  const storeProducts = useMemo(() => !store?.catalogueId ? [] : allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId)), [store, allProducts]);
+  const storeProducts = useMemo(() => {
+    if (!store?.catalogueId) return [];
+
+    // Filter products enabled for this catalogue
+    const enabledProducts = allProducts.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
+
+    // If no products are explicitly enabled for this catalogue, show all products as fallback
+    // This ensures stores don't appear empty when a new catalogue is selected
+    if (enabledProducts.length === 0 && allProducts.length > 0) {
+      return allProducts;
+    }
+
+    return enabledProducts;
+  }, [store?.catalogueId, allProducts]);
   const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
   const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
@@ -766,7 +787,7 @@ export default function StoreView() {
           const imgUrl = drawerProduct.image || drawerProduct.imageUrl;
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
-              <div className="sv-drawer">
+              <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className="sv-drawer-img-wrap">
                   {isPublicUrl(imgUrl)
@@ -780,7 +801,16 @@ export default function StoreView() {
                   {getCats(drawerProduct).length > 0 && (
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
-                  {price > 0 && <div className="sv-drawer-price">{fmt(price, currencySymbol)}{priceUnit && <span>/ {unitLabel(priceUnit)}</span>}</div>}
+                  <div className="sv-drawer-price">
+                    {price > 0 ? (
+                      <>
+                        {fmt(price, currencySymbol)}
+                        {priceUnit && <span>/ {unitLabel(priceUnit)}</span>}
+                      </>
+                    ) : (
+                      <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
+                    )}
+                  </div>
                   {fields.length > 0 && (
                     <div className="sv-detail-table">
                       {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}

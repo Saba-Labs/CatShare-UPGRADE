@@ -104,6 +104,23 @@ export async function fetchSellerOrders(
   status?: 'pending' | 'completed' | 'cancelled'
 ): Promise<{ data: Order[] | null; error: any }> {
   try {
+    // Validate seller user ID is provided and not empty
+    if (!sellerUserId || sellerUserId.trim() === '') {
+      return {
+        data: null,
+        error: new Error('Seller user ID is required and cannot be empty')
+      };
+    }
+
+    // Validate UUID format (roughly: 8-4-4-4-12 hex chars)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(sellerUserId)) {
+      return {
+        data: null,
+        error: new Error('Invalid seller user ID format. Guest users cannot access orders.')
+      };
+    }
+
     const client = getSupabaseClient();
 
     let query = client
