@@ -1414,14 +1414,19 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  console.log('🟢 Mark as In Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
                   );
+                  console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
                   localStorage.setItem('products', JSON.stringify(updated));
+                  // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
                   window.dispatchEvent(new CustomEvent("product-added"));
+                  window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+                  console.log('✅ Product-added and sync-to-supabase events dispatched');
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -1436,14 +1441,19 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  console.log('🔴 Mark as Out of Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p
                   );
+                  console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
                   localStorage.setItem('products', JSON.stringify(updated));
+                  // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
                   window.dispatchEvent(new CustomEvent("product-added"));
+                  window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+                  console.log('✅ Product-added and sync-to-supabase events dispatched');
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
