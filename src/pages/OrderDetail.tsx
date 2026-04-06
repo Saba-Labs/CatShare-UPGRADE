@@ -1092,8 +1092,8 @@ useEffect(() => {
                         <ProductThumb url={item.imageUrl} name={item.name} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
-                          {item.category && (
-                            <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.category}</div>
+                          {item.subtitle && (
+                            <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.subtitle}</div>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>

@@ -413,6 +413,7 @@ export default function StoreView() {
               unitPrice,
               rowTotal,
               category: product.category?.[0],
+              subtitle: product.subtitle,
               priceUnit: catData[catalogue.priceUnitField],
               imageUrl: product.image || product.imageUrl,
               quantityStep: catData.orderQuantityStep,

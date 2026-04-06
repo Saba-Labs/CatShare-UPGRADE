@@ -7,6 +7,7 @@ export interface OrderItem {
   unitPrice: number;
   rowTotal: number;
   category?: string;
+  subtitle?: string;
   priceUnit?: string;
   imageUrl?: string;
   quantityStep?: number;
