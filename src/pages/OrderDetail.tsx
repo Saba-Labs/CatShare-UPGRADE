@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { FileSharer } from '@byteowls/capacitor-filesharer';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
@@ -698,36 +700,34 @@ useEffect(() => {
       const isMobile = (window as any).Capacitor?.isNative;
 
       if (isMobile) {
-        // Use Capacitor's Filesystem API for mobile
+        // Use Capacitor's Filesystem and Share API for mobile
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
           const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
+          // Write file to cache location
           const result = await Filesystem.writeFile({
             path: fileName,
             data: base64,
-            directory: Directory.Documents,
+            directory: Directory.Cache,
             recursive: true,
           });
 
-          showToast(`Invoice saved to ${result.uri}`, 'success');
-        } catch (fsErr) {
-          console.error('Filesystem error:', fsErr);
-          // Fallback: try native share
-          try {
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            if (navigator.share) {
-              await navigator.share({
-                title: `Invoice - ${order.customer_name}`,
-                text: `Invoice for ${order.customer_name}`,
-                files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
-              });
-            }
-            showToast('Invoice generated!', 'success');
-          } catch (shareErr) {
-            showToast('Failed to save invoice', 'error');
+          // Use Capacitor Share to share the PDF
+          if (Share) {
+            await Share.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              url: result.uri,
+              dialogTitle: 'Share Invoice',
+            });
+            showToast('Invoice ready to share!', 'success');
+          } else {
+            showToast('Invoice generated! Check your notifications.', 'success');
           }
+        } catch (err) {
+          console.error('Mobile share error:', err);
+          showToast('Failed to share invoice. Please try again.', 'error');
         }
       } else {
         // Web: Use standard download
@@ -757,44 +757,105 @@ useEffect(() => {
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
 
-      // Try to use native share API if available (works on mobile)
-      try {
-        if (navigator.share) {
-          await navigator.share({
-            title: `Invoice - ${order.customer_name}`,
-            text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
-            files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use FileSharer plugin to share PDF with WhatsApp on mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          // Write file to cache
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Cache,
+            recursive: true,
           });
-          showToast('Invoice shared!', 'success');
-          setPdfLoading(false);
-          return;
+
+          // Share with WhatsApp using FileSharer if available
+          const message = `Hi ${order.customer_name}, please find your invoice attached. 📎`;
+          if (FileSharer) {
+            await FileSharer.share({
+              title: message,
+              text: message,
+              files: [result.uri],
+              chooserTitle: 'Share via WhatsApp',
+            });
+            showToast('Invoice sent to WhatsApp!', 'success');
+          } else {
+            throw new Error('FileSharer not available');
+          }
+        } catch (err) {
+          console.error('WhatsApp share error:', err);
+          // Fallback: Try using Capacitor Share API
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+            const cacheResult = await Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+              recursive: true,
+            });
+
+            if (Share) {
+              await Share.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+                url: cacheResult.uri,
+                dialogTitle: 'Share Invoice',
+              });
+              showToast('Invoice ready to share!', 'success');
+            } else {
+              throw new Error('Share API not available');
+            }
+          } catch (shareErr) {
+            console.error('Share API error:', shareErr);
+            showToast('Please share manually from your files', 'error');
+          }
         }
-      } catch (shareErr) {
-        // Share API failed or not supported, continue with fallback
+      } else {
+        // Web: Try native share or fallback to opening WhatsApp URL
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+              files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            // Fallback for web: download and suggest manual WhatsApp send
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+            showToast('Invoice downloaded. Please attach it in WhatsApp.', 'info');
+          }
+        } catch (err) {
+          console.error('Web share error:', err);
+          showToast('Failed to share invoice', 'error');
+        }
       }
-
-      // Fallback: Download PDF and open WhatsApp with message
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-
-      const phone = (order as any).customer_whatsapp || '';
-      const message = encodeURIComponent(`Hi ${order.customer_name}, please find your invoice attached. 📎`);
-      const cleaned = phone.replace(/[^\d]/g, '');
-      window.open(cleaned ? `https://wa.me/${cleaned}?text=${message}` : `https://wa.me/?text=${message}`, '_blank');
-      showToast('Invoice downloaded. You can now attach it in WhatsApp.', 'success');
-    } catch {
+    } catch (err) {
+      console.error('PDF generation error:', err);
       // Fallback: Send bill as text if PDF generation fails
-      const symbol = getSymbolForCurrencyCode(order.currency_code);
-      const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
-      const text = encodeURIComponent(billText(order, symbol));
-      window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
-      showToast('Sent bill details to WhatsApp', 'info');
+      try {
+        const symbol = getSymbolForCurrencyCode(order.currency_code);
+        const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
+        const text = encodeURIComponent(billText(order, symbol));
+        window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+        showToast('Opening WhatsApp with bill details', 'info');
+      } catch {
+        showToast('Failed to open WhatsApp', 'error');
+      }
     }
     setPdfLoading(false);
   };
