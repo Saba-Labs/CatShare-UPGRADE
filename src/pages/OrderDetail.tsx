@@ -793,7 +793,6 @@ useEffect(() => {
           const message = `Hi ${order.customer_name}, please find your invoice attached. 📎`;
           if (FileSharer) {
             await FileSharer.share({
-              title: message,
               text: message,
               files: [result.uri],
               chooserTitle: 'Share via WhatsApp',
