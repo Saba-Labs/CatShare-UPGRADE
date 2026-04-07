@@ -368,6 +368,7 @@ export default function CreateOrder() {
         category: item.category,
         subtitle: item.subtitle,
         imageUrl: item.imageUrl,
+        priceUnit: item.priceUnit,
         quantityStep: item.quantityStep,
       }));
 
