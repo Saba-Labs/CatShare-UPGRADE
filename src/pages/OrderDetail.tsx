@@ -382,32 +382,43 @@ function ActionsMenu({
       animation: 'dropIn 0.15s cubic-bezier(0.34,1.3,0.64,1)',
     }}>
       <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
-      {actions.map((action, i) => (
-        <button
-          key={i}
-          onClick={() => { action.onClick(); onClose(); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            width: '100%', padding: '12px 16px',
-            border: 'none', borderBottom: i < actions.length - 1 ? `1px solid #F2F2F7` : 'none',
-            background: 'transparent',
-            cursor: 'pointer', fontFamily: FONT,
-            fontSize: 13, fontWeight: 500,
-            color: COLORS.text,
-            transition: 'background 0.1s',
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = '#F5F5F7'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-        >
-          <div style={{ color: action.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {action.icon}
-          </div>
-          <div style={{ textAlign: 'left', flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>{action.label}</div>
-            <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{action.sublabel}</div>
-          </div>
-        </button>
-      ))}
+      {actions.map((action, i) => {
+        // Disable buttons while loading (except Copy which is instant)
+        const isDisabled = pdfLoading && i !== 2; // i === 2 is Copy button
+        return (
+          <button
+            key={i}
+            onClick={() => { if (!isDisabled) { action.onClick(); onClose(); } }}
+            disabled={isDisabled}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              width: '100%', padding: '12px 16px',
+              border: 'none', borderBottom: i < actions.length - 1 ? `1px solid #F2F2F7` : 'none',
+              background: 'transparent',
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              fontFamily: FONT,
+              fontSize: 13, fontWeight: 500,
+              color: isDisabled ? COLORS.muted : COLORS.text,
+              transition: 'background 0.1s, opacity 0.1s',
+              opacity: isDisabled ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isDisabled) e.currentTarget.style.background = '#F5F5F7';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{ color: isDisabled ? COLORS.muted : action.color, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isDisabled ? 0.6 : 1 }}>
+              {action.icon}
+            </div>
+            <div style={{ textAlign: 'left', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: isDisabled ? COLORS.muted : COLORS.text }}>{action.label}</div>
+              <div style={{ fontSize: 11, color: isDisabled ? COLORS.subtle : COLORS.muted, marginTop: 2 }}>{action.sublabel}</div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -548,6 +559,7 @@ export default function OrderDetail() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const isSwipeProcessingRef = useRef(false);
+  const pdfProcessingRef = useRef(false);
   const editModeRef = useRef(editMode);
 
   const setEditModeSync = (val: boolean) => {
@@ -688,7 +700,8 @@ useEffect(() => {
   };
 
   const handleGeneratePDF = async () => {
-    if (!order) return;
+    if (!order || pdfProcessingRef.current) return;
+    pdfProcessingRef.current = true;
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
@@ -746,10 +759,12 @@ useEffect(() => {
       showToast('Failed to generate PDF', 'error');
     }
     setPdfLoading(false);
+    pdfProcessingRef.current = false;
   };
 
   const handleShareWhatsApp = async () => {
-    if (!order) return;
+    if (!order || pdfProcessingRef.current) return;
+    pdfProcessingRef.current = true;
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
