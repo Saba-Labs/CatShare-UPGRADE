@@ -647,7 +647,10 @@ useEffect(() => {
     setSaveLoading(true);
     try {
       const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
-      const itemsToSave = editItems.map(({ _key, ...item }) => item) as any[];
+      const itemsToSave = editItems.map(({ _key, ...item }) => ({
+        ...item,
+        rowTotal: (item.unitPrice || 0) * item.quantity,
+      })) as any[];
       const { error } = await updateOrder(order.id, {
         items: itemsToSave as any,
         customer_name: editName,
@@ -661,9 +664,13 @@ useEffect(() => {
         return;
       }
 
+      const updatedItems = editItems.map(item => ({
+        ...item,
+        rowTotal: (item.unitPrice || 0) * item.quantity,
+      }));
       setOrder({
         ...order,
-        items: editItems,
+        items: updatedItems,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
