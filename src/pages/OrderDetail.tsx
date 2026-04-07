@@ -910,7 +910,6 @@ useEffect(() => {
 
           if (FileSharer) {
             await FileSharer.share({
-              title: `Invoice - ${order.customer_name}`,
               text: `Invoice for ${order.customer_name}`,
               files: [result.uri],
               chooserTitle: 'Share Invoice',
