@@ -453,6 +453,17 @@ export default function Orders() {
   }, [user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid || user.isAnonymous) return;
+    const handler = () => {
+      void fetchSellerOrders(user.uid).then(({ data, error }) => {
+        if (!error && data) setOrders(data);
+      });
+    };
+    window.addEventListener('catshareNewOrder', handler);
+    return () => window.removeEventListener('catshareNewOrder', handler);
+  }, [user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
     if (showSearch && searchInputRef.current) {
       searchInputRef.current.focus();
     }

@@ -97,8 +97,28 @@ When saving an order, the `items` jsonb should contain:
 ]
 ```
 
+### 4) Realtime (new-order notifications for sellers)
+
+The app subscribes to `INSERT` on `orders` while the seller is signed in. Enable the table for Realtime and allow `SELECT` via the signed-in user’s JWT (Realtime does not use the `x-user-id` header the same way as REST).
+
+```sql
+-- Expose orders to Supabase Realtime (run once)
+alter publication supabase_realtime add table public.orders;
+
+-- Sellers can read their own rows when authenticated (JWT), for Realtime + REST
+create policy "seller_select_own_orders_via_auth"
+on public.orders
+for select
+to authenticated
+using (seller_user_id::text = (auth.uid())::text);
+```
+
+Keep the existing `seller_select_own_orders` policy that uses `x-user-id` for REST clients that rely on that header. Postgres combines multiple `SELECT` policies with **OR**, so both can apply.
+
 ### Troubleshooting
 
 1. **`x-user-id` and RLS** — The policies expect the browser to send `x-user-id` matching `seller_user_id`. The CatShare web app sets this header on every Supabase request when signed in.
 
 2. **Order creation** — Orders are created when a customer confirms their selection in the order form and sends WhatsApp message. The app should save the order to this table at that point.
+
+3. **No realtime events** — In the Supabase dashboard, confirm **Database → Replication** includes `orders`, and that the `seller_select_own_orders_via_auth` policy exists so the subscribed user can read new rows.

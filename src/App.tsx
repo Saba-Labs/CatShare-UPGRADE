@@ -22,6 +22,7 @@ import {
 } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
+import { subscribeToNewSellerOrders } from "./services/orderNotifications";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -1106,6 +1107,16 @@ if (user?.uid && !authService.isOfflineGuest()) {
       window.removeEventListener("firebaseNotification", handleFirebaseNotification);
     };
   }, []);
+
+  // Notify seller when a customer places an order (Supabase Realtime → local / web notification)
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    if (authService.isOfflineGuest()) return;
+    if (user.isAnonymous) return;
+
+    return subscribeToNewSellerOrders(user.uid);
+  }, [loading, user?.uid, user?.isAnonymous]);
 
   // Initialize catalogue system with data migration
   useEffect(() => {

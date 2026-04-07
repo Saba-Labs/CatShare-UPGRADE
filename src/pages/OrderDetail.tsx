@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
+import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -13,6 +14,19 @@ import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import './OrderDetail.css';
+
+/** Base64-encode PDF bytes without stack overflow on large buffers. */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const end = Math.min(offset + chunkSize, bytes.length);
+    const chunk = bytes.subarray(offset, end);
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = 'pending' | 'completed' | 'cancelled';
@@ -709,14 +723,13 @@ useEffect(() => {
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
 
-      // Check if running on mobile (Capacitor)
-      const isMobile = (window as any).Capacitor?.isNative;
+      const isNative = Capacitor.isNativePlatform();
 
-      if (isMobile) {
+      if (isNative) {
         // Use Capacitor's Filesystem and Share API for mobile
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const base64 = arrayBufferToBase64(arrayBuffer);
 
           // Write file to cache location
           const result = await Filesystem.writeFile({
@@ -726,18 +739,13 @@ useEffect(() => {
             recursive: true,
           });
 
-          // Use Capacitor Share to share the PDF
-          if (Share) {
-            await Share.share({
-              title: `Invoice - ${order.customer_name}`,
-              text: `Invoice for ${order.customer_name}`,
-              url: result.uri,
-              dialogTitle: 'Share Invoice',
-            });
-            showToast('Invoice ready to share!', 'success');
-          } else {
-            showToast('Invoice generated! Check your notifications.', 'success');
-          }
+          await Share.share({
+            title: `Invoice - ${order.customer_name}`,
+            text: `Invoice for ${order.customer_name}`,
+            url: result.uri,
+            dialogTitle: 'Share Invoice',
+          });
+          showToast('Invoice ready to share!', 'success');
         } catch (err) {
           console.error('Mobile share error:', err);
           showToast('Failed to share invoice. Please try again.', 'error');
@@ -772,42 +780,27 @@ useEffect(() => {
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
 
-      // Check if running on mobile (Capacitor)
-      const isMobile = (window as any).Capacitor?.isNative;
+      const isNative = Capacitor.isNativePlatform();
 
-      if (isMobile) {
-        // Use FileSharer plugin to share PDF with WhatsApp on mobile
+      if (isNative) {
+        // FileSharer opens the system sheet — user can pick WhatsApp
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const base64 = arrayBufferToBase64(arrayBuffer);
 
-          // Write file to cache
-          const result = await Filesystem.writeFile({
-            path: fileName,
-            data: base64,
-            directory: Directory.Cache,
-            recursive: true,
+          await FileSharer.share({
+            filename: fileName,
+            base64Data: base64,
+            contentType: 'application/pdf',
+            android: { chooserTitle: 'Share via WhatsApp' },
           });
-
-          // Share with WhatsApp using FileSharer if available
-          const message = `Hi ${order.customer_name}, please find your invoice attached. 📎`;
-          if (FileSharer) {
-            await FileSharer.share({
-              filename: fileName,
-              base64Data: base64,
-              contentType: 'application/pdf',
-              android: { chooserTitle: 'Share via WhatsApp' },
-            });
-            showToast('Invoice sent to WhatsApp!', 'success');
-          } else {
-            throw new Error('FileSharer not available');
-          }
+          showToast('Choose WhatsApp to send the invoice', 'success');
         } catch (err) {
           console.error('WhatsApp share error:', err);
-          // Fallback: Try using Capacitor Share API
+          // Fallback: Capacitor Share with file URI
           try {
             const arrayBuffer = await pdfBlob.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            const base64 = arrayBufferToBase64(arrayBuffer);
 
             const cacheResult = await Filesystem.writeFile({
               path: fileName,
@@ -816,20 +809,16 @@ useEffect(() => {
               recursive: true,
             });
 
-            if (Share) {
-              await Share.share({
-                title: `Invoice - ${order.customer_name}`,
-                text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
-                url: cacheResult.uri,
-                dialogTitle: 'Share Invoice',
-              });
-              showToast('Invoice ready to share!', 'success');
-            } else {
-              throw new Error('Share API not available');
-            }
+            await Share.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+              url: cacheResult.uri,
+              dialogTitle: 'Share Invoice',
+            });
+            showToast('Invoice ready to share!', 'success');
           } catch (shareErr) {
             console.error('Share API error:', shareErr);
-            showToast('Please share manually from your files', 'error');
+            showToast('Could not open share sheet. Try Download PDF.', 'error');
           }
         }
       } else {
@@ -893,39 +882,25 @@ useEffect(() => {
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
 
-      // Check if running on mobile (Capacitor)
-      const isMobile = (window as any).Capacitor?.isNative;
+      const isNative = Capacitor.isNativePlatform();
 
-      if (isMobile) {
-        // Use FileSharer for mobile
+      if (isNative) {
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const base64 = arrayBufferToBase64(arrayBuffer);
 
-          const result = await Filesystem.writeFile({
-            path: fileName,
-            data: base64,
-            directory: Directory.Cache,
-            recursive: true,
+          await FileSharer.share({
+            filename: fileName,
+            base64Data: base64,
+            contentType: 'application/pdf',
+            android: { chooserTitle: 'Share Invoice' },
           });
-
-          if (FileSharer) {
-            await FileSharer.share({
-              filename: fileName,
-              base64Data: base64,
-              contentType: 'application/pdf',
-              android: { chooserTitle: 'Share Invoice' },
-            });
-            showToast('Invoice shared!', 'success');
-          } else {
-            throw new Error('FileSharer not available');
-          }
+          showToast('Invoice ready to share!', 'success');
         } catch (err) {
           console.error('Mobile share error:', err);
-          // Fallback: Try Capacitor Share
           try {
             const arrayBuffer = await pdfBlob.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            const base64 = arrayBufferToBase64(arrayBuffer);
 
             const cacheResult = await Filesystem.writeFile({
               path: fileName,
@@ -934,17 +909,13 @@ useEffect(() => {
               recursive: true,
             });
 
-            if (Share) {
-              await Share.share({
-                title: `Invoice - ${order.customer_name}`,
-                text: `Invoice for ${order.customer_name}`,
-                url: cacheResult.uri,
-                dialogTitle: 'Share Invoice',
-              });
-              showToast('Invoice shared!', 'success');
-            } else {
-              throw new Error('Share API not available');
-            }
+            await Share.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              url: cacheResult.uri,
+              dialogTitle: 'Share Invoice',
+            });
+            showToast('Invoice ready to share!', 'success');
           } catch (shareErr) {
             showToast('Failed to share invoice', 'error');
           }
