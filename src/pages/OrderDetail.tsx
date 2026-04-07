@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { FileSharer } from '@byteowls/capacitor-filesharer';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
@@ -380,32 +382,43 @@ function ActionsMenu({
       animation: 'dropIn 0.15s cubic-bezier(0.34,1.3,0.64,1)',
     }}>
       <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
-      {actions.map((action, i) => (
-        <button
-          key={i}
-          onClick={() => { action.onClick(); onClose(); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            width: '100%', padding: '12px 16px',
-            border: 'none', borderBottom: i < actions.length - 1 ? `1px solid #F2F2F7` : 'none',
-            background: 'transparent',
-            cursor: 'pointer', fontFamily: FONT,
-            fontSize: 13, fontWeight: 500,
-            color: COLORS.text,
-            transition: 'background 0.1s',
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = '#F5F5F7'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-        >
-          <div style={{ color: action.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {action.icon}
-          </div>
-          <div style={{ textAlign: 'left', flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: COLORS.text }}>{action.label}</div>
-            <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{action.sublabel}</div>
-          </div>
-        </button>
-      ))}
+      {actions.map((action, i) => {
+        // Disable buttons while loading (except Copy which is instant)
+        const isDisabled = pdfLoading && i !== 2; // i === 2 is Copy button
+        return (
+          <button
+            key={i}
+            onClick={() => { if (!isDisabled) { action.onClick(); onClose(); } }}
+            disabled={isDisabled}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              width: '100%', padding: '12px 16px',
+              border: 'none', borderBottom: i < actions.length - 1 ? `1px solid #F2F2F7` : 'none',
+              background: 'transparent',
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              fontFamily: FONT,
+              fontSize: 13, fontWeight: 500,
+              color: isDisabled ? COLORS.muted : COLORS.text,
+              transition: 'background 0.1s, opacity 0.1s',
+              opacity: isDisabled ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isDisabled) e.currentTarget.style.background = '#F5F5F7';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{ color: isDisabled ? COLORS.muted : action.color, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isDisabled ? 0.6 : 1 }}>
+              {action.icon}
+            </div>
+            <div style={{ textAlign: 'left', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: isDisabled ? COLORS.muted : COLORS.text }}>{action.label}</div>
+              <div style={{ fontSize: 11, color: isDisabled ? COLORS.subtle : COLORS.muted, marginTop: 2 }}>{action.sublabel}</div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -546,6 +559,7 @@ export default function OrderDetail() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const isSwipeProcessingRef = useRef(false);
+  const pdfProcessingRef = useRef(false);
   const editModeRef = useRef(editMode);
 
   const setEditModeSync = (val: boolean) => {
@@ -647,7 +661,10 @@ useEffect(() => {
     setSaveLoading(true);
     try {
       const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
-      const itemsToSave = editItems.map(({ _key, ...item }) => item) as any[];
+      const itemsToSave = editItems.map(({ _key, ...item }) => ({
+        ...item,
+        rowTotal: (item.unitPrice || 0) * item.quantity,
+      })) as any[];
       const { error } = await updateOrder(order.id, {
         items: itemsToSave as any,
         customer_name: editName,
@@ -661,9 +678,13 @@ useEffect(() => {
         return;
       }
 
+      const updatedItems = editItems.map(item => ({
+        ...item,
+        rowTotal: (item.unitPrice || 0) * item.quantity,
+      }));
       setOrder({
         ...order,
-        items: editItems,
+        items: updatedItems,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total > 0 ? total : order.total_amount,
@@ -679,7 +700,8 @@ useEffect(() => {
   };
 
   const handleGeneratePDF = async () => {
-    if (!order) return;
+    if (!order || pdfProcessingRef.current) return;
+    pdfProcessingRef.current = true;
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
@@ -691,36 +713,34 @@ useEffect(() => {
       const isMobile = (window as any).Capacitor?.isNative;
 
       if (isMobile) {
-        // Use Capacitor's Filesystem API for mobile
+        // Use Capacitor's Filesystem and Share API for mobile
         try {
           const arrayBuffer = await pdfBlob.arrayBuffer();
           const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
+          // Write file to cache location
           const result = await Filesystem.writeFile({
             path: fileName,
             data: base64,
-            directory: Directory.Documents,
+            directory: Directory.Cache,
             recursive: true,
           });
 
-          showToast(`Invoice saved to ${result.uri}`, 'success');
-        } catch (fsErr) {
-          console.error('Filesystem error:', fsErr);
-          // Fallback: try native share
-          try {
-            const arrayBuffer = await pdfBlob.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            if (navigator.share) {
-              await navigator.share({
-                title: `Invoice - ${order.customer_name}`,
-                text: `Invoice for ${order.customer_name}`,
-                files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
-              });
-            }
-            showToast('Invoice generated!', 'success');
-          } catch (shareErr) {
-            showToast('Failed to save invoice', 'error');
+          // Use Capacitor Share to share the PDF
+          if (Share) {
+            await Share.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              url: result.uri,
+              dialogTitle: 'Share Invoice',
+            });
+            showToast('Invoice ready to share!', 'success');
+          } else {
+            showToast('Invoice generated! Check your notifications.', 'success');
           }
+        } catch (err) {
+          console.error('Mobile share error:', err);
+          showToast('Failed to share invoice. Please try again.', 'error');
         }
       } else {
         // Web: Use standard download
@@ -739,10 +759,12 @@ useEffect(() => {
       showToast('Failed to generate PDF', 'error');
     }
     setPdfLoading(false);
+    pdfProcessingRef.current = false;
   };
 
   const handleShareWhatsApp = async () => {
-    if (!order) return;
+    if (!order || pdfProcessingRef.current) return;
+    pdfProcessingRef.current = true;
     setPdfLoading(true);
     try {
       const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
@@ -750,44 +772,105 @@ useEffect(() => {
       const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
       const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
 
-      // Try to use native share API if available (works on mobile)
-      try {
-        if (navigator.share) {
-          await navigator.share({
-            title: `Invoice - ${order.customer_name}`,
-            text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
-            files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use FileSharer plugin to share PDF with WhatsApp on mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          // Write file to cache
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Cache,
+            recursive: true,
           });
-          showToast('Invoice shared!', 'success');
-          setPdfLoading(false);
-          return;
+
+          // Share with WhatsApp using FileSharer if available
+          const message = `Hi ${order.customer_name}, please find your invoice attached. 📎`;
+          if (FileSharer) {
+            await FileSharer.share({
+              filename: fileName,
+              base64Data: base64,
+              contentType: 'application/pdf',
+              android: { chooserTitle: 'Share via WhatsApp' },
+            });
+            showToast('Invoice sent to WhatsApp!', 'success');
+          } else {
+            throw new Error('FileSharer not available');
+          }
+        } catch (err) {
+          console.error('WhatsApp share error:', err);
+          // Fallback: Try using Capacitor Share API
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+            const cacheResult = await Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+              recursive: true,
+            });
+
+            if (Share) {
+              await Share.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+                url: cacheResult.uri,
+                dialogTitle: 'Share Invoice',
+              });
+              showToast('Invoice ready to share!', 'success');
+            } else {
+              throw new Error('Share API not available');
+            }
+          } catch (shareErr) {
+            console.error('Share API error:', shareErr);
+            showToast('Please share manually from your files', 'error');
+          }
         }
-      } catch (shareErr) {
-        // Share API failed or not supported, continue with fallback
+      } else {
+        // Web: Try native share or fallback to opening WhatsApp URL
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+              files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            // Fallback for web: download and suggest manual WhatsApp send
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+            showToast('Invoice downloaded. Please attach it in WhatsApp.', 'info');
+          }
+        } catch (err) {
+          console.error('Web share error:', err);
+          showToast('Failed to share invoice', 'error');
+        }
       }
-
-      // Fallback: Download PDF and open WhatsApp with message
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = pdfUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
-
-      const phone = (order as any).customer_whatsapp || '';
-      const message = encodeURIComponent(`Hi ${order.customer_name}, please find your invoice attached. 📎`);
-      const cleaned = phone.replace(/[^\d]/g, '');
-      window.open(cleaned ? `https://wa.me/${cleaned}?text=${message}` : `https://wa.me/?text=${message}`, '_blank');
-      showToast('Invoice downloaded. You can now attach it in WhatsApp.', 'success');
-    } catch {
+    } catch (err) {
+      console.error('PDF generation error:', err);
       // Fallback: Send bill as text if PDF generation fails
-      const symbol = getSymbolForCurrencyCode(order.currency_code);
-      const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
-      const text = encodeURIComponent(billText(order, symbol));
-      window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
-      showToast('Sent bill details to WhatsApp', 'info');
+      try {
+        const symbol = getSymbolForCurrencyCode(order.currency_code);
+        const phone = ((order as any).customer_whatsapp || '').replace(/[^\d]/g, '');
+        const text = encodeURIComponent(billText(order, symbol));
+        window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+        showToast('Opening WhatsApp with bill details', 'info');
+      } catch {
+        showToast('Failed to open WhatsApp', 'error');
+      }
     }
     setPdfLoading(false);
   };
@@ -803,12 +886,101 @@ useEffect(() => {
 
   const handleNativeShare = async () => {
     if (!order) return;
-    const symbol = getSymbolForCurrencyCode(order.currency_code);
-    if (navigator.share) {
-      await navigator.share({ title: `Order — ${order.customer_name}`, text: billText(order, symbol) });
-    } else {
-      handleCopy();
+    setPdfLoading(true);
+    try {
+      const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
+      const symbol = getSymbolForCurrencyCode(order.currency_code);
+      const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
+      const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
+
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use FileSharer for mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Cache,
+            recursive: true,
+          });
+
+          if (FileSharer) {
+            await FileSharer.share({
+              filename: fileName,
+              base64Data: base64,
+              contentType: 'application/pdf',
+              android: { chooserTitle: 'Share Invoice' },
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            throw new Error('FileSharer not available');
+          }
+        } catch (err) {
+          console.error('Mobile share error:', err);
+          // Fallback: Try Capacitor Share
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+            const cacheResult = await Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+              recursive: true,
+            });
+
+            if (Share) {
+              await Share.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Invoice for ${order.customer_name}`,
+                url: cacheResult.uri,
+                dialogTitle: 'Share Invoice',
+              });
+              showToast('Invoice shared!', 'success');
+            } else {
+              throw new Error('Share API not available');
+            }
+          } catch (shareErr) {
+            showToast('Failed to share invoice', 'error');
+          }
+        }
+      } else {
+        // Web: Use native share or fallback
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            // Fallback: download
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+            showToast('Invoice downloaded!', 'success');
+          }
+        } catch (err) {
+          console.error('Web share error:', err);
+          showToast('Failed to share invoice', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      showToast('Failed to generate invoice', 'error');
     }
+    setPdfLoading(false);
   };
 
   const handleDelete = async () => {

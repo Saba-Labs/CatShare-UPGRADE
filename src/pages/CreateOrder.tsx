@@ -368,6 +368,7 @@ export default function CreateOrder() {
         category: item.category,
         subtitle: item.subtitle,
         imageUrl: item.imageUrl,
+        priceUnit: item.priceUnit,
         quantityStep: item.quantityStep,
       }));
 
@@ -1238,7 +1239,7 @@ export default function CreateOrder() {
         background: '#fff',
         borderTop: '1px solid #E2E8F0',
         padding: '12px 16px',
-        display: 'flex',
+        display: step === 'catalogue' ? 'none' : 'flex',
         gap: 12,
         boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
       }}>
