@@ -871,12 +871,101 @@ useEffect(() => {
 
   const handleNativeShare = async () => {
     if (!order) return;
-    const symbol = getSymbolForCurrencyCode(order.currency_code);
-    if (navigator.share) {
-      await navigator.share({ title: `Order — ${order.customer_name}`, text: billText(order, symbol) });
-    } else {
-      handleCopy();
+    setPdfLoading(true);
+    try {
+      const businessProfile = getBusinessProfileForPdf(supabaseData?.userSettings);
+      const symbol = getSymbolForCurrencyCode(order.currency_code);
+      const pdfBlob = await generateInvoicePDF(order, businessProfile, symbol);
+      const fileName = `Invoice_${order.id.substring(0, 8)}_${(order.customer_name || 'customer').replace(/\s+/g, '_')}.pdf`;
+
+      // Check if running on mobile (Capacitor)
+      const isMobile = (window as any).Capacitor?.isNative;
+
+      if (isMobile) {
+        // Use FileSharer for mobile
+        try {
+          const arrayBuffer = await pdfBlob.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+          const result = await Filesystem.writeFile({
+            path: fileName,
+            data: base64,
+            directory: Directory.Cache,
+            recursive: true,
+          });
+
+          if (FileSharer) {
+            await FileSharer.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              files: [result.uri],
+              chooserTitle: 'Share Invoice',
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            throw new Error('FileSharer not available');
+          }
+        } catch (err) {
+          console.error('Mobile share error:', err);
+          // Fallback: Try Capacitor Share
+          try {
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+            const cacheResult = await Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+              recursive: true,
+            });
+
+            if (Share) {
+              await Share.share({
+                title: `Invoice - ${order.customer_name}`,
+                text: `Invoice for ${order.customer_name}`,
+                url: cacheResult.uri,
+                dialogTitle: 'Share Invoice',
+              });
+              showToast('Invoice shared!', 'success');
+            } else {
+              throw new Error('Share API not available');
+            }
+          } catch (shareErr) {
+            showToast('Failed to share invoice', 'error');
+          }
+        }
+      } else {
+        // Web: Use native share or fallback
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Invoice - ${order.customer_name}`,
+              text: `Invoice for ${order.customer_name}`,
+              files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
+            });
+            showToast('Invoice shared!', 'success');
+          } else {
+            // Fallback: download
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(pdfUrl), 100);
+            showToast('Invoice downloaded!', 'success');
+          }
+        } catch (err) {
+          console.error('Web share error:', err);
+          showToast('Failed to share invoice', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      showToast('Failed to generate invoice', 'error');
     }
+    setPdfLoading(false);
   };
 
   const handleDelete = async () => {
