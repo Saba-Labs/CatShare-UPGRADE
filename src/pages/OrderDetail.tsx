@@ -796,7 +796,7 @@ useEffect(() => {
               filename: fileName,
               base64Data: base64,
               contentType: 'application/pdf',
-              chooserTitle: 'Share via WhatsApp',
+              android: { chooserTitle: 'Share via WhatsApp' },
             });
             showToast('Invoice sent to WhatsApp!', 'success');
           } else {
@@ -914,7 +914,7 @@ useEffect(() => {
               filename: fileName,
               base64Data: base64,
               contentType: 'application/pdf',
-              chooserTitle: 'Share Invoice',
+              android: { chooserTitle: 'Share Invoice' },
             });
             showToast('Invoice shared!', 'success');
           } else {
