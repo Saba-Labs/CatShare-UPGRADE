@@ -116,6 +116,7 @@ export default function CreateOrderModal({
       category?: string;
       subtitle?: string;
       imageUrl?: string;
+      priceUnit?: string;
       quantityStep?: number;
     }> = [];
 
