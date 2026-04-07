@@ -793,8 +793,9 @@ useEffect(() => {
           const message = `Hi ${order.customer_name}, please find your invoice attached. 📎`;
           if (FileSharer) {
             await FileSharer.share({
-              text: message,
-              files: [result.uri],
+              filename: fileName,
+              base64Data: base64,
+              contentType: 'application/pdf',
               chooserTitle: 'Share via WhatsApp',
             });
             showToast('Invoice sent to WhatsApp!', 'success');
@@ -910,8 +911,9 @@ useEffect(() => {
 
           if (FileSharer) {
             await FileSharer.share({
-              text: `Invoice for ${order.customer_name}`,
-              files: [result.uri],
+              filename: fileName,
+              base64Data: base64,
+              contentType: 'application/pdf',
               chooserTitle: 'Share Invoice',
             });
             showToast('Invoice shared!', 'success');
