@@ -15,6 +15,11 @@
 # Preserve line number information for debugging stack traces
 -keepattributes SourceFile,LineNumberTable,Signature,Exceptions
 
+# Firebase / FCM (push when app is background or killed)
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+
 # Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;

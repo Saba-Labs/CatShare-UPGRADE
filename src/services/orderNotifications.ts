@@ -5,6 +5,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../supabaseClient';
 import { fetchSellerOrders, type Order } from './orderService';
+import { PUSH_REGISTERED_STORAGE_KEY } from './pushTokenService';
 
 const ORDERS_CHANNEL_ID = 'catshare_new_orders';
 
@@ -125,6 +126,16 @@ function setRealtimeAuthFromSession(session: Session | null): void {
   }
 }
 
+/** When FCM token is saved, server sends push for new orders; skip in-app local notification to avoid duplicates. */
+function shouldSkipLocalNotificationBecauseFcm(): boolean {
+  if (Capacitor.getPlatform() === 'web') return false;
+  try {
+    return localStorage.getItem(PUSH_REGISTERED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function emitNewOrderIfEligible(
   order: Order,
   _source: 'realtime' | 'poll',
@@ -136,7 +147,9 @@ function emitNewOrderIfEligible(
   recentlyHandledOrderIds.add(order.id);
   window.setTimeout(() => recentlyHandledOrderIds.delete(order.id), DEDUPE_MS);
 
-  void showNewOrderNotification(order);
+  if (!shouldSkipLocalNotificationBecauseFcm()) {
+    void showNewOrderNotification(order);
+  }
   options?.onNewOrder?.(order);
   try {
     window.dispatchEvent(

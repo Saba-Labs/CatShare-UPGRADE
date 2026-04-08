@@ -1,0 +1,5 @@
+# https://supabase.com/docs/guides/cli/config
+# Run `supabase link` to set project ref for local deploys.
+
+[functions.send-order-push]
+verify_jwt = false

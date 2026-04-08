@@ -23,6 +23,7 @@ import {
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
+import { initPushTokenForLoggedInUser } from "./services/pushTokenService";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -1134,6 +1135,32 @@ if (user?.uid && !authService.isOfflineGuest()) {
       cancelled = true;
       removePoll?.();
       removeRealtime?.();
+    };
+  }, [loading, user?.uid, user?.isAnonymous]);
+
+  // FCM device token → Supabase (native only); enables push when app is killed via Edge Function + webhook.
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    if (authService.isOfflineGuest()) return;
+    if (user.isAnonymous) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    let cancelled = false;
+    let removePush: (() => void) | undefined;
+
+    void (async () => {
+      const cleanup = await initPushTokenForLoggedInUser(user.uid);
+      if (cancelled) {
+        await cleanup();
+      } else {
+        removePush = cleanup;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      void removePush?.();
     };
   }, [loading, user?.uid, user?.isAnonymous]);
 
