@@ -10,6 +10,8 @@ create table if not exists public.stores (
   seller_user_id text not null unique,  -- One store per seller
   store_slug text not null unique,      -- URL identifier (e.g., "refresh")
   catalogue_id text not null,           -- Foreign key to selected catalogue
+  is_live boolean not null default true, -- Public storefront on/off (seller toggle)
+  store_whatsapp text, -- Optional WhatsApp for public storefront (international format)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -20,6 +22,16 @@ create index if not exists stores_seller_user_id_idx
 
 create index if not exists stores_store_slug_idx
   on public.stores (store_slug);
+```
+
+**Migration (existing databases):** live / offline toggle and optional storefront WhatsApp.
+
+```sql
+alter table public.stores
+  add column if not exists is_live boolean not null default true;
+
+alter table public.stores
+  add column if not exists store_whatsapp text;
 ```
 
 ### 2) RLS Policies (Seller can manage their own store, public can read via slug)
@@ -110,7 +122,9 @@ begin
     s.seller_user_id,
     s.store_slug,
     s.catalogue_id,
-    s.created_at
+    s.created_at,
+    coalesce(s.is_live, true) as is_live,
+    s.store_whatsapp
   into rec
   from public.stores s
   where s.store_slug = p_slug
@@ -155,7 +169,9 @@ begin
     'sellerWebsite', nullif(trim(bp ->> 'website'), ''),
     'sellerAddress', nullif(trim(bp ->> 'address'), ''),
     'sellerDescription', nullif(trim(bp ->> 'description'), ''),
-    'createdAt', rec.created_at
+    'createdAt', rec.created_at,
+    'isLive', coalesce(rec.is_live, true),
+    'whatsapp', nullif(trim(rec.store_whatsapp), '')
   );
 end;
 $$;

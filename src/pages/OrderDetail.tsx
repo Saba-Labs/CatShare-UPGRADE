@@ -14,6 +14,7 @@ import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import './OrderDetail.css';
+import MainAppBottomNav from '../components/MainAppBottomNav';
 
 /** Base64-encode PDF bytes without stack overflow on large buffers. */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -610,7 +611,7 @@ useEffect(() => {
       if (wasInEditMode) {
         setEditModeSync(false);
       } else {
-        navigate('/orders');
+        navigate(-1);
       }
 
       setTimeout(() => {
@@ -644,7 +645,7 @@ useEffect(() => {
     if (editMode) {
       setEditModeSync(false);
     } else {
-      navigate('/orders');
+      navigate(-1);
     }
   };
 
@@ -1103,7 +1104,7 @@ useEffect(() => {
       </div>
 
       {/* ── Scrollable content ── */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
+      <main style={{ flex: 1, overflowY: 'auto', padding: '16px 16px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
         <div style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* ── Customer card ── */}
@@ -1408,6 +1409,8 @@ useEffect(() => {
           )}
         </div>
       </main>
+
+      <MainAppBottomNav active="orders" />
     </div>
   );
 }

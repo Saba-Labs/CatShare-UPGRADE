@@ -140,6 +140,12 @@ const CSS = `
 .sv-cart-cta { flex-shrink: 0; height: 40px; padding: 0 18px; border-radius: var(--r-full); background: var(--c-accent); color: white; font-size: 13px; font-weight: 600; font-family: var(--f-body); border: none; cursor: pointer; letter-spacing: 0.1px; transition: opacity var(--trans); white-space: nowrap; }
 .sv-cart-cta:hover { opacity: 0.88; }
 
+/* ── Seller WhatsApp FAB (public contact) ── */
+.sv-fab-wa { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 210; width: 56px; height: 56px; border-radius: 50%; background: #25d366; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(37, 211, 102, 0.45); transition: transform 0.2s ease, box-shadow 0.2s ease; text-decoration: none; pointer-events: all; }
+.sv-fab-wa:hover { transform: scale(1.06); box-shadow: 0 6px 22px rgba(37, 211, 102, 0.55); }
+.sv-fab-wa:active { transform: scale(0.96); }
+.sv-fab-wa--above-cart { bottom: calc(108px + env(safe-area-inset-bottom)); }
+
 /* ── Morphing panel ── */
 .sv-panel { position: fixed; inset: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--c-bg); z-index: 120; display: flex; flex-direction: column; animation: sv-panel-in 0.3s cubic-bezier(0.32,0.72,0,1); overflow-y: auto; }
 @keyframes sv-panel-in { from{transform:translateX(-50%) translateY(100%)} to{transform:translateX(-50%) translateY(0)} }
@@ -206,9 +212,9 @@ const CSS = `
 .sv-drawer { background: var(--c-surface); border-radius: var(--r-xl) var(--r-xl) 0 0; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; animation: sv-drawer-up 0.26s cubic-bezier(0.32,0.72,0,1); box-shadow: 0 -4px 32px rgba(0,0,0,0.12); }
 @keyframes sv-drawer-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
 .sv-drawer-handle { width: 36px; height: 4px; background: var(--c-surface3); border-radius: var(--r-full); margin: 12px auto 0; }
-.sv-drawer-img-wrap { width: 100%; aspect-ratio: 16/9; background: var(--c-surface2); overflow: hidden; position: relative; margin-top: 14px; }
-.sv-drawer-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.sv-drawer-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.sv-drawer-img-wrap { width: 100%; background: var(--c-surface); position: relative; margin-top: 14px; padding: 0; box-sizing: border-box; }
+.sv-drawer-img-wrap img { display: block; width: 100%; height: auto; }
+.sv-drawer-img-ph { width: 100%; min-height: 180px; display: flex; align-items: center; justify-content: center; }
 .sv-drawer-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.88); border: 1px solid var(--c-border2); cursor: pointer; color: var(--c-text); font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
 .sv-drawer-body { padding: 18px 20px 36px; }
 .sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 400; color: var(--c-text); letter-spacing: -0.3px; line-height: 1.2; }
@@ -253,6 +259,10 @@ const CSS = `
 .sv-error-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
 .sv-error-btn { width: 100%; height: 48px; border-radius: var(--r-full); background: var(--c-accent); color: white; border: none; font-size: 14px; font-weight: 600; font-family: var(--f-body); cursor: pointer; transition: opacity var(--trans); }
 .sv-error-btn:hover { opacity: 0.88; }
+
+.sv-offline-icon { width: 60px; height: 60px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 28px; }
+.sv-offline-title { font-family: var(--f-head); font-size: 20px; font-weight: 400; color: var(--c-text); letter-spacing: -0.2px; margin-bottom: 8px; }
+.sv-offline-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
 `;
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -392,6 +402,7 @@ const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="no
 const IconMail = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
 const IconLink = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
 const IconWA = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
+const IconWAFab = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    SUB-COMPONENTS
@@ -486,6 +497,11 @@ export default function StoreView() {
 
   useEffect(() => {
     if (!store?.sellerUserId) return;
+    if (store.isLive === false) {
+      setAllProducts([]);
+      setProductsLoading(false);
+      return;
+    }
     setProductsLoading(true);
     getStoreProducts(store.sellerUserId).then((result) => {
       if (result.success && result.products) {
@@ -493,7 +509,7 @@ export default function StoreView() {
       }
       setProductsLoading(false);
     });
-  }, [store?.sellerUserId]);
+  }, [store?.sellerUserId, store?.isLive]);
 
   const catalogues = useMemo(() => getAllCatalogues(null), []);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
@@ -557,6 +573,14 @@ export default function StoreView() {
   }, [selectedProducts, store, catalogue, allProducts]);
 
   const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
+
+  /** Digits for wa.me — same bar as hero chip (any digits); wa.me prefers full country code. */
+  const sellerWhatsappDigits = useMemo(() => {
+    const w = store?.whatsapp?.trim();
+    if (!w) return '';
+    const d = w.replace(/\D/g, '');
+    return d.length > 0 ? d : '';
+  }, [store?.whatsapp]);
 
   const changeQty = (productId: string, delta: number, qstep: number) => {
     const s = normalizeOrderQuantityStep(qstep);
@@ -684,6 +708,33 @@ export default function StoreView() {
               <div className="sv-error-title">Store unavailable</div>
               <div className="sv-error-desc">{storeError || 'This store could not be found.'}</div>
               <button className="sv-error-btn" onClick={() => navigate('/')}>Go home</button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  /* ── Seller paused storefront (no product fetch) ── */
+  if (store.isLive === false) {
+    const pausedName =
+      store.sellerBusinessName?.trim() ||
+      (store.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'This store');
+    return (
+      <>
+        <style>{CSS}</style>
+        <div className="sv sv-fullscreen">
+          <div className="sv-error-card">
+            <div className="sv-error-stripe" style={{ background: 'linear-gradient(90deg,#94a3b8,#64748b)' }} />
+            <div className="sv-error-body">
+              <div className="sv-offline-icon" aria-hidden>🌙</div>
+              <div className="sv-offline-title">Store is paused</div>
+              <div className="sv-offline-desc">
+                {pausedName} is temporarily closed. Please check back later or contact the seller through their other channels if you need help.
+              </div>
+              <button type="button" className="sv-error-btn" onClick={() => navigate('/')}>
+                Go home
+              </button>
             </div>
           </div>
         </div>
@@ -924,6 +975,18 @@ export default function StoreView() {
               </>
             )}
           </div>
+        )}
+
+        {sellerWhatsappDigits && !drawerProduct && (step === 'products' || step === 'customer' || step === 'review') && (
+          <a
+            className={`sv-fab-wa${step === 'products' && selectedProductCount > 0 ? ' sv-fab-wa--above-cart' : ''}`}
+            href={`https://wa.me/${sellerWhatsappDigits}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Chat with seller on WhatsApp"
+          >
+            <IconWAFab />
+          </a>
         )}
 
         {/* ══ PRODUCT DETAIL DRAWER ══ */}

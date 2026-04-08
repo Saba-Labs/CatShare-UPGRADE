@@ -145,6 +145,10 @@ export interface Store {
   catalogueId: string;
   createdAt: string;
   updatedAt?: string;
+  /** When false, public storefront is hidden (persisted as `stores.is_live`). */
+  isLive: boolean;
+  /** Optional WhatsApp for public storefront (persisted as `stores.store_whatsapp`). */
+  storeWhatsapp: string | null;
 }
 
 export interface StorePublic {
@@ -172,6 +176,36 @@ export interface StorePublic {
   twitter?: string | null;
   facebook?: string | null;
   website?: string | null;
+  /** False = seller paused the storefront (from `get_store_by_slug`). */
+  isLive?: boolean;
+}
+
+function mapStoreRow(row: Record<string, unknown>): Store {
+  const wa = row.store_whatsapp;
+  return {
+    id: String(row.id ?? ''),
+    sellerUserId: String(row.seller_user_id ?? ''),
+    storeSlug: String(row.store_slug ?? ''),
+    catalogueId: String(row.catalogue_id ?? ''),
+    createdAt: String(row.created_at ?? ''),
+    updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
+    isLive: row.is_live !== false,
+    storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
+  };
+}
+
+/** Trim; empty → null. If non-empty, require enough digits for wa.me (country + number). */
+export function normalizeStoreWhatsappInput(raw: string): { ok: true; value: string | null } | { ok: false; error: string } {
+  const t = raw.trim();
+  if (!t) return { ok: true, value: null };
+  const digits = t.replace(/\D/g, '');
+  if (digits.length < 8) {
+    return { ok: false, error: 'Use a full number with country code (at least 8 digits).' };
+  }
+  if (digits.length > 15) {
+    return { ok: false, error: 'Number looks too long. Check and try again.' };
+  }
+  return { ok: true, value: t };
 }
 
 /**
@@ -186,31 +220,31 @@ export function validateStoreSlug(slug: string): { valid: boolean; error?: strin
   const trimmed = slug.trim().toLowerCase();
   
   if (!trimmed) {
-    return { valid: false, error: 'Slug cannot be empty' };
+    return { valid: false, error: 'Enter a name for the last part of your store link' };
   }
-  
+
   if (trimmed.length < 3) {
-    return { valid: false, error: 'Slug must be at least 3 characters' };
+    return { valid: false, error: 'Use at least 3 characters' };
   }
-  
+
   if (trimmed.length > 50) {
-    return { valid: false, error: 'Slug must not exceed 50 characters' };
+    return { valid: false, error: 'Use at most 50 characters' };
   }
-  
+
   if (!/^[a-z0-9-]+$/.test(trimmed)) {
-    return { valid: false, error: 'Slug can only contain lowercase letters, numbers, and hyphens' };
+    return { valid: false, error: 'Use only lowercase letters, numbers, and hyphens (no spaces)' };
   }
-  
+
   if (trimmed.startsWith('-') || trimmed.endsWith('-')) {
-    return { valid: false, error: 'Slug cannot start or end with a hyphen' };
+    return { valid: false, error: 'Cannot start or end with a hyphen' };
   }
-  
+
   if (trimmed.includes('--')) {
-    return { valid: false, error: 'Slug cannot contain consecutive hyphens' };
+    return { valid: false, error: 'Cannot use two hyphens in a row' };
   }
-  
+
   if (reservedWords.includes(trimmed)) {
-    return { valid: false, error: `"${slug}" is a reserved word. Please choose another slug` };
+    return { valid: false, error: 'That name is reserved. Please choose a different one' };
   }
   
   return { valid: true };
@@ -275,6 +309,7 @@ export async function createStore(
         seller_user_id: sellerUserId,
         store_slug: normalizedSlug,
         catalogue_id: catalogueId,
+        is_live: true,
       })
       .select()
       .single();
@@ -287,7 +322,7 @@ export async function createStore(
         const suggestions = generateSlugAlternatives(normalizedSlug);
         return {
           success: false,
-          error: `The slug "${normalizedSlug}" is already taken. Try one of these instead:`,
+          error: `That store link name ("${normalizedSlug}") is already taken. Try one of these:`,
           suggestedSlugs: suggestions,
         };
       }
@@ -298,14 +333,7 @@ export async function createStore(
     console.log('✅ Store created:', data);
     return {
       success: true,
-      data: {
-        id: data.id,
-        sellerUserId: data.seller_user_id,
-        storeSlug: data.store_slug,
-        catalogueId: data.catalogue_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
+      data: mapStoreRow(data as Record<string, unknown>),
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -338,8 +366,42 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     if (!data) {
       return { success: false, error: 'Store not found' };
     }
-    
-    return { success: true, data };
+
+    let parsed: unknown = data;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        /* keep string; row access will fail gracefully */
+      }
+    }
+    const row = parsed as Record<string, unknown>;
+    let waRaw = row.whatsapp ?? row.store_whatsapp ?? row.storeWhatsapp;
+    let whatsapp: string | undefined =
+      typeof waRaw === 'string' && waRaw.trim() !== '' ? waRaw.trim() : undefined;
+
+    /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
+    if (!whatsapp) {
+      const { data: storeRow } = await client
+        .from('stores')
+        .select('store_whatsapp')
+        .eq('store_slug', normalizedSlug)
+        .maybeSingle();
+      const col = storeRow && (storeRow as Record<string, unknown>).store_whatsapp;
+      if (typeof col === 'string' && col.trim() !== '') {
+        whatsapp = col.trim();
+      }
+    }
+
+    const normalized: StorePublic = {
+      ...(parsed as StorePublic),
+      isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
+    };
+    if (whatsapp) {
+      normalized.whatsapp = whatsapp;
+    }
+
+    return { success: true, data: normalized };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in getStoreBySlug:', errorMessage);
@@ -375,14 +437,7 @@ export async function getSellerStore(sellerUserId: string): Promise<{ success: b
     const store = data[0];
     return {
       success: true,
-      data: {
-        id: store.id,
-        sellerUserId: store.seller_user_id,
-        storeSlug: store.store_slug,
-        catalogueId: store.catalogue_id,
-        createdAt: store.created_at,
-        updatedAt: store.updated_at,
-      },
+      data: mapStoreRow(store as Record<string, unknown>),
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -429,7 +484,7 @@ export async function updateStoreSlug(
         const suggestions = generateSlugAlternatives(normalizedSlug);
         return {
           success: false,
-          error: `The slug "${normalizedSlug}" is already taken. Try one of these instead:`,
+          error: `That store link name ("${normalizedSlug}") is already taken. Try one of these:`,
           suggestedSlugs: suggestions,
         };
       }
@@ -440,14 +495,7 @@ export async function updateStoreSlug(
     console.log('✅ Store slug updated:', data);
     return {
       success: true,
-      data: {
-        id: data.id,
-        sellerUserId: data.seller_user_id,
-        storeSlug: data.store_slug,
-        catalogueId: data.catalogue_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
+      data: mapStoreRow(data as Record<string, unknown>),
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -489,19 +537,93 @@ export async function updateStoreCatalogue(
     console.log('✅ Store catalogue updated:', data);
     return {
       success: true,
-      data: {
-        id: data.id,
-        sellerUserId: data.seller_user_id,
-        storeSlug: data.store_slug,
-        catalogueId: data.catalogue_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      },
+      data: mapStoreRow(data as Record<string, unknown>),
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreCatalogue:', errorMessage);
     return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+/**
+ * Toggle whether the public storefront is visible (persisted in `stores.is_live`).
+ */
+/**
+ * Set or clear the WhatsApp number shown on the public storefront (floating button + chip).
+ * Pass null or empty after normalization to remove.
+ */
+export async function updateStoreWhatsapp(
+  sellerUserId: string,
+  storeWhatsapp: string | null
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        store_whatsapp: storeWhatsapp,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store WhatsApp:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreWhatsapp:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreLiveStatus(
+  sellerUserId: string,
+  isLive: boolean
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        is_live: isLive,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store live status:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreLiveStatus:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
   }
 }
 

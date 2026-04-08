@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
 import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -18,6 +18,7 @@ import { MdInventory2 } from "react-icons/md";
 import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import RatingModal from "./components/RatingModal";
+import MainAppBottomNav from "./components/MainAppBottomNav";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
 import { useSync } from "./context/SyncContext";
@@ -66,12 +67,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const { showToast } = useToast();
   const { syncProductsToCloud, isStrictMode } = useSync();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const pathname = location.pathname;
+  const tab = pathname === "/catalogues" ? "catalogues" : "products";
   const scrollRef = useRef(null);
   const isNative = Capacitor.getPlatform() !== "web";
 
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
-  const [tab, setTab] = useState("products");
   const [selectedCatalogueInCataloguesTab, setSelectedCatalogueInCataloguesTab] = useState<string | null>(null);
   const [showManageCatalogues, setShowManageCatalogues] = useState(false);
   const [renamingCatalogueIds, setRenamingCatalogueIds] = useState<Set<string>>(new Set());
@@ -119,20 +122,22 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     return () => window.removeEventListener("catalogues-changed", handleCataloguesChanged);
   }, []);
 
-  // Handle catalogue query parameter - when returning from edit view
+  // Legacy ?tab=catalogues&catalogue= → /catalogues?catalogue=
   useEffect(() => {
     const catalogueParam = searchParams.get("catalogue");
     const tabParam = searchParams.get("tab");
 
     if (tabParam === "catalogues" && catalogueParam) {
-      // Set the tab and selected catalogue
-      setTab("catalogues");
-      setSelectedCatalogueInCataloguesTab(catalogueParam);
-
-      // Clean up the URL to remove the query parameters
-      navigate("/?tab=catalogues", { replace: true });
+      navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueParam)}`, { replace: true });
     }
   }, [searchParams, navigate]);
+
+  // /catalogues?catalogue=id — open that catalogue; bare /catalogues — list
+  useEffect(() => {
+    if (pathname !== "/catalogues") return;
+    const catalogueParam = searchParams.get("catalogue");
+    setSelectedCatalogueInCataloguesTab(catalogueParam || null);
+  }, [pathname, searchParams]);
 
   // Handle rating modal query parameters - when returning from create product page
   useEffect(() => {
@@ -143,10 +148,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setShowRatingModal(true);
       setProductCountForRating(parseInt(productCountParam, 10));
 
-      // Clean up the URL to remove the query parameters
-      const baseUrl = searchParams.get("tab") === "catalogues" && searchParams.get("catalogue")
-        ? `/?tab=catalogues&catalogue=${searchParams.get("catalogue")}`
-        : "/";
+      const cat = searchParams.get("catalogue");
+      const baseUrl = cat ? `/catalogues?catalogue=${encodeURIComponent(cat)}` : "/";
       navigate(baseUrl, { replace: true });
     }
   }, [searchParams, navigate]);
@@ -287,8 +290,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       if (match) {
         // Only set tab if it's a valid tab value (products or catalogues)
         // Ignore catalogue IDs passed from within catalogue views
-        if (tab && (tab === "products" || tab === "catalogues")) {
-          setTab(tab);
+        if (tab === "catalogues") {
+          navigate("/catalogues");
+        } else if (tab === "products") {
+          navigate("/");
         }
         setPreviewList(list);
         setPreviewProduct(match);
@@ -296,7 +301,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     };
     window.addEventListener("open-preview", handler);
     return () => window.removeEventListener("open-preview", handler);
-  }, [products]);
+  }, [products, navigate]);
 
   useEffect(() => {
     const handleEditProduct = (e) => {
@@ -423,9 +428,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         return;
       }
 
-      // 4. If on catalogues tab (showing list), go back to products tab
+      // 4. If on catalogues tab (list or same section), go to previous screen in history (e.g. another tab)
       if (tab === "catalogues") {
-        setTab("products");
+        navigate(-1);
         return;
       }
 
@@ -439,10 +444,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     return () => {
       if (removeListener) removeListener();
     };
-  }, [tab, selectedCatalogueInCataloguesTab, isRendering]);
+  }, [tab, selectedCatalogueInCataloguesTab, isRendering, navigate]);
 
-  const handleTabChange = (key) => {
-    setTab(key);
+  const handleTabChange = (key: "products" | "catalogues") => {
+    if (key === "catalogues") {
+      navigate("/catalogues");
+    } else {
+      navigate("/");
+    }
     setSelected([]);
     setSearch("");
     if (key === "catalogues") {
@@ -796,6 +805,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     <div
       className="w-full min-h-[100dvh] flex flex-col bg-gradient-to-b from-white to-gray-100"
     >
+      <Outlet />
 
       {tab === "products" && (
         <>
@@ -822,7 +832,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             <h1
               className="text-xl font-bold text-center flex-1 cursor-pointer transition-opacity duration-200 flex items-center justify-center leading-none"
               onClick={() => {
-                setTab("products");
+                navigate("/");
               }}
             >
               <span className="inline-flex items-center justify-center gap-2">
@@ -1236,6 +1246,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               catalogues={catalogues}
               onSelectCatalogue={(catalogueId) => {
                 setSelectedCatalogueInCataloguesTab(catalogueId);
+                navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueId)}`);
               }}
               imageMap={imageMap}
               products={products}
@@ -1272,6 +1283,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     onBack={() => {
                       setSelected([]);
                       setSelectedCatalogueInCataloguesTab(null);
+                      navigate('/catalogues', { replace: true });
                     }}
                   />
                 </div>
@@ -1354,48 +1366,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-30 flex justify-around text-sm font-medium pb-[env(safe-area-inset-bottom,0px)]">
-        {/* Products tab */}
-        <button
-          onClick={async () => {
-            await Haptics.impact({ style: ImpactStyle.Light });
-            handleTabChange("products");
-          }}
-          className={`flex-1 py-3.5 text-center transition-all ${
-            tab === "products"
-              ? "bg-blue-500 text-white"
-              : "bg-white text-gray-600"
-          }`}
-        >
-          Products
-        </button>
-
-        {/* Catalogues tab */}
-        <button
-          onClick={async () => {
-            await Haptics.impact({ style: ImpactStyle.Light });
-            handleTabChange("catalogues");
-          }}
-          className={`flex-1 py-3.5 text-center transition-all ${
-            tab === "catalogues"
-              ? "bg-blue-500 text-white"
-              : "bg-white text-gray-600"
-          }`}
-        >
-          Catalogues
-        </button>
-
-        {/* Store tab */}
-        <button
-          onClick={async () => {
-            await Haptics.impact({ style: ImpactStyle.Light });
-            navigate("/orders");
-          }}
-          className="flex-1 py-3.5 text-center transition-all bg-white text-gray-600"
-        >
-          Orders
-        </button>
-      </nav>
+      <MainAppBottomNav active={pathname === "/catalogues" ? "catalogues" : "products"} />
 
       {tab === "products" && (
         <button

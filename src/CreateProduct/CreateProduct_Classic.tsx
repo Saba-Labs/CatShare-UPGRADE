@@ -1057,7 +1057,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const shouldShowRating = isRatingMilestone(totalProducts);
 
       const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
-      const basePath = isCatalogueId ? `/?tab=catalogues&catalogue=${fromParam}` : "/";
+      const basePath = isCatalogueId ? `/catalogues?catalogue=${fromParam}` : "/";
       const navigationPath = shouldShowRating
         ? `${basePath}${basePath.includes('?') ? '&' : '?'}showRating=true&productCount=${totalProducts}`
         : basePath;
@@ -1124,7 +1124,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
   const handleCancel = () => {
     const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
-    const navigationPath = isCatalogueId ? `/?tab=catalogues&catalogue=${fromParam}` : "/";
+    const navigationPath = isCatalogueId ? `/catalogues?catalogue=${fromParam}` : "/";
     navigate(navigationPath);
   };
 

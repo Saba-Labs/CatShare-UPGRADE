@@ -7,11 +7,16 @@ import {
   createStore,
   updateStoreSlug,
   updateStoreCatalogue,
+  updateStoreLiveStatus,
+  updateStoreWhatsapp,
+  normalizeStoreWhatsappInput,
   deleteStore,
   validateStoreSlug,
   type Store,
 } from '../services/storeService';
 import { getAllCatalogues } from '../config/catalogueConfig';
+import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
+import MainAppBottomNav from '../components/MainAppBottomNav';
 
 /* ─── tiny icons ─────────────────────────────────────────────── */
 const IconCopy = () => (
@@ -32,7 +37,7 @@ const IconTrash = () => (
   </svg>
 );
 const IconChevron = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
     <path d="M6 9l6 6 6-6" />
   </svg>
 );
@@ -51,79 +56,75 @@ const IconLink = () => (
   </svg>
 );
 
-/* ─── css injected once ────────────────────────────────────────── */
+/* ─── css — aligned with Orders page (Plus Jakarta Sans, slate palette) ─── */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #F4F3EF;
+    --bg: #F8FAFC;
     --card: #FFFFFF;
-    --border: #E2DDD5;
-    --text-primary: #18160F;
-    --text-secondary: #7A7469;
-    --text-muted: #B0AAA0;
-    --accent: #E85D00;
-    --accent-soft: #FFF0E8;
-    --accent-dark: #C24B00;
-    --green: #15803D;
+    --border: #E2E8F0;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+    --accent: #2563EB;
+    --accent-soft: #EFF6FF;
+    --accent-dark: #1D4ED8;
+    --green: #16A34A;
     --green-soft: #F0FDF4;
     --green-border: #BBF7D0;
     --red: #DC2626;
     --red-soft: #FEF2F2;
     --red-border: #FECACA;
-    --blue: #2563EB;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-    --radius: 14px;
-    --radius-sm: 8px;
-    --font-head: 'Syne', sans-serif;
-    --font-body: 'DM Sans', sans-serif;
+    --shadow-sm: 0 1px 3px rgba(15,23,42,0.06);
+    --shadow-md: 0 4px 16px rgba(15,23,42,0.08);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 
-  body { font-family: var(--font-body); background: var(--bg); }
+  body { font-family: var(--font); background: var(--bg); }
 
   .store-root {
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
     background: var(--bg);
-    font-family: var(--font-body);
+    font-family: var(--font);
   }
 
-  /* status bar */
   .status-bar {
     position: fixed;
     inset: 0 0 auto 0;
-    height: 44px;
-    background: #18160F;
+    height: 40px;
+    background: #0F172A;
     z-index: 60;
   }
 
-  /* header */
   .header {
     position: sticky;
-    top: 44px;
+    top: 40px;
     z-index: 50;
-    background: #fff;
-    padding: 0 16px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 12px 16px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    height: 52px;
-    border-bottom: 1px solid #E2E8F0;
-    box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+    min-height: 52px;
+    border-bottom: 1px solid var(--border);
   }
   .header-title {
-    font-size: 20px;
-    font-weight: 800;
-    color: #0F172A;
-    letter-spacing: -0.4px;
-    line-height: 1;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+    line-height: 1.2;
     display: flex;
     align-items: center;
-    height: 100%;
   }
   .header-badge {
     display: flex;
@@ -133,7 +134,7 @@ const CSS = `
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
-    font-family: var(--font-body);
+    font-family: var(--font);
     letter-spacing: 0.2px;
     transition: all 0.2s;
     margin-left: auto;
@@ -160,11 +161,10 @@ const CSS = `
     50% { box-shadow: 0 0 0 5px rgba(74,222,128,0.1); }
   }
 
-  /* main */
   .main {
     flex: 1;
-    padding: 20px 16px 100px;
-    padding-top: 80px;
+    padding: 16px 16px 100px;
+    padding-top: 72px;
     max-width: 520px;
     margin: 0 auto;
     width: 100%;
@@ -185,7 +185,7 @@ const CSS = `
   }
   .toggle-card.live-on { border-color: var(--green-border); background: var(--green-soft); }
   .toggle-info { display: flex; flex-direction: column; gap: 2px; }
-  .toggle-label { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .toggle-label { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text-primary); }
   .toggle-sub { font-size: 12px; color: var(--text-secondary); }
   .toggle-sub.live { color: var(--green); }
 
@@ -211,6 +211,7 @@ const CSS = `
   }
   input:checked + .slider { background: var(--green); }
   input:checked + .slider::before { transform: translateX(24px); }
+  .switch.pending .slider { cursor: wait; opacity: 0.88; }
 
   /* info card */
   .info-card {
@@ -229,27 +230,27 @@ const CSS = `
   }
   .info-card-label {
     font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.8px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     color: var(--text-muted);
-    font-family: var(--font-head);
+    font-family: var(--font);
   }
   .edit-btn {
     display: flex; align-items: center; gap: 4px;
     background: none; border: none;
     font-size: 12px; font-weight: 600; color: var(--accent);
-    cursor: pointer; font-family: var(--font-body);
+    cursor: pointer; font-family: var(--font);
     padding: 4px 8px; border-radius: 6px;
     transition: background 0.15s;
   }
   .edit-btn:hover { background: var(--accent-soft); }
   .info-value {
-    font-family: var(--font-head);
-    font-size: 17px;
-    font-weight: 700;
+    font-family: var(--font);
+    font-size: 16px;
+    font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: -0.3px;
+    letter-spacing: -0.2px;
   }
   .mono { font-family: 'SFMono-Regular', 'Menlo', monospace; font-size: 15px; }
 
@@ -277,7 +278,7 @@ const CSS = `
     color: white;
     border: none; border-radius: var(--radius-sm);
     font-size: 12px; font-weight: 700; cursor: pointer;
-    font-family: var(--font-body);
+    font-family: var(--font);
     white-space: nowrap;
     flex-shrink: 0;
     transition: background 0.15s;
@@ -286,13 +287,25 @@ const CSS = `
 
   /* edit row */
   .edit-row { display: flex; gap: 8px; align-items: flex-start; }
+  .edit-row.catalogue-edit-row { align-items: center; flex-wrap: nowrap; }
+  .edit-row.catalogue-edit-row .select-wrap {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+  .edit-row.catalogue-edit-row .save-btn,
+  .edit-row.catalogue-edit-row .cancel-btn {
+    padding-top: 9px;
+    padding-bottom: 9px;
+    align-self: center;
+  }
   .field-input {
     flex: 1;
     padding: 10px 12px;
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: 14px;
-    font-family: var(--font-body);
+    font-family: var(--font);
     outline: none;
     background: #fff;
     transition: border-color 0.15s;
@@ -300,21 +313,6 @@ const CSS = `
   }
   .field-input:focus { border-color: var(--accent); }
   .field-input.error { border-color: var(--red); }
-  .field-select {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
-    font-family: var(--font-body);
-    outline: none;
-    background: #fff;
-    appearance: none;
-    cursor: pointer;
-    min-width: 0;
-    transition: border-color 0.15s;
-  }
-  .field-select:focus { border-color: var(--accent); }
   .save-btn {
     padding: 10px 16px;
     border-radius: var(--radius-sm);
@@ -324,7 +322,7 @@ const CSS = `
     cursor: pointer;
     font-size: 13px;
     font-weight: 700;
-    font-family: var(--font-body);
+    font-family: var(--font);
     white-space: nowrap;
     flex-shrink: 0;
     transition: background 0.15s;
@@ -340,7 +338,7 @@ const CSS = `
     font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
-    font-family: var(--font-body);
+    font-family: var(--font);
     white-space: nowrap;
     flex-shrink: 0;
     transition: background 0.15s;
@@ -359,7 +357,7 @@ const CSS = `
     font-weight: 600;
     color: var(--text-primary);
     cursor: pointer;
-    font-family: var(--font-body);
+    font-family: var(--font);
     transition: all 0.15s;
   }
   .sug-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
@@ -374,7 +372,7 @@ const CSS = `
     color: var(--red);
     font-size: 14px; font-weight: 600;
     cursor: pointer;
-    font-family: var(--font-body);
+    font-family: var(--font);
     display: flex; align-items: center; justify-content: center; gap: 8px;
     transition: all 0.15s;
     margin-top: 4px;
@@ -387,7 +385,7 @@ const CSS = `
     padding: 18px 20px;
     margin-top: 4px;
   }
-  .confirm-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 6px; }
+  .confirm-title { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 6px; }
   .confirm-body { font-size: 13px; color: #991B1B; margin-bottom: 14px; line-height: 1.5; }
   .confirm-row { display: flex; gap: 8px; }
   .confirm-yes {
@@ -395,7 +393,7 @@ const CSS = `
     border-radius: var(--radius-sm); border: none;
     background: var(--red); color: #fff;
     font-size: 13px; font-weight: 700;
-    cursor: pointer; font-family: var(--font-body);
+    cursor: pointer; font-family: var(--font);
     transition: opacity 0.15s;
   }
   .confirm-yes:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -405,7 +403,7 @@ const CSS = `
     border: 1.5px solid var(--red-border);
     background: #fff; color: #991B1B;
     font-size: 13px; font-weight: 600;
-    cursor: pointer; font-family: var(--font-body);
+    cursor: pointer; font-family: var(--font);
   }
 
   /* create form */
@@ -418,7 +416,7 @@ const CSS = `
     margin: 0 auto 16px;
     color: #F4F3EF;
   }
-  .create-title { font-family: var(--font-head); font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
+  .create-title { font-family: var(--font); font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
   .create-sub { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
 
   .form-group { margin-bottom: 16px; }
@@ -428,7 +426,7 @@ const CSS = `
     letter-spacing: 0.6px;
     text-transform: uppercase;
     color: var(--text-secondary);
-    font-family: var(--font-head);
+    font-family: var(--font);
     margin-bottom: 8px;
   }
   .form-label span { color: var(--red); }
@@ -454,27 +452,47 @@ const CSS = `
   .slug-field {
     flex: 1; padding: 11px 14px;
     border: none; outline: none;
-    font-size: 14px; font-family: var(--font-body);
+    font-size: 14px; font-family: var(--font);
     background: transparent;
     min-width: 0;
   }
-  .select-wrap { position: relative; }
-  .select-wrap svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-muted); }
-  .form-select {
+  .select-wrap {
+    position: relative;
+    display: block;
     width: 100%;
-    padding: 11px 38px 11px 14px;
+  }
+  .select-wrap svg {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .form-select,
+  .field-select {
+    width: 100%;
+    max-width: 100%;
+    min-height: 40px;
+    padding: 9px 38px 9px 12px;
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: 14px;
-    font-family: var(--font-body);
+    font-family: var(--font);
+    line-height: 1.4;
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     background: #fff;
     cursor: pointer;
     outline: none;
     color: var(--text-primary);
     transition: border-color 0.15s;
+    box-sizing: border-box;
   }
-  .form-select:focus { border-color: var(--accent); }
+  .form-select:focus,
+  .field-select:focus { border-color: var(--accent); }
   .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
 
   .submit-btn {
@@ -484,7 +502,7 @@ const CSS = `
     background: #18160F;
     color: #F4F3EF;
     font-size: 15px; font-weight: 700;
-    cursor: pointer; font-family: var(--font-head);
+    cursor: pointer; font-family: var(--font);
     letter-spacing: 0.2px;
     transition: opacity 0.15s, background 0.15s;
   }
@@ -502,32 +520,6 @@ const CSS = `
   @keyframes spin { to { transform: rotate(360deg); } }
   .loader { display: flex; justify-content: center; align-items: center; height: 200px; }
 
-  /* bottom nav */
-  .bottom-nav {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 30;
-    background: #fff;
-    display: flex;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    border-top: 1px solid #E2E8F0;
-  }
-  .nav-btn {
-    flex: 1; padding: 14px 16px;
-    background: #fff; border: none;
-    font-family: inherit;
-    font-size: 14px; font-weight: 500;
-    cursor: pointer;
-    color: #4B5563;
-    transition: all 0.15s;
-    text-align: center;
-  }
-  .nav-btn.active {
-    background: #2563EB;
-    color: #fff;
-  }
-  .nav-btn:not(.active):hover { background: #F8FAFC; }
-
   /* section divider */
   .section-gap { margin-bottom: 12px; }
 `;
@@ -540,8 +532,9 @@ export default function StorePage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | null>(null);
+  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'whatsapp' | null>(null);
   const [isLive, setIsLive] = useState(true);
+  const [liveTogglePending, setLiveTogglePending] = useState(false);
 
   const [formSlug, setFormSlug] = useState('');
   const [formCatalogue, setFormCatalogue] = useState('');
@@ -549,6 +542,7 @@ export default function StorePage() {
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [formWhatsapp, setFormWhatsapp] = useState('');
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
 
@@ -559,11 +553,9 @@ export default function StorePage() {
       const result = await getSellerStore(user.uid);
       if (result.success && result.data) {
         setStore(result.data);
+        setFormWhatsapp(result.data.storeWhatsapp || '');
         setShowCreateForm(false);
-        // persist live state from store data if available
-        if (typeof (result.data as any).isLive === 'boolean') {
-          setIsLive((result.data as any).isLive);
-        }
+        setIsLive(result.data.isLive);
       } else {
         setStore(null);
         setShowCreateForm(true);
@@ -584,16 +576,19 @@ export default function StorePage() {
     e.preventDefault();
     if (!user?.uid) return;
     const v = validateStoreSlug(formSlug);
-    if (!v.valid) { setSlugError(v.error || 'Invalid slug'); return; }
-    if (!formCatalogue) { showToast('Please select a catalogue', 'error'); return; }
+    if (!v.valid) { setSlugError(v.error || 'Check the link name and try again'); return; }
+    if (!formCatalogue) { showToast('Please choose which products to show in your store', 'error'); return; }
     setIsSubmitting(true);
     const result = await createStore(user.uid, formSlug, formCatalogue);
     if (result.success && result.data) {
-      setStore(result.data); setShowCreateForm(false);
+      setStore(result.data);
+      setIsLive(result.data.isLive);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
       showToast('Store created!', 'success');
     } else {
-      if (result.suggestedSlugs?.length) { setSlugError(result.error || 'Slug not available'); setSlugSuggestions(result.suggestedSlugs); }
+      if (result.suggestedSlugs?.length) { setSlugError(result.error || 'That name is already taken'); setSlugSuggestions(result.suggestedSlugs); }
       else setSlugError(result.error || 'Failed to create store');
       showToast(result.error || 'Failed to create store', 'error');
     }
@@ -603,12 +598,14 @@ export default function StorePage() {
   const handleUpdateSlug = async (newSlug: string) => {
     if (!user?.uid) return;
     const v = validateStoreSlug(newSlug);
-    if (!v.valid) { showToast(v.error || 'Invalid slug', 'error'); return; }
+    if (!v.valid) { showToast(v.error || 'Check the link name and try again', 'error'); return; }
     setIsSubmitting(true);
     const result = await updateStoreSlug(user.uid, newSlug);
     if (result.success && result.data) {
-      setStore(result.data); setEditingField(null);
-      showToast('Slug updated!', 'success');
+      setStore(result.data);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      setEditingField(null);
+      showToast('Store link updated', 'success');
     } else {
       showToast(result.suggestedSlugs ? `${result.error} Try: ${result.suggestedSlugs.join(', ')}` : (result.error || 'Failed'), 'error');
     }
@@ -619,8 +616,31 @@ export default function StorePage() {
     if (!user?.uid) return;
     setIsSubmitting(true);
     const result = await updateStoreCatalogue(user.uid, catId);
-    if (result.success && result.data) { setStore(result.data); setEditingField(null); showToast('Catalogue updated!', 'success'); }
+    if (result.success && result.data) {
+      setStore(result.data);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      setEditingField(null);
+      showToast('Products list updated', 'success');
+    }
     else showToast(result.error || 'Failed', 'error');
+    setIsSubmitting(false);
+  };
+
+  const handleSaveWhatsapp = async () => {
+    if (!user?.uid) return;
+    const n = normalizeStoreWhatsappInput(formWhatsapp);
+    if (n.ok === false) {
+      showToast(n.error, 'error');
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await updateStoreWhatsapp(user.uid, n.value);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      setEditingField(null);
+      showToast(n.value ? 'WhatsApp updated for your store' : 'WhatsApp removed from your store', 'success');
+    } else showToast(result.error || 'Failed to save', 'error');
     setIsSubmitting(false);
   };
 
@@ -635,14 +655,42 @@ export default function StorePage() {
     setIsSubmitting(false);
   };
 
-  const handleLiveToggle = () => {
-    const next = !isLive;
+  const handleLiveToggle = async () => {
+    if (!user?.uid || liveTogglePending) return;
+    const prev = isLive;
+    const next = !prev;
     setIsLive(next);
-    showToast(next ? 'Store is now live 🟢' : 'Store paused — visitors will see offline page', next ? 'success' : 'error');
-    // TODO: persist to backend — e.g. updateStoreLiveStatus(user.uid, next)
+    setLiveTogglePending(true);
+    const result = await updateStoreLiveStatus(user.uid, next);
+    setLiveTogglePending(false);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setIsLive(result.data.isLive);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      showToast(
+        next ? 'Store is now live' : 'Store is offline — visitors see a paused message',
+        next ? 'success' : 'info'
+      );
+    } else {
+      setIsLive(prev);
+      showToast(result.error || 'Could not update store status', 'error');
+    }
   };
 
-  const getStoreUrl = () => store ? `${window.location.origin}/store/${store.storeSlug}` : '';
+  const publicWebBase = getPublicWebBaseUrl();
+  const storeUrlHostPrefix = publicWebBase
+    ? (() => {
+        try {
+          return new URL(publicWebBase).host;
+        } catch {
+          return publicWebBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+      })()
+    : typeof window !== 'undefined'
+      ? window.location.host
+      : 'yourapp.com';
+
+  const getStoreUrl = () => (store ? `${publicWebBase}/store/${store.storeSlug}` : '');
   const getCatalogueName = (id: string) => catalogues.find(c => c.id === id)?.label || id;
 
   return (
@@ -671,27 +719,29 @@ export default function StorePage() {
               <div className="create-hero">
                 <div className="create-icon"><IconStore /></div>
                 <h2 className="create-title">Set Up Your Store</h2>
-                <p className="create-sub">Create a permanent storefront with a custom URL to start selling.</p>
+                <p className="create-sub">Open a simple online shop with your own link that you can share anywhere.</p>
               </div>
 
               <form onSubmit={handleCreateStore}>
-                {/* Slug */}
                 <div className="form-group">
-                  <label className="form-label">Store URL <span>*</span></label>
+                  <label className="form-label">Choose your store link name <span>*</span></label>
+                  <p className="form-hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                    This is the ending of your address after <strong>/store/</strong>. Use small letters, numbers, and hyphens only—no spaces.
+                  </p>
                   <div className={`slug-prefix${slugError ? ' error' : ''}`}>
-                    <span className="slug-pre">yourapp.com/store/</span>
+                    <span className="slug-pre">{storeUrlHostPrefix}/store/</span>
                     <input
                       type="text"
                       className="slug-field"
                       value={formSlug}
                       onChange={e => validateAndSetSlug(e.target.value)}
-                      placeholder="my-shop"
+                      placeholder="e.g. my-bakery"
                     />
                   </div>
                   {slugError && <div className="error-text">{slugError}</div>}
                   {slugSuggestions.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 8, marginBottom: 4 }}>Try these:</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 8, marginBottom: 4 }}>Try one of these names:</div>
                       <div className="suggestions">
                         {slugSuggestions.map(s => (
                           <button key={s} type="button" className="sug-chip" onClick={() => validateAndSetSlug(s)}>{s}</button>
@@ -701,17 +751,16 @@ export default function StorePage() {
                   )}
                 </div>
 
-                {/* Catalogue */}
                 <div className="form-group">
-                  <label className="form-label">Catalogue <span>*</span></label>
+                  <label className="form-label">Which products to show <span>*</span></label>
                   <div className="select-wrap">
                     <select className="form-select" value={formCatalogue} onChange={e => setFormCatalogue(e.target.value)}>
-                      <option value="">— Choose a catalogue —</option>
+                      <option value="">— Pick a product list —</option>
                       {catalogues.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
                     <IconChevron />
                   </div>
-                  <p className="form-hint">All products from this catalogue will appear in your store.</p>
+                  <p className="form-hint">Only products from this list appear in your shop. You can change it later.</p>
                 </div>
 
                 <button
@@ -734,16 +783,20 @@ export default function StorePage() {
                     {isLive ? 'Customers can browse and order' : 'Hidden from customers'}
                   </div>
                 </div>
-                <label className="switch">
-                  <input type="checkbox" checked={isLive} onChange={handleLiveToggle} />
+                <label className={`switch${liveTogglePending ? ' pending' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={isLive}
+                    disabled={liveTogglePending}
+                    onChange={() => void handleLiveToggle()}
+                  />
                   <span className="slider" />
                 </label>
               </div>
 
-              {/* Store URL */}
               <div className="info-card section-gap">
                 <div className="info-card-row">
-                  <div className="info-card-label"><IconLink /> &nbsp;Store URL</div>
+                  <div className="info-card-label"><IconLink /> &nbsp;Your store link</div>
                 </div>
                 <div className="url-row">
                   <input type="text" className="url-input" value={getStoreUrl()} readOnly />
@@ -756,10 +809,9 @@ export default function StorePage() {
                 </div>
               </div>
 
-              {/* Slug */}
               <div className="info-card section-gap">
                 <div className="info-card-row">
-                  <div className="info-card-label">URL Slug</div>
+                  <div className="info-card-label">Link name</div>
                   {editingField !== 'slug' && (
                     <button className="edit-btn" onClick={() => { setEditingField('slug'); setFormSlug(store.storeSlug); setSlugError(''); }}>
                       <IconEdit /> Edit
@@ -769,6 +821,7 @@ export default function StorePage() {
 
                 {editingField === 'slug' ? (
                   <>
+                    <p className="form-hint" style={{ marginBottom: 10 }}>Small letters, numbers, and hyphens only. Changing this changes your full store address.</p>
                     <div className="edit-row">
                       <input
                         type="text"
@@ -783,14 +836,18 @@ export default function StorePage() {
                     {slugError && <div className="error-text">{slugError}</div>}
                   </>
                 ) : (
-                  <div className="info-value mono">{store.storeSlug}</div>
+                  <>
+                    <div className="info-value mono">{store.storeSlug}</div>
+                    <p className="form-hint" style={{ marginTop: 10, marginBottom: 0 }}>
+                      The text at the end of your store address (after <strong>/store/</strong>).
+                    </p>
+                  </>
                 )}
               </div>
 
-              {/* Catalogue */}
               <div className="info-card section-gap">
                 <div className="info-card-row">
-                  <div className="info-card-label">Catalogue</div>
+                  <div className="info-card-label">Products shown</div>
                   {editingField !== 'catalogue' && (
                     <button className="edit-btn" onClick={() => { setEditingField('catalogue'); setFormCatalogue(store.catalogueId); }}>
                       <IconEdit /> Change
@@ -799,18 +856,71 @@ export default function StorePage() {
                 </div>
 
                 {editingField === 'catalogue' ? (
-                  <div className="edit-row">
-                    <div className="select-wrap" style={{ flex: 1, minWidth: 0 }}>
-                      <select className="field-select" value={formCatalogue} onChange={e => setFormCatalogue(e.target.value)}>
+                  <div className="edit-row catalogue-edit-row">
+                    <div className="select-wrap">
+                      <select className="field-select" value={formCatalogue} onChange={e => setFormCatalogue(e.target.value)} aria-label="Choose product list">
                         {catalogues.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                       </select>
                       <IconChevron />
                     </div>
-                    <button className="save-btn" disabled={isSubmitting} onClick={() => handleUpdateCatalogue(formCatalogue)}>Save</button>
-                    <button className="cancel-btn" onClick={() => { setEditingField(null); setFormCatalogue(''); }}>✕</button>
+                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => handleUpdateCatalogue(formCatalogue)}>Save</button>
+                    <button type="button" className="cancel-btn" onClick={() => { setEditingField(null); setFormCatalogue(''); }}>Cancel</button>
                   </div>
                 ) : (
                   <div className="info-value">{getCatalogueName(store.catalogueId)}</div>
+                )}
+              </div>
+
+              <div className="info-card section-gap">
+                <div className="info-card-row">
+                  <div className="info-card-label">WhatsApp for customers</div>
+                  {editingField !== 'whatsapp' && (
+                    <button
+                      type="button"
+                      className="edit-btn"
+                      onClick={() => {
+                        setEditingField('whatsapp');
+                        setFormWhatsapp(store.storeWhatsapp || '');
+                      }}
+                    >
+                      <IconEdit /> {store.storeWhatsapp ? 'Change' : 'Add'}
+                    </button>
+                  )}
+                </div>
+                <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'whatsapp' ? 10 : 8 }}>
+                  If you add a number, customers see a green WhatsApp button on your public store. Leave empty to hide it. Use full number with country code (e.g. +91 9876543210).
+                </p>
+                {editingField === 'whatsapp' ? (
+                  <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      className="field-input"
+                      style={{ flex: '1 1 200px' }}
+                      placeholder="+91 9876543210"
+                      value={formWhatsapp}
+                      onChange={(e) => setFormWhatsapp(e.target.value)}
+                      aria-label="WhatsApp number"
+                    />
+                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => void handleSaveWhatsapp()}>
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="cancel-btn"
+                      onClick={() => {
+                        setEditingField(null);
+                        setFormWhatsapp(store.storeWhatsapp || '');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="info-value" style={{ fontWeight: store.storeWhatsapp ? 600 : 400, color: store.storeWhatsapp ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    {store.storeWhatsapp || 'Not set — no WhatsApp button on your store'}
+                  </div>
                 )}
               </div>
 
@@ -822,7 +932,7 @@ export default function StorePage() {
               ) : (
                 <div className="confirm-card">
                   <div className="confirm-title">Delete this store?</div>
-                  <p className="confirm-body">This can't be undone. Your store URL will stop working immediately.</p>
+                  <p className="confirm-body">This can't be undone. Your store link will stop working for customers right away.</p>
                   <div className="confirm-row">
                     <button className="confirm-yes" disabled={isSubmitting} onClick={handleDeleteStore}>
                       {isSubmitting ? 'Deleting…' : 'Yes, Delete'}
@@ -836,10 +946,7 @@ export default function StorePage() {
         </main>
 
         {/* Bottom Nav */}
-        <nav className="bottom-nav">
-          <button className="nav-btn" onClick={() => navigate('/orders')}>Orders</button>
-          <button className="nav-btn active">Store</button>
-        </nav>
+        <MainAppBottomNav active="store" />
       </div>
     </>
   );

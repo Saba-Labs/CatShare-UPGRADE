@@ -22,7 +22,7 @@ import {
 } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
-import { subscribeToNewSellerOrders } from "./services/orderNotifications";
+import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
@@ -1108,14 +1108,33 @@ if (user?.uid && !authService.isOfflineGuest()) {
     };
   }, []);
 
-  // Notify seller when a customer places an order (Supabase Realtime → local / web notification)
+  // New orders: Realtime (if enabled) + REST polling (reliable when Realtime/RLS misses events)
   useEffect(() => {
     if (loading) return;
     if (!user?.uid) return;
     if (authService.isOfflineGuest()) return;
     if (user.isAnonymous) return;
 
-    return subscribeToNewSellerOrders(user.uid);
+    let cancelled = false;
+    let removeRealtime: (() => void) | undefined;
+    let removePoll: (() => void) | undefined;
+
+    removePoll = startPollingForNewSellerOrders(user.uid);
+
+    void (async () => {
+      const remove = await subscribeToNewSellerOrders(user.uid);
+      if (cancelled) {
+        remove();
+      } else {
+        removeRealtime = remove;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      removePoll?.();
+      removeRealtime?.();
+    };
   }, [loading, user?.uid, user?.isAnonymous]);
 
   // Initialize catalogue system with data migration
@@ -1532,7 +1551,10 @@ if (user?.uid && !authService.isOfflineGuest()) {
               />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route index />
+          <Route path="catalogues" />
+        </Route>
         <Route
           path="/create"
           element={

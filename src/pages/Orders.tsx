@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import './Orders.css';
+import MainAppBottomNav from '../components/MainAppBottomNav';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -477,7 +478,7 @@ export default function Orders() {
       } catch (e) {
         // Haptics might not be available on web
       }
-      navigate('/');
+      navigate(-1);
     };
 
     let listener: any = null;
@@ -530,7 +531,7 @@ export default function Orders() {
     // Navigate back if swiped more than 80px
     if (deltaX > 80) {
       await Haptics.impact({ style: ImpactStyle.Light });
-      navigate('/');
+      navigate(-1);
     }
 
     setSwipeProgress(0);
@@ -680,26 +681,7 @@ export default function Orders() {
         boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
       }}>
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => handleNavigate('/')}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: '#64748B',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#0F172A'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
-              title="Back to Products"
-            >
-              <IconChevronLeft />
-            </button>
+          <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
           </div>
 
@@ -919,64 +901,7 @@ export default function Orders() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 30,
-        display: 'flex',
-        justifyContent: 'space-around',
-        fontSize: 14,
-        fontWeight: 500,
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        background: '#fff',
-        borderTop: '1px solid #E2E8F0',
-      }}>
-        <button
-          onClick={() => handleNavigate('/orders')}
-          style={{
-            flex: 1,
-            padding: '14px 16px',
-            textAlign: 'center',
-            transition: 'all 0.15s',
-            background: '#2563EB',
-            color: '#fff',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
-          Orders
-        </button>
-        <button
-          onClick={() => handleNavigate('/store')}
-          style={{
-            flex: 1,
-            padding: '14px 16px',
-            textAlign: 'center',
-            transition: 'all 0.15s',
-            background: '#fff',
-            color: '#4B5563',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F8FAFC';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#fff';
-          }}
-        >
-          Store
-        </button>
-      </nav>
+      <MainAppBottomNav active="orders" />
     </div>
   );
 }
