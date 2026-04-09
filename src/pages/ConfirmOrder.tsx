@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
@@ -51,6 +51,19 @@ const Ic = {
 const Divider = () => (
   <div style={{ height: 1, background: '#F2F2F7', margin: '0 0' }} />
 );
+
+// Quantity Control
+function QtyControl({ value, step, onChange }: { value: number; step: number; onChange: (delta: number) => void }) {
+  const s = Math.max(1, Math.floor(step) || 1);
+  const inc = s > 1 ? s : 1;
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#F5F5F7', borderRadius: 6, padding: '4px 8px' }}>
+      <button type="button" onClick={() => onChange(-inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: COLORS.muted, padding: 0, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+      <span style={{ minWidth: 30, textAlign: 'center', fontSize: 13, fontWeight: 600, color: COLORS.text }}>{value}</span>
+      <button type="button" onClick={() => onChange(inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: COLORS.muted, padding: 0, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+    </div>
+  );
+}
 
 // Product image thumbnail
 function ProductThumb({ url, name }: { url?: string; name: string }) {
@@ -112,6 +125,7 @@ export default function ConfirmOrder() {
   const [customerName, setCustomerName] = useState(state?.customerName || '');
   const [customerWhatsapp, setCustomerWhatsapp] = useState(state?.customerWhatsapp || '');
   const [savingOrder, setSavingOrder] = useState(false);
+  const [localQty, setLocalQty] = useState<QtyMap>(state?.qty || {});
 
   // Validate that we have the required state
   if (!state || !token) {
@@ -123,7 +137,28 @@ export default function ConfirmOrder() {
     );
   }
 
-  const { selectedItems, qty, currencySymbol, currencyCode, sellerWhatsapp, sellerUserId, lineAmounts, orderTotalAmount } = state;
+  const { selectedItems, currencySymbol, currencyCode, sellerWhatsapp, sellerUserId } = state;
+
+  const handleQtyChange = (productId: string, delta: number) => {
+    setLocalQty((prev) => {
+      const newQty = Math.max(0, (prev[productId] ?? 0) + delta);
+      return { ...prev, [productId]: newQty };
+    });
+  };
+
+  // Recalculate line amounts and total based on local quantities
+  const { updatedLineAmounts, updatedTotal } = useMemo(() => {
+    const lineAmounts: Record<string, number> = {};
+    let total = 0;
+    selectedItems.forEach((item) => {
+      const q = localQty[item.productId] ?? 0;
+      const unitPrice = parseItemPriceNumeric(item.price);
+      const lineTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
+      lineAmounts[item.productId] = lineTotal;
+      total += lineTotal;
+    });
+    return { updatedLineAmounts: lineAmounts, updatedTotal: total };
+  }, [selectedItems, localQty]);
 
   const confirmOrder = async () => {
     // Validate customer name (required)
@@ -145,7 +180,7 @@ export default function ConfirmOrder() {
       try {
         // Build order items structure
         const orderItems: OrderItem[] = selectedItems.map((i) => {
-          const q = qty[i.productId] ?? 0;
+          const q = localQty[i.productId] ?? 0;
           const unitPrice = parseItemPriceNumeric(i.price);
           const rowTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
 
@@ -169,7 +204,7 @@ export default function ConfirmOrder() {
           token,
           customerName.trim(),
           orderItems,
-          orderTotalAmount,
+          updatedTotal,
           currencyCode,
           customerWhatsapp.trim() || undefined
         );
@@ -208,7 +243,7 @@ export default function ConfirmOrder() {
 
     let total = 0;
     selectedItems.forEach((i, idx) => {
-      const q = qty[i.productId] ?? 0;
+      const q = localQty[i.productId] ?? 0;
       const unit = parseItemPriceNumeric(i.price);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
       total += itemTotal;
@@ -342,35 +377,36 @@ export default function ConfirmOrder() {
             }}>
               <div style={{ padding: '4px 16px' }}>
                 {selectedItems.map((item, i) => {
-                  const q = qty[item.productId] ?? 0;
+                  const q = localQty[item.productId] ?? 0;
                   const hasCost = item.price !== undefined && item.price !== '';
                   const unitPrice = parseItemPriceNumeric(item.price);
-                  const lineTotal = lineAmounts[item.productId] ?? 0;
+                  const lineTotal = updatedLineAmounts[item.productId] ?? 0;
 
                   return (
                     <div key={item.productId}>
                       {i > 0 && <Divider />}
-                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', padding: '12px 0', gap: 12 }}>
                         <ProductThumb url={item.imageUrl} name={item.name} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
                             {item.name}
                           </div>
                           {item.subtitle && (
-                            <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT }}>
+                            <div style={{ fontSize: 11, color: COLORS.subtle, fontFamily: FONT, marginBottom: 8 }}>
                               {item.subtitle}
                             </div>
                           )}
+                          <QtyControl value={q} step={item.quantityStep || 1} onChange={(delta) => handleQtyChange(item.productId, delta)} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && Number.isFinite(unitPrice) && (
                             <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              {q} {getOrderUnitLabel(item.priceUnit)} × {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                             </div>
                           )}
                           {(!hasCost || !Number.isFinite(unitPrice)) && (
                             <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              Qty: {q}
+                              {hasCost ? 'Price' : 'Item'}
                             </div>
                           )}
                           {hasCost && Number.isFinite(unitPrice) && lineTotal > 0 && (
@@ -393,7 +429,7 @@ export default function ConfirmOrder() {
                 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
                   <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
-                    {formatOrderMoney(orderTotalAmount, currencySymbol)}
+                    {formatOrderMoney(updatedTotal, currencySymbol)}
                   </span>
                 </div>
               </div>
