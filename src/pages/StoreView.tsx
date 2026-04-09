@@ -587,7 +587,7 @@ export default function StoreView() {
     const current = selectedProducts.get(productId) || 0;
     const rounded = Math.round(Math.max(0, current + delta) / s) * s;
     const map = new Map(selectedProducts);
-    if (rounded <= 0) map.delete(productId); else map.set(productId, rounded);
+    map.set(productId, rounded);
     setSelectedProducts(map);
   };
 
