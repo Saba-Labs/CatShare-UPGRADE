@@ -967,14 +967,16 @@ export default function StoreView() {
                                     {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    {cd && <span style={{ fontSize: '11.5px', color: 'var(--c-text3)' }}>{cd}</span>}
+                                    <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
                                     <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-accent)' }}>{fmt(item.rowTotal, currencySymbol)}</span>
                                   </div>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
-                              </div>
+                              {cd && (
+                                <div style={{ fontSize: '11.5px', color: 'var(--c-text3)', paddingTop: 4, borderTop: '1px solid var(--c-border)' }}>
+                                  {cd}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
