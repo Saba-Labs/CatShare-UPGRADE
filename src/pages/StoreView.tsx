@@ -98,7 +98,7 @@ const CSS = `
 .sv-pcard.selected { border-color: var(--c-accent); box-shadow: 0 0 0 1.5px var(--c-accent), var(--shadow-md); }
 
 .sv-pcard-img-wrap { width: 100%; aspect-ratio: 1/1; background: var(--c-surface2); position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
-.sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s ease; display: block; }
+.sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; transition: transform 0.35s ease; display: block; }
 .sv-pcard-img-wrap:hover img { transform: scale(1.05); }
 .sv-pcard-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .sv-pcard-sel { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%; background: var(--c-accent); display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
@@ -187,7 +187,7 @@ const CSS = `
 
 /* ── Review ── */
 .sv-review-list { padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 9px; }
-.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; box-shadow: var(--shadow-sm); }
+.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: visible; display: flex; box-shadow: var(--shadow-sm); align-items: center; gap: 12px; padding: 12px; }
 .sv-rcard-img { width: 80px; height: 80px; flex-shrink: 0; background: var(--c-surface2); overflow: hidden; position: relative; }
 .sv-rcard-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sv-rcard-img-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -587,7 +587,7 @@ export default function StoreView() {
     const current = selectedProducts.get(productId) || 0;
     const rounded = Math.round(Math.max(0, current + delta) / s) * s;
     const map = new Map(selectedProducts);
-    if (rounded <= 0) map.delete(productId); else map.set(productId, rounded);
+    map.set(productId, rounded);
     setSelectedProducts(map);
   };
 
@@ -654,7 +654,11 @@ export default function StoreView() {
   };
 
   const handlePanelAction = () => {
-    if (step === 'customer') { if (!customerName.trim()) { alert('Please enter your name'); return; } setStep('review'); }
+    if (step === 'customer') {
+      if (!customerName.trim()) { alert('Please enter your name'); return; }
+      if (!customerWhatsapp.trim()) { alert('Please enter your WhatsApp number'); return; }
+      setStep('review');
+    }
     else void handlePlaceOrder();
   };
 
@@ -921,7 +925,7 @@ export default function StoreView() {
                 <div className="sv-panel-title">{step === 'customer' ? 'Your details' : 'Review order'}</div>
                 <div className="sv-panel-subtitle">{step === 'customer' ? 'Almost there — just a few details' : 'Confirm everything looks right'}</div>
               </div>
-              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() : isSubmitting}>
+              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() || !customerWhatsapp.trim() : isSubmitting}>
                 {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
               </button>
             </div>
@@ -937,7 +941,7 @@ export default function StoreView() {
                   <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
                 </div>
                 <div className="sv-field">
-                  <label>WhatsApp Number</label>
+                  <label>WhatsApp Number *</label>
                   <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
                 </div>
 
@@ -954,11 +958,11 @@ export default function StoreView() {
                           const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
                           const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
                           return (
-                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px' }}>
+                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px', opacity: item.quantity === 0 ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
                               <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                                   {isDisplayableImageUrl(item.imageUrl)
-                                    ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
                                     : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -1001,10 +1005,10 @@ export default function StoreView() {
                     const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
                     return (
                       <div key={item.productId} className="sv-rcard">
-                        <div className="sv-rcard-img">
+                        <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                           {isDisplayableImageUrl(item.imageUrl)
-                            ? <img src={item.imageUrl} alt={item.name} />
-                            : <div className="sv-rcard-img-ph"><IconImg size={24} /></div>}
+                            ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
                         </div>
                         <div className="sv-rcard-body">
                           <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
