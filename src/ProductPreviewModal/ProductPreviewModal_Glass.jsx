@@ -199,10 +199,18 @@ export default function ProductPreviewModal_Glass({
 
   useEffect(() => {
     const loadImage = async () => {
+      const withVersion = (url, version) => {
+        const raw = typeof url === "string" ? url.trim() : "";
+        if (!raw) return "";
+        if (!/^https?:\/\//i.test(raw)) return raw;
+        const v = String(version ?? "").trim();
+        if (!v) return raw;
+        return `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
+      };
       // Priority: cloud URL > local file > base64
       // 1. Try cloud URL first (Cloudflare R2)
       if (product?.imageUrl) {
-        setImageUrl(product.imageUrl);
+        setImageUrl(withVersion(product.imageUrl, product.imageVersion));
         return;
       }
 

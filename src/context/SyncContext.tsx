@@ -289,7 +289,11 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               if (!uploaded?.url) {
                 throw new Error(`Cloud upload returned no URL for product ${p.id}`);
               }
-              return { productId: p.id, imageUrl: uploaded.url };
+              return {
+                productId: p.id,
+                imageUrl: uploaded.url,
+                imageVersion: Date.now(),
+              };
             } catch (err) {
               console.error(`❌ Image upload failed for product ${p.id}:`, err);
               throw err;
@@ -300,12 +304,14 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           })
         );
 
-        const urlMap = new Map(
-          uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl])
+        const uploadMap = new Map(
+          uploadedPairs.map((x: any) => [String(x.productId), { url: x.imageUrl, version: x.imageVersion }])
         );
         const merged = items.map((p: any) => {
-          const url = urlMap.get(String(p.id));
-          return url ? { ...p, imageUrl: url } : p;
+          const uploadedInfo = uploadMap.get(String(p.id));
+          return uploadedInfo
+            ? { ...p, imageUrl: uploadedInfo.url, imageVersion: uploadedInfo.version, image: '' }
+            : p;
         });
         assertProductsHaveCloudImageUrlForSync(merged, phaseLabel);
         return merged;

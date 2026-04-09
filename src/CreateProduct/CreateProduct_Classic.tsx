@@ -573,10 +573,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
   setSuggestedColors(migratedProduct.suggestedColors);
 }
 
-        if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
+        const versionedCloudUrl =
+          migratedProduct.imageUrl && typeof migratedProduct.imageUrl === "string"
+            ? `${migratedProduct.imageUrl}${migratedProduct.imageUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(String(migratedProduct.imageVersion || ""))}`
+            : "";
+        if (versionedCloudUrl) {
+          // Prefer latest cloud image for edited products; avoids stale local/base64 preview.
+          setImagePreview(versionedCloudUrl);
+        } else if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
           setImagePreview(migratedProduct.image);
         } else if (migratedProduct.imageUrl) {
-          // ✅ Load from Cloudflare R2
           setImagePreview(migratedProduct.imageUrl);
         } else if (migratedProduct.imagePath) {
           setImageFilePath(migratedProduct.imagePath);
@@ -1076,8 +1082,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
               const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
               if (uploaded.url) {
                 const allProducts = safeGetFromStorage(productsStorageKeyNow, []);
+                const newImageVersion = Date.now();
                 const updated = allProducts.map((p: any) =>
-                  p.id === id ? { ...p, imageUrl: uploaded.url } : p
+                  p.id === id ? { ...p, imageUrl: uploaded.url, imageVersion: newImageVersion } : p
                 );
                 safeSetInStorage(productsStorageKeyNow, updated);
                 window.dispatchEvent(new CustomEvent("product-added"));

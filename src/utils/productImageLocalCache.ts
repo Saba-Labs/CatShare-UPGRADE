@@ -13,11 +13,11 @@ const HTTP_URL = /^https?:\/\//i;
 
 async function localImageFileExists(path: string): Promise<boolean> {
   try {
-    await Filesystem.readFile({ path, directory: Directory.Data });
+    await Filesystem.readFile({ path, directory: Directory.External });
     return true;
   } catch {
     try {
-      await Filesystem.readFile({ path, directory: Directory.External });
+      await Filesystem.readFile({ path, directory: Directory.Data });
       return true;
     } catch {
       return false;
@@ -53,6 +53,21 @@ export async function cacheCloudProductImages(
   const totalWithId = products.reduce((n, p) => n + (p?.id != null ? 1 : 0), 0);
   let seenWithId = 0;
 
+  const urlCacheKey = `cloudImageUrlCache::${userId}`;
+  let previousUrlMap: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem(urlCacheKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        previousUrlMap = parsed as Record<string, string>;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  const nextUrlMap: Record<string, string> = {};
+
   const out: any[] = [];
   for (const p of products) {
     if (!p || p.id == null) {
@@ -71,16 +86,21 @@ export async function cacheCloudProductImages(
       out.push(p);
       continue;
     }
+    const normalizedUrl = url.trim();
+    const pid = String(p.id);
+    nextUrlMap[pid] = normalizedUrl;
 
     const targetPath = getUserImagePath(String(p.id), userId);
+    const cachedUrl = previousUrlMap[pid] || '';
+    const urlChanged = cachedUrl !== normalizedUrl;
 
     try {
-      if (await localImageFileExists(targetPath)) {
+      if (!urlChanged && (await localImageFileExists(targetPath))) {
         out.push(p.imagePath === targetPath ? p : { ...p, imagePath: targetPath });
         continue;
       }
 
-      const dataUrl = await fetchUrlAsDataUrl(url.trim());
+      const dataUrl = await fetchUrlAsDataUrl(normalizedUrl);
       const base64 = stripDataUrlToBase64(dataUrl);
       const ok = await safeWriteFile({ path: targetPath, data: base64 });
       if (!ok) {
@@ -94,6 +114,12 @@ export async function cacheCloudProductImages(
       console.warn(`⚠️ cacheCloudProductImages: could not cache image for product ${p.id}:`, e);
       out.push(p);
     }
+  }
+
+  try {
+    localStorage.setItem(urlCacheKey, JSON.stringify(nextUrlMap));
+  } catch {
+    /* ignore */
   }
 
   return out;

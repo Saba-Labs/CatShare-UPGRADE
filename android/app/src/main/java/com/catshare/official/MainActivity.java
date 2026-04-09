@@ -6,6 +6,7 @@ import com.getcapacitor.BridgeActivity;
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
 import com.capacitorjs.plugins.localnotifications.LocalNotificationsPlugin;
 import com.catshare.official.BackgroundRendererPlugin;
+import com.catshare.plugins.OpenInvoicePdfPlugin;
 import com.codetrixstudio.capacitor.GoogleAuth.GoogleAuth;
 
 // In-app update imports
@@ -40,6 +41,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PushNotificationsPlugin.class);
         registerPlugin(LocalNotificationsPlugin.class);
         registerPlugin(BackgroundRendererPlugin.class);
+        registerPlugin(OpenInvoicePdfPlugin.class);
         registerPlugin(GoogleAuth.class);
 
         // In-app updates

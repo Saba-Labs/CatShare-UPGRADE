@@ -478,7 +478,7 @@ function AppWithBackHandler() {
           return items;
         }
 
-        const uploadedPairs: { productId: string; imageUrl: string }[] = [];
+        const uploadedPairs: { productId: string; imageUrl: string; imageVersion: number }[] = [];
         for (let i = 0; i < missing.length; i++) {
           const p = missing[i];
           let base64: string | null = null;
@@ -505,7 +505,11 @@ function AppWithBackHandler() {
           if (!uploaded?.url) {
             throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
           }
-          uploadedPairs.push({ productId: String(p.id), imageUrl: uploaded.url });
+          uploadedPairs.push({
+            productId: String(p.id),
+            imageUrl: uploaded.url,
+            imageVersion: Date.now(),
+          });
           const done = i + 1;
           const span = Math.max(0, to - from);
           const pct = from + Math.round((done / missing.length) * span);
@@ -515,10 +519,14 @@ function AppWithBackHandler() {
           );
         }
 
-        const urlMap = new Map(uploadedPairs.map((x: any) => [String(x.productId), x.imageUrl]));
+        const uploadMap = new Map(
+          uploadedPairs.map((x: any) => [String(x.productId), { url: x.imageUrl, version: x.imageVersion }])
+        );
         const merged = items.map((p: any) => {
-          const url = urlMap.get(String(p.id));
-          return url ? { ...p, imageUrl: url } : p;
+          const uploadedInfo = uploadMap.get(String(p.id));
+          return uploadedInfo
+            ? { ...p, imageUrl: uploadedInfo.url, imageVersion: uploadedInfo.version, image: '' }
+            : p;
         });
         assertProductsHaveCloudImageUrlForSync(merged, label);
         return merged;

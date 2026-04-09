@@ -85,13 +85,18 @@ export function getOrderedSourceImagePaths(product: { id?: unknown; imagePath?: 
     ordered.push(stored);
   }
 
+  /** Avoid dozens of legacy paths (one per catalogue) → hundreds of failed readFile calls and console spam. */
+  const MAX_LEGACY_CATALOGUE_PATHS = 5;
+  let legacyAdded = 0;
   try {
     for (const cat of getAllCatalogues(uid)) {
+      if (legacyAdded >= MAX_LEGACY_CATALOGUE_PATHS) break;
       const folder = cat.folder || cat.label;
       if (!folder) continue;
       const legacy = `user-${uid}/${folder}/product-${id}.png`;
       if (!ordered.includes(legacy)) {
         ordered.push(legacy);
+        legacyAdded++;
       }
     }
   } catch {
@@ -102,14 +107,16 @@ export function getOrderedSourceImagePaths(product: { id?: unknown; imagePath?: 
 }
 
 async function readFileDataBase64(path: string): Promise<string | null> {
-  try {
-    const res = await Filesystem.readFile({ path, directory: Directory.Data });
-    if (res?.data) return String(res.data);
-  } catch {
-    /* try External */
-  }
+  // Android source writes prefer External; read it first to avoid stale Data copies
+  // shadowing freshly replaced images.
   try {
     const res = await Filesystem.readFile({ path, directory: Directory.External });
+    if (res?.data) return String(res.data);
+  } catch {
+    /* try Data fallback */
+  }
+  try {
+    const res = await Filesystem.readFile({ path, directory: Directory.Data });
     if (res?.data) return String(res.data);
   } catch {
     /* ignore */

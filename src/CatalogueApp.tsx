@@ -182,6 +182,60 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [shelfTarget, setShelfTarget] = useState(null);
   const [showHiddenDangerShelfActions, setShowHiddenDangerShelfActions] = useState(false);
 
+  const stableImageVersionFromUrl = (url: string) => {
+    const s = String(url || "").trim();
+    if (!s) return 0;
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) || 1;
+  };
+
+  const withImageVersion = (url: string, version: unknown) => {
+    const raw = String(url || "").trim();
+    if (!raw) return "";
+    if (!/^https?:\/\//i.test(raw)) return raw;
+    const v = String(version ?? "").trim();
+    if (!v) return raw;
+    return `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
+  };
+
+  // One-time migration for older products:
+  // - assign deterministic imageVersion for existing imageUrl rows
+  // - clear stale inline image payload when cloud URL exists
+  useEffect(() => {
+    if (!Array.isArray(products) || products.length === 0) return;
+    let changed = false;
+    const migrated = products.map((p: any) => {
+      if (!p || typeof p !== "object") return p;
+      const hasCloudUrl = typeof p.imageUrl === "string" && p.imageUrl.trim().length > 0;
+      if (!hasCloudUrl) return p;
+
+      const needsVersion = !(Number(p.imageVersion) > 0);
+      const hasStaleInlineImage = typeof p.image === "string" && p.image.length > 0;
+      if (!needsVersion && !hasStaleInlineImage) return p;
+
+      changed = true;
+      return {
+        ...p,
+        imageVersion: needsVersion ? stableImageVersionFromUrl(p.imageUrl) : p.imageVersion,
+        image: "",
+      };
+    });
+
+    if (!changed) return;
+    setProducts(migrated);
+    try {
+      const uid = user?.uid;
+      const key = uid ? getStorageKey("products", uid) : "products";
+      localStorage.setItem(key, JSON.stringify(migrated));
+    } catch {
+      /* ignore */
+    }
+  }, [products, setProducts, user?.uid]);
+
   useEffect(() => {
     const onUnlocked = () => setShowHiddenDangerShelfActions(true);
     window.addEventListener(HIDDEN_MENU_UNLOCKED_EVENT, onUnlocked);
@@ -242,7 +296,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           // ✅ PRIORITY: Always use imageUrl (cloud URL) if available
           // This ensures fresh data from Supabase is always displayed
           if (p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim()) {
-            map[p.id] = p.imageUrl;
+            map[p.id] = withImageVersion(p.imageUrl, p.imageVersion);
             return;
           }
 
@@ -321,9 +375,20 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   useEffect(() => {
     const handleNewProduct = async () => {
       const uid = user?.uid;
-      const updated = uid
+      const updatedRaw = uid
         ? safeGetFromStorage(getStorageKey("products", uid), [])
         : JSON.parse(localStorage.getItem("products") || "[]");
+      const updated = Array.isArray(updatedRaw)
+        ? updatedRaw.map((p: any) => {
+            // If cloud URL exists, stale in-object data URLs should never override it.
+            if (p && typeof p === "object" && typeof p.imageUrl === "string" && p.imageUrl.trim()) {
+              const cloned = { ...p };
+              delete cloned.image;
+              return cloned;
+            }
+            return p;
+          })
+        : [];
       setProducts(updated);
 
       // Clear outdated imageMap entries to prevent displaying old cached images
@@ -982,9 +1047,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                               ☰
                             </div>
                             <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                              {imageMap[p.id] || p.imageUrl ? (
+                              {imageMap[p.id] || withImageVersion(p.imageUrl, p.imageVersion) ? (
                                 <img
-                                  src={imageMap[p.id] || p.imageUrl}
+                                  src={imageMap[p.id] || withImageVersion(p.imageUrl, p.imageVersion)}
                                   alt={p.name}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {

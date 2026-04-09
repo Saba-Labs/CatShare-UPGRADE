@@ -36,6 +36,16 @@ export interface Order {
 const MARGIN = 16;
 const PAGE_BREAK_THRESHOLD = 260; // MM before jumping to new page
 
+function normalizePdfCurrencySymbol(symbol: string): string {
+  return String(symbol || '').trim();
+}
+
+function formatAmountNumber(amount: number, locale?: string): string {
+  return locale
+    ? amount.toLocaleString(locale, { minimumFractionDigits: 2 })
+    : amount.toLocaleString();
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -44,40 +54,112 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function renderTextToImage(text: string, fontSize: number, color: string, bold: boolean) {
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    const scale = 4;
-    const weight = bold ? '700' : '400';
-    const font = `${weight} ${fontSize}px -apple-system, sans-serif`;
-    ctx.font = font;
-    const metrics = ctx.measureText(text);
-    const cw = metrics.width + fontSize * 0.4;
-    const ch = fontSize * 1.5;
-    canvas.width = cw * scale;
-    canvas.height = ch * scale;
-    ctx.scale(scale, scale);
-    ctx.font = font;
-    ctx.fillStyle = color;
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, (fontSize * 0.2), ch / 2);
-    return { dataUrl: canvas.toDataURL('image/png'), width: cw, height: ch };
-  } catch { return null; }
+function hexToRgb(hex: string): [number, number, number] {
+  const cleaned = hex.replace('#', '').trim();
+  if (cleaned.length === 3) {
+    const r = parseInt(cleaned[0] + cleaned[0], 16);
+    const g = parseInt(cleaned[1] + cleaned[1], 16);
+    const b = parseInt(cleaned[2] + cleaned[2], 16);
+    return [r, g, b];
+  }
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return [r, g, b];
 }
 
 function addUniformText(
   pdf: jsPDF, text: string, x: number, y: number, 
   sizeMm: number, color: string, bold = false, align: 'left' | 'center' | 'right' = 'left'
 ) {
-  const img = renderTextToImage(text, 48, color, bold);
-  if (!img) return;
-  const wMm = (img.width / img.height) * sizeMm;
-  let drawX = x;
-  if (align === 'center') drawX = x - wMm / 2;
-  if (align === 'right') drawX = x - wMm;
-  pdf.addImage(img.dataUrl, 'PNG', drawX, y - sizeMm / 2, wMm, sizeMm);
+  const safeText = String(text ?? '');
+  const [r, g, b] = hexToRgb(color);
+
+  // jsPDF uses points for font size. Convert from mm-like visual size.
+  const fontSizePt = Math.max(7, sizeMm * 2.6);
+
+  pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+  pdf.setFontSize(fontSizePt);
+  pdf.setTextColor(r, g, b);
+  pdf.text(safeText, x, y, { align, baseline: 'middle' });
+}
+
+type CurrencyGlyph = { dataUrl: string; width: number; height: number };
+const currencyGlyphCache = new Map<string, CurrencyGlyph>();
+
+function getCurrencyGlyph(symbol: string, color: string, bold: boolean): CurrencyGlyph | null {
+  const key = `${symbol}|${color}|${bold ? 'b' : 'n'}`;
+  const cached = currencyGlyphCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const fontPx = 64;
+    const font = `${bold ? '700' : '500'} ${fontPx}px Arial, "Noto Sans", sans-serif`;
+    ctx.font = font;
+    const metrics = ctx.measureText(symbol);
+    const width = Math.ceil(metrics.width + 24);
+    const height = Math.ceil(fontPx * 1.4);
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(symbol, 10, height / 2);
+
+    const glyph = {
+      dataUrl: canvas.toDataURL('image/png'),
+      width,
+      height,
+    };
+    currencyGlyphCache.set(key, glyph);
+    return glyph;
+  } catch {
+    return null;
+  }
+}
+
+function addCurrencyAmount(
+  pdf: jsPDF,
+  symbol: string,
+  amountText: string,
+  x: number,
+  y: number,
+  sizeMm: number,
+  color: string,
+  bold = false,
+  align: 'left' | 'center' | 'right' = 'left'
+) {
+  const [r, g, b] = hexToRgb(color);
+  const fontSizePt = Math.max(7, sizeMm * 2.6);
+  pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+  pdf.setFontSize(fontSizePt);
+  pdf.setTextColor(r, g, b);
+
+  const glyph = getCurrencyGlyph(symbol, color, bold);
+  if (!glyph) {
+    pdf.text(`${symbol} ${amountText}`, x, y, { align, baseline: 'middle' });
+    return;
+  }
+
+  const textWidth = pdf.getTextWidth(amountText);
+  // Keep symbol visually even with adjacent numeric text across row + grand total.
+  const glyphH = Math.max(3.9, sizeMm * 1.12);
+  const glyphW = (glyph.width / glyph.height) * glyphH;
+  const gap = 0.6;
+  const totalW = glyphW + gap + textWidth;
+
+  let startX = x;
+  if (align === 'center') startX = x - totalW / 2;
+  if (align === 'right') startX = x - totalW;
+
+  const glyphY = y - glyphH / 2 + 0.15;
+  pdf.addImage(glyph.dataUrl, 'PNG', startX, glyphY, glyphW, glyphH);
+  pdf.text(amountText, startX + glyphW + gap, y, { align: 'left', baseline: 'middle' });
 }
 
 // ─── Component Renderers ─────────────────────────────────────────────────────
@@ -121,24 +203,25 @@ function drawFooter(pdf: jsPDF, pageWidth: number, pageHeight: number) {
   const footerH = 15;
   const footerY = pageHeight - footerH;
 
-  // Differentiation band
-  pdf.setFillColor(248, 250, 252);
+  // Subtle footer band
+  pdf.setFillColor(250, 251, 253);
   pdf.rect(0, footerY, pageWidth, footerH, 'F');
-  pdf.setDrawColor(226, 232, 240);
+  pdf.setDrawColor(235, 240, 246);
   pdf.line(0, footerY, pageWidth, footerY);
 
   const textY = footerY + (footerH / 2) + 1;
-  addUniformText(pdf, 'This is a computer generated document.', MARGIN, textY, 4.2, '#94A3B8');
+  addUniformText(pdf, 'This is a computer generated document.', MARGIN, textY, 3.8, '#A3AFBF');
 
   const brandX = pageWidth - MARGIN;
-  addUniformText(pdf, 'Generated by ', brandX - 18, textY, 4.5, '#64748B', false, 'right');
-  addUniformText(pdf, 'CatShare', brandX, textY, 4.5, '#16A34A', true, 'right');
+  addUniformText(pdf, 'Generated by  ', brandX - 14, textY, 3.8, '#A3AFBF', false, 'right');
+  addUniformText(pdf, 'CatShare', brandX, textY, 3.8, '#23824C', false, 'right');
 }
 
 // ─── Main Logic ──────────────────────────────────────────────────────────────
 
 export async function generateInvoicePDF(order: Order, business: BusinessProfile, symbol: string): Promise<Blob> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const currency = normalizePdfCurrencySymbol(symbol);
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   
@@ -175,7 +258,7 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
 
     // 1. Item Name + Subtitle
-    addUniformText(pdf, item.name, MARGIN + 4, currentY + 5.5, 5, '#000000', true);
+    addUniformText(pdf, item.name, MARGIN + 4, currentY + 5.5, 5, '#000000', false);
     if (item.subtitle) {
       addUniformText(pdf, item.subtitle, MARGIN + 4, currentY + 11.5, 3.8, '#64748B', false);
     }
@@ -185,12 +268,30 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     addUniformText(pdf, qtyLabel, colQty, midY, 5, '#000000', false, 'center');
     
     // 3. Rate (Now Black)
-    const rate = `${symbol}${ (item.unitPrice || 0).toLocaleString() }`;
-    addUniformText(pdf, rate, colRate, midY, 5, '#000000', false, 'center');
+    addCurrencyAmount(
+      pdf,
+      currency,
+      formatAmountNumber(item.unitPrice || 0),
+      colRate,
+      midY,
+      5,
+      '#000000',
+      false,
+      'center'
+    );
 
     // 4. Total
-    const total = `${symbol}${ (item.rowTotal || (item.unitPrice || 0) * item.quantity).toLocaleString() }`;
-    addUniformText(pdf, total, colTotal - 4, midY, 5, '#000000', true, 'right');
+    addCurrencyAmount(
+      pdf,
+      currency,
+      formatAmountNumber(item.rowTotal || (item.unitPrice || 0) * item.quantity),
+      colTotal - 4,
+      midY,
+      5,
+      '#000000',
+      false,
+      'right'
+    );
 
     currentY += rowH;
   });
@@ -204,8 +305,17 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
 
   currentY += 15;
   addUniformText(pdf, 'GRAND TOTAL', MARGIN, currentY, 5.5, '#64748B', true);
-  const totalStr = `${symbol}${ (order.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) }`;
-  addUniformText(pdf, totalStr, pageWidth - MARGIN - 4, currentY, 8.5, '#16A34A', true, 'right');
+  addCurrencyAmount(
+    pdf,
+    currency,
+    formatAmountNumber(order.total_amount || 0, 'en-IN'),
+    pageWidth - MARGIN - 4,
+    currentY,
+    8.5,
+    '#16A34A',
+    true,
+    'right'
+  );
 
   // Thank You Box
   currentY += 15;
