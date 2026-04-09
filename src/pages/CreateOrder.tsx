@@ -269,7 +269,7 @@ export default function CreateOrder() {
   // Calculate order totals
   const orderSummary = useMemo(() => {
     if (!selectedCatalogueId) return { items: [], total: 0, count: 0 };
-    
+
     const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
     if (!catalogue) return { items: [], total: 0, count: 0 };
 
@@ -290,30 +290,33 @@ export default function CreateOrder() {
     let count = 0;
 
     selectedProducts.forEach((quantity, productId) => {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        const catData = getCatalogueData(product, selectedCatalogueId);
-        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
-        const rowTotal = unitPrice * quantity;
+      // Only include items with quantity > 0 in the summary
+      if (quantity > 0) {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+          const catData = getCatalogueData(product, selectedCatalogueId);
+          const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+          const rowTotal = unitPrice * quantity;
 
-        const priceUnit = catData[catalogue.priceUnitField];
-        const quantityStep = (catData as any).orderQuantityStep || 1;
-        const productImage = imageMap[product.id] || product.image || product.imageUrl;
-        items.push({
-          productId,
-          name: product.name,
-          quantity,
-          unitPrice,
-          rowTotal,
-          category: product.category?.[0],
-          imageUrl: productImage,
-          priceUnit,
-          subtitle: product.subtitle,
-          quantityStep,
-        });
+          const priceUnit = catData[catalogue.priceUnitField];
+          const quantityStep = (catData as any).orderQuantityStep || 1;
+          const productImage = imageMap[product.id] || product.image || product.imageUrl;
+          items.push({
+            productId,
+            name: product.name,
+            quantity,
+            unitPrice,
+            rowTotal,
+            category: product.category?.[0],
+            imageUrl: productImage,
+            priceUnit,
+            subtitle: product.subtitle,
+            quantityStep,
+          });
 
-        total += rowTotal;
-        count += quantity;
+          total += rowTotal;
+          count += quantity;
+        }
       }
     });
 
@@ -348,6 +351,21 @@ export default function CreateOrder() {
     setSelectedProducts(filteredProducts);
     setStepSync('customer');
   };
+
+  // Clean up items with 0 quantity when navigating away
+  React.useEffect(() => {
+    const cleanupOnUnmount = () => {
+      // Filter out items with 0 quantity when component unmounts
+      const filteredProducts = new Map(
+        Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
+      );
+      setSelectedProducts(filteredProducts);
+    };
+
+    return () => {
+      cleanupOnUnmount();
+    };
+  }, []);
 
   const handleContinueToReview = () => {
     if (!customerName.trim()) {
