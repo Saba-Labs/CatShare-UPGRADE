@@ -1001,10 +1001,10 @@ export default function StoreView() {
                     const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
                     return (
                       <div key={item.productId} className="sv-rcard">
-                        <div className="sv-rcard-img">
+                        <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                           {isDisplayableImageUrl(item.imageUrl)
-                            ? <img src={item.imageUrl} alt={item.name} />
-                            : <div className="sv-rcard-img-ph"><IconImg size={24} /></div>}
+                            ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
                         </div>
                         <div className="sv-rcard-body">
                           <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
