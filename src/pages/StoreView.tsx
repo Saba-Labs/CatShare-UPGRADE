@@ -654,7 +654,11 @@ export default function StoreView() {
   };
 
   const handlePanelAction = () => {
-    if (step === 'customer') { if (!customerName.trim()) { alert('Please enter your name'); return; } setStep('review'); }
+    if (step === 'customer') {
+      if (!customerName.trim()) { alert('Please enter your name'); return; }
+      if (!customerWhatsapp.trim()) { alert('Please enter your WhatsApp number'); return; }
+      setStep('review');
+    }
     else void handlePlaceOrder();
   };
 
@@ -921,7 +925,7 @@ export default function StoreView() {
                 <div className="sv-panel-title">{step === 'customer' ? 'Your details' : 'Review order'}</div>
                 <div className="sv-panel-subtitle">{step === 'customer' ? 'Almost there — just a few details' : 'Confirm everything looks right'}</div>
               </div>
-              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() : isSubmitting}>
+              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() || !customerWhatsapp.trim() : isSubmitting}>
                 {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
               </button>
             </div>
@@ -937,7 +941,7 @@ export default function StoreView() {
                   <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
                 </div>
                 <div className="sv-field">
-                  <label>WhatsApp Number</label>
+                  <label>WhatsApp Number *</label>
                   <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
                 </div>
 
