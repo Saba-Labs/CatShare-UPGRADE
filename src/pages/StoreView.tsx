@@ -936,6 +936,11 @@ export default function StoreView() {
 
             {step === 'customer' && (
               <div className="sv-form-body">
+                {(!customerName.trim() || !customerWhatsapp.trim()) && (
+                  <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
+                    ⚠️ Name and WhatsApp should be filled to continue
+                  </div>
+                )}
                 <div className="sv-field">
                   <label>Your Name *</label>
                   <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
