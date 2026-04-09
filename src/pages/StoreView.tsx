@@ -954,7 +954,7 @@ export default function StoreView() {
                           const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
                           const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
                           return (
-                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px' }}>
+                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px', opacity: item.quantity === 0 ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
                               <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                                   {isDisplayableImageUrl(item.imageUrl)
