@@ -597,30 +597,40 @@ export default function StoreView() {
     window.history.back();
   }, [drawerProduct, step]);
 
+  // Filter out 0-quantity items for final submission
+  const reviewSummary = useMemo(() => {
+    return {
+      items: orderSummary.items.filter(item => item.quantity > 0),
+      total: orderSummary.items
+        .filter(item => item.quantity > 0)
+        .reduce((sum, item) => sum + item.rowTotal, 0),
+    };
+  }, [orderSummary]);
+
   const handlePlaceOrder = async () => {
     if (!store?.catalogueId) return;
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
-      selectedProducts.forEach((quantity, productId) => {
-        const product = allProducts.find((p) => p.id === productId); if (!product) return;
+      reviewSummary.items.forEach((item) => {
+        const product = allProducts.find((p) => p.id === item.productId); if (!product) return;
         const catData = getCatalogueData(product, store.catalogueId);
         const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
         orderItems.push({
-          productId,
-          name: product.name,
-          quantity,
-          unitPrice,
-          rowTotal: unitPrice * quantity,
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          rowTotal: item.rowTotal,
           category: product.category?.[0],
           subtitle: product.subtitle,
           priceUnit,
-          imageUrl: pickProductImageSrc(product),
+          imageUrl: item.imageUrl,
           quantityStep: catData.orderQuantityStep,
         });
       });
       setSupabaseRlsUserId(store.sellerUserId);
-      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, orderSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
+      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
       if (error) alert('Failed to place order. Please try again.');
       else {
         alert('Order placed! The seller will contact you soon.');
@@ -930,20 +940,60 @@ export default function StoreView() {
                   <label>WhatsApp Number</label>
                   <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
                 </div>
-                <div className="sv-order-pill">
-                  <div>
-                    <div className="sv-order-pill-label">Your selection</div>
-                    <div className="sv-order-pill-detail">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</div>
-                  </div>
-                  <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
-                </div>
+
+                {/* Order Items with Quantity Controls */}
+                {orderSummary.items.length > 0 && (
+                  <>
+                    <div style={{ marginTop: 8, paddingBottom: 8 }}>
+                      <div style={{ fontSize: '10.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--c-text3)', marginBottom: 10, fontFamily: 'var(--f-body)' }}>
+                        Your Items
+                      </div>
+                      <div className="sv-review-list">
+                        {orderSummary.items.map((item: any) => {
+                          const catData = store?.catalogueId ? getCatalogueData(allProducts.find(p => p.id === item.productId), store.catalogueId) : null;
+                          const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
+                          const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
+                          return (
+                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px' }}>
+                              <div style={{ display: 'flex', gap: 12 }}>
+                                <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
+                                  {isDisplayableImageUrl(item.imageUrl)
+                                    ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                  <div>
+                                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--c-text)', marginBottom: 2 }}>{item.name}</div>
+                                    {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    {cd && <span style={{ fontSize: '11.5px', color: 'var(--c-text3)' }}>{cd}</span>}
+                                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-accent)' }}>{fmt(item.rowTotal, currencySymbol)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="sv-order-pill">
+                      <div>
+                        <div className="sv-order-pill-label">Total</div>
+                        <div className="sv-order-pill-detail">{orderSummary.items.length} item{orderSummary.items.length === 1 ? '' : 's'}</div>
+                      </div>
+                      <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
             {step === 'review' && (
               <>
                 <div className="sv-review-list">
-                  {orderSummary.items.map((item: any) => {
+                  {reviewSummary.items.map((item: any) => {
                     const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
                     return (
                       <div key={item.productId} className="sv-rcard">
@@ -968,9 +1018,9 @@ export default function StoreView() {
                 <div className="sv-review-total-bar">
                   <div>
                     <div className="sv-review-total-label">Total amount</div>
-                    <div className="sv-review-total-val">{fmt(orderSummary.total, currencySymbol)}</div>
+                    <div className="sv-review-total-val">{fmt(reviewSummary.total, currencySymbol)}</div>
                   </div>
-                  <button type="button" className="sv-edit-btn" onClick={() => setStep('products')}>Edit items</button>
+                  <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>Edit items</button>
                 </div>
               </>
             )}
