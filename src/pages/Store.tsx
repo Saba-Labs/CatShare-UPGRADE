@@ -888,7 +888,7 @@ export default function StorePage() {
                   )}
                 </div>
                 <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'whatsapp' ? 10 : 8 }}>
-                  Customers will see a WhatsApp button. Format: +91 9876543210
+                  Customers will see a WhatsApp button. Format: +91 98xxxxxxxx
                 </p>
                 {editingField === 'whatsapp' ? (
                   <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
@@ -898,7 +898,7 @@ export default function StorePage() {
                       autoComplete="tel"
                       className="field-input"
                       style={{ flex: '1 1 200px' }}
-                      placeholder="+91 9876543210"
+                      placeholder="+91 98xxxxxxxx"
                       value={formWhatsapp}
                       onChange={(e) => setFormWhatsapp(e.target.value)}
                       aria-label="WhatsApp number"
