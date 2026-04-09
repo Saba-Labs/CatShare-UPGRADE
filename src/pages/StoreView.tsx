@@ -187,7 +187,7 @@ const CSS = `
 
 /* ── Review ── */
 .sv-review-list { padding: 16px 16px 12px; display: flex; flex-direction: column; gap: 9px; }
-.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; box-shadow: var(--shadow-sm); }
+.sv-rcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; box-shadow: var(--shadow-sm); align-items: center; }
 .sv-rcard-img { width: 80px; height: 80px; flex-shrink: 0; background: var(--c-surface2); overflow: hidden; position: relative; }
 .sv-rcard-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sv-rcard-img-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
