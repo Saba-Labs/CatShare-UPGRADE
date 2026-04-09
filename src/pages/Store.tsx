@@ -888,7 +888,7 @@ export default function StorePage() {
                   )}
                 </div>
                 <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'whatsapp' ? 10 : 8 }}>
-                  If you add a number, customers see a green WhatsApp button on your public store. Leave empty to hide it. Use full number with country code (e.g. +91 9876543210).
+                  Customers will see a WhatsApp button. Format: +91 9876543210
                 </p>
                 {editingField === 'whatsapp' ? (
                   <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
@@ -919,7 +919,7 @@ export default function StorePage() {
                   </div>
                 ) : (
                   <div className="info-value" style={{ fontWeight: store.storeWhatsapp ? 600 : 400, color: store.storeWhatsapp ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                    {store.storeWhatsapp || 'Not set — no WhatsApp button on your store'}
+                    {store.storeWhatsapp || 'Not set'}
                   </div>
                 )}
               </div>
