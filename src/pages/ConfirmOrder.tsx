@@ -57,10 +57,10 @@ function QtyControl({ value, step, onChange }: { value: number; step: number; on
   const s = Math.max(1, Math.floor(step) || 1);
   const inc = s > 1 ? s : 1;
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#F5F5F7', borderRadius: 6, padding: '4px 8px' }}>
-      <button type="button" onClick={() => onChange(-inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: COLORS.muted, padding: 0, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-      <span style={{ minWidth: 30, textAlign: 'center', fontSize: 13, fontWeight: 600, color: COLORS.text }}>{value}</span>
-      <button type="button" onClick={() => onChange(inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: COLORS.muted, padding: 0, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: '#F5F5F7', borderRadius: 6, padding: '3px 6px', width: 'fit-content' }}>
+      <button type="button" onClick={() => onChange(-inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+      <span style={{ width: 24, textAlign: 'center', fontSize: 12, fontWeight: 600, color: COLORS.text }}>{value}</span>
+      <button type="button" onClick={() => onChange(inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
     </div>
   );
 }
