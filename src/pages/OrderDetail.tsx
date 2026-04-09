@@ -978,11 +978,11 @@ useEffect(() => {
   return (
     <div {...swipeHandlers} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
       {/* Status bar */}
-      <div style={{ position: 'fixed', inset: '0 0 auto', height: 44, background: '#1C1C1E', zIndex: 100 }} />
+      <div style={{ position: 'fixed', inset: '0 0 auto', height: 40, background: '#1C1C1E', zIndex: 100 }} />
 
       {/* ── Header ── */}
       <div style={{
-        position: 'sticky', top: 44, zIndex: 50,
+        position: 'sticky', top: 40, zIndex: 50,
         background: 'rgba(245,245,247,0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
