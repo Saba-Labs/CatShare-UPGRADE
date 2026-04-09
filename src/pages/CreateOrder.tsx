@@ -330,11 +330,7 @@ export default function CreateOrder() {
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     const newSelected = new Map(selectedProducts);
-    if (quantity <= 0) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.set(productId, quantity);
-    }
+    newSelected.set(productId, Math.max(0, quantity));
     setSelectedProducts(newSelected);
   };
 
