@@ -335,10 +335,17 @@ export default function CreateOrder() {
   };
 
   const handleContinueToCustomer = () => {
-    if (selectedProducts.size === 0) {
+    // Filter out products with 0 quantity
+    const filteredProducts = new Map(
+      Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
+    );
+
+    if (filteredProducts.size === 0) {
       showToast('Please add at least one product to the order', 'error');
       return;
     }
+
+    setSelectedProducts(filteredProducts);
     setStepSync('customer');
   };
 
