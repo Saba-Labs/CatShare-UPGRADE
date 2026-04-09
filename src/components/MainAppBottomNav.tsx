@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { FiBox, FiGrid, FiShoppingCart, FiShoppingBag } from 'react-icons/fi';
+import { FiPackage, FiGrid, FiShoppingCart, FiShoppingBag } from 'react-icons/fi';
 
 export type MainAppTab = 'products' | 'catalogues' | 'orders' | 'store';
 
@@ -44,7 +44,7 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
   };
 
   const tabs: { id: MainAppTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'products', label: 'Products', icon: FiBox },
+    { id: 'products', label: 'Products', icon: FiPackage },
     { id: 'catalogues', label: 'Catalogues', icon: FiGrid },
     { id: 'orders', label: 'Orders', icon: FiShoppingCart },
     { id: 'store', label: 'Store', icon: FiShoppingBag },
