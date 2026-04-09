@@ -184,7 +184,7 @@ export default function Login() {
           </p>
 
           <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Build your own store—sell direct, any time.
+            Build your own store — sell direct, any time.
           </h1>
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
