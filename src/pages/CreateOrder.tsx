@@ -269,7 +269,7 @@ export default function CreateOrder() {
   // Calculate order totals
   const orderSummary = useMemo(() => {
     if (!selectedCatalogueId) return { items: [], total: 0, count: 0 };
-    
+
     const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
     if (!catalogue) return { items: [], total: 0, count: 0 };
 
@@ -349,6 +349,34 @@ export default function CreateOrder() {
     setStepSync('customer');
   };
 
+  // Filter out 0-quantity items for final review/submission
+  const reviewSummary = useMemo(() => {
+    return {
+      items: orderSummary.items.filter(item => item.quantity > 0),
+      total: orderSummary.items
+        .filter(item => item.quantity > 0)
+        .reduce((sum, item) => sum + item.rowTotal, 0),
+      count: orderSummary.items
+        .filter(item => item.quantity > 0)
+        .reduce((sum, item) => sum + item.quantity, 0),
+    };
+  }, [orderSummary]);
+
+  // Clean up items with 0 quantity when navigating away
+  React.useEffect(() => {
+    const cleanupOnUnmount = () => {
+      // Filter out items with 0 quantity when component unmounts
+      const filteredProducts = new Map(
+        Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
+      );
+      setSelectedProducts(filteredProducts);
+    };
+
+    return () => {
+      cleanupOnUnmount();
+    };
+  }, []);
+
   const handleContinueToReview = () => {
     if (!customerName.trim()) {
       showToast('Please enter customer name', 'error');
@@ -362,7 +390,7 @@ export default function CreateOrder() {
 
     setIsSubmitting(true);
     try {
-      const orderItems: OrderItem[] = orderSummary.items.map(item => ({
+      const orderItems: OrderItem[] = reviewSummary.items.map(item => ({
         productId: item.productId,
         name: item.name,
         quantity: item.quantity,
@@ -379,7 +407,7 @@ export default function CreateOrder() {
         user.uid,
         customerName.trim(),
         orderItems,
-        orderSummary.total,
+        reviewSummary.total,
         'INR',
         customerWhatsapp.trim() || undefined,
         selectedCatalogueId
@@ -1157,7 +1185,7 @@ export default function CreateOrder() {
                 Order Items
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {orderSummary.items.map((item) => (
+                {reviewSummary.items.map((item) => (
                   <div key={item.productId} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1195,7 +1223,7 @@ export default function CreateOrder() {
                 Total Amount
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
-                ₹{orderSummary.total.toLocaleString('en-IN')}
+                ₹{reviewSummary.total.toLocaleString('en-IN')}
               </div>
             </div>
           </div>
