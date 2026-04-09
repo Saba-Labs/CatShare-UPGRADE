@@ -972,7 +972,9 @@ export default function StoreView() {
                                   </div>
                                 </div>
                               </div>
-                              <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
+                              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
+                              </div>
                             </div>
                           );
                         })}
