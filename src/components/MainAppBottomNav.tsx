@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { FiBox, FiGrid, FiShoppingCart, FiShoppingBag } from 'react-icons/fi';
 
 export type MainAppTab = 'products' | 'catalogues' | 'orders' | 'store';
 
@@ -42,11 +43,11 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
     navigate(dest);
   };
 
-  const tabs: { id: MainAppTab; label: string }[] = [
-    { id: 'products', label: 'Products' },
-    { id: 'catalogues', label: 'Catalogues' },
-    { id: 'orders', label: 'Orders' },
-    { id: 'store', label: 'Store' },
+  const tabs: { id: MainAppTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'products', label: 'Products', icon: FiBox },
+    { id: 'catalogues', label: 'Catalogues', icon: FiGrid },
+    { id: 'orders', label: 'Orders', icon: FiShoppingCart },
+    { id: 'store', label: 'Store', icon: FiShoppingBag },
   ];
 
   return (
@@ -54,16 +55,17 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
       className="fixed bottom-0 left-0 right-0 z-30 flex justify-around text-xs font-medium pb-[env(safe-area-inset-bottom,0px)] border-t border-gray-200 bg-white sm:text-sm"
       aria-label="Main navigation"
     >
-      {tabs.map(({ id, label }) => (
+      {tabs.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           type="button"
           onClick={() => go(id)}
-          className={`flex-1 py-3 text-center transition-colors ${
+          className={`flex-1 flex flex-col items-center justify-center gap-1 py-2.5 px-1 transition-colors ${
             active === id ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
           }`}
         >
-          {label}
+          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="text-xs sm:text-sm font-medium">{label}</span>
         </button>
       ))}
     </nav>
