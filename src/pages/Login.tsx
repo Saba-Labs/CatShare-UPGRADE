@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiMail, FiLock, FiAlertCircle, FiStore, FiZap, FiImage } from 'react-icons/fi';
+import { FiMail, FiLock, FiAlertCircle, FiShoppingBag, FiZap, FiImage } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,7 @@ import { safeGetFromStorage } from '../utils/safeStorage';
 
 const introHighlights = [
   {
-    icon: FiStore,
+    icon: FiShoppingBag,
     title: 'Branded storefronts',
     text: 'Showcase and sell your collection.',
   },
