@@ -20,7 +20,12 @@ import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, getSellerCurrencyForShareLink, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF, pdfFilenamePrefix } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
-import { createShareLink, productToShareLinkItem } from "./services/shareLinks";
+import {
+  createShareLink,
+  productToShareLinkItem,
+  SHARE_LINK_EXPIRY_PRESETS,
+  type ShareLinkExpiryPresetId,
+} from "./services/shareLinks";
 import { businessProfileFromUserSettings, getBusinessProfileForPdf } from "./config/businessProfile";
 import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
@@ -330,6 +335,8 @@ export default React.memo(function CatalogueView({
   const [showAddProductsModal, setShowAddProductsModal] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
+  const [showShareLinkExpiryPopup, setShowShareLinkExpiryPopup] = useState(false);
+  const [shareLinkExpiryPresetId, setShareLinkExpiryPresetId] = useState<ShareLinkExpiryPresetId>('24h');
   const [showWhatsAppRequiredForLink, setShowWhatsAppRequiredForLink] = useState(false);
   const [linkWhatsappDial, setLinkWhatsappDial] = useState("");
   const [linkWhatsappLocal, setLinkWhatsappLocal] = useState("");
@@ -956,6 +963,9 @@ const handleTouchEnd = useCallback(() => {
         const { code: sellerCurrencyCode, symbol: sellerCurrencySymbol } =
           getSellerCurrencyForShareLink(supabaseData?.userSettings);
 
+        const expiresInDays =
+          SHARE_LINK_EXPIRY_PRESETS.find((p) => p.id === shareLinkExpiryPresetId)?.expiresInDays ?? 1;
+
         const { url } = await createShareLink({
           sellerUserId: user.uid,
           sellerWhatsapp,
@@ -964,6 +974,7 @@ const handleTouchEnd = useCallback(() => {
           sellerCurrencyCode,
           sellerCurrencySymbol,
           sellerLogoUrl,
+          expiresInDays,
         });
 
         if (!isPro) {
@@ -1029,7 +1040,7 @@ const handleTouchEnd = useCallback(() => {
         );
       }
     },
-    [user, supabaseData, allProducts, selected, catalogueId, isPro]
+    [user, supabaseData, allProducts, selected, catalogueId, isPro, shareLinkExpiryPresetId]
   );
 
   const saveWhatsAppFromLinkModal = async () => {
@@ -1643,22 +1654,15 @@ const handleTouchEnd = useCallback(() => {
             </button>
 
             <button
-              onClick={async () => {
+              onClick={() => {
                 if (!user?.uid) {
                   setShowShareOptions(false);
                   alert("Please login first.");
                   return;
                 }
-                const sellerWhatsapp =
-                  localStorage.getItem("whatsappNumber") ||
-                  supabaseData?.userSettings?.whatsapp_number ||
-                  supabaseData?.userSettings?.whatsappNumber ||
-                  "";
-                if (!String(sellerWhatsapp).trim()) {
-                  setShowWhatsAppRequiredForLink(true);
-                  return;
-                }
-                await runOrderFormShareFlow(String(sellerWhatsapp).trim());
+                setShowShareOptions(false);
+                setShareLinkExpiryPresetId('24h');
+                setShowShareLinkExpiryPopup(true);
               }}
               className="flex flex-col items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700/50 group"
             >
@@ -1683,6 +1687,94 @@ const handleTouchEnd = useCallback(() => {
     </div>
   )}
 </AnimatePresence>
+
+  {/* Order link expiry — opens after user taps Link in Share Selection */}
+  <AnimatePresence>
+    {showShareLinkExpiryPopup && (
+      <div className="fixed inset-0 z-[105] flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => {
+            setShowShareLinkExpiryPopup(false);
+            setShowShareOptions(true);
+          }}
+        />
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0, y: 10 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 10 }}
+          className="relative w-full max-w-[340px] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden p-5 sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-start gap-3 mb-4">
+            <div className="shrink-0 w-11 h-11 rounded-2xl bg-green-500/15 dark:bg-green-500/20 flex items-center justify-center">
+              <FiLink className="w-6 h-6 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                Link expiry
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                How long should the order link stay active?
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            {SHARE_LINK_EXPIRY_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setShareLinkExpiryPresetId(preset.id)}
+                className={`rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors border ${
+                  shareLinkExpiryPresetId === preset.id
+                    ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                    : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:border-green-400/60'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                setShowShareLinkExpiryPopup(false);
+                const sellerWhatsapp =
+                  localStorage.getItem("whatsappNumber") ||
+                  supabaseData?.userSettings?.whatsapp_number ||
+                  supabaseData?.userSettings?.whatsappNumber ||
+                  "";
+                if (!String(sellerWhatsapp).trim()) {
+                  setShowWhatsAppRequiredForLink(true);
+                  return;
+                }
+                await runOrderFormShareFlow(String(sellerWhatsapp).trim());
+              }}
+              className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors touch-manipulation"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowShareLinkExpiryPopup(false);
+                setShowShareOptions(true);
+              }}
+              className="w-full py-2.5 rounded-xl text-slate-500 dark:text-slate-400 font-semibold text-sm hover:text-slate-700 dark:hover:text-slate-200 transition-colors touch-manipulation"
+            >
+              Back
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
 
   {/* WhatsApp input — required for order link (saved locally only) */}
   <AnimatePresence>

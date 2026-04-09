@@ -146,6 +146,16 @@ export function productToShareLinkItem(
   return item;
 }
 
+/** Presets for catalogue “share as link” (order form). Values are days for `expires_at` (48h = 2 days). */
+export const SHARE_LINK_EXPIRY_PRESETS = [
+  { id: '24h' as const, label: '24 hours', expiresInDays: 1 },
+  { id: '48h' as const, label: '48 hours', expiresInDays: 2 },
+  { id: '4d' as const, label: '4 days', expiresInDays: 4 },
+  { id: '7d' as const, label: '7 days', expiresInDays: 7 },
+] as const;
+
+export type ShareLinkExpiryPresetId = (typeof SHARE_LINK_EXPIRY_PRESETS)[number]['id'];
+
 export async function createShareLink(options: {
   sellerUserId: string;
   sellerWhatsapp: string;
@@ -158,6 +168,7 @@ export async function createShareLink(options: {
   sellerCurrencySymbol?: string;
   /** Business logo URL (Account → business details). */
   sellerLogoUrl?: string;
+  /** Default 1 day (24h). Use `SHARE_LINK_EXPIRY_PRESETS` for UI. */
   expiresInDays?: number;
 }): Promise<{ token: string; url: string }> {
   const token = randomToken(16);

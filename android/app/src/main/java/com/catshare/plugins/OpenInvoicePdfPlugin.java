@@ -108,7 +108,11 @@ public class OpenInvoicePdfPlugin extends Plugin {
               file);
 
       Intent send = new Intent(Intent.ACTION_SEND);
-      send.setType("application/pdf");
+      String shareMime = getMimeType(path);
+      if (shareMime == null || shareMime.isEmpty()) {
+        shareMime = "application/pdf";
+      }
+      send.setType(shareMime);
       send.putExtra(Intent.EXTRA_STREAM, contentUri);
       if (subject != null && !subject.isEmpty()) {
         send.putExtra(Intent.EXTRA_SUBJECT, subject);

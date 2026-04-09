@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import html2canvas from 'html2canvas';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { Capacitor } from '@capacitor/core';
@@ -16,6 +17,7 @@ import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 /** Haptics throws/rejects on desktop web — avoids dozens of console errors in DevTools. */
 async function safeHapticsLight() {
@@ -159,6 +161,289 @@ function invoicePdfFileName(order: Order): string {
   return `Invoice_${idPart}_${raw || 'customer'}.pdf`;
 }
 
+function orderSnapshotPngFileName(order: Order): string {
+  const idPart = order.id.substring(0, 8);
+  const raw = (order.customer_name || 'customer').replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_').slice(0, 80);
+  return `Order_${idPart}_${raw || 'customer'}.png`;
+}
+
+/** Supabase JSON may use snake_case; UI expects camelCase. */
+function normalizeOrderItemFromApi(raw: unknown): Order['items'][number] {
+  const r = raw as Record<string, unknown>;
+  const imageUrl =
+    (typeof r.imageUrl === 'string' && r.imageUrl.trim()) ||
+    (typeof r.image_url === 'string' && r.image_url.trim()) ||
+    undefined;
+  const productId =
+    (typeof r.productId === 'string' && r.productId.trim()) ||
+    (typeof r.product_id === 'string' && r.product_id.trim()) ||
+    undefined;
+  return {
+    ...(raw as object),
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(productId ? { productId } : {}),
+  } as Order['items'][number];
+}
+
+function normalizeOrderFromApi(o: Order): Order {
+  return {
+    ...o,
+    items: (o.items || []).map((it) => normalizeOrderItemFromApi(it)),
+  };
+}
+
+function resolveOrderItemImageUrl(item: OrderItem): string | undefined {
+  const a = item.imageUrl;
+  if (typeof a === 'string' && a.trim()) return a.trim();
+  const b = (item as unknown as { image_url?: string }).image_url;
+  if (typeof b === 'string' && b.trim()) return b.trim();
+  return undefined;
+}
+
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  dw: number,
+  dh: number
+) {
+  const el = source as HTMLImageElement;
+  const iw = el.naturalWidth || el.width;
+  const ih = el.naturalHeight || el.height;
+  if (!iw || !ih) return;
+  const scale = Math.max(dw / iw, dh / ih);
+  const rw = iw * scale;
+  const rh = ih * scale;
+  const x = (dw - rw) / 2;
+  const y = (dh - rh) / 2;
+  ctx.drawImage(source, 0, 0, iw, ih, x, y, rw, rh);
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const h = m[1];
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+/** Snapshot only: html2canvas mis-draws avatar & product imgs; rasterize with Canvas2D then restore. */
+function replaceCustomerAvatarWithCanvasForCapture(container: HTMLElement): () => void {
+  const el = container.querySelector<HTMLElement>('[data-order-avatar-capture]');
+  if (!el) return () => {};
+
+  const dot = el.getAttribute('data-dot') || '#F59E0B';
+  const initial = el.getAttribute('data-initial') || '?';
+  const parent = el.parentElement;
+  if (!parent) return () => {};
+
+  const size = 44;
+  const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  canvas.style.width = `${size}px`;
+  canvas.style.height = `${size}px`;
+  canvas.style.display = 'block';
+  canvas.style.flexShrink = '0';
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return () => {};
+
+  ctx.scale(dpr, dpr);
+
+  const rgb = hexToRgb(dot);
+  ctx.beginPath();
+  ctx.arc(22, 22, 20, 0, Math.PI * 2);
+  if (rgb) {
+    ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${0x18 / 255})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${0x30 / 255})`;
+  } else {
+    ctx.fillStyle = dot;
+    ctx.fill();
+    ctx.strokeStyle = dot;
+  }
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.font =
+    '700 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = dot;
+  ctx.fillText(initial, 22, 22);
+
+  parent.insertBefore(canvas, el);
+  const prev = el.style.display;
+  el.style.display = 'none';
+  return () => {
+    el.style.display = prev;
+    canvas.remove();
+  };
+}
+
+async function prepareImagesForCaptureSnapshot(container: HTMLElement): Promise<() => void> {
+  const restores: Array<() => void> = [];
+  restores.push(replaceCustomerAvatarWithCanvasForCapture(container));
+
+  const imgs = Array.from(container.querySelectorAll('img'));
+  const { loadImage } = await import('../utils/canvasRenderer');
+
+  for (const node of imgs) {
+    const img = node as HTMLImageElement;
+    const url = (img.currentSrc || img.src || '').trim();
+    if (!url) continue;
+
+    const parent = img.parentElement;
+    if (!parent) continue;
+
+    const w = img.offsetWidth || 52;
+    const h = img.offsetHeight || 52;
+    if (w < 4 || h < 4) continue;
+
+    try {
+      const loaded = await loadImage(url);
+      const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2);
+      const cw = Math.round(w * dpr);
+      const ch = Math.round(h * dpr);
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      canvas.style.display = 'block';
+      canvas.style.borderRadius = getComputedStyle(img).borderRadius || '12px';
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      drawImageCover(ctx, loaded, cw, ch);
+
+      parent.insertBefore(canvas, img);
+      const prevDisplay = img.style.display;
+      img.style.display = 'none';
+      restores.push(() => {
+        img.style.display = prevDisplay;
+        canvas.remove();
+      });
+    } catch (e) {
+      console.warn('Order snapshot: could not rasterize thumb', url, e);
+    }
+  }
+
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+
+  return () => {
+    restores.forEach((fn) => fn());
+  };
+}
+
+type StoredProductRow = { id?: string; imageUrl?: string };
+
+/**
+ * Snapshot only: html2canvas misaligns flex rows. Live Order Detail keeps a simple flex layout;
+ * we re-assert stretch + inner flex centering on the cloned DOM before rasterize.
+ */
+function applyOrderSnapshotLayoutForClone(doc: Document) {
+  const imp = 'important';
+
+  const customerRow = doc.querySelector('[data-order-customer-snapshot-row]');
+  if (customerRow instanceof HTMLElement) {
+    customerRow.style.setProperty('display', 'flex', imp);
+    customerRow.style.setProperty('flex-direction', 'row', imp);
+    customerRow.style.setProperty('align-items', 'stretch', imp);
+    customerRow.style.setProperty('justify-content', 'space-between', imp);
+    customerRow.style.setProperty('gap', '12px', imp);
+    customerRow.style.setProperty('box-sizing', 'border-box', imp);
+    customerRow.style.setProperty('width', '100%', imp);
+
+    const left = customerRow.children[0];
+    const right = customerRow.children[1];
+    if (left instanceof HTMLElement) {
+      left.style.setProperty('display', 'flex', imp);
+      left.style.setProperty('flex-direction', 'row', imp);
+      left.style.setProperty('align-items', 'center', imp);
+      left.style.setProperty('gap', '12px', imp);
+      left.style.setProperty('flex', '1', imp);
+      left.style.setProperty('min-width', '0', imp);
+    }
+    const textEl = customerRow.querySelector('[data-order-customer-text-snapshot]');
+    if (textEl instanceof HTMLElement) {
+      textEl.style.setProperty('display', 'flex', imp);
+      textEl.style.setProperty('flex-direction', 'column', imp);
+      textEl.style.setProperty('justify-content', 'center', imp);
+      textEl.style.setProperty('min-width', '0', imp);
+      // Match Order Total PNG-only spacing; avatar is a sibling and keeps its own styles
+      textEl.style.setProperty('padding', '4px 0 16px', imp);
+      textEl.style.setProperty('box-sizing', 'border-box', imp);
+    }
+    if (right instanceof HTMLElement) {
+      right.style.setProperty('display', 'flex', imp);
+      right.style.setProperty('flex-direction', 'column', imp);
+      right.style.setProperty('justify-content', 'center', imp);
+      right.style.setProperty('align-items', 'flex-end', imp);
+      right.style.setProperty('text-align', 'right', imp);
+      right.style.setProperty('white-space', 'nowrap', imp);
+      // PNG-only; right totals column only
+      right.style.setProperty('padding', '0 0 4px', imp);
+      right.style.setProperty('box-sizing', 'border-box', imp);
+      right.style.setProperty('margin-top', '-2px', imp);
+    }
+  }
+
+  const orderTotalRow = doc.querySelector('[data-order-snapshot-order-total-row]');
+  if (orderTotalRow instanceof HTMLElement) {
+    orderTotalRow.style.setProperty('display', 'flex', imp);
+    orderTotalRow.style.setProperty('flex-direction', 'row', imp);
+    orderTotalRow.style.setProperty('justify-content', 'space-between', imp);
+    orderTotalRow.style.setProperty('align-items', 'center', imp);
+    // PNG-only padding: tighter than before; still a touch more bottom than top so the row doesn’t hug the card edge
+    orderTotalRow.style.setProperty('padding', '2px 0 16px', imp);
+    orderTotalRow.style.setProperty('box-sizing', 'border-box', imp);
+  }
+
+  doc.querySelectorAll('[data-order-snapshot-line-right]').forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.style.setProperty('padding', '0 0 4px', imp);
+      node.style.setProperty('box-sizing', 'border-box', imp);
+      node.style.setProperty('margin-top', '-2px', imp);
+    }
+  });
+
+  const orderTotalValue = doc.querySelector('[data-order-snapshot-order-total-value]');
+  if (orderTotalValue instanceof HTMLElement) {
+    orderTotalValue.style.setProperty('display', 'inline-block', imp);
+    orderTotalValue.style.setProperty('padding', '0 0 4px', imp);
+    orderTotalValue.style.setProperty('box-sizing', 'border-box', imp);
+    orderTotalValue.style.setProperty('margin-top', '-2px', imp);
+  }
+}
+
+function hydrateOrderItemImagesFromLocalProducts(
+  items: Order['items'],
+  userId: string | undefined
+): Order['items'] {
+  if (!userId) return items;
+  const products = safeGetFromStorage(getStorageKey('products', userId), [] as StoredProductRow[]);
+  const byId = new Map<string, StoredProductRow>();
+  for (const p of products) {
+    if (p?.id != null) byId.set(String(p.id), p);
+  }
+  return items.map((it) => {
+    if (resolveOrderItemImageUrl(it as OrderItem)) return it;
+    const pid = (it as { productId?: string }).productId;
+    if (!pid) return it;
+    const p = byId.get(String(pid));
+    const u = typeof p?.imageUrl === 'string' ? p.imageUrl.trim() : '';
+    if (!u) return it;
+    return { ...it, imageUrl: u } as Order['items'][number];
+  });
+}
+
 async function copyTextToClipboard(text: string): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     const { Clipboard } = await import('@capacitor/clipboard');
@@ -264,6 +549,21 @@ const Ic = {
   Img: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" strokeWidth="1.5">
       <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+    </svg>
+  ),
+  ImageShare: () => (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  ),
+  /** Arrow-into-tray — used for Download image (distinct from ImageShare). */
+  Download: () => (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   ),
   MoreVertical: () => (
@@ -393,14 +693,20 @@ function ActionsMenu({
   onWhatsApp,
   onOpenPDF,
   onCopyBill,
+  onDownloadOrderImage,
+  onShareOrderImage,
   pdfLoading,
+  shareImageLoading,
   copied,
 }: {
   onClose: () => void;
   onWhatsApp: () => void;
   onOpenPDF: () => void;
   onCopyBill: () => void;
+  onDownloadOrderImage: () => void;
+  onShareOrderImage: () => void;
   pdfLoading: boolean;
+  shareImageLoading: boolean;
   copied: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -417,6 +723,8 @@ function ActionsMenu({
     { icon: <Ic.WhatsApp size={16} />, label: 'Send Invoice', sublabel: 'WhatsApp', onClick: onWhatsApp, color: '#16A34A' },
     { icon: <Ic.PDF />, label: 'Open PDF', sublabel: pdfLoading ? 'Generating…' : 'Invoice', onClick: onOpenPDF, color: '#0A84FF' },
     { icon: <Ic.Copy />, label: copied ? 'Copied!' : 'Copy Bill', sublabel: 'Plain text', onClick: onCopyBill, color: '#8B5CF6' },
+    { icon: <Ic.Download />, label: 'Download image', sublabel: shareImageLoading ? 'Preparing…' : 'Order summary PNG', onClick: onDownloadOrderImage, color: '#0EA5E9' },
+    { icon: <Ic.ImageShare />, label: 'Share image', sublabel: shareImageLoading ? 'Preparing…' : 'Order summary', onClick: onShareOrderImage, color: '#14B8A6' },
   ];
 
   return (
@@ -430,8 +738,9 @@ function ActionsMenu({
     }}>
       <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
       {actions.map((action, i) => {
-        // Disable buttons while loading (except Copy which is instant)
-        const isDisabled = pdfLoading && i !== 2; // i === 2 is Copy button
+        const isDisabled =
+          (pdfLoading && i !== 2) ||
+          (shareImageLoading && (i === 3 || i === 4));
         return (
           <button
             key={i}
@@ -604,9 +913,12 @@ export default function OrderDetail() {
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [shareImageLoading, setShareImageLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const isSwipeProcessingRef = useRef(false);
   const pdfProcessingRef = useRef(false);
+  const shareImageProcessingRef = useRef(false);
+  const orderShareCaptureRef = useRef<HTMLDivElement>(null);
   const editModeRef = useRef(editMode);
 
   const setEditModeSync = (val: boolean) => {
@@ -662,10 +974,15 @@ useEffect(() => {
       if (!error && data) {
         const found = data.find((o: Order) => o.id === id);
         if (found) {
-          setOrder(found);
-          setEditName(found.customer_name || '');
-          setEditPhone((found as any).customer_whatsapp || '');
-          setEditItems((found.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
+          const normalized = normalizeOrderFromApi(found);
+          const hydrated = {
+            ...normalized,
+            items: hydrateOrderItemImagesFromLocalProducts(normalized.items, user.uid),
+          };
+          setOrder(hydrated);
+          setEditName(hydrated.customer_name || '');
+          setEditPhone((hydrated as any).customer_whatsapp || '');
+          setEditItems((hydrated.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
         } else showToast('Order not found', 'error');
       } else showToast('Failed to load order', 'error');
       setLoading(false);
@@ -930,6 +1247,153 @@ useEffect(() => {
     }
   };
 
+  const captureOrderSnapshotBlob = useCallback(async (): Promise<Blob | null> => {
+    const el = orderShareCaptureRef.current;
+    if (!el) return null;
+    let restoreImages: (() => void) | undefined;
+    try {
+      restoreImages = await prepareImagesForCaptureSnapshot(el);
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: COLORS.bg,
+        imageTimeout: 30000,
+        onclone: (clonedDoc) => {
+          applyOrderSnapshotLayoutForClone(clonedDoc);
+        },
+      });
+      return await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/png', 0.92)
+      );
+    } catch (e) {
+      console.error('captureOrderSnapshotBlob:', e);
+      return null;
+    } finally {
+      restoreImages?.();
+    }
+  }, []);
+
+  const handleDownloadOrderImage = async () => {
+    if (!order || shareImageProcessingRef.current) return;
+    shareImageProcessingRef.current = true;
+    setShareImageLoading(true);
+    try {
+      const blob = await captureOrderSnapshotBlob();
+      if (!blob) {
+        showToast('Could not capture order view.', 'error');
+        return;
+      }
+      const fileName = orderSnapshotPngFileName(order);
+      if (Capacitor.isNativePlatform()) {
+        const arrayBuffer = await blob.arrayBuffer();
+        const base64 = arrayBufferToBase64(arrayBuffer);
+        await Filesystem.writeFile({
+          path: fileName,
+          data: base64,
+          directory: Directory.Documents,
+          recursive: true,
+        });
+        showToast(`Saved ${fileName} to Documents`, 'success');
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+        showToast('Image downloaded', 'success');
+      }
+    } catch (err) {
+      console.error('Download order image error:', err);
+      showToast('Could not save image.', 'error');
+    } finally {
+      setShareImageLoading(false);
+      shareImageProcessingRef.current = false;
+    }
+  };
+
+  const handleShareOrderImage = async () => {
+    if (!order || shareImageProcessingRef.current) return;
+    shareImageProcessingRef.current = true;
+    setShareImageLoading(true);
+    try {
+      const blob = await captureOrderSnapshotBlob();
+      if (!blob) {
+        showToast('Could not capture order view.', 'error');
+        return;
+      }
+      const fileName = orderSnapshotPngFileName(order);
+      const isNative = Capacitor.isNativePlatform();
+
+      if (isNative) {
+        try {
+          if (Capacitor.getPlatform() === 'android') {
+            const arrayBuffer = await blob.arrayBuffer();
+            const base64 = arrayBufferToBase64(arrayBuffer);
+            const { uri } = await Filesystem.writeFile({
+              path: fileName,
+              data: base64,
+              directory: Directory.Cache,
+              recursive: true,
+            });
+            try {
+              await OpenInvoicePdf.shareFile({
+                path: uri,
+                dialogTitle: 'Share order',
+                title: `Order — ${order.customer_name}`,
+                text: `Hi ${order.customer_name}, here is your order summary.`,
+              });
+            } catch (nativeShareErr) {
+              console.error('OpenInvoicePdf.shareFile failed:', nativeShareErr);
+              await Share.share({
+                title: `Order — ${order.customer_name}`,
+                text: `Hi ${order.customer_name}, here is your order summary.`,
+                url: uri,
+                dialogTitle: 'Share order',
+              });
+            }
+            showToast('Choose an app to share', 'success');
+          } else {
+            showToast('Share image is optimized for Android in this build.', 'info');
+          }
+        } catch (err) {
+          console.error('Share order image error:', err);
+          showToast('Could not share image.', 'error');
+        }
+      } else {
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: `Order — ${order.customer_name}`,
+              text: `Hi ${order.customer_name}, here is your order summary.`,
+              files: [new File([blob], fileName, { type: 'image/png' })],
+            });
+            showToast('Shared!', 'success');
+          } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 500);
+            showToast('Image downloaded', 'success');
+          }
+        } catch (err) {
+          console.error('Web share order image:', err);
+          showToast('Could not share. Try Download image.', 'error');
+        }
+      }
+    } finally {
+      setShareImageLoading(false);
+      shareImageProcessingRef.current = false;
+    }
+  };
+
   const handleDelete = async () => {
     if (!order) return;
     try {
@@ -1062,7 +1526,10 @@ useEffect(() => {
                     onWhatsApp={handleShareWhatsApp}
                     onOpenPDF={handleOpenPDF}
                     onCopyBill={handleCopy}
+                    onDownloadOrderImage={handleDownloadOrderImage}
+                    onShareOrderImage={handleShareOrderImage}
                     pdfLoading={pdfLoading}
+                    shareImageLoading={shareImageLoading}
                     copied={copied}
                   />
                 )}
@@ -1081,7 +1548,7 @@ useEffect(() => {
       <main style={{ flex: 1, overflowY: 'auto', padding: '16px 16px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
         <div style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-          {/* ── Customer card ── */}
+          {/* ── Customer + items: edit mode vs snapshot ref for share/download image ── */}
           {editMode ? (
             <>
               <SectionLabel>Customer Info</SectionLabel>
@@ -1121,24 +1588,74 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
+              <SectionLabel>Edit Items</SectionLabel>
+              <Card>
+                <div style={{ padding: '4px 16px' }}>
+                  {editItems.map((it, i) => (
+                    <div key={it._key}>
+                      {i > 0 && <Divider />}
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                        <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
+                          {it.unitPrice ? (
+                            <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
+                          ) : null}
+                        </div>
+                        <QtyStepper value={it.quantity} step={it.quantityStep ?? 1} onChange={qty => {
+                          if (qty === 0) {
+                            setEditItems(prev => prev.filter(x => x._key !== it._key));
+                          } else {
+                            setEditItems(prev => prev.map(x => x._key === it._key ? { ...x, quantity: qty } : x));
+                          }
+                        }} />
+                      </div>
+                    </div>
+                  ))}
+                  {editItems.length === 0 && (
+                    <div style={{ padding: '20px 0', textAlign: 'center', color: COLORS.subtle, fontSize: 14 }}>
+                      No items remaining
+                    </div>
+                  )}
+                </div>
+              </Card>
             </>
           ) : (
-            <>
+            <div ref={orderShareCaptureRef} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <SectionLabel>Customer</SectionLabel>
               <Card>
-                <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Avatar */}
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 22,
-                      background: `${statusCfg.dot}18`,
-                      border: `2px solid ${statusCfg.dot}30`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 18, fontWeight: 700, color: statusCfg.dot, flexShrink: 0,
-                    }}>
-                      {(order.customer_name || '?').charAt(0).toUpperCase()}
+                <div
+                  data-order-customer-snapshot-row
+                  style={{
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  {/*
+                    Avatar wrapper keeps canvas rasterization inside one flex child (see replaceCustomerAvatarWithCanvasForCapture).
+                    data-order-customer-text-snapshot is for html2canvas onclone only.
+                  */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div
+                        data-order-avatar-capture
+                        data-dot={statusCfg.dot}
+                        data-initial={(order.customer_name || '?').charAt(0).toUpperCase()}
+                        style={{
+                          width: 44, height: 44, borderRadius: 22,
+                          background: `${statusCfg.dot}18`,
+                          border: `2px solid ${statusCfg.dot}30`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 18, fontWeight: 700, color: statusCfg.dot, flexShrink: 0,
+                        }}
+                      >
+                        {(order.customer_name || '?').charAt(0).toUpperCase()}
+                      </div>
                     </div>
-                    <div>
+                    <div data-order-customer-text-snapshot>
                       <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.text }}>{order.customer_name}</div>
                       {phone ? (
                         <a
@@ -1164,93 +1681,70 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
-            </>
-          )}
-
-          {/* ── Items ── */}
-          <SectionLabel>{editMode ? 'Edit Items' : 'Order Items'}</SectionLabel>
-          <Card>
-            {editMode ? (
-              <div style={{ padding: '4px 16px' }}>
-                {editItems.map((it, i) => (
-                  <div key={it._key}>
-                    {i > 0 && <Divider />}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
-                      <ProductThumb url={it.imageUrl} name={it.name} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
-                        {it.unitPrice ? (
-                          <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
-                        ) : null}
-                      </div>
-                      <QtyStepper value={it.quantity} step={it.quantityStep ?? 1} onChange={qty => {
-                        if (qty === 0) {
-                          setEditItems(prev => prev.filter(x => x._key !== it._key));
-                        } else {
-                          setEditItems(prev => prev.map(x => x._key === it._key ? { ...x, quantity: qty } : x));
-                        }
-                      }} />
-                    </div>
-                  </div>
-                ))}
-                {editItems.length === 0 && (
-                  <div style={{ padding: '20px 0', textAlign: 'center', color: COLORS.subtle, fontSize: 14 }}>
-                    No items remaining
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ padding: '4px 16px' }}>
-                {items.map((item, i) => {
-                  const hasCost = item.unitPrice != null && item.unitPrice > 0;
-                  const lineTotal = item.rowTotal || (hasCost ? item.unitPrice! * item.quantity : null);
-                  return (
-                    <div key={i}>
-                      {i > 0 && <Divider />}
-                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
-                        <ProductThumb url={item.imageUrl} name={item.name} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
-                          {item.subtitle && (
-                            <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.subtitle}</div>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                          {hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              {item.quantity} {getOrderUnitLabel(item.priceUnit)} × {symbol}{item.unitPrice}
-                            </div>
-                          )}
-                          {!hasCost && (
-                            <div style={{ fontSize: 12, color: COLORS.muted }}>
-                              Qty: {item.quantity} {getOrderUnitLabel(item.priceUnit)}
-                            </div>
-                          )}
-                          {lineTotal != null ? (
-                            <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>
-                              {formatMoney(lineTotal, symbol)}
-                            </div>
-                          ) : null}
+              <SectionLabel>Order Items</SectionLabel>
+              <Card>
+                <div style={{ padding: '4px 16px' }}>
+                  {items.map((item, i) => {
+                    const hasCost = item.unitPrice != null && item.unitPrice > 0;
+                    const lineTotal = item.rowTotal || (hasCost ? item.unitPrice! * item.quantity : null);
+                    return (
+                      <div key={i}>
+                        {i > 0 && <Divider />}
+                        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                          <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
+                            {item.subtitle && (
+                              <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.subtitle}</div>
+                            )}
+                          </div>
+                          <div
+                            data-order-snapshot-line-right
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}
+                          >
+                            {hasCost && (
+                              <div style={{ fontSize: 12, color: COLORS.muted }}>
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} × {symbol}{item.unitPrice}
+                              </div>
+                            )}
+                            {!hasCost && (
+                              <div style={{ fontSize: 12, color: COLORS.muted }}>
+                                Qty: {item.quantity} {getOrderUnitLabel(item.priceUnit)}
+                              </div>
+                            )}
+                            {lineTotal != null ? (
+                              <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.text }}>
+                                {formatMoney(lineTotal, symbol)}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-
-                {/* Total row */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '14px 0 10px', marginTop: 4,
-                  borderTop: `2px solid ${COLORS.border}`,
-                }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}>
-                    {order.total_amount ? formatMoney(order.total_amount, symbol) : '—'}
-                  </span>
+                    );
+                  })}
+                  <div
+                    data-order-snapshot-order-total-row
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '14px 0 10px',
+                      marginTop: 4,
+                      borderTop: `2px solid ${COLORS.border}`,
+                    }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
+                    <span
+                      data-order-snapshot-order-total-value
+                      style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}
+                    >
+                      {order.total_amount ? formatMoney(order.total_amount, symbol) : '—'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
-          </Card>
+              </Card>
+            </div>
+          )}
 
           {/* ── Edit mode total ── */}
           {editMode && editTotal > 0 && (

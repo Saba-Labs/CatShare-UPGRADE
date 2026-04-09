@@ -38,7 +38,21 @@ export async function fetchPublicImageProxyAsDataUrl(url: string): Promise<strin
     const text = await res.text().catch(() => "");
     throw new Error(`Proxy HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
-  const j = (await res.json()) as { dataUrl?: string; error?: string };
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const raw = await res.text();
+  if (!ct.includes("application/json")) {
+    const hint =
+      raw.trimStart().startsWith("<!DOCTYPE") || raw.trimStart().startsWith("<html")
+        ? " Got HTML instead of JSON — Vite dev must expose GET /api/fetch-public-image (see vite.config)."
+        : "";
+    throw new Error(`Proxy returned non-JSON (${ct || "no content-type"}).${hint}`);
+  }
+  let j: { dataUrl?: string; error?: string };
+  try {
+    j = JSON.parse(raw) as { dataUrl?: string; error?: string };
+  } catch {
+    throw new Error("Proxy: response was not valid JSON.");
+  }
   if (typeof j.dataUrl === "string" && j.dataUrl.startsWith("data:")) {
     return j.dataUrl;
   }

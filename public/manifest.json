@@ -1,29 +1,14 @@
 {
   "name": "CatShare - Share Faster, Sell Quicker",
   "short_name": "CatShare",
-  "description": "CatShare - Share Faster, Sell Quicker. Create, organize, and share product catalogs with ease. Create product listings, bulk edit inventory, render images, and export to multiple channels. Powerful Catalog Maker for retail, wholesale, and ecommerce businesses.",
+  "description": "CatShare - Share Faster, Sell Quicker. Create, organize, and share product catalogs with ease.",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "scope": "/",
   "categories": ["productivity", "business"],
-  "keywords": "create catalogue, catalog manager, create catalog, catalogue manager, product catalogue, product catalog, catalogue maker, catalog maker, product management, dual pricing catalogue, share catalogue, dukaan, share easy, sell fast, catalogue software, inventory management, ecommerce tools, product listing",
-  "screenshots": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "form_factor": "narrow",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "form_factor": "wide",
-      "type": "image/png"
-    }
-  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -42,55 +27,14 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/logo-catalogue-share.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
   ],
-  "shortcuts": [
+  "prefer_related_applications": true,
+  "related_applications": [
     {
-      "name": "Create Product",
-      "short_name": "New Product",
-      "description": "Create a new product in your catalog",
-      "url": "/create",
-      "icons": [
-        {
-          "src": "/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Manage Inventory",
-      "short_name": "Inventory",
-      "description": "View and manage your product shelf",
-      "url": "/shelf",
-      "icons": [
-        {
-          "src": "/icons/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.catshare.official",
+      "id": "com.catshare.official"
     }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url",
-      "files": [
-        {
-          "name": "catalog",
-          "accept": ["image/*", ".zip"]
-        }
-      ]
-    }
-  },
-  "prefer_related_applications": false
+  ]
 }

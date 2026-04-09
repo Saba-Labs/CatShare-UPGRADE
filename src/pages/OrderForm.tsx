@@ -557,7 +557,7 @@ export default function OrderForm() {
             marginBottom: 28,
           }}>
             {isExpired
-              ? 'Order links are valid for 24 hours. This one has expired or is no longer active.'
+              ? 'This order link has expired or is no longer active. Ask the seller for a new link.'
               : error}
           </div>
 
