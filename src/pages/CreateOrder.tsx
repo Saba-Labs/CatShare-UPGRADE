@@ -290,33 +290,30 @@ export default function CreateOrder() {
     let count = 0;
 
     selectedProducts.forEach((quantity, productId) => {
-      // Only include items with quantity > 0 in the summary
-      if (quantity > 0) {
-        const product = products.find(p => p.id === productId);
-        if (product) {
-          const catData = getCatalogueData(product, selectedCatalogueId);
-          const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
-          const rowTotal = unitPrice * quantity;
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        const catData = getCatalogueData(product, selectedCatalogueId);
+        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+        const rowTotal = unitPrice * quantity;
 
-          const priceUnit = catData[catalogue.priceUnitField];
-          const quantityStep = (catData as any).orderQuantityStep || 1;
-          const productImage = imageMap[product.id] || product.image || product.imageUrl;
-          items.push({
-            productId,
-            name: product.name,
-            quantity,
-            unitPrice,
-            rowTotal,
-            category: product.category?.[0],
-            imageUrl: productImage,
-            priceUnit,
-            subtitle: product.subtitle,
-            quantityStep,
-          });
+        const priceUnit = catData[catalogue.priceUnitField];
+        const quantityStep = (catData as any).orderQuantityStep || 1;
+        const productImage = imageMap[product.id] || product.image || product.imageUrl;
+        items.push({
+          productId,
+          name: product.name,
+          quantity,
+          unitPrice,
+          rowTotal,
+          category: product.category?.[0],
+          imageUrl: productImage,
+          priceUnit,
+          subtitle: product.subtitle,
+          quantityStep,
+        });
 
-          total += rowTotal;
-          count += quantity;
-        }
+        total += rowTotal;
+        count += quantity;
       }
     });
 
@@ -352,6 +349,19 @@ export default function CreateOrder() {
     setStepSync('customer');
   };
 
+  // Filter out 0-quantity items for final review/submission
+  const reviewSummary = useMemo(() => {
+    return {
+      items: orderSummary.items.filter(item => item.quantity > 0),
+      total: orderSummary.items
+        .filter(item => item.quantity > 0)
+        .reduce((sum, item) => sum + item.rowTotal, 0),
+      count: orderSummary.items
+        .filter(item => item.quantity > 0)
+        .reduce((sum, item) => sum + item.quantity, 0),
+    };
+  }, [orderSummary]);
+
   // Clean up items with 0 quantity when navigating away
   React.useEffect(() => {
     const cleanupOnUnmount = () => {
@@ -380,7 +390,7 @@ export default function CreateOrder() {
 
     setIsSubmitting(true);
     try {
-      const orderItems: OrderItem[] = orderSummary.items.map(item => ({
+      const orderItems: OrderItem[] = reviewSummary.items.map(item => ({
         productId: item.productId,
         name: item.name,
         quantity: item.quantity,
@@ -397,7 +407,7 @@ export default function CreateOrder() {
         user.uid,
         customerName.trim(),
         orderItems,
-        orderSummary.total,
+        reviewSummary.total,
         'INR',
         customerWhatsapp.trim() || undefined,
         selectedCatalogueId
@@ -1175,7 +1185,7 @@ export default function CreateOrder() {
                 Order Items
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {orderSummary.items.map((item) => (
+                {reviewSummary.items.map((item) => (
                   <div key={item.productId} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -1213,7 +1223,7 @@ export default function CreateOrder() {
                 Total Amount
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
-                ₹{orderSummary.total.toLocaleString('en-IN')}
+                ₹{reviewSummary.total.toLocaleString('en-IN')}
               </div>
             </div>
           </div>
