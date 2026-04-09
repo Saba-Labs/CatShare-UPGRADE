@@ -330,19 +330,22 @@ export default function CreateOrder() {
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     const newSelected = new Map(selectedProducts);
-    if (quantity <= 0) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.set(productId, quantity);
-    }
+    newSelected.set(productId, Math.max(0, quantity));
     setSelectedProducts(newSelected);
   };
 
   const handleContinueToCustomer = () => {
-    if (selectedProducts.size === 0) {
+    // Filter out products with 0 quantity
+    const filteredProducts = new Map(
+      Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
+    );
+
+    if (filteredProducts.size === 0) {
       showToast('Please add at least one product to the order', 'error');
       return;
     }
+
+    setSelectedProducts(filteredProducts);
     setStepSync('customer');
   };
 
@@ -1090,41 +1093,11 @@ export default function CreateOrder() {
                             )}
                           </div>
                         </div>
-                        {isZero ? (
-                          <button
-                            onClick={() => {
-                              const newSelected = new Map(selectedProducts);
-                              newSelected.delete(item.productId);
-                              setSelectedProducts(newSelected);
-                            }}
-                            style={{
-                              padding: '10px 16px',
-                              borderRadius: 8,
-                              border: `1.5px solid ${COLORS.border}`,
-                              background: COLORS.surface,
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: '#EF4444',
-                              cursor: 'pointer',
-                              fontFamily: FONT,
-                              transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.background = '#FEE2E2';
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.background = COLORS.surface;
-                            }}
-                          >
-                            Remove Item
-                          </button>
-                        ) : (
-                          <QtyStepper
-                            value={item.quantity}
-                            step={item.quantityStep ?? 1}
-                            onChange={qty => handleUpdateQuantity(item.productId, qty)}
-                          />
-                        )}
+                        <QtyStepper
+                          value={item.quantity}
+                          step={item.quantityStep ?? 1}
+                          onChange={qty => handleUpdateQuantity(item.productId, qty)}
+                        />
                       </div>
                     </div>
                   );

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiMail, FiLock, FiAlertCircle, FiShoppingCart, FiZap, FiImage } from 'react-icons/fi';
+import { FiMail, FiLock, FiAlertCircle, FiShoppingBag, FiZap, FiImage } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,9 +10,9 @@ import { safeGetFromStorage } from '../utils/safeStorage';
 
 const introHighlights = [
   {
-    icon: FiShoppingCart,
-    title: 'Order forms',
-    text: 'One link—qty, line totals, then WhatsApp.',
+    icon: FiShoppingBag,
+    title: 'Branded storefronts',
+    text: 'Showcase and sell your collection.',
   },
   {
     icon: FiZap,
@@ -184,17 +184,17 @@ export default function Login() {
           </p>
 
           <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Catalogues and order links—less busywork.
+            Build your own store — sell direct, any time.
           </h1>
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
           <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Order links with live prices; buyers pick qty and message you on WhatsApp.
+            Set up your storefront in minutes; sell catalogues, process orders, and grow your business.
           </p>
 
           {/* Desktop: full intro */}
           <p className="hidden lg:block text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
-            Shareable order forms from your catalogue—clear prices and subtotals, then one tap to WhatsApp.
+            Create a branded storefront to showcase your products, manage inventory, and sell directly to customers with instant order management.
           </p>
 
           <ul className="hidden lg:block space-y-4">

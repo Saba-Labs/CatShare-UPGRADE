@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CatShare - Share faster, sell quicker</string>
+    <string name="app_name">CatShare - Share Faster, Sell Quicker</string>
     <string name="title_activity_main">CatShare</string>
-    <string name="app_tagline">Share faster, sell quicker</string>
+    <string name="app_tagline">Share Faster, Sell Quicker</string>
     <string name="app_keywords">create catalogue, catalog manager, create catalog, catalogue manager, product catalogue, product catalog, catalogue maker, catalog maker, product management, dual pricing catalogue, share catalogue, dukaan, share easy, sell fast, catalogue software, inventory management, ecommerce tools, product listing, retail management, wholesale pricing, share catalog, inventory app</string>
-    <string name="app_description">CatShare - Share faster, sell quicker. Powerful mobile-first product catalog and inventory management app. Create, organize, and share product listings with customers across multiple channels. Features bulk editing, image rendering, multi-format export, and dual pricing support.</string>
+    <string name="app_description">CatShare - Share Faster, Sell Quicker. Powerful mobile-first product catalog and inventory management app. Create, organize, and share product listings with customers across multiple channels. Features bulk editing, image rendering, multi-format export, and dual pricing support.</string>
     <string name="package_name">com.venuskids.catalogue</string>
     <string name="custom_url_scheme">com.venuskids.catalogue</string>
     <string name="facebook_app_id">1366943418568478</string>

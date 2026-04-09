@@ -1,7 +1,7 @@
 {
-  "name": "CatShare - Share faster, sell quicker",
+  "name": "CatShare - Share Faster, Sell Quicker",
   "short_name": "CatShare",
-  "description": "CatShare - Share faster, sell quicker. Create, organize, and share product catalogs with ease. Create product listings, bulk edit inventory, render images, and export to multiple channels. Powerful Catalog Maker for retail, wholesale, and ecommerce businesses.",
+  "description": "CatShare - Share Faster, Sell Quicker. Create, organize, and share product catalogs with ease. Create product listings, bulk edit inventory, render images, and export to multiple channels. Powerful Catalog Maker for retail, wholesale, and ecommerce businesses.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
