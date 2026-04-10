@@ -8,6 +8,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { getCroppedImg } from "../cropUtils";
 import { getPalette } from "../colorUtils";
 import { saveRenderedImage } from "../Save";
+import { uploadProductImageToR2 } from "../services/r2Upload";
 import { useToast } from "../context/ToastContext";
 import { useTheme } from "../context/ThemeContext";
 import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
@@ -32,10 +33,11 @@ import {
 import { getFieldConfig, getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
-import { logProductAdded } from "../config/analyticsEvents";
+import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
 import { useSubscription } from "../context/SubscriptionContext";
 import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
+import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -300,7 +302,42 @@ export default function CreateProduct() {
     : "products";
   const useUserImages = Boolean(authUserId);
 
-  const categories = JSON.parse(localStorage.getItem("categories") || "[]");
+  const [categoryList, setCategoryList] = useState<string[]>(() => readCategoriesList(authUserId));
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [categoryAddOpen, setCategoryAddOpen] = useState(false);
+  const categoryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleAddCategory = useCallback(() => {
+    const c = newCategoryName.trim();
+    if (!c) {
+      showToast("Enter a category name", "warning");
+      return;
+    }
+    if (categoryList.some((x) => x.toLowerCase() === c.toLowerCase())) {
+      showToast("That category already exists", "warning");
+      return;
+    }
+    const next = [...categoryList, c];
+    persistCategoriesList(authUserId, next);
+    setCategoryList(next);
+    setNewCategoryName("");
+    setCategoryAddOpen(false);
+    logCategoryManaged("added", c);
+    if (authUserId) {
+      void import("../services/supabaseSync").then(({ syncCategories }) => {
+        syncCategories(
+          authUserId,
+          next.map((name) => ({ id: name, name }))
+        ).catch((err) => console.warn("⚠️ Failed to sync categories:", err));
+      });
+    }
+  }, [authUserId, categoryList, newCategoryName, showToast]);
+
+  useEffect(() => {
+    if (categoryAddOpen) {
+      requestAnimationFrame(() => categoryInputRef.current?.focus());
+    }
+  }, [categoryAddOpen]);
 
   // Bottom sheet state using Framer Motion for buttery smooth performance
   const MAX_HEIGHT = typeof window !== 'undefined' ? window.innerHeight - 100 : 600;
@@ -961,20 +998,40 @@ if (migratedProduct.suggestedColors?.length > 0) {
       return;
     }
 
-    // ✅ Preserve existing imageUrl when editing, upload new one when image changed
-    const existingImageUrl = editingId
-      ? safeGetFromStorage(productsStorageKeyNow, [])
-          .find((p: any) => p.id === editingId)?.imageUrl
+    const existingProduct = editingId
+      ? safeGetFromStorage(productsStorageKeyNow, []).find((p: any) => p.id === editingId)
       : undefined;
 
-    // Determine imageUrl for local storage immediately (without waiting for R2 upload)
     let imageUrl: string | undefined;
+    let imageVersion: number | undefined;
+
     if (imagePreview?.startsWith("http")) {
-      // ✅ Image loaded from existing R2 URL — preserve it
       imageUrl = imagePreview;
-    } else {
-      // ✅ Fallback to existing saved URL or undefined (will upload in background)
-      imageUrl = existingImageUrl;
+      if (
+        typeof existingProduct?.imageVersion === "number" &&
+        Number.isFinite(existingProduct.imageVersion)
+      ) {
+        imageVersion = existingProduct.imageVersion;
+      }
+    } else if (imagePreview?.startsWith("data:image")) {
+      try {
+        const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
+        if (uploaded?.url) {
+          imageUrl = uploaded.url;
+          imageVersion = uploaded.imageVersion ?? Date.now();
+        } else {
+          setIsSaving(false);
+          showToast("Image upload failed: invalid response.", "error");
+          return;
+        }
+      } catch (err: any) {
+        setIsSaving(false);
+        showToast(
+          err?.message || "Could not upload image. Check your connection and try again.",
+          "error"
+        );
+        return;
+      }
     }
 
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
@@ -985,6 +1042,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       id,
       imagePath,
       ...(imageUrl ? { imageUrl } : {}),
+      ...(typeof imageVersion === "number" && Number.isFinite(imageVersion) ? { imageVersion } : {}),
       suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
       fontColor: fontColor || "white",
       imageBgColor: imageBgOverride || "white",
@@ -1072,28 +1130,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
       navigate(navigationPath);
       setIsSaving(false);
 
-      // Perform R2 upload and PNG rendering in background (fire and forget)
+      // PNG rendering in background (R2 upload already completed when preview was data:image)
       (async () => {
         try {
-          // Attempt R2 upload if new image (retries + dedupe live in uploadProductImageToR2)
-          if (imagePreview?.startsWith("data:image")) {
-            try {
-              const { uploadProductImageToR2 } = await import("../services/r2Upload");
-              const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
-              if (uploaded.url) {
-                const allProducts = safeGetFromStorage(productsStorageKeyNow, []);
-                const newImageVersion = Date.now();
-                const updated = allProducts.map((p: any) =>
-                  p.id === id ? { ...p, imageUrl: uploaded.url, imageVersion: newImageVersion } : p
-                );
-                safeSetInStorage(productsStorageKeyNow, updated);
-                window.dispatchEvent(new CustomEvent("product-added"));
-              }
-            } catch (err: any) {
-              console.warn("⚠️ R2 upload failed in background:", err?.message || err);
-            }
-          }
-
           // Render PNG images in background
           try {
             const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
@@ -1601,7 +1640,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <div className="mb-5">
                 <label className="block text-xs font-semibold mb-3 text-gray-600 dark:text-gray-400">Categories</label>
                 <div className="flex flex-wrap gap-2">
-                  {categories.map((cat) => {
+                  {categoryList.map((cat) => {
                     const isSelected = formData.category.includes(cat);
                     return (
                       <div
@@ -1617,13 +1656,70 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         className={`px-2 py-1 rounded-full text-xs cursor-pointer ${
                           isSelected
                             ? "bg-blue-600 text-white"
-                            : "bg-gray-200 text-gray-700"
+                            : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
                         }`}
                       >
                         {cat}
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  {!categoryAddOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => setCategoryAddOpen(true)}
+                      className="inline-flex items-center justify-center gap-1 rounded-full border border-dashed border-gray-300 bg-transparent px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-blue-500 dark:hover:text-blue-400"
+                    >
+                      <span className="text-[13px] leading-none">+</span>
+                      Add
+                    </button>
+                  ) : (
+                    <div className="flex min-w-0 w-full max-w-md items-center gap-1">
+                      <input
+                        ref={categoryInputRef}
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddCategory();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setNewCategoryName("");
+                            setCategoryAddOpen(false);
+                          }
+                        }}
+                        placeholder="New category"
+                        className="min-w-0 flex-1 appearance-none rounded-none border-0 border-b border-gray-300 bg-transparent py-1.5 text-sm text-gray-900 shadow-none placeholder:text-gray-400 outline-none ring-0 focus:border-blue-500 focus:outline-none focus:ring-0 dark:border-gray-600 dark:text-gray-100 dark:focus:border-blue-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        className="shrink-0 p-1 text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        aria-label="Save category"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewCategoryName("");
+                          setCategoryAddOpen(false);
+                        }}
+                        className="shrink-0 p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                        aria-label="Cancel"
+                      >
+                        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                          <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

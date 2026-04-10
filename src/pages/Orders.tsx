@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 
@@ -22,6 +23,7 @@ interface OrderItem {
   subtitle?: string;
   productId?: string;
   imageUrl?: string;
+  imageVersion?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -58,16 +60,16 @@ function getStatusConfig(status: string) {
   }
 }
 
-function getOrderSourceConfig(source?: string) {
+function getOrderSourceLabel(source?: string): string {
   switch (source) {
     case 'link':
-      return { bg: '#DDD6FE', text: '#4C1D95', label: 'Link' };
+      return 'Link';
     case 'manual':
-      return { bg: '#E0E7FF', text: '#3730A3', label: 'Manual' };
+      return 'Manual';
     case 'store':
-      return { bg: '#DBEAFE', text: '#0C4A6E', label: 'Store' };
+      return 'Store';
     default:
-      return { bg: '#F3F4F6', text: '#374151', label: 'Unknown' };
+      return 'Unknown';
   }
 }
 
@@ -330,13 +332,21 @@ function OrderRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
             {/* Order source pill */}
             {order.order_source && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: getOrderSourceConfig(order.order_source).bg, color: getOrderSourceConfig(order.order_source).text,
-                fontSize: 11, fontWeight: 700,
-                padding: '4px 9px', borderRadius: 100, border: 'none',
-              }}>
-                {getOrderSourceConfig(order.order_source).label}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#F8FAFC',
+                  color: '#64748B',
+                  border: '1px solid #E2E8F0',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  letterSpacing: '0.01em',
+                }}
+              >
+                {getOrderSourceLabel(order.order_source)}
               </span>
             )}
 
@@ -384,6 +394,10 @@ function EditItemRow({
   onChange: (key: string, qty: number) => void;
 }) {
   const hasImage = item.imageUrl && /^https?:\/\//i.test(item.imageUrl);
+  const thumbSrc =
+    hasImage && item.imageUrl
+      ? productImageDisplayUrl(item.imageUrl, item.imageVersion)
+      : '';
   return (
     <div style={{
       display: 'flex', alignItems: 'center',
@@ -396,7 +410,12 @@ function EditItemRow({
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {hasImage ? (
-          <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img
+            key={thumbSrc}
+            src={thumbSrc}
+            alt={item.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
         ) : (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
             <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>

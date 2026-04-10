@@ -3,3 +3,6 @@
 
 [functions.send-order-push]
 verify_jwt = false
+
+[functions.send-broadcast-push]
+verify_jwt = false

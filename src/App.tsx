@@ -14,12 +14,7 @@ import { KeepAwake } from '@capacitor-community/keep-awake';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { initializeFieldSystem } from "./config/initializeFields";
 import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
-import {
-  runMigrations,
-  migrateUnkeyedDataToUserKeyed,
-  migrateProductImagePaths,
-  migrateLegacyRenderedImagesToUserFolder,
-} from "./utils/dataMigration";
+import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
@@ -34,7 +29,7 @@ import SyncStatusIndicator from "./components/SyncStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 import { supabase } from "./supabaseClient";
 
-import CatalogueApp from "./CatalogueApp";
+const CatalogueApp = lazy(() => import("./CatalogueApp"));
 const CreateProduct = lazy(() => import("./CreateProduct"));
 const Shelf = lazy(() => import("./Shelf"));
 const Retail = lazy(() => import("./Retail"));
@@ -150,6 +145,13 @@ function AppWithBackHandler() {
     startupPhase === "pending";
 
   const isNative = Capacitor.getPlatform() !== "web";
+
+  // Prefetch CatalogueApp JS while auth + Supabase profile load — same chunk as lazy route, faster time-to-interactive.
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    void import("./CatalogueApp");
+  }, [loading, user?.uid]);
 
   // Never re-show the native Capacitor splash (logo-only). Cold start uses a plain white window (Android styles);
   // loading UX is SplashLoadingLayout / auth UI inside the WebView.

@@ -9,6 +9,7 @@ import React, {
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../config/catalogueProductUtils";
 import { saveProducts } from "../config/productUtils";
+import { productImageDisplayUrl } from "../utils/imageUrl";
 
 interface AddProductsModalProps {
   isOpen: boolean;
@@ -34,11 +35,14 @@ const CatalogueProductToggleRow = memo(function CatalogueProductToggleRow({
   onToggle,
 }: ProductRowProps) {
   const isEnabled = isProductEnabledForCatalogue(product, catalogueId);
+  const displaySrc = imageSrc
+    ? productImageDisplayUrl(imageSrc, product.imageVersion)
+    : "";
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-150">
       <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-        {imageSrc ? (
-          <img src={imageSrc} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+        {displaySrc ? (
+          <img key={displaySrc} src={displaySrc} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <span className="text-[9px] text-gray-400">No img</span>
         )}

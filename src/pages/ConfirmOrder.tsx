@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 
 type QtyMap = Record<string, number>;
 
@@ -66,8 +67,17 @@ function QtyControl({ value, step, onChange }: { value: number; step: number; on
 }
 
 // Product image thumbnail
-function ProductThumb({ url, name }: { url?: string; name: string }) {
+function ProductThumb({
+  url,
+  name,
+  imageVersion,
+}: {
+  url?: string;
+  name: string;
+  imageVersion?: number;
+}) {
   const [failed, setFailed] = useState(false);
+  const src = url && /^https?:\/\//i.test(url) ? productImageDisplayUrl(url, imageVersion) : '';
   const valid = url && /^https?:\/\//i.test(url) && !failed;
   return (
     <div style={{
@@ -77,8 +87,13 @@ function ProductThumb({ url, name }: { url?: string; name: string }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {valid ? (
-        <img src={url} alt={name} onError={() => setFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img
+          key={src}
+          src={src}
+          alt={name}
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
       ) : (
         <Ic.Img />
       )}
@@ -386,7 +401,7 @@ export default function ConfirmOrder() {
                     <div key={item.productId}>
                       {i > 0 && <Divider />}
                       <div style={{ display: 'flex', alignItems: 'flex-start', padding: '12px 0', gap: 12 }}>
-                        <ProductThumb url={item.imageUrl} name={item.name} />
+                        <ProductThumb url={item.imageUrl} name={item.name} imageVersion={item.imageVersion} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
                             {item.name}

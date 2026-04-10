@@ -10,6 +10,7 @@ import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityS
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 import './CreateOrder.css';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
@@ -88,8 +89,21 @@ const Divider = () => (
 );
 
 // Product image thumbnail
-function ProductThumb({ url, name }: { url?: string; name: string }) {
+function ProductThumb({
+  url,
+  name,
+  imageVersion,
+}: {
+  url?: string;
+  name: string;
+  imageVersion?: number;
+}) {
   const [failed, setFailed] = React.useState(false);
+  const src = url
+    ? url.startsWith('data:') || !/^https?:\/\//i.test(url)
+      ? url
+      : productImageDisplayUrl(url, imageVersion)
+    : '';
   const valid = url && (url.startsWith('data:') || /^https?:\/\//i.test(url)) && !failed;
   return (
     <div style={{
@@ -99,8 +113,13 @@ function ProductThumb({ url, name }: { url?: string; name: string }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {valid ? (
-        <img src={url} alt={name} onError={() => setFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img
+          key={src}
+          src={src}
+          alt={name}
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
       ) : (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" strokeWidth="1.5">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -281,6 +300,7 @@ export default function CreateOrder() {
       rowTotal: number;
       category?: string;
       imageUrl?: string;
+      imageVersion?: number;
       priceUnit?: string;
       subtitle?: string;
       quantityStep?: number;
@@ -307,6 +327,10 @@ export default function CreateOrder() {
           rowTotal,
           category: product.category?.[0],
           imageUrl: productImage,
+          imageVersion:
+            typeof product.imageVersion === 'number' && Number.isFinite(product.imageVersion)
+              ? product.imageVersion
+              : undefined,
           priceUnit,
           subtitle: product.subtitle,
           quantityStep,
@@ -399,6 +423,7 @@ export default function CreateOrder() {
         category: item.category,
         subtitle: item.subtitle,
         imageUrl: item.imageUrl,
+        imageVersion: item.imageVersion,
         priceUnit: item.priceUnit,
         quantityStep: item.quantityStep,
       }));
@@ -1097,7 +1122,7 @@ export default function CreateOrder() {
                         transition: 'opacity 0.2s ease',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <ProductThumb url={item.imageUrl} name={item.name} />
+                          <ProductThumb url={item.imageUrl} name={item.name} imageVersion={item.imageVersion} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2, fontFamily: FONT }}>
                               {item.name}

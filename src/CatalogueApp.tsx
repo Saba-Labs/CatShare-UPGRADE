@@ -28,6 +28,7 @@ import {
   deleteProductSourceImagesBestEffort,
 } from "./utils/productSourceImage";
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
+import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
 
 declare global {
   interface Window {
@@ -193,15 +194,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     return (h >>> 0) || 1;
   };
 
-  const withImageVersion = (url: string, version: unknown) => {
-    const raw = String(url || "").trim();
-    if (!raw) return "";
-    if (!/^https?:\/\//i.test(raw)) return raw;
-    const v = String(version ?? "").trim();
-    if (!v) return raw;
-    return `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
-  };
-
   // One-time migration for older products:
   // - assign deterministic imageVersion for existing imageUrl rows
   // - clear stale inline image payload when cloud URL exists
@@ -218,9 +210,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       if (!needsVersion && !hasStaleInlineImage) return p;
 
       changed = true;
+      const fromQuery = parseImageVersionFromUrl(p.imageUrl);
       return {
         ...p,
-        imageVersion: needsVersion ? stableImageVersionFromUrl(p.imageUrl) : p.imageVersion,
+        imageVersion: needsVersion ? (fromQuery ?? stableImageVersionFromUrl(p.imageUrl)) : p.imageVersion,
         image: "",
       };
     });
@@ -293,21 +286,23 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Load this batch in parallel
         const promises = batch.map(async (p) => {
-          // ✅ PRIORITY: Always use imageUrl (cloud URL) if available
-          // This ensures fresh data from Supabase is always displayed
-          if (p.imageUrl && typeof p.imageUrl === 'string' && p.imageUrl.trim()) {
-            map[p.id] = withImageVersion(p.imageUrl, p.imageVersion);
+          // Prefer on-device source (just saved / not yet replaced in cloud) over CDN URL
+          const resolved = await tryReadProductSourceAsDataUrl(p);
+          if (resolved && resolved.startsWith("data:")) {
+            map[p.id] = resolved;
             return;
           }
 
-          // Fallback: Try to read local file
-          const resolved = await tryReadProductSourceAsDataUrl(p);
+          if (p.imageUrl && typeof p.imageUrl === "string" && p.imageUrl.trim()) {
+            map[p.id] = productImageDisplayUrl(p.imageUrl, p.imageVersion);
+            return;
+          }
+
           if (resolved) {
             map[p.id] = resolved;
             return;
           }
 
-          // Final fallback: Use base64 image
           map[p.id] = (typeof p.image === "string" && p.image ? p.image : "") || "";
         });
 
@@ -1047,9 +1042,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                               ☰
                             </div>
                             <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                              {imageMap[p.id] || withImageVersion(p.imageUrl, p.imageVersion) ? (
+                              {imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion) ? (
                                 <img
-                                  src={imageMap[p.id] || withImageVersion(p.imageUrl, p.imageVersion)}
+                                  key={imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion)}
+                                  src={imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion)}
                                   alt={p.name}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {

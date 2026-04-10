@@ -17,6 +17,7 @@ import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logProductAdded, logProductEdited, logProductDeleted } from "./config/analyticsEvents";
 import { getPersistedAuthUserId } from "./utils/authUserId";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
+import { productImageDisplayUrl } from "./utils/imageUrl";
 
 export default function Retail({ products = [] }) {
   const navigate = useNavigate();
@@ -658,7 +659,12 @@ export default function Retail({ products = [] }) {
               {products.map((p) => (
                 <label key={p.id} className="flex items-center gap-3 p-2 border rounded">
                   <input type="checkbox" checked={selectedToPull.includes(p.id)} onChange={() => toggleSelectToPull(p.id)} />
-                  <img src={p.image || p.imagePath || ""} alt="" className="w-12 h-12 object-cover rounded bg-gray-100" />
+                  <img
+                    key={productImageDisplayUrl(p.imageUrl || p.image || p.imagePath, p.imageVersion)}
+                    src={productImageDisplayUrl(p.imageUrl || p.image || p.imagePath, p.imageVersion)}
+                    alt=""
+                    className="w-12 h-12 object-cover rounded bg-gray-100"
+                  />
                   <div className="min-w-0">
                     <div className="font-medium truncate">{p.name}</div>
                     <div className="text-xs text-gray-500">Wholesale: {currencySymbol}{p.wholesale || 0}</div>

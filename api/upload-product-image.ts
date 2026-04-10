@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 import { applyApiCors } from "../lib/apiCors.js";
+import { purgeCloudflareCacheForUrls } from "../lib/cloudflarePurge.js";
 
 export const config = {
   api: {
@@ -122,6 +123,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Upload failed" });
   }
 
-  const url = `${publicBaseUrl.replace(/\/$/, "")}/${key}`;
-  return res.status(200).json({ url, key });
+  const publicBase = `${publicBaseUrl.replace(/\/$/, "")}/${key}`;
+  try {
+    await purgeCloudflareCacheForUrls([publicBase]);
+  } catch (e) {
+    console.warn("Cloudflare purge (non-fatal):", e);
+  }
+
+  const imageVersion = Date.now();
+  const url = `${publicBase}?v=${imageVersion}`;
+  return res.status(200).json({ url, key, imageVersion });
 }

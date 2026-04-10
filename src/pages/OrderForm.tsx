@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { fetchShareLinkForCustomer, fetchSellerUserIdForToken, type ShareLinkItem } from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 import './OrderForm.css';
 
 /** CatShare on Google Play — update if store listing changes. */
@@ -761,7 +762,12 @@ export default function OrderForm() {
                 {/* Image */}
                 <div className="of-img-wrap" onClick={() => openProductDrawer(item)}>
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="of-img" />
+                    <img
+                      key={productImageDisplayUrl(item.imageUrl, item.imageVersion)}
+                      src={productImageDisplayUrl(item.imageUrl, item.imageVersion)}
+                      alt={item.name}
+                      className="of-img"
+                    />
                   ) : (
                     <div className="of-img-ph"><ImgIcon /></div>
                   )}
@@ -920,7 +926,12 @@ export default function OrderForm() {
               {/* Image */}
               <div className="of-drawer-img-wrap">
                 {drawerItem.imageUrl ? (
-                  <img src={drawerItem.imageUrl} alt={drawerItem.name} className="of-drawer-img" />
+                  <img
+                    key={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
+                    src={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
+                    alt={drawerItem.name}
+                    className="of-drawer-img"
+                  />
                 ) : (
                   <div className="of-drawer-img-ph"><ImgIcon size={48} /></div>
                 )}

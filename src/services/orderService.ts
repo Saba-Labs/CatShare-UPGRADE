@@ -16,6 +16,8 @@ export interface OrderItem {
   subtitle?: string;
   priceUnit?: string;
   imageUrl?: string;
+  /** Bumps when product image changes — cache bust for CDN/browser */
+  imageVersion?: number;
   quantityStep?: number;
 }
 

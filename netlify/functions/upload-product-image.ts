@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { purgeCloudflareCacheForUrls } from '../../lib/cloudflarePurge';
 
 const s3 = new S3Client({
   region: 'auto',
@@ -36,10 +37,18 @@ export const handler: Handler = async (event) => {
       ContentType: mime,
     }));
 
-    const url = `${process.env.R2_PUBLIC_BASE_URL}/${key}`;
+    const publicBase = `${String(process.env.R2_PUBLIC_BASE_URL).replace(/\/$/, '')}/${key}`;
+    try {
+      await purgeCloudflareCacheForUrls([publicBase]);
+    } catch (e) {
+      console.warn('Cloudflare purge (non-fatal):', e);
+    }
+
+    const imageVersion = Date.now();
+    const url = `${publicBase}?v=${imageVersion}`;
     return {
       statusCode: 200,
-      body: JSON.stringify({ url, key }),
+      body: JSON.stringify({ url, key, imageVersion }),
     };
   } catch (err: any) {
     console.error('Upload error:', err);

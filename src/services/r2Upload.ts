@@ -81,7 +81,7 @@ async function postUploadWithRetries(
   endpoint: string,
   productId: string,
   blob: Blob
-): Promise<{ url: string; key: string }> {
+): Promise<{ url: string; key: string; imageVersion?: number }> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
@@ -109,7 +109,11 @@ async function postUploadWithRetries(
       if (resp.ok) {
         const json = await resp.json();
         if (json?.url && json?.key) {
-          return { url: json.url, key: json.key };
+          const imageVersion =
+            typeof json.imageVersion === 'number' && Number.isFinite(json.imageVersion)
+              ? json.imageVersion
+              : undefined;
+          return { url: json.url, key: json.key, imageVersion };
         }
         lastError = new Error('Upload response missing url/key');
         continue;
@@ -146,7 +150,7 @@ async function postUploadWithRetries(
 export async function uploadProductImageToR2(options: {
   productId: string;
   dataUrl: string;
-}): Promise<{ url: string; key: string }> {
+}): Promise<{ url: string; key: string; imageVersion?: number }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('Not authenticated');
 

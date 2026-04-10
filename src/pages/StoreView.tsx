@@ -14,6 +14,7 @@ import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition } from '../config/fieldConfig';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    INLINE STYLES — clean, professional light storefront
@@ -320,6 +321,17 @@ function pickProductImageSrc(p: ProductWithCatalogueData | Record<string, unknow
   return undefined;
 }
 
+/** Cache-bust HTTPS product images; leave data URLs unchanged. */
+function displayStoreProductImage(p: ProductWithCatalogueData | Record<string, unknown>): string | undefined {
+  const raw = pickProductImageSrc(p);
+  if (!raw) return undefined;
+  if (raw.startsWith('data:image/')) return raw;
+  const r = p as Record<string, unknown>;
+  const v = r.imageVersion ?? r.image_version;
+  const ver = typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  return productImageDisplayUrl(raw, ver);
+}
+
 /**
  * Public store visitors may not have the seller's custom catalogue in localStorage.
  * When catalogue config is missing, still read price from product.catalogueData using price1…price10.
@@ -557,6 +569,8 @@ export default function StoreView() {
       const catData = getCatalogueData(product, store.catalogueId);
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
       const rowTotal = unitPrice * quantity;
+      const pr = product as Record<string, unknown>;
+      const iv = pr.imageVersion ?? pr.image_version;
       items.push({
         productId,
         name: product.name,
@@ -565,6 +579,7 @@ export default function StoreView() {
         rowTotal,
         priceUnit,
         imageUrl: pickProductImageSrc(product),
+        imageVersion: typeof iv === 'number' && Number.isFinite(iv) ? iv : undefined,
         subtitle: product.subtitle,
       });
       total += rowTotal;
@@ -626,6 +641,7 @@ export default function StoreView() {
           subtitle: product.subtitle,
           priceUnit,
           imageUrl: item.imageUrl,
+          imageVersion: item.imageVersion,
           quantityStep: catData.orderQuantityStep,
         });
       });
@@ -862,13 +878,13 @@ export default function StoreView() {
               const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
               const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-              const imgUrl = pickProductImageSrc(product);
+              const imgUrl = displayStoreProductImage(product);
               const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
               return (
                 <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
                   <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
                     {isDisplayableImageUrl(imgUrl)
-                      ? <img src={String(imgUrl)} alt={product.name} />
+                      ? <img key={imgUrl} src={String(imgUrl)} alt={product.name} />
                       : <div className="sv-pcard-img-ph"><IconImg size={32} /></div>}
                     {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
                   </div>
@@ -966,9 +982,12 @@ export default function StoreView() {
                             <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px', opacity: item.quantity === 0 ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
                               <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
-                                  {isDisplayableImageUrl(item.imageUrl)
-                                    ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
-                                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
+                                  {(() => {
+                                    const src = productImageDisplayUrl(item.imageUrl, item.imageVersion);
+                                    return isDisplayableImageUrl(src)
+                                      ? <img key={src} src={src} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                                      : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>;
+                                  })()}
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
@@ -1011,9 +1030,12 @@ export default function StoreView() {
                     return (
                       <div key={item.productId} className="sv-rcard">
                         <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
-                          {isDisplayableImageUrl(item.imageUrl)
-                            ? <img src={item.imageUrl} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
-                            : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>}
+                          {(() => {
+                            const src = productImageDisplayUrl(item.imageUrl, item.imageVersion);
+                            return isDisplayableImageUrl(src)
+                              ? <img key={src} src={src} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>;
+                          })()}
                         </div>
                         <div className="sv-rcard-body">
                           <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
@@ -1065,14 +1087,14 @@ export default function StoreView() {
             const { label, unitSuffix } = fieldLU(drawerProduct, n);
             return { label, value: unitSuffix ? `${String(value)} ${unitSuffix}` : String(value) };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
-          const imgUrl = pickProductImageSrc(drawerProduct);
+          const imgUrl = displayStoreProductImage(drawerProduct);
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className="sv-drawer-img-wrap">
                   {isDisplayableImageUrl(imgUrl)
-                    ? <img src={String(imgUrl)} alt={drawerProduct.name} />
+                    ? <img key={imgUrl} src={String(imgUrl)} alt={drawerProduct.name} />
                     : <div className="sv-drawer-img-ph"><IconImg size={48} /></div>}
                   <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
                 </div>

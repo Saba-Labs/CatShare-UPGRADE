@@ -55,6 +55,7 @@ export type ShareLinkItem = {
   price?: string | number;
   priceUnit?: string;
   imageUrl?: string;
+  imageVersion?: number;
   category?: string[];
   field1?: string;  field1Label?: string;  field1Unit?: string;
   field2?: string;  field2Label?: string;  field2Unit?: string;
@@ -121,6 +122,9 @@ export function productToShareLinkItem(
     ...(subtitle ? { subtitle } : {}),
     ...(categories.length > 0 ? { category: categories } : {}),
     imageUrl: product.imageUrl || undefined,
+    ...(typeof product.imageVersion === 'number' && Number.isFinite(product.imageVersion)
+      ? { imageVersion: product.imageVersion }
+      : {}),
     price: price !== undefined && price !== '' ? String(price) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
     ...(step > 1 ? { quantityStep: step } : {}),

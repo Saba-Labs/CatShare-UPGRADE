@@ -18,6 +18,7 @@ import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { productImageDisplayUrl } from '../utils/imageUrl';
 
 /** Haptics throws/rejects on desktop web — avoids dozens of console errors in DevTools. */
 async function safeHapticsLight() {
@@ -54,6 +55,7 @@ interface OrderItem {
   subtitle?: string;
   productId?: string;
   imageUrl?: string;
+  imageVersion?: number;
   priceUnit?: string;
   quantityStep?: number;
 }
@@ -174,6 +176,13 @@ function normalizeOrderItemFromApi(raw: unknown): Order['items'][number] {
     (typeof r.imageUrl === 'string' && r.imageUrl.trim()) ||
     (typeof r.image_url === 'string' && r.image_url.trim()) ||
     undefined;
+  const iv = r.imageVersion ?? r.image_version;
+  const imageVersion =
+    typeof iv === 'number' && Number.isFinite(iv)
+      ? iv
+      : typeof iv === 'string' && /^\d+$/.test(iv)
+        ? Number(iv)
+        : undefined;
   const productId =
     (typeof r.productId === 'string' && r.productId.trim()) ||
     (typeof r.product_id === 'string' && r.product_id.trim()) ||
@@ -181,6 +190,7 @@ function normalizeOrderItemFromApi(raw: unknown): Order['items'][number] {
   return {
     ...(raw as object),
     ...(imageUrl ? { imageUrl } : {}),
+    ...(imageVersion != null ? { imageVersion } : {}),
     ...(productId ? { productId } : {}),
   } as Order['items'][number];
 }
@@ -342,7 +352,41 @@ async function prepareImagesForCaptureSnapshot(container: HTMLElement): Promise<
   };
 }
 
-type StoredProductRow = { id?: string; imageUrl?: string };
+/** Wait for webfonts + paint so html2canvas measures the same as desktop (esp. Android WebView). */
+async function waitForSnapshotPaintReady(): Promise<void> {
+  try {
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+  } catch {
+    /* ignore */
+  }
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+  if (Capacitor.isNativePlatform()) {
+    await new Promise<void>((r) => setTimeout(r, 100));
+  }
+}
+
+type StoredProductRow = { id?: string; imageUrl?: string; imageVersion?: number };
+
+/**
+ * WebView (Capacitor) can apply different text autosizing / subpixel layout than desktop Chrome.
+ * Normalize on the cloned document so PNG matches web as closely as possible.
+ */
+function applySnapshotCloneRootHints(doc: Document) {
+  const imp = 'important';
+  if (doc.body instanceof HTMLElement) {
+    doc.body.style.setProperty('-webkit-text-size-adjust', '100%', imp);
+  }
+  const root = doc.querySelector('[data-order-snapshot-root]');
+  if (root instanceof HTMLElement) {
+    root.style.setProperty('-webkit-text-size-adjust', '100%', imp);
+    root.style.setProperty('text-rendering', 'geometricPrecision', imp);
+    root.style.setProperty('-webkit-font-smoothing', 'antialiased', imp);
+  }
+}
 
 /**
  * Snapshot only: html2canvas misaligns flex rows. Live Order Detail keeps a simple flex layout;
@@ -350,6 +394,7 @@ type StoredProductRow = { id?: string; imageUrl?: string };
  */
 function applyOrderSnapshotLayoutForClone(doc: Document) {
   const imp = 'important';
+  applySnapshotCloneRootHints(doc);
 
   const customerRow = doc.querySelector('[data-order-customer-snapshot-row]');
   if (customerRow instanceof HTMLElement) {
@@ -440,7 +485,11 @@ function hydrateOrderItemImagesFromLocalProducts(
     const p = byId.get(String(pid));
     const u = typeof p?.imageUrl === 'string' ? p.imageUrl.trim() : '';
     if (!u) return it;
-    return { ...it, imageUrl: u } as Order['items'][number];
+    const imageVersion =
+      typeof p?.imageVersion === 'number' && Number.isFinite(p.imageVersion)
+        ? p.imageVersion
+        : undefined;
+    return { ...it, imageUrl: u, ...(imageVersion != null ? { imageVersion } : {}) } as Order['items'][number];
   });
 }
 
@@ -875,8 +924,21 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
 }
 
 // ─── Product image ────────────────────────────────────────────────────────────
-function ProductThumb({ url, name }: { url?: string; name: string }) {
+function ProductThumb({
+  url,
+  name,
+  imageVersion,
+}: {
+  url?: string;
+  name: string;
+  imageVersion?: number;
+}) {
   const [failed, setFailed] = useState(false);
+  const src = url
+    ? url.startsWith('data:') || !/^https?:\/\//i.test(url)
+      ? url
+      : productImageDisplayUrl(url, imageVersion)
+    : '';
   const valid = url && (url.startsWith('data:') || /^https?:\/\//i.test(url)) && !failed;
   return (
     <div style={{
@@ -886,8 +948,13 @@ function ProductThumb({ url, name }: { url?: string; name: string }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {valid ? (
-        <img src={url} alt={name} onError={() => setFailed(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <img
+          key={src}
+          src={src}
+          alt={name}
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
       ) : (
         <Ic.Img />
       )}
@@ -1252,7 +1319,17 @@ useEffect(() => {
     if (!el) return null;
     let restoreImages: (() => void) | undefined;
     try {
+      try {
+        if (document.fonts?.ready) await document.fonts.ready;
+      } catch {
+        /* ignore */
+      }
+      el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      void el.offsetHeight;
+
       restoreImages = await prepareImagesForCaptureSnapshot(el);
+      await waitForSnapshotPaintReady();
+
       const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
@@ -1595,7 +1672,7 @@ useEffect(() => {
                     <div key={it._key}>
                       {i > 0 && <Divider />}
                       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
-                        <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} />
+                        <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} imageVersion={it.imageVersion} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
                           {it.unitPrice ? (
@@ -1621,7 +1698,18 @@ useEffect(() => {
               </Card>
             </>
           ) : (
-            <div ref={orderShareCaptureRef} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div
+              ref={orderShareCaptureRef}
+              data-order-snapshot-root
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                padding: 20,
+                boxSizing: 'border-box',
+                backgroundColor: COLORS.bg,
+              }}
+            >
               <SectionLabel>Customer</SectionLabel>
               <Card>
                 <div
@@ -1691,7 +1779,7 @@ useEffect(() => {
                       <div key={i}>
                         {i > 0 && <Divider />}
                         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
-                          <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} />
+                          <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} imageVersion={item.imageVersion} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
                             {item.subtitle && (
@@ -1743,6 +1831,34 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
+              {/* Match invoice PDF footer (invoiceGenerator drawFooter) */}
+              <div
+                data-order-snapshot-footer
+                style={{
+                  marginTop: 4,
+                  paddingTop: 12,
+                  paddingBottom: 2,
+                  borderTop: '1px solid #EBF0F6',
+                  background: '#FAFBFD',
+                  borderRadius: 10,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 10,
+                  paddingLeft: 12,
+                  paddingRight: 12,
+                  minHeight: 40,
+                }}
+              >
+                <span style={{ fontSize: 12, color: '#A3AFBF', fontFamily: FONT, lineHeight: 1.4 }}>
+                  This is a computer generated document.
+                </span>
+                <span style={{ fontSize: 12, fontFamily: FONT, lineHeight: 1.4, textAlign: 'right' }}>
+                  <span style={{ color: '#A3AFBF' }}>Generated by </span>
+                  <span style={{ color: '#23824C', fontWeight: 600 }}>CatShare</span>
+                </span>
+              </div>
             </div>
           )}
 
