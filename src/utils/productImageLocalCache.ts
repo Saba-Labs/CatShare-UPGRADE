@@ -11,6 +11,9 @@ import { safeWriteFile } from './platformFilesystem';
 
 const HTTP_URL = /^https?:\/\//i;
 
+/** Max parallel downloads + writes per batch (keeps memory stable on low-end devices). */
+const CACHE_IMAGE_CONCURRENCY = 4;
+
 async function localImageFileExists(path: string): Promise<boolean> {
   try {
     await Filesystem.readFile({ path, directory: Directory.External });
@@ -68,23 +71,15 @@ export async function cacheCloudProductImages(
   }
   const nextUrlMap: Record<string, string> = {};
 
-  const out: any[] = [];
-  for (const p of products) {
+  const computeOne = async (i: number): Promise<any> => {
+    const p = products[i];
     if (!p || p.id == null) {
-      out.push(p);
-      continue;
+      return p;
     }
-
-    seenWithId += 1;
-    const rawName = typeof p.name === 'string' ? p.name.trim() : '';
-    const productName =
-      rawName.length > 42 ? `${rawName.slice(0, 39)}…` : rawName || undefined;
-    onProgress?.({ current: seenWithId, total: totalWithId, productName });
 
     const url = p.imageUrl;
     if (typeof url !== 'string' || !HTTP_URL.test(url.trim())) {
-      out.push(p);
-      continue;
+      return p;
     }
     const normalizedUrl = url.trim();
     const pid = String(p.id);
@@ -96,8 +91,7 @@ export async function cacheCloudProductImages(
 
     try {
       if (!urlChanged && (await localImageFileExists(targetPath))) {
-        out.push(p.imagePath === targetPath ? p : { ...p, imagePath: targetPath });
-        continue;
+        return p.imagePath === targetPath ? p : { ...p, imagePath: targetPath };
       }
 
       const dataUrl = await fetchUrlAsDataUrl(normalizedUrl);
@@ -105,14 +99,36 @@ export async function cacheCloudProductImages(
       const ok = await safeWriteFile({ path: targetPath, data: base64 });
       if (!ok) {
         console.warn(`⚠️ cacheCloudProductImages: write failed for product ${p.id}`);
-        out.push(p);
-        continue;
+        return p;
       }
 
-      out.push({ ...p, imagePath: targetPath });
+      return { ...p, imagePath: targetPath };
     } catch (e) {
       console.warn(`⚠️ cacheCloudProductImages: could not cache image for product ${p.id}:`, e);
-      out.push(p);
+      return p;
+    }
+  };
+
+  const out: any[] = new Array(products.length);
+
+  for (let batchStart = 0; batchStart < products.length; batchStart += CACHE_IMAGE_CONCURRENCY) {
+    const batchEnd = Math.min(batchStart + CACHE_IMAGE_CONCURRENCY, products.length);
+    for (let i = batchStart; i < batchEnd; i++) {
+      const p = products[i];
+      if (p && p.id != null) {
+        seenWithId += 1;
+        const rawName = typeof p.name === 'string' ? p.name.trim() : '';
+        const productName =
+          rawName.length > 42 ? `${rawName.slice(0, 39)}…` : rawName || undefined;
+        onProgress?.({ current: seenWithId, total: totalWithId, productName });
+      }
+    }
+
+    const slice = await Promise.all(
+      Array.from({ length: batchEnd - batchStart }, (_, k) => computeOne(batchStart + k))
+    );
+    for (let k = 0; k < slice.length; k++) {
+      out[batchStart + k] = slice[k];
     }
   }
 

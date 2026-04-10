@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { FiMail, FiLock, FiAlertCircle, FiShoppingBag, FiZap, FiImage } from 'react-icons/fi';
@@ -7,6 +7,7 @@ import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { safeGetFromStorage } from '../utils/safeStorage';
+import { supabase } from '../supabaseClient';
 
 const introHighlights = [
   {
@@ -29,6 +30,7 @@ const introHighlights = [
 export default function Login() {
   const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { user, supabaseData, loading: authBootstrapLoading } = useAuth();
 
@@ -48,11 +50,17 @@ export default function Login() {
     fieldsSyncAttemptedRef.current = false;
   }, [user?.uid]);
 
-  /**
-   * Redirect off /login as soon as the session is ready — do not wait for fetchAllUserData.
-   * Home shows SplashLoadingLayout (CatShare loading) while cloud sync / startup pipeline runs.
-   * Welcome vs catalogue is handled in App after data loads.
-   */
+  /** Password recovery links may land on /login first; send user to set-password page. */
+  useLayoutEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/reset-password', { replace: true });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  /** One-shot sync of legacy local fields when cloud snapshot exists (any visit with session on /login). */
   useEffect(() => {
     if (authService.isOfflineGuest()) return;
     if (authBootstrapLoading) return;
@@ -73,7 +81,6 @@ export default function Login() {
       Array.isArray(localStorageFields.fields) &&
       localStorageFields.fields.length > 0;
 
-    // After cloud snapshot exists: one-shot sync of legacy local fields (same as before).
     if (
       supabaseData != null &&
       hasLocalFields &&
@@ -92,17 +99,41 @@ export default function Login() {
         });
       });
     }
+  }, [authBootstrapLoading, user, supabaseData]);
+
+  /**
+   * After explicit sign-in from this page: redirect home as soon as session is ready.
+   * Do not redirect recovery sessions or "already logged in" visits here (see below).
+   */
+  useEffect(() => {
+    if (authService.isOfflineGuest()) return;
+    if (authBootstrapLoading) return;
+    if (!user?.uid || user.isAnonymous) return;
+    if (!hasJustLoggedIn) return;
 
     if (postAuthRedirectDoneRef.current) return;
     postAuthRedirectDoneRef.current = true;
 
-    if (hasJustLoggedIn) {
-      showToast('Login successful!', 'success');
-    }
+    showToast('Login successful!', 'success');
     setHasJustLoggedIn(false);
 
     navigate('/', { replace: true });
-  }, [authBootstrapLoading, user, supabaseData, hasJustLoggedIn, navigate, showToast]);
+  }, [authBootstrapLoading, user, hasJustLoggedIn, navigate, showToast]);
+
+  /** Already logged in and opened /login: brief delay so PASSWORD_RECOVERY can navigate first. */
+  useEffect(() => {
+    if (authService.isOfflineGuest()) return;
+    if (authBootstrapLoading) return;
+    if (!user?.uid || user.isAnonymous) return;
+    if (hasJustLoggedIn) return;
+    if (location.pathname !== '/login') return;
+
+    const t = window.setTimeout(() => {
+      if (window.location.pathname !== '/login') return;
+      navigate('/', { replace: true });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [authBootstrapLoading, user, hasJustLoggedIn, location.pathname, navigate]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

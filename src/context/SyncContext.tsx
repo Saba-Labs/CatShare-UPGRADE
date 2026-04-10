@@ -7,6 +7,10 @@ import { readProductSourceBase64ForCloudUpload } from '../utils/productSourceIma
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { getFieldsDefinition, setFieldsDefinition } from '../config/fieldConfig';
 import { getCataloguesDefinition, setCataloguesDefinition } from '../config/catalogueConfig';
+import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
+
+/** Max parallel image reads + R2 uploads (avoids OOM from huge Promise.all). */
+const SYNC_UPLOAD_CONCURRENCY = 4;
 
 export type RefreshFromCloudOptions = {
   onStatus?: (message: string) => void;
@@ -252,8 +256,10 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const total = missing.length;
         let finished = 0;
 
-        const uploadedPairs = await Promise.all(
-          missing.map(async (p: any, slot: number) => {
+        const uploadedPairs = await mapWithConcurrencyLimit(
+          missing,
+          SYNC_UPLOAD_CONCURRENCY,
+          async (p: any, slot: number) => {
             const rawName = typeof p.name === 'string' ? p.name.trim() : '';
             const shortName =
               rawName.length > 36 ? `${rawName.slice(0, 33)}…` : rawName || undefined;
@@ -262,46 +268,40 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               : `${phaseLabel} ${slot + 1}/${total}`;
             setDetail(slotMsg);
 
-            try {
-              let base64: string | null = null;
-              for (let attempt = 0; attempt < 3; attempt++) {
-                base64 = await readProductSourceBase64ForCloudUpload(p);
-                if (base64) break;
-                if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
-              }
-              if (!base64) {
-                throw new Error(
-                  `Cannot read image file for product "${p.name || p.id}" (${p.id}). ` +
-                    `The file may be missing or still writing — try sync again in a moment.`
-                );
-              }
-              const pathHint =
-                typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
-              const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
-              const dataUrlPrefix =
-                filename.endsWith('.jpg') || filename.endsWith('.jpeg')
-                  ? 'data:image/jpeg;base64,'
-                  : 'data:image/png;base64,';
-              const uploaded = await uploadProductImageToR2({
-                productId: String(p.id),
-                dataUrl: `${dataUrlPrefix}${base64}`,
-              });
-              if (!uploaded?.url) {
-                throw new Error(`Cloud upload returned no URL for product ${p.id}`);
-              }
-              return {
-                productId: p.id,
-                imageUrl: uploaded.url,
-                imageVersion: Date.now(),
-              };
-            } catch (err) {
-              console.error(`❌ Image upload failed for product ${p.id}:`, err);
-              throw err;
-            } finally {
-              finished += 1;
-              setDetail(`${phaseLabel} ${finished}/${total}`);
+            let base64: string | null = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              base64 = await readProductSourceBase64ForCloudUpload(p);
+              if (base64) break;
+              if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
             }
-          })
+            if (!base64) {
+              throw new Error(
+                `Cannot read image file for product "${p.name || p.id}" (${p.id}). ` +
+                  `The file may be missing or still writing — try sync again in a moment.`
+              );
+            }
+            const pathHint =
+              typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
+            const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
+            const dataUrlPrefix =
+              filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+                ? 'data:image/jpeg;base64,'
+                : 'data:image/png;base64,';
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${base64}`,
+            });
+            if (!uploaded?.url) {
+              throw new Error(`Cloud upload returned no URL for product ${p.id}`);
+            }
+            finished += 1;
+            setDetail(`${phaseLabel} ${finished}/${total}`);
+            return {
+              productId: p.id,
+              imageUrl: uploaded.url,
+              imageVersion: Date.now(),
+            };
+          }
         );
 
         const uploadMap = new Map(

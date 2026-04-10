@@ -5,6 +5,7 @@
 
 import { getSupabaseClient } from '../supabaseClient';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
+import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
 import { deleteImageFromR2 } from './cloudflareService';
 
 interface SyncResult {
@@ -224,8 +225,10 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
     const imageRows = rows.filter((r: any) => r.data?.imageUrl);
     if (imageRows.length > 0) {
       console.log(`🗑️ Deleting ${imageRows.length} images from R2`);
-      const results = await Promise.all(
-        imageRows.map((r: any) => deleteImageFromR2(r.data.imageUrl))
+      const results = await mapWithConcurrencyLimit(
+        imageRows,
+        4,
+        async (r: any) => deleteImageFromR2(r.data.imageUrl)
       );
       const failed = results.filter(r => !r.success);
       if (failed.length > 0) {

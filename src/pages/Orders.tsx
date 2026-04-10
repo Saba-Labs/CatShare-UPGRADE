@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,8 @@ import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+
+const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -454,6 +457,8 @@ function EditItemRow({
 // ─── Main Orders Component ────────────────────────────────────────────────────
 export default function Orders() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const scrollRef = useRef<HTMLElement | null>(null);
   const { user } = useAuth();
   const { showToast } = useToast();
   const [tab, setTab] = useState<TabType>('all');
@@ -638,12 +643,21 @@ export default function Orders() {
   };
   const symbol = orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹';
 
+  const shouldRestoreScroll =
+    location.pathname === '/orders' && !loading && !error;
+  useListScrollRestore(ORDERS_LIST_SCROLL_KEY, scrollRef, {
+    active: shouldRestoreScroll,
+    contentLength: shouldRestoreScroll ? filteredOrders.length : 0,
+  });
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
+        minHeight: 0,
+        overflow: 'hidden',
         background: '#F8FAFC',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -706,7 +720,10 @@ export default function Orders() {
 
           {/* Create Order Button */}
           <button
-            onClick={() => handleNavigate('/create-order')}
+            onClick={() => {
+              persistListScroll(ORDERS_LIST_SCROLL_KEY, scrollRef.current);
+              handleNavigate('/create-order');
+            }}
             style={{
               padding: '8px 14px',
               background: '#2563EB',
@@ -871,7 +888,10 @@ export default function Orders() {
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: 'auto', paddingBottom: 70, paddingTop: 50 }}>
+      <main
+        ref={scrollRef}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70, paddingTop: 50 }}
+      >
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
@@ -913,6 +933,7 @@ export default function Orders() {
               onStatusChange={handleStatusChange}
               onClick={async () => {
                 await Haptics.impact({ style: ImpactStyle.Light });
+                persistListScroll(ORDERS_LIST_SCROLL_KEY, scrollRef.current);
                 navigate(`/orders/${order.id}`);
               }}
             />

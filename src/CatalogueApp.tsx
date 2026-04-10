@@ -30,6 +30,29 @@ import {
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
 
+const PRODUCT_SCROLL_KEY = "productScroll";
+
+/** Read exact scroll: prefer main (the real list scroller); fallback to window if needed. */
+function readProductsListScrollY(scrollEl: HTMLElement | null): number {
+  if (scrollEl) {
+    const st = scrollEl.scrollTop;
+    if (st > 0 || scrollEl.scrollHeight > scrollEl.clientHeight + 1) {
+      return st;
+    }
+  }
+  return (
+    window.scrollY ||
+    document.documentElement.scrollTop ||
+    document.body.scrollTop ||
+    0
+  );
+}
+
+function persistProductsListScrollForEdit(scrollEl: HTMLElement | null) {
+  const y = readProductsListScrollY(scrollEl);
+  localStorage.setItem(PRODUCT_SCROLL_KEY, String(y));
+}
+
 declare global {
   interface Window {
     __catalogueAppState?: {
@@ -356,7 +379,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     const handleEditProduct = (e) => {
       const { id, catalogueId, fromCatalogue } = e.detail || {};
       if (id) {
-        localStorage.setItem("productScroll", scrollRef.current?.scrollTop || 0);
+        persistProductsListScrollForEdit(scrollRef.current);
         let url = `/create?id=${id}`;
         if (catalogueId) url += `&catalogue=${catalogueId}`;
         if (fromCatalogue) url += `&from=${fromCatalogue}`;
@@ -416,17 +439,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   useEffect(() => {
     sessionStorage.removeItem("bypassStockWarningUntil");
-  }, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      const savedY = localStorage.getItem("productScroll");
-      if (savedY && scrollRef.current) {
-        scrollRef.current.scrollTop = parseInt(savedY, 10);
-        localStorage.removeItem("productScroll");
-      }
-    }, 1);
-    return () => clearTimeout(timeout);
   }, []);
 
   // Handle back button for catalogue navigation
@@ -860,10 +872,122 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     return v;
   }, [filtered, sortBy, catalogues]);
 
+  // After /create: restore exact main.scrollTop. ResizeObserver re-applies as list height grows (images).
+  useEffect(() => {
+    if (pathname !== "/" || tab !== "products") return;
+    const raw = localStorage.getItem(PRODUCT_SCROLL_KEY);
+    if (raw == null) return;
+    const target = parseFloat(raw);
+    if (Number.isNaN(target) || target < 0) {
+      localStorage.removeItem(PRODUCT_SCROLL_KEY);
+      return;
+    }
+    if (visible.length === 0) {
+      localStorage.removeItem(PRODUCT_SCROLL_KEY);
+      return;
+    }
+
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    const clearKey = () => {
+      localStorage.removeItem(PRODUCT_SCROLL_KEY);
+    };
+
+    let ro: ResizeObserver | null = null;
+    const node = scrollRef.current;
+
+    /** Apply exact pixel scroll; returns true when target is reachable or we're pinned at bottom. */
+    const applyExactScroll = (): boolean => {
+      if (cancelled) return true;
+      const el = scrollRef.current;
+      if (!el) return true;
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+
+      const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+      const y = Math.min(target, maxScroll);
+      el.scrollTop = y;
+
+      const reached = maxScroll + 0.5 >= target;
+      const pinnedBottom = target > maxScroll && maxScroll > 0 && Math.abs(y - maxScroll) < 1.5;
+      return reached || pinnedBottom;
+    };
+
+    /** Must run once restore is done or timed out — otherwise RO/load keep forcing old scrollTop. */
+    const finishRestore = () => {
+      if (cancelled) return;
+      cancelled = true;
+      ro?.disconnect();
+      ro = null;
+      node?.removeEventListener("load", onImgLoadCapture, true);
+      timers.forEach(clearTimeout);
+      timers.length = 0;
+      clearKey();
+    };
+
+    const onImgLoadCapture = () => {
+      if (cancelled) return;
+      if (applyExactScroll()) finishRestore();
+    };
+
+    if (node) {
+      node.addEventListener("load", onImgLoadCapture, true);
+    }
+    if (node && typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        if (cancelled) return;
+        if (applyExactScroll()) finishRestore();
+      });
+      ro.observe(node);
+      const droppable = node.querySelector('[data-rbd-droppable-id="product-list"]');
+      if (droppable) ro.observe(droppable);
+    }
+
+    const tick = () => {
+      if (cancelled) return true;
+      if (applyExactScroll()) {
+        finishRestore();
+        return true;
+      }
+      return false;
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) tick();
+      });
+    });
+
+    [0, 16, 50, 100, 200, 400, 700, 1200, 2000].forEach((ms) => {
+      timers.push(
+        setTimeout(() => {
+          if (tick()) return;
+        }, ms)
+      );
+    });
+
+    timers.push(
+      setTimeout(() => {
+        if (cancelled) return;
+        applyExactScroll();
+        finishRestore();
+      }, 2800)
+    );
+
+    return () => {
+      cancelled = true;
+      ro?.disconnect();
+      node?.removeEventListener("load", onImgLoadCapture, true);
+      timers.forEach(clearTimeout);
+    };
+  }, [pathname, tab, visible.length, products.length]);
+
 
   return (
     <div
-      className="w-full min-h-[100dvh] flex flex-col bg-gradient-to-b from-white to-gray-100"
+      className="w-full h-[100dvh] min-h-0 flex flex-col overflow-hidden bg-gradient-to-b from-white to-gray-100"
     >
       <Outlet />
 
@@ -996,7 +1120,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       )}
 
 
-      <main ref={scrollRef} className={`flex-1 min-h-0 ${tab === 'products' ? 'overflow-y-auto pt-6' : ''} px-4 pb-24`}>
+      <main ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}>
         {tab === "products" && visible.length === 0 && (
           <EmptyStateIntro onCreateProduct={() => navigate("/create")} />
         )}
@@ -1028,6 +1152,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                         <div
                           ref={provided.innerRef}
                           {...provided.draggableProps}
+                          data-product-row-id={p.id}
                           className="bg-white rounded-lg shadow p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between"
                         >
                           {/* Left: Name + Subtitle + Drag + Image */}
@@ -1070,7 +1195,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                             <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 onClick={() => {
-                                  localStorage.setItem("productScroll", scrollRef.current?.scrollTop || 0);
+                                  persistProductsListScrollForEdit(scrollRef.current);
                                   navigate(`/create?id=${p.id}`);
                                 }}
                                 className="text-blue-600 hover:text-blue-800"
@@ -1360,7 +1485,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             catalogueId={selectedCatalogueInCataloguesTab}
             filteredProducts={previewList}
             onClose={() => setPreviewProduct(null)}
-            onEdit={() => navigate(`/create?id=${previewProduct.id}`)}
+            onEdit={() => {
+              persistProductsListScrollForEdit(scrollRef.current);
+              navigate(`/create?id=${previewProduct.id}`);
+            }}
             onToggleStock={(fieldOrProduct, isMasterToggle) => {
               let updated;
 

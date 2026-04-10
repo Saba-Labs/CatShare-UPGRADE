@@ -22,6 +22,7 @@ import { initPushTokenForLoggedInUser } from "./services/pushTokenService";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
+import { mapWithConcurrencyLimit } from "./utils/concurrencyPool";
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { useAuth } from "./context/AuthContext";
 import { useSync, applyUserSettingsFromCloud } from "./context/SyncContext";
@@ -44,6 +45,7 @@ const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Account = lazy(() => import("./pages/Account"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Store = lazy(() => import("./pages/Store"));
@@ -480,46 +482,49 @@ function AppWithBackHandler() {
           return items;
         }
 
-        const uploadedPairs: { productId: string; imageUrl: string; imageVersion: number }[] = [];
-        for (let i = 0; i < missing.length; i++) {
-          const p = missing[i];
-          let base64: string | null = null;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            base64 = await readProductSourceBase64ForCloudUpload(p);
-            if (base64) break;
-            if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
-          }
-          if (!base64) {
-            throw new Error(
-              `[${label}] Cannot read image file for product "${p.name || p.id}" (${p.id}).`
+        let completed = 0;
+        const uploadedPairs = await mapWithConcurrencyLimit(
+          missing,
+          4,
+          async (p: any) => {
+            let base64: string | null = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+              base64 = await readProductSourceBase64ForCloudUpload(p);
+              if (base64) break;
+              if (attempt < 2) await new Promise((r) => setTimeout(r, 180));
+            }
+            if (!base64) {
+              throw new Error(
+                `[${label}] Cannot read image file for product "${p.name || p.id}" (${p.id}).`
+              );
+            }
+            const pathHint =
+              typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
+            const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
+            const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+              ? 'data:image/jpeg;base64,'
+              : 'data:image/png;base64,';
+            const uploaded = await uploadProductImageToR2({
+              productId: String(p.id),
+              dataUrl: `${dataUrlPrefix}${base64}`,
+            });
+            if (!uploaded?.url) {
+              throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
+            }
+            completed += 1;
+            const span = Math.max(0, to - from);
+            const pct = from + Math.round((completed / missing.length) * span);
+            setSyncPhase(
+              pct,
+              `${prefix} (${completed}/${missing.length})${p.name ? ` · ${p.name}` : ''}`
             );
+            return {
+              productId: String(p.id),
+              imageUrl: uploaded.url,
+              imageVersion: Date.now(),
+            };
           }
-          const pathHint =
-            typeof p.imagePath === 'string' && p.imagePath.trim() ? p.imagePath.trim() : '';
-          const filename = (pathHint.split('/').pop() || 'product.png').toLowerCase();
-          const dataUrlPrefix = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
-            ? 'data:image/jpeg;base64,'
-            : 'data:image/png;base64,';
-          const uploaded = await uploadProductImageToR2({
-            productId: String(p.id),
-            dataUrl: `${dataUrlPrefix}${base64}`,
-          });
-          if (!uploaded?.url) {
-            throw new Error(`[${label}] Cloud upload returned no URL for product ${p.id}`);
-          }
-          uploadedPairs.push({
-            productId: String(p.id),
-            imageUrl: uploaded.url,
-            imageVersion: Date.now(),
-          });
-          const done = i + 1;
-          const span = Math.max(0, to - from);
-          const pct = from + Math.round((done / missing.length) * span);
-          setSyncPhase(
-            pct,
-            `${prefix} (${done}/${missing.length})${p.name ? ` · ${p.name}` : ''}`
-          );
-        }
+        );
 
         const uploadMap = new Map(
           uploadedPairs.map((x: any) => [String(x.productId), { url: x.imageUrl, version: x.imageVersion }])
@@ -731,7 +736,7 @@ function AppWithBackHandler() {
     const hasLocalFields = !!getFieldsDefinition(user.uid);
     const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
 
-    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/privacy', '/terms', '/website', '/o/'];
+    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/privacy', '/terms', '/website', '/o/'];
     const isOnPublicPage = publicPages.some(p => location.pathname.includes(p));
 
     if (isNewUser && !hasLocalFields && !hasCompletedOnboarding && !isOnPublicPage) {
@@ -1546,6 +1551,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Public Routes */}
         <Route path="/o/:token" element={<OrderForm />} />
