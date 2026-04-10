@@ -10,15 +10,32 @@ import { getCataloguesDefinition, setCataloguesDefinition } from '../config/cata
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
 
 /** Max parallel image reads + R2 uploads (avoids OOM from huge Promise.all). */
-const SYNC_UPLOAD_CONCURRENCY = 4;
+const SYNC_UPLOAD_CONCURRENCY = 6;
+
+/** Fired after native background image cache finishes writing `imagePath` to storage. */
+export const CATALOGUE_LOCAL_IMAGES_READY_EVENT = 'catalogue-local-images-ready';
 
 export type RefreshFromCloudOptions = {
   onStatus?: (message: string) => void;
+  /**
+   * When true (e.g. after sync-to-cloud), wait until all product images are cached to disk.
+   * Default false: persist catalogue JSON immediately and cache images in parallel (faster startup).
+   */
+  blockUntilImagesCached?: boolean;
 };
 
 /** When true, updates `syncStatusDetail` during sync (full-screen overlay). Default false — routine saves stay on “Please wait…”. */
 export type SyncProductsToCloudOptions = {
   detailedStatus?: boolean;
+  /**
+   * Upsert only these product IDs (positions taken from the full `products` array order).
+   * Skips full-table sync, deleted-products upsert, table cleanup, and full cloud refresh — faster for single saves.
+   */
+  onlyProductIds?: string[];
+  /** No global sync overlay / isSyncing — for drag reorder and other non-blocking syncs. */
+  background?: boolean;
+  /** After upserts + cleanup, skip `refreshFromCloud` (local state is already correct — e.g. reorder). */
+  skipFullCloudRefresh?: boolean;
 };
 
 interface SyncContextType {
@@ -125,6 +142,8 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [syncProgressPercent, setSyncProgressPercent] = useState(0);
   const [syncError, setSyncError] = useState<string | null>(null);
   const syncLockRef = useRef(false);
+  /** Invalidate in-flight native image cache when a newer refreshFromCloud starts. */
+  const imageCacheGenerationRef = useRef(0);
 
   const isStrictMode = useCallback(() => {
     return localStorage.getItem('strictOnlineMode::device') === 'true';
@@ -156,48 +175,107 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       (p: any) => p?.id != null && !deletedIds.has(String(p.id))
     );
 
+    // Invalidate any in-flight background cache from an older refresh before we write.
+    imageCacheGenerationRef.current += 1;
+    const sessionGen = imageCacheGenerationRef.current;
+
     opts?.onStatus?.('Saving catalogue on device…');
 
-    const cachedProducts = await cacheCloudProductImages(userId, filteredProducts, (info) => {
-      const suffix = info.productName ? ` · ${info.productName}` : '';
-      opts?.onStatus?.(`Syncing product ${info.current} of ${info.total}${suffix}`);
-    });
-    const cachedDeleted = await cacheCloudProductImages(userId, nextDeleted, (info) => {
-      const suffix = info.productName ? ` · ${info.productName}` : '';
-      opts?.onStatus?.(`Syncing removed item ${info.current} of ${info.total}${suffix}`);
-    });
+    const persistCatalogueMeta = () => {
+      const rawCats = snapshot.categories || [];
+      const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
+      const categoriesJson = JSON.stringify(normalizedCats);
+      localStorage.setItem('categories', categoriesJson);
+      localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
 
-    let storedProducts = cachedProducts;
-    let storedDeleted = cachedDeleted;
-    if (Capacitor.isNativePlatform()) {
-      const { migrateProductImagePaths } = await import('../utils/dataMigration');
-      const mp = [...cachedProducts];
-      const md = [...cachedDeleted];
-      await migrateProductImagePaths(mp, userId);
-      await migrateProductImagePaths(md, userId);
-      storedProducts = mp;
-      storedDeleted = md;
+      if (snapshot.fieldsDefinition) {
+        setFieldsDefinition(snapshot.fieldsDefinition, userId);
+      }
+      if (snapshot.cataloguesDefinition) {
+        setCataloguesDefinition(snapshot.cataloguesDefinition, userId);
+      }
+
+      applyUserSettingsFromCloud(snapshot.userSettings);
+    };
+
+    const persistProducts = (prods: any[], del: any[]) => {
+      safeSetInStorage(getProductsKey(userId), prods);
+      safeSetInStorage(getDeletedProductsKey(userId), del);
+    };
+
+    /**
+     * Download + write local files; run migrations; persist.
+     * Aborts before writing if `sessionGen` no longer matches (newer refreshFromCloud started).
+     */
+    const runImageCacheAndPersist = async (
+      sessionGen: number
+    ): Promise<{ storedProducts: any[]; storedDeleted: any[] } | null> => {
+      const prodCb = (info: { current: number; total: number; productName?: string }) => {
+        const suffix = info.productName ? ` · ${info.productName}` : '';
+        opts?.onStatus?.(`Syncing product ${info.current} of ${info.total}${suffix}`);
+      };
+      const delCb = (info: { current: number; total: number; productName?: string }) => {
+        const suffix = info.productName ? ` · ${info.productName}` : '';
+        opts?.onStatus?.(`Syncing removed item ${info.current} of ${info.total}${suffix}`);
+      };
+
+      const [cachedProducts, cachedDeleted] = await Promise.all([
+        cacheCloudProductImages(userId, filteredProducts, prodCb),
+        cacheCloudProductImages(userId, nextDeleted, delCb),
+      ]);
+
+      if (imageCacheGenerationRef.current !== sessionGen) {
+        return null;
+      }
+
+      let storedProducts = cachedProducts;
+      let storedDeleted = cachedDeleted;
+      if (Capacitor.isNativePlatform()) {
+        const { migrateProductImagePaths } = await import('../utils/dataMigration');
+        const mp = [...cachedProducts];
+        const md = [...cachedDeleted];
+        await migrateProductImagePaths(mp, userId);
+        await migrateProductImagePaths(md, userId);
+        storedProducts = mp;
+        storedDeleted = md;
+      }
+
+      if (imageCacheGenerationRef.current !== sessionGen) {
+        return null;
+      }
+
+      persistProducts(storedProducts, storedDeleted);
+      return { storedProducts, storedDeleted };
+    };
+
+    persistCatalogueMeta();
+    persistProducts(filteredProducts, nextDeleted);
+
+    const block = opts?.blockUntilImagesCached === true;
+    const native = Capacitor.isNativePlatform();
+
+    if (!native || block) {
+      const out = await runImageCacheAndPersist(sessionGen);
+      if (!out) {
+        console.warn('⚠️ refreshFromCloud: image cache superseded; returning snapshot without full local files');
+        return { products: filteredProducts, deletedProducts: nextDeleted };
+      }
+      return { products: out.storedProducts, deletedProducts: out.storedDeleted };
     }
 
-    safeSetInStorage(getProductsKey(userId), storedProducts);
-    safeSetInStorage(getDeletedProductsKey(userId), storedDeleted);
+    void (async () => {
+      try {
+        const out = await runImageCacheAndPersist(sessionGen);
+        if (!out || imageCacheGenerationRef.current !== sessionGen) return;
+        window.dispatchEvent(
+          new CustomEvent(CATALOGUE_LOCAL_IMAGES_READY_EVENT, { detail: { userId } })
+        );
+      } catch (e) {
+        console.warn('⚠️ Background image cache failed:', e);
+      }
+    })();
 
-    const rawCats = snapshot.categories || [];
-    const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
-    const categoriesJson = JSON.stringify(normalizedCats);
-    localStorage.setItem('categories', categoriesJson);
-    localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
-
-    if (snapshot.fieldsDefinition) {
-      setFieldsDefinition(snapshot.fieldsDefinition, userId);
-    }
-    if (snapshot.cataloguesDefinition) {
-      setCataloguesDefinition(snapshot.cataloguesDefinition, userId);
-    }
-
-    applyUserSettingsFromCloud(snapshot.userSettings);
-
-    return { products: storedProducts, deletedProducts: storedDeleted };
+    return { products: filteredProducts, deletedProducts: nextDeleted };
   }, [user?.uid]);
 
   const syncProductsToCloud = useCallback(async (
@@ -216,16 +294,19 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const detailedStatus = options?.detailedStatus === true;
+    const showSyncUi = options?.background !== true;
 
     syncLockRef.current = true;
-    setIsSyncing(true);
-    setSyncError(null);
-    setSyncProgressPercent(0);
-    if (detailedStatus) {
-      setSyncStatusDetail('Preparing sync…');
-      setSyncProgressPercent(computeSyncPercentFromDetail('Preparing sync…'));
-    } else {
-      setSyncStatusDetail(null);
+    if (showSyncUi) {
+      setIsSyncing(true);
+      setSyncError(null);
+      setSyncProgressPercent(0);
+      if (detailedStatus) {
+        setSyncStatusDetail('Preparing sync…');
+        setSyncProgressPercent(computeSyncPercentFromDetail('Preparing sync…'));
+      } else {
+        setSyncStatusDetail(null);
+      }
     }
 
     try {
@@ -236,6 +317,12 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setSyncProgressPercent(computeSyncPercentFromDetail(message));
         }
       };
+
+      const onlyIdsRaw = options?.onlyProductIds?.filter(
+        (id) => id != null && String(id).length > 0
+      );
+      const onlyIds = onlyIdsRaw?.map((id) => String(id)) ?? null;
+      const isPartialProductSync = Array.isArray(onlyIds) && onlyIds.length > 0;
 
       // Helper: upload missing R2 images (reads Data + External + legacy paths like hydration)
       const uploadMissingImages = async (items: any[], phaseLabel: string): Promise<any[]> => {
@@ -317,7 +404,30 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return merged;
       };
 
-      // Upload images for both active and deleted products
+      if (isPartialProductSync) {
+        const idSet = new Set(onlyIds);
+        const subset: any[] = [];
+        for (const p of Array.isArray(products) ? products : []) {
+          if (p?.id != null && idSet.has(String(p.id))) {
+            subset.push(p);
+          }
+        }
+        if (subset.length === 0) {
+          console.warn('⚠️ Partial sync: no products matched onlyProductIds', onlyIds);
+          return { products, deletedProducts };
+        }
+
+        const { syncProducts } = await import('../services/supabaseSync');
+        setDetail('Saving product to cloud…');
+        const productsForSync = await uploadMissingImages(subset, 'Uploading image');
+        const res = await syncProducts(userId, productsForSync, {
+          fullListForPosition: Array.isArray(products) ? products : [],
+        });
+        if (!res.success) throw new Error(res.error || 'Products sync failed');
+        return { products, deletedProducts };
+      }
+
+      // Upload images for both active and deleted products (full catalogue sync)
       let productsForSync = await uploadMissingImages(
         Array.isArray(products) ? [...products] : [],
         'Uploading image'
@@ -364,22 +474,32 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         removeFromDeletedProductsTable(userId, idsToRemoveFromDeleted),
       ]);
 
+      if (options?.skipFullCloudRefresh === true) {
+        return { products, deletedProducts };
+      }
+
       setDetail('Refreshing from cloud…');
       const cloudData = await refreshFromCloud(
-        detailedStatus ? { onStatus: setDetail } : undefined
+        detailedStatus
+          ? { onStatus: setDetail, blockUntilImagesCached: true }
+          : { blockUntilImagesCached: true }
       );
       if (!cloudData) throw new Error('Cloud refresh returned null');
 
       return cloudData;
     } catch (err: any) {
       const msg = err?.message || 'Sync failed';
-      setSyncError(msg);
+      if (showSyncUi) {
+        setSyncError(msg);
+      }
       throw err;
     } finally {
       syncLockRef.current = false;
-      setIsSyncing(false);
-      setSyncStatusDetail(null);
-      setSyncProgressPercent(0);
+      if (showSyncUi) {
+        setIsSyncing(false);
+        setSyncStatusDetail(null);
+        setSyncProgressPercent(0);
+      }
     }
   }, [user?.uid, isStrictMode, refreshFromCloud]);
 

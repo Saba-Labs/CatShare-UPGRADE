@@ -24,6 +24,12 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
+export type SyncProductsOptions = {
+  skipImageUrlAssertion?: boolean;
+  /** When syncing a subset of rows, pass the full ordered list so `position` matches drag order in the app. */
+  fullListForPosition?: any[];
+};
+
 /**
  * Sync products to Supabase
  * @param syncOptions.skipImageUrlAssertion — set true only for rare callers (e.g. raw backup JSON) that have not run the R2 upload step yet.
@@ -31,7 +37,7 @@ function getErrorMessage(error: unknown): string {
 export async function syncProducts(
   userId: string,
   products: any[],
-  syncOptions?: { skipImageUrlAssertion?: boolean }
+  syncOptions?: SyncProductsOptions
 ): Promise<SyncResult> {
   try {
     if (!userId || !Array.isArray(products)) {
@@ -54,16 +60,24 @@ export async function syncProducts(
       assertProductsHaveCloudImageUrlForSync(cleanedProducts, 'syncProducts');
     }
 
-    const upsertData = cleanedProducts.map((product, index) => ({
-  user_id: userId,
-  product_id: product.id,
-  name: product.name || '',
-  sku: product.sku || null,
-  category_id: product.categoryId || null,
-  data: product,
-  position: index, // ✅ preserve drag order
-  updated_at: new Date().toISOString(),
-}));
+    const upsertData = cleanedProducts.map((product, index) => {
+      let position = index;
+      const full = syncOptions?.fullListForPosition;
+      if (full && Array.isArray(full) && full.length > 0) {
+        const gi = full.findIndex((p: any) => p != null && String(p.id) === String(product.id));
+        if (gi >= 0) position = gi;
+      }
+      return {
+        user_id: userId,
+        product_id: product.id,
+        name: product.name || '',
+        sku: product.sku || null,
+        category_id: product.categoryId || null,
+        data: product,
+        position,
+        updated_at: new Date().toISOString(),
+      };
+    });
 
     if (upsertData.length === 0) {
       return { success: true, data: [] };

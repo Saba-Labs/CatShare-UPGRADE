@@ -1165,7 +1165,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
         logProductAdded(updated.length);
       }
 
-      window.dispatchEvent(new CustomEvent("product-added"));
+      window.dispatchEvent(
+        new CustomEvent("product-added", { detail: { onlyProductId: String(newItem.id) } })
+      );
 
       // Check if we should show the rating modal
       // Pattern: 10, 25 (10+15), 45 (25+20), 70 (45+25), 100 (70+30), etc.

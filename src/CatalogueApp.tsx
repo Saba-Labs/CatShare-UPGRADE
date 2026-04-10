@@ -86,7 +86,7 @@ function applyVisibleOrderToProducts(products: any[], visibleBefore: any[], visi
   });
 }
 
-export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>> }) {
+export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done' }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done' }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { syncProductsToCloud, isStrictMode } = useSync();
@@ -1121,7 +1121,23 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
 
       <main ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}>
-        {tab === "products" && visible.length === 0 && (
+        {tab === "products" && visible.length === 0 && startupPhase !== "done" && (
+          <div
+            className="flex flex-col items-center justify-center py-16 px-6 text-center"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading products"
+          >
+            <div
+              className="h-9 w-9 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4"
+              aria-hidden
+            />
+            <p className="text-base font-medium text-gray-800">Loading products…</p>
+            <p className="text-sm text-gray-500 mt-2">Fetching your catalogue</p>
+          </div>
+        )}
+
+        {tab === "products" && visible.length === 0 && startupPhase === "done" && (
           <EmptyStateIntro onCreateProduct={() => navigate("/create")} />
         )}
 
@@ -1137,10 +1153,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
             if (isStrictMode() && user?.uid) {
-              syncProductsToCloud(copy, deletedProducts).then(cloudData => {
-                setProducts(cloudData.products);
-                setDeletedProducts(cloudData.deletedProducts);
-              }).catch(err => console.error('Strict sync failed:', err));
+              void syncProductsToCloud(copy, deletedProducts, {
+                background: true,
+                skipFullCloudRefresh: true,
+              }).catch((err) => console.error('Strict sync failed:', err));
             }
           }}>
             <Droppable droppableId="product-list">

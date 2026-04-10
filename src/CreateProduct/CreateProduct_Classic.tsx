@@ -1106,7 +1106,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
         logProductAdded(updated.length);
       }
 
-      window.dispatchEvent(new CustomEvent("product-added"));
+      window.dispatchEvent(
+        new CustomEvent("product-added", { detail: { onlyProductId: String(newItem.id) } })
+      );
 
       const totalProducts = updated.length;
       const isRatingMilestone = (count: number): boolean => {

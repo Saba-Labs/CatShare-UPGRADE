@@ -12,7 +12,7 @@ import { safeWriteFile } from './platformFilesystem';
 const HTTP_URL = /^https?:\/\//i;
 
 /** Max parallel downloads + writes per batch (keeps memory stable on low-end devices). */
-const CACHE_IMAGE_CONCURRENCY = 4;
+const CACHE_IMAGE_CONCURRENCY = 6;
 
 async function localImageFileExists(path: string): Promise<boolean> {
   try {

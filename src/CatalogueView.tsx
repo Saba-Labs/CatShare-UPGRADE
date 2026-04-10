@@ -322,6 +322,14 @@ export default React.memo(function CatalogueView({
   const [allCategories, setAllCategories] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
+  /** Synced immediately on entering selection so popstate runs before the next paint still sees truth. */
+  const selectModeRef = useRef(false);
+  const selectedLenRef = useRef(0);
+  const onBackRef = useRef(onBack);
+  selectModeRef.current = selectMode;
+  selectedLenRef.current = selected.length;
+  onBackRef.current = onBack;
+
   const [processing, setProcessing] = useState(false);
   const [processingIndex, setProcessingIndex] = useState(0);
   const [processingTotal, setProcessingTotal] = useState(0);
@@ -461,24 +469,32 @@ useEffect(() => {
   }, [showToolsMenu]);
 
   useEffect(() => {
-  const handlePopState = async () => {
-    if (selectMode) {
-      setSelectMode(false);
-      setSelected([]);
-      try {
-        await Haptics.impact({ style: ImpactStyle.Light });
-      } catch (err) {
-        console.warn("Haptics not supported:", err);
-      }
-    } else {
-      // If not in select mode, and we popped, it means we want to exit catalogue
-      onBack();
-    }
-  };
+    const handlePopState = () => {
+      const inSelection =
+        selectModeRef.current || selectedLenRef.current > 0;
 
-  window.addEventListener("popstate", handlePopState);
-  return () => window.removeEventListener("popstate", handlePopState);
-}, [selectMode, setSelected, onBack]);
+      if (inSelection) {
+        selectModeRef.current = false;
+        selectedLenRef.current = 0;
+        setSelectMode(false);
+        setSelected([]);
+        // Must run synchronously (before any await) so a second popstate in the same gesture
+        // still sees the repaired stack — same pattern as Resell/Wholesale.
+        window.history.pushState({ catalogueSelectionCleared: true }, "");
+        try {
+          void Haptics.impact({ style: ImpactStyle.Light });
+        } catch (err) {
+          console.warn("Haptics not supported:", err);
+        }
+        return;
+      }
+
+      onBackRef.current();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [setSelected]);
 
 useEffect(() => {
   // Push a fake entry to trap back
@@ -542,6 +558,7 @@ useEffect(() => {
         // If we're now dragging and not yet in select mode, enter it
         if (!hasEnteredSelectMode) {
           hasEnteredSelectMode = true;
+          selectModeRef.current = true;
           setSelectMode(true);
           window.history.pushState({ select: true }, "");
         }
@@ -613,8 +630,9 @@ useEffect(() => {
 
   touchStateRef.current.touchTimer = setTimeout(() => {
     if (!touchStateRef.current.moved) {
-      if (!selectMode) {
+      if (!selectModeRef.current) {
         window.history.pushState({ select: true }, "");
+        selectModeRef.current = true;
         setSelectMode(true);
       }
       touchStateRef.current.isLongPress = true;
@@ -622,7 +640,7 @@ useEffect(() => {
       try { Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
     }
   }, 600);
-}, [selectMode]);
+}, []);
 
 const handleTouchMove = useCallback((e) => {
   const touch = e.touches?.[0] || e;
