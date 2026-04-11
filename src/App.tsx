@@ -1406,6 +1406,11 @@ if (user?.uid && !authService.isOfflineGuest()) {
       const previewModalOpen = document.querySelector(".backdrop-blur-xl.z-50");
       if (fullScreenImageOpen || previewModalOpen) {
         window.dispatchEvent(new CustomEvent("close-preview"));
+      } else if (location.pathname === "/catalogues") {
+        // CatalogueApp registers its own backButton listener and uses window.history.back()
+        // for selection mode + catalogue exit. Do not navigate(-1) here — that ran as a
+        // second back on mobile and skipped clearing selection / required two gestures.
+        return;
       } else if (location.pathname !== "/") {
         navigate(-1);
       } else {
