@@ -1,0 +1,139 @@
+diff --git a/node_modules/capacitor-billing/android/src/main/java/de/carstenklaffke/billing/BillingPlugin.java b/node_modules/capacitor-billing/android/src/main/java/de/carstenklaffke/billing/BillingPlugin.java
+index bf96aaa..c25df64 100644
+--- a/node_modules/capacitor-billing/android/src/main/java/de/carstenklaffke/billing/BillingPlugin.java
++++ b/node_modules/capacitor-billing/android/src/main/java/de/carstenklaffke/billing/BillingPlugin.java
+@@ -24,6 +24,61 @@ import java.util.List;
+ @CapacitorPlugin()
+ public class BillingPlugin extends Plugin {
+ 
++    /**
++     * Picks the correct {@link ProductDetails.SubscriptionOfferDetails} when a subscription product has
++     * multiple base plans (e.g. legacy inactive + active). Play Billing does not guarantee offer order.
++     */
++    private static ProductDetails.SubscriptionOfferDetails pickSubscriptionOffer(
++            ProductDetails productDetails,
++            String basePlanIdHint,
++            String productId
++    ) {
++        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
++        if (offers == null || offers.isEmpty()) {
++            return null;
++        }
++
++        if (basePlanIdHint != null && !basePlanIdHint.isEmpty()) {
++            for (ProductDetails.SubscriptionOfferDetails o : offers) {
++                if (basePlanIdHint.equals(o.getBasePlanId())) {
++                    return o;
++                }
++            }
++        }
++
++        if (productId != null && productId.contains("yearly")) {
++            for (ProductDetails.SubscriptionOfferDetails o : offers) {
++                String bid = o.getBasePlanId();
++                if (bid != null && (bid.contains("yearly-v2") || bid.endsWith("-v2"))) {
++                    return o;
++                }
++            }
++            for (ProductDetails.SubscriptionOfferDetails o : offers) {
++                if (o.getPricingPhases() == null || o.getPricingPhases().getPricingPhaseList().isEmpty()) {
++                    continue;
++                }
++                String period = o.getPricingPhases().getPricingPhaseList().get(0).getBillingPeriod();
++                if ("P1Y".equals(period)) {
++                    return o;
++                }
++            }
++        }
++
++        if (productId != null && productId.contains("monthly")) {
++            for (ProductDetails.SubscriptionOfferDetails o : offers) {
++                if (o.getPricingPhases() == null || o.getPricingPhases().getPricingPhaseList().isEmpty()) {
++                    continue;
++                }
++                String period = o.getPricingPhases().getPricingPhaseList().get(0).getBillingPeriod();
++                if ("P1M".equals(period)) {
++                    return o;
++                }
++            }
++        }
++
++        return offers.get(0);
++    }
++
+     private BillingClient createNewBillingClient(PurchasesUpdatedListener listener) {
+         return BillingClient.newBuilder(bridge.getActivity())
+                 .setListener(listener)
+@@ -74,6 +129,9 @@ public class BillingPlugin extends Plugin {
+                             .setProductList(productList)
+                             .build();
+ 
++                    final String queryProductId = call.getString("product", "fullversion");
++                    final String queryBasePlanId = call.getString("basePlanId", null);
++
+                     billingClient.queryProductDetailsAsync(params, (billingResult1, productDetailsList) -> {
+                         if (billingResult1.getResponseCode() == BillingClient.BillingResponseCode.OK && productDetailsList != null && !productDetailsList.isEmpty()) {
+                             ProductDetails productDetails = productDetailsList.get(0);
+@@ -90,7 +148,15 @@ public class BillingPlugin extends Plugin {
+                             }
+ 
+                             if (productDetails.getSubscriptionOfferDetails() != null && !productDetails.getSubscriptionOfferDetails().isEmpty()) {
+-                                ProductDetails.SubscriptionOfferDetails subscriptionOfferDetails = productDetails.getSubscriptionOfferDetails().get(0);
++                                ProductDetails.SubscriptionOfferDetails subscriptionOfferDetails = pickSubscriptionOffer(
++                                        productDetails,
++                                        queryBasePlanId,
++                                        queryProductId
++                                );
++                                if (subscriptionOfferDetails == null) {
++                                    call.reject("No subscription offer available for this product");
++                                    return;
++                                }
+                                 ProductDetails.PricingPhases pricingPhases = subscriptionOfferDetails.getPricingPhases();
+                                 ProductDetails.PricingPhase pricingPhase = pricingPhases.getPricingPhaseList().get(0);
+ 
+@@ -136,12 +202,23 @@ public class BillingPlugin extends Plugin {
+                             .setProductList(productList)
+                             .build();
+ 
++                    final String flowProductId = call.getString("product", "fullversion");
++                    final String flowBasePlanId = call.getString("basePlanId", null);
++
+                     billingClient.queryProductDetailsAsync(params, (billingResult1, productDetailsList) -> {
+                         if (billingResult1.getResponseCode() == BillingClient.BillingResponseCode.OK && productDetailsList != null && !productDetailsList.isEmpty()) {
+                             ProductDetails productDetails = productDetailsList.get(0);
+ 
+                             if (productDetails.getSubscriptionOfferDetails() != null && !productDetails.getSubscriptionOfferDetails().isEmpty()) {
+-                                ProductDetails.SubscriptionOfferDetails subscriptionOfferDetails = productDetails.getSubscriptionOfferDetails().get(0);
++                                ProductDetails.SubscriptionOfferDetails subscriptionOfferDetails = pickSubscriptionOffer(
++                                        productDetails,
++                                        flowBasePlanId,
++                                        flowProductId
++                                );
++                                if (subscriptionOfferDetails == null) {
++                                    call.reject("No subscription offer available for this product");
++                                    return;
++                                }
+                                 String offerToken = subscriptionOfferDetails.getOfferToken();
+ 
+                                 BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
+diff --git a/node_modules/capacitor-billing/dist/esm/definitions.d.ts b/node_modules/capacitor-billing/dist/esm/definitions.d.ts
+index 94b68f6..96715ad 100644
+--- a/node_modules/capacitor-billing/dist/esm/definitions.d.ts
++++ b/node_modules/capacitor-billing/dist/esm/definitions.d.ts
+@@ -2,12 +2,16 @@ export interface BillingPluginPlugin {
+     querySkuDetails(options: {
+         product: string;
+         type: string;
++        /** Google Play subscription base plan ID when the product has multiple base plans */
++        basePlanId?: string;
+     }): Promise<{
+         value: string;
+     }>;
+     launchBillingFlow(options: {
+         product: string;
+         type: string;
++        /** Must match the active base plan in Play Console (e.g. yearly-v2) */
++        basePlanId?: string;
+     }): Promise<{
+         value: string;
+     }>;

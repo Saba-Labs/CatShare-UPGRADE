@@ -17,6 +17,7 @@ import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 
@@ -344,7 +345,11 @@ async function prepareImagesForCaptureSnapshot(container: HTMLElement): Promise<
   }
 
   await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
   });
 
   return () => {
@@ -352,8 +357,41 @@ async function prepareImagesForCaptureSnapshot(container: HTMLElement): Promise<
   };
 }
 
-/** Wait for webfonts + paint so html2canvas measures the same as desktop (esp. Android WebView). */
-async function waitForSnapshotPaintReady(): Promise<void> {
+/** Ensure every img in the snapshot subtree is decoded so layout and raster match across runs. */
+async function waitForImagesInElement(container: HTMLElement): Promise<void> {
+  const imgs = Array.from(container.querySelectorAll('img')) as HTMLImageElement[];
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = (img.currentSrc || img.src || '').trim();
+      if (!src) return;
+      if (!img.complete) {
+        await new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        });
+      }
+      try {
+        if (typeof img.decode === 'function') {
+          await img.decode();
+        }
+      } catch {
+        /* decode() rejects for some broken/cached images; capture still proceeds */
+      }
+    })
+  );
+}
+
+function flushSnapshotLayout(container: HTMLElement): void {
+  void container.offsetHeight;
+  void container.scrollWidth;
+  container.getBoundingClientRect();
+}
+
+/**
+ * Web fonts + layout flush + multiple paint frames so html2canvas sees a stable tree (mobile WebView varies run-to-run).
+ */
+async function waitForSnapshotPaintReady(container: HTMLElement): Promise<void> {
   try {
     if (typeof document !== 'undefined' && document.fonts?.ready) {
       await document.fonts.ready;
@@ -361,11 +399,21 @@ async function waitForSnapshotPaintReady(): Promise<void> {
   } catch {
     /* ignore */
   }
+  flushSnapshotLayout(container);
   await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
   });
+  flushSnapshotLayout(container);
   if (Capacitor.isNativePlatform()) {
-    await new Promise<void>((r) => setTimeout(r, 100));
+    await new Promise<void>((r) => setTimeout(r, 180));
+    flushSnapshotLayout(container);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
   }
 }
 
@@ -385,7 +433,55 @@ function applySnapshotCloneRootHints(doc: Document) {
     root.style.setProperty('-webkit-text-size-adjust', '100%', imp);
     root.style.setProperty('text-rendering', 'geometricPrecision', imp);
     root.style.setProperty('-webkit-font-smoothing', 'antialiased', imp);
+    root.style.setProperty('overflow', 'visible', imp);
+    /* Tighter inset in PNG only — live Order Detail keeps padding on the element in JSX */
+    root.style.setProperty('padding', '10px', imp);
   }
+}
+
+/** html2canvas can clip descendants; widen overflow on the clone ancestor chain (snapshot subtree only). */
+function forceSnapshotCloneAncestorsOverflowVisible(doc: Document, leaf: HTMLElement) {
+  const imp = 'important';
+  let n: HTMLElement | null = leaf;
+  const htmlEl = doc.documentElement;
+  while (n) {
+    n.style.setProperty('overflow', 'visible', imp);
+    n.style.setProperty('overflow-x', 'visible', imp);
+    n.style.setProperty('overflow-y', 'visible', imp);
+    if (n === htmlEl) break;
+    n = n.parentElement;
+  }
+}
+
+/** Injected only in html2canvas clone — not visible on the live Order Detail page. */
+function appendOrderSnapshotCaptureFooter(doc: Document) {
+  const root = doc.querySelector('[data-order-snapshot-root]');
+  if (!(root instanceof HTMLElement)) return;
+  if (root.querySelector('[data-order-snapshot-capture-footer]')) return;
+
+  const footer = doc.createElement('div');
+  footer.setAttribute('data-order-snapshot-capture-footer', 'true');
+  footer.style.cssText = [
+    'margin-top:0',
+    'padding:0 0 5px 0',
+    'display:flex',
+    'justify-content:flex-end',
+    'align-items:center',
+    'box-sizing:border-box',
+    "font-family:'DM Sans',system-ui,sans-serif",
+    '-webkit-font-smoothing:antialiased',
+  ].join(';');
+
+  const line = doc.createElement('span');
+  line.style.cssText = 'font-size:11px;color:#A3AFBF;line-height:1.35;white-space:nowrap';
+  line.appendChild(doc.createTextNode('Generated by '));
+  const brand = doc.createElement('span');
+  brand.textContent = 'CatShare';
+  brand.style.cssText = 'color:#23824C;font-weight:600';
+  line.appendChild(brand);
+
+  footer.appendChild(line);
+  root.appendChild(footer);
 }
 
 /**
@@ -400,11 +496,12 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
   if (customerRow instanceof HTMLElement) {
     customerRow.style.setProperty('display', 'flex', imp);
     customerRow.style.setProperty('flex-direction', 'row', imp);
-    customerRow.style.setProperty('align-items', 'stretch', imp);
     customerRow.style.setProperty('justify-content', 'space-between', imp);
     customerRow.style.setProperty('gap', '12px', imp);
     customerRow.style.setProperty('box-sizing', 'border-box', imp);
     customerRow.style.setProperty('width', '100%', imp);
+    customerRow.style.setProperty('align-items', 'center', imp);
+    customerRow.style.setProperty('padding', '14px 16px', imp);
 
     const left = customerRow.children[0];
     const right = customerRow.children[1];
@@ -415,16 +512,12 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
       left.style.setProperty('gap', '12px', imp);
       left.style.setProperty('flex', '1', imp);
       left.style.setProperty('min-width', '0', imp);
+      left.style.setProperty('overflow', 'visible', imp);
     }
     const textEl = customerRow.querySelector('[data-order-customer-text-snapshot]');
     if (textEl instanceof HTMLElement) {
-      textEl.style.setProperty('display', 'flex', imp);
-      textEl.style.setProperty('flex-direction', 'column', imp);
-      textEl.style.setProperty('justify-content', 'center', imp);
       textEl.style.setProperty('min-width', '0', imp);
-      // Match Order Total PNG-only spacing; avatar is a sibling and keeps its own styles
-      textEl.style.setProperty('padding', '4px 0 16px', imp);
-      textEl.style.setProperty('box-sizing', 'border-box', imp);
+      textEl.style.setProperty('overflow', 'visible', imp);
     }
     if (right instanceof HTMLElement) {
       right.style.setProperty('display', 'flex', imp);
@@ -437,6 +530,26 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
       right.style.setProperty('padding', '0 0 4px', imp);
       right.style.setProperty('box-sizing', 'border-box', imp);
       right.style.setProperty('margin-top', '-2px', imp);
+    }
+
+    const waLink = customerRow.querySelector('[data-order-customer-text-snapshot] a[href*="wa.me"]');
+    if (waLink instanceof HTMLElement) {
+      forceSnapshotCloneAncestorsOverflowVisible(doc, waLink);
+      waLink.style.setProperty('display', 'flex', imp);
+      waLink.style.setProperty('flex-direction', 'row', imp);
+      waLink.style.setProperty('align-items', 'center', imp);
+      waLink.style.setProperty('justify-content', 'flex-start', imp);
+      waLink.style.setProperty('gap', '0', imp);
+      waLink.style.setProperty('margin-top', '2px', imp);
+      waLink.style.setProperty('font-size', '13px', imp);
+      waLink.style.setProperty('white-space', 'nowrap', imp);
+      waLink.style.setProperty('overflow', 'visible', imp);
+      waLink.style.setProperty('color', COLORS.subtle, imp);
+      waLink.style.setProperty('text-decoration', 'none', imp);
+      const svg = waLink.querySelector(':scope > svg');
+      if (svg instanceof SVGElement) {
+        svg.style.setProperty('display', 'none', imp);
+      }
     }
   }
 
@@ -466,6 +579,8 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
     orderTotalValue.style.setProperty('box-sizing', 'border-box', imp);
     orderTotalValue.style.setProperty('margin-top', '-2px', imp);
   }
+
+  appendOrderSnapshotCaptureFooter(doc);
 }
 
 function hydrateOrderItemImagesFromLocalProducts(
@@ -1325,10 +1440,13 @@ useEffect(() => {
         /* ignore */
       }
       el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-      void el.offsetHeight;
+      flushSnapshotLayout(el);
+
+      await waitForImagesInElement(el);
 
       restoreImages = await prepareImagesForCaptureSnapshot(el);
-      await waitForSnapshotPaintReady();
+      await waitForSnapshotPaintReady(el);
+      flushSnapshotLayout(el);
 
       const canvas = await html2canvas(el, {
         scale: 2,
@@ -1622,7 +1740,7 @@ useEffect(() => {
       </div>
 
       {/* ── Scrollable content ── */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '16px 16px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+      <main style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
         <div style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* ── Customer + items: edit mode vs snapshot ref for share/download image ── */}
@@ -1705,7 +1823,7 @@ useEffect(() => {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 12,
-                padding: 20,
+                padding: 6,
                 boxSizing: 'border-box',
                 backgroundColor: COLORS.bg,
               }}
@@ -1831,34 +1949,6 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
-              {/* Match invoice PDF footer (invoiceGenerator drawFooter) */}
-              <div
-                data-order-snapshot-footer
-                style={{
-                  marginTop: 4,
-                  paddingTop: 12,
-                  paddingBottom: 2,
-                  borderTop: '1px solid #EBF0F6',
-                  background: '#FAFBFD',
-                  borderRadius: 10,
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 10,
-                  paddingLeft: 12,
-                  paddingRight: 12,
-                  minHeight: 40,
-                }}
-              >
-                <span style={{ fontSize: 12, color: '#A3AFBF', fontFamily: FONT, lineHeight: 1.4 }}>
-                  This is a computer generated document.
-                </span>
-                <span style={{ fontSize: 12, fontFamily: FONT, lineHeight: 1.4, textAlign: 'right' }}>
-                  <span style={{ color: '#A3AFBF' }}>Generated by </span>
-                  <span style={{ color: '#23824C', fontWeight: 600 }}>CatShare</span>
-                </span>
-              </div>
             </div>
           )}
 
@@ -1909,92 +1999,97 @@ useEffect(() => {
             </div>
           ) : (
             <>
-              {/* ── Quick status change ── */}
-              <SectionLabel>Quick Actions</SectionLabel>
-
-              {/* Mark as row */}
-              <div style={{ display: 'flex', gap: 8 }}>
-                {(['pending', 'completed', 'cancelled'] as StatusType[]).filter(s => s !== order.status).map(s => {
-                  const cfg = getStatusConfig(s);
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => handleStatusChange(s)}
-                      style={{
-                        flex: 1, padding: '11px 8px', borderRadius: 12,
-                        border: `1.5px solid ${cfg.dot}25`,
-                        background: cfg.bg, cursor: 'pointer',
-                        fontSize: 12.5, fontWeight: 600, color: cfg.text, fontFamily: FONT,
-                        transition: 'transform 0.1s',
-                      }}
-                    >
-                      {s === 'completed' ? '✓ Complete' : s === 'cancelled' ? '✕ Cancel' : '↩ Reopen'}
-                    </button>
-                  );
-                })}
-              </div>
-
-
-              {/* Edit */}
-              <button
-                onClick={() => setEditModeSync(true)}
-                style={{
-                  width: '100%', padding: '14px', borderRadius: 14,
-                  border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,
-                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  color: COLORS.text, fontFamily: FONT,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  transition: 'background 0.15s',
-                }}
-              >
-                <Ic.Edit />
-                Edit Order
-              </button>
-
-              {/* Delete */}
-              {showDeleteConfirm ? (
-                <div style={{
-                  background: '#FFF1F2', borderRadius: 14, border: `1.5px solid #FECDD3`,
-                  padding: '16px',
-                }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#881337', textAlign: 'center', marginBottom: 4 }}>
-                    Delete this order?
-                  </div>
-                  <div style={{ fontSize: 12, color: '#BE123C', textAlign: 'center', marginBottom: 14 }}>
-                    This action cannot be undone.
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setShowDeleteConfirm(false)} style={{
-                      flex: 1, padding: '11px', borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
-                      background: '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: COLORS.muted,
-                    }}>Keep</button>
-                    <button onClick={handleDelete} style={{
-                      flex: 1, padding: '11px', borderRadius: 10, border: 'none',
-                      background: '#F43F5E', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 700, color: '#fff',
-                    }}>Delete</button>
-                  </div>
+              <div style={{ padding: '0 6px' }}>
+                <SectionLabel>Quick Actions</SectionLabel>
+                <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['pending', 'completed', 'cancelled'] as StatusType[]).filter(s => s !== order.status).map(s => {
+                    const cfg = getStatusConfig(s);
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => handleStatusChange(s)}
+                        style={{
+                          flex: 1, padding: '11px 8px', borderRadius: 12,
+                          border: `1.5px solid ${cfg.dot}25`,
+                          background: cfg.bg, cursor: 'pointer',
+                          fontSize: 12.5, fontWeight: 600, color: cfg.text, fontFamily: FONT,
+                          transition: 'transform 0.1s',
+                        }}
+                      >
+                        {s === 'completed' ? '✓ Complete' : s === 'cancelled' ? '✕ Cancel' : '↩ Reopen'}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : (
+
                 <button
-                  onClick={() => setShowDeleteConfirm(true)}
+                  onClick={() => setEditModeSync(true)}
                   style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                    width: '100%', padding: '12px', borderRadius: 12,
-                    border: `1.5px solid #FECDD3`, background: '#FFF1F2',
-                    cursor: 'pointer', fontFamily: FONT, fontSize: 13, fontWeight: 600, color: '#F43F5E',
+                    width: '100%', padding: '14px', borderRadius: 14,
+                    border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    color: COLORS.text, fontFamily: FONT,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     transition: 'background 0.15s',
                   }}
                 >
-                  <Ic.Trash />
-                  Delete Order
+                  <Ic.Edit />
+                  Edit Order
                 </button>
-              )}
+
+                {showDeleteConfirm ? (
+                  <div style={{
+                    background: '#FFF1F2', borderRadius: 14, border: `1.5px solid #FECDD3`,
+                    padding: '16px',
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#881337', textAlign: 'center', marginBottom: 4 }}>
+                      Delete this order?
+                    </div>
+                    <div style={{ fontSize: 12, color: '#BE123C', textAlign: 'center', marginBottom: 14 }}>
+                      This action cannot be undone.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setShowDeleteConfirm(false)} style={{
+                        flex: 1, padding: '11px', borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
+                        background: '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 600, color: COLORS.muted,
+                      }}>Keep</button>
+                      <button onClick={handleDelete} style={{
+                        flex: 1, padding: '11px', borderRadius: 10, border: 'none',
+                        background: '#F43F5E', cursor: 'pointer', fontFamily: FONT, fontSize: 14, fontWeight: 700, color: '#fff',
+                      }}>Delete</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                      width: '100%', padding: '12px', borderRadius: 12,
+                      border: `1.5px solid #FECDD3`, background: '#FFF1F2',
+                      cursor: 'pointer', fontFamily: FONT, fontSize: 13, fontWeight: 600, color: '#F43F5E',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <Ic.Trash />
+                    Delete Order
+                  </button>
+                )}
+                </div>
+              </div>
             </>
           )}
         </div>
       </main>
 
       <MainAppBottomNav active="orders" />
+      {shareImageLoading ? (
+        <SyncBusyOverlay
+          title="Preparing image…"
+          subtitle="Order summary"
+          zClassName="z-[200]"
+        />
+      ) : null}
     </div>
   );
 }

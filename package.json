@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "patch-package",
     "extract-version": "node scripts/extract-version.js",
     "dev": "npm run extract-version && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js",
     "build": "npm run extract-version && tsc && vite build",

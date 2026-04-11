@@ -97,7 +97,7 @@ function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const { user, loading, supabaseData, supabaseDataLoading } = useAuth();
+  const { user, loading, supabaseData, supabaseDataLoading, refreshSupabaseData } = useAuth();
   const {
     isSyncing: isSyncContextSyncing,
     syncStatusDetail,
@@ -122,6 +122,7 @@ function AppWithBackHandler() {
   const previousUserIdRef = useRef<string | null>(null);
   const [showOfflineSyncModal, setShowOfflineSyncModal] = useState(false);
   const [syncNowLoading, setSyncNowLoading] = useState(false);
+  const [offlineDeleteLoading, setOfflineDeleteLoading] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
   const [syncProgressPercent, setSyncProgressPercent] = useState(0);
 
@@ -137,6 +138,8 @@ function AppWithBackHandler() {
   const startupRanForUserRef = useRef<string | null>(null);
   /** Strict returning-user bootstrap runs once per login; separate from startupRanForUserRef (step 3/4). */
   const strictBootstrapRanRef = useRef<string | null>(null);
+  /** False until first catalogue hydrate finishes (strict: after refreshFromCloud settles). Avoids EmptyStateIntro while cloud still loading. */
+  const [catalogueFirstLoadSettled, setCatalogueFirstLoadSettled] = useState(false);
 
   const isHomeRoute = location.pathname === '/' || location.pathname === '';
   const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
@@ -231,6 +234,7 @@ function AppWithBackHandler() {
       setStartupPhase('pending');
       startupRanForUserRef.current = null;
       strictBootstrapRanRef.current = null;
+      setCatalogueFirstLoadSettled(false);
       setProducts([]);
       setDeletedProducts([]);
       return;
@@ -247,6 +251,7 @@ function AppWithBackHandler() {
       const guestDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
       setProducts(guestProducts);
       setDeletedProducts(guestDeleted);
+      setCatalogueFirstLoadSettled(true);
       setStartupPhase('done');
       return;
     }
@@ -328,19 +333,33 @@ function AppWithBackHandler() {
             }
             applyUserSettingsFromCloud(supabaseData?.userSettings);
           } else {
-            const localFields = getFieldsDefinition(userId);
-            if (localFields && Array.isArray(localFields.fields) && localFields.fields.length > 0) {
-              setFieldsDefinition(localFields, userId);
-              window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
-                detail: { newDefinition: localFields, template: localFields.industry || 'Custom', isBackupRestore: false }
-              }));
+            const rawFd = localStorage.getItem(getStorageKey('fieldsDefinition', userId));
+            if (rawFd) {
+              try {
+                const localFields = JSON.parse(rawFd);
+                if (localFields && Array.isArray(localFields.fields) && localFields.fields.length > 0) {
+                  setFieldsDefinition(localFields, userId);
+                  window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+                    detail: { newDefinition: localFields, template: localFields.industry || 'Custom', isBackupRestore: false }
+                  }));
+                }
+              } catch {
+                /* ignore */
+              }
             }
-            const localCatalogues = getCataloguesDefinition(userId);
-            if (localCatalogues?.catalogues?.length) {
-              setCataloguesDefinition(localCatalogues, userId);
-              window.dispatchEvent(new CustomEvent('catalogues-changed', {
-                detail: { action: 'update', catalogues: localCatalogues.catalogues }
-              }));
+            const rawCat = localStorage.getItem(getStorageKey('cataloguesDefinition', userId));
+            if (rawCat) {
+              try {
+                const localCatalogues = JSON.parse(rawCat);
+                if (localCatalogues?.catalogues?.length) {
+                  setCataloguesDefinition(localCatalogues, userId);
+                  window.dispatchEvent(new CustomEvent('catalogues-changed', {
+                    detail: { action: 'update', catalogues: localCatalogues.catalogues }
+                  }));
+                }
+              } catch {
+                /* ignore */
+              }
             }
           }
 
@@ -359,10 +378,14 @@ function AppWithBackHandler() {
             .catch((e) => {
               console.warn('⚠️ refreshFromCloud failed (using auth snapshot):', e);
               setSupabaseSyncStatus('synced');
+            })
+            .finally(() => {
+              setCatalogueFirstLoadSettled(true);
             });
         } catch (e) {
           console.error('❌ Strict startup bootstrap failed:', e);
           setStartupPhase('done');
+          setCatalogueFirstLoadSettled(true);
         }
       })();
       return;
@@ -389,8 +412,8 @@ function AppWithBackHandler() {
         return Array.isArray(c) && c.length > 0;
       } catch { return false; }
     })();
-    const hasLegacyFields = !!getFieldsDefinition(userId);
-    const hasLegacyCatalogues = !!getCataloguesDefinition(userId);
+    const hasLegacyFields = Boolean(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
+    const hasLegacyCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
     const hasAnyOfflineData = hasLegacyProducts || hasLegacyDeleted || hasLegacyCategories || hasLegacyFields || hasLegacyCatalogues;
 
     if (!legacyResolved && hasAnyOfflineData) {
@@ -466,6 +489,7 @@ function AppWithBackHandler() {
     localStorage.setItem('strictOnlineMode::device', 'true');
     localStorage.setItem('offlineLegacyResolved::device', 'true');
       setSupabaseSyncStatus('synced');
+    setCatalogueFirstLoadSettled(true);
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
   }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches, refreshFromCloud]);
@@ -776,6 +800,7 @@ function AppWithBackHandler() {
 
       setSyncPhase(100, 'Done');
       setShowOfflineSyncModal(false);
+      setCatalogueFirstLoadSettled(true);
       setStartupPhase('done');
       setSyncProgress('');
       setSyncProgressPercent(0);
@@ -819,13 +844,22 @@ function AppWithBackHandler() {
     if (!user?.uid) return;
 
     const isNewUser = !supabaseData?.fieldsDefinition;
-    const hasLocalFields = !!getFieldsDefinition(user.uid);
-    const hasCompletedOnboarding = safeGetFromStorage('hasCompletedOnboarding', false);
+    // getFieldsDefinition() returns in-memory defaults when nothing is stored — do not treat that as "has local fields"
+    const hasPersistedFieldDefinition = Boolean(
+      user.uid && localStorage.getItem(getStorageKey('fieldsDefinition', user.uid))
+    );
+    let hasCompletedOnboarding = Boolean(
+      user.uid && safeGetFromStorage(getStorageKey('hasCompletedOnboarding', user.uid), false)
+    );
+    if (!hasCompletedOnboarding && user.uid && safeGetFromStorage('hasCompletedOnboarding', false) && supabaseData?.fieldsDefinition) {
+      safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
+      hasCompletedOnboarding = true;
+    }
 
     const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/privacy', '/terms', '/website', '/o/'];
     const isOnPublicPage = publicPages.some(p => location.pathname.includes(p));
 
-    if (isNewUser && !hasLocalFields && !hasCompletedOnboarding && !isOnPublicPage) {
+    if (isNewUser && !hasPersistedFieldDefinition && !hasCompletedOnboarding && !isOnPublicPage) {
       navigate('/welcome');
     }
   }, [navigate, location.pathname, loading, startupPhase, supabaseData?.fieldsDefinition, user?.uid]);
@@ -1493,7 +1527,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
 
             <div className="space-y-3 mb-4">
               <button
-                disabled={syncNowLoading}
+                disabled={syncNowLoading || offlineDeleteLoading}
                 onClick={() => syncOfflineDataNow()}
                 className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold text-sm sm:text-base transition-colors"
               >
@@ -1504,11 +1538,13 @@ if (user?.uid && !authService.isOfflineGuest()) {
             <div className="border-t border-gray-200 my-4"></div>
 
               <button
-                disabled={syncNowLoading}
+                disabled={syncNowLoading || offlineDeleteLoading}
               onClick={async () => {
                 const ok = window.confirm("Delete offline data permanently? This cannot be undone.");
                 if (!ok) return;
 
+                setOfflineDeleteLoading(true);
+                try {
                 setProducts([]);
                 setDeletedProducts([]);
                 safeSetInStorage(getProductsKey(user.uid), []);
@@ -1527,17 +1563,20 @@ if (user?.uid && !authService.isOfflineGuest()) {
                 localStorage.removeItem(getStorageKey('fieldsDefinition', user.uid));
                 localStorage.removeItem('showTutorialOnInit');
 
-                // Check if user already has data in the cloud before sending to welcome.
+                // Fresh fetch — stale/empty supabaseData from fast splash can wrongly send returning users to Welcome.
+                const freshSnapshot = await refreshSupabaseData({ skipLoadingIndicator: true });
+                const cloud = freshSnapshot ?? supabaseData;
+
                 const hasCloudData = !!(
-                  supabaseData?.fieldsDefinition ||
-                  (supabaseData?.products && supabaseData.products.length > 0) ||
-                  supabaseData?.cataloguesDefinition
+                  cloud?.fieldsDefinition ||
+                  (cloud?.products && cloud.products.length > 0) ||
+                  cloud?.cataloguesDefinition
                 );
 
                 if (hasCloudData) {
                   // User already set up on another device — load from cloud, skip welcome.
-                  const cloudProducts = Array.isArray(supabaseData?.products) ? supabaseData!.products : [];
-                  const cloudDeleted = Array.isArray(supabaseData?.deletedProducts) ? supabaseData!.deletedProducts : [];
+                  const cloudProducts = Array.isArray(cloud?.products) ? cloud!.products : [];
+                  const cloudDeleted = Array.isArray(cloud?.deletedProducts) ? cloud!.deletedProducts : [];
                   const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
                   const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
                   setProducts(filteredProducts);
@@ -1545,32 +1584,46 @@ if (user?.uid && !authService.isOfflineGuest()) {
                   safeSetInStorage(getProductsKey(user.uid), filteredProducts);
                   safeSetInStorage(getDeletedProductsKey(user.uid), cloudDeleted);
 
-                  const rawCats = supabaseData?.categories || [];
+                  const rawCats = cloud?.categories || [];
                   const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
                   localStorage.setItem('categories', JSON.stringify(normalizedCats));
 
-                  if (supabaseData?.fieldsDefinition) {
-                    setFieldsDefinition(supabaseData.fieldsDefinition, user.uid);
+                  if (cloud?.fieldsDefinition) {
+                    setFieldsDefinition(cloud.fieldsDefinition, user.uid);
                   }
-                  if (supabaseData?.cataloguesDefinition) {
-                    setCataloguesDefinition(supabaseData.cataloguesDefinition, user.uid);
+                  if (cloud?.cataloguesDefinition) {
+                    setCataloguesDefinition(cloud.cataloguesDefinition, user.uid);
                   }
-                  applyUserSettingsFromCloud(supabaseData?.userSettings);
-                  safeSetInStorage('hasCompletedOnboarding', true);
+                  applyUserSettingsFromCloud(cloud?.userSettings);
+                  safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
                 } else {
-                  safeSetInStorage('hasCompletedOnboarding', false);
+                  safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), false);
                 }
 
                   setShowOfflineSyncModal(false);
+                setCatalogueFirstLoadSettled(true);
                 setStartupPhase('done');
 
                 if (!hasCloudData) {
                   navigate('/welcome');
                 }
+                } finally {
+                  setOfflineDeleteLoading(false);
+                }
               }}
-              className="w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors"
+              className={`w-full px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 disabled:bg-red-50 text-red-700 font-semibold text-sm sm:text-base transition-colors flex items-center justify-center min-h-[48px] ${offlineDeleteLoading ? 'cursor-wait' : ''}`}
             >
-              Delete offline data
+              {offlineDeleteLoading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span
+                    className="h-4 w-4 border-2 border-red-200 border-t-red-700 rounded-full animate-spin shrink-0"
+                    aria-hidden
+                  />
+                  Checking account…
+                </span>
+              ) : (
+                'Delete offline data'
+              )}
               </button>
               </>
           </div>
@@ -1702,6 +1755,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
                 showTutorial={showTutorial}
                 setShowTutorial={setShowTutorial}
                 startupPhase={startupPhase}
+                catalogueFirstLoadSettled={catalogueFirstLoadSettled}
               />
             </ProtectedRoute>
           }

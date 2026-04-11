@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { INDUSTRY_PRESETS } from '../config/industryPresets';
 import { DEFAULT_FIELDS, FieldConfig } from '../config/fieldConfig';
-import { safeSetInStorage } from '../utils/safeStorage';
+import { safeSetInStorage, getStorageKey } from '../utils/safeStorage';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
@@ -140,9 +140,14 @@ export default function Welcome() {
         lastUpdated: Date.now(),
       };
 
-      // Save to localStorage
-      safeSetInStorage('fieldsDefinition', fieldsDefinition);
-      safeSetInStorage('hasCompletedOnboarding', true);
+      // Save to localStorage (keyed per account so new signups are not treated as onboarded)
+      if (user?.uid) {
+        safeSetInStorage(getStorageKey('fieldsDefinition', user.uid), fieldsDefinition);
+        safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
+      } else {
+        safeSetInStorage('fieldsDefinition', fieldsDefinition);
+        safeSetInStorage('hasCompletedOnboarding', true);
+      }
       safeSetInStorage('showTutorialOnInit', true);
 
       // Sync to Supabase if user is logged in

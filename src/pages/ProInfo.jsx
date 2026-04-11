@@ -5,7 +5,7 @@ import { Capacitor } from "@capacitor/core";
 import { BillingPlugin } from "capacitor-billing";
 import { useSubscription } from "../context/SubscriptionContext";
 import { getSupabaseAccessToken } from "../supabaseClient";
-import { SUBSCRIPTION_SKUS, INAPP_SKUS } from "../config/subscriptionSkus";
+import { SUBSCRIPTION_SKUS, SUBSCRIPTION_BASE_PLAN_IDS, INAPP_SKUS } from "../config/subscriptionSkus";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import {
   FREE_MAX_PRODUCTS,
@@ -57,7 +57,11 @@ useEffect(() => {
       // Subscriptions: monthly + yearly
       for (const sku of [SUBSCRIPTION_SKUS.monthly, SUBSCRIPTION_SKUS.yearly]) {
         try {
-          const result = await BillingPlugin.querySkuDetails({ product: sku, type: "SUBS" });
+          const result = await BillingPlugin.querySkuDetails({
+            product: sku,
+            type: "SUBS",
+            basePlanId: SUBSCRIPTION_BASE_PLAN_IDS[sku],
+          });
 console.error("querySkuDetails [subs] raw", sku, JSON.stringify(result));
 
 const parsed = Array.isArray(result) ? result[0] : result;
@@ -122,6 +126,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
     const result = await BillingPlugin.launchBillingFlow({
       product: cleanSku,
       type: "SUBS",
+      basePlanId: SUBSCRIPTION_BASE_PLAN_IDS[cleanSku],
     });
     console.error("launchBillingFlow [subs] raw", cleanSku, result?.value);
 

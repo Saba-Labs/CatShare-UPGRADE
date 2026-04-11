@@ -29,6 +29,8 @@ import {
 } from "./utils/productSourceImage";
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
+import Lottie from "lottie-react";
+import syncAnimationData from "./loading.json";
 
 const PRODUCT_SCROLL_KEY = "productScroll";
 
@@ -86,7 +88,7 @@ function applyVisibleOrderToProducts(products: any[], visibleBefore: any[], visi
   });
 }
 
-export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done' }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done' }) {
+export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done', catalogueFirstLoadSettled = true }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done'; /** After first load path finished (incl. strict cloud refresh); empty list may show intro */ catalogueFirstLoadSettled?: boolean }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { syncProductsToCloud, isStrictMode } = useSync();
@@ -1121,23 +1123,35 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
 
       <main ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}>
-        {tab === "products" && visible.length === 0 && startupPhase !== "done" && (
+        {tab === "products" &&
+          visible.length === 0 &&
+          (startupPhase !== "done" || !catalogueFirstLoadSettled) && (
           <div
             className="flex flex-col items-center justify-center py-16 px-6 text-center"
             role="status"
             aria-live="polite"
+            aria-busy="true"
             aria-label="Loading products"
           >
-            <div
-              className="h-9 w-9 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin mb-4"
-              aria-hidden
-            />
-            <p className="text-base font-medium text-gray-800">Loading products…</p>
-            <p className="text-sm text-gray-500 mt-2">Fetching your catalogue</p>
+            <div className="w-52 h-52" aria-hidden>
+              <Lottie
+                animationData={syncAnimationData}
+                loop
+                autoplay
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
+            <p className="text-gray-800 font-semibold text-lg mt-2 text-center px-4">
+              Loading products…
+            </p>
+            <p className="text-gray-500 text-sm mt-1 text-center px-4">Fetching your catalogue</p>
           </div>
         )}
 
-        {tab === "products" && visible.length === 0 && startupPhase === "done" && (
+        {tab === "products" &&
+          visible.length === 0 &&
+          startupPhase === "done" &&
+          catalogueFirstLoadSettled && (
           <EmptyStateIntro onCreateProduct={() => navigate("/create")} />
         )}
 

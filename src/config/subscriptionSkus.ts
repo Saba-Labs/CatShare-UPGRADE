@@ -3,6 +3,15 @@ export const SUBSCRIPTION_SKUS = {
   yearly: "catshare_pro_yearly",
 } as const;
 
+/** Google Play base plan IDs — must match Subscriptions → each product → base plan ID in Play Console */
+export const SUBSCRIPTION_BASE_PLAN_IDS: Record<
+  (typeof SUBSCRIPTION_SKUS)[keyof typeof SUBSCRIPTION_SKUS],
+  string
+> = {
+  [SUBSCRIPTION_SKUS.monthly]: "monthly",
+  [SUBSCRIPTION_SKUS.yearly]: "yearly-v2",
+};
+
 export const INAPP_SKUS = {
   lifetime: "catshare_pro_lifetime",
 } as const;

@@ -52,8 +52,8 @@ interface AuthContextType {
   error: string | null;
   supabaseData: SupabaseUserData | null;
   supabaseDataLoading: boolean;
-  /** Refetch cloud snapshot (e.g. after saving Account / business details). */
-  refreshSupabaseData: () => Promise<void>;
+  /** Refetch cloud snapshot (e.g. after saving Account / business details). Returns the fetched row or null. */
+  refreshSupabaseData: (opts?: { skipLoadingIndicator?: boolean }) => Promise<SupabaseUserData | null>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -76,32 +76,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseData, setSupabaseData] = useState<SupabaseUserData | null>(null);
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
-  const refreshSupabaseData = useCallback(async () => {
-    if (authService.isOfflineGuest()) return;
+  const refreshSupabaseData = useCallback(async (opts?: { skipLoadingIndicator?: boolean }): Promise<SupabaseUserData | null> => {
+    if (authService.isOfflineGuest()) return null;
 
-    setSupabaseDataLoading(true);
+    const skipIndicator = opts?.skipLoadingIndicator === true;
+    if (!skipIndicator) {
+      setSupabaseDataLoading(true);
+    }
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession();
       const uid = session?.user?.id;
-      if (!uid) return;
+      if (!uid) return null;
 
       const result = await fetchAllUserData(uid);
       const {
         data: { session: latest },
       } = await supabase.auth.getSession();
-      if (!latest?.user || latest.user.id !== uid) return;
+      if (!latest?.user || latest.user.id !== uid) return null;
 
       if (result.success && result.data) {
-        setSupabaseData(result.data as SupabaseUserData);
-      } else {
-        console.warn('⚠️ refreshSupabaseData failed:', result.error);
+        const data = result.data as SupabaseUserData;
+        setSupabaseData(data);
+        return data;
       }
+      console.warn('⚠️ refreshSupabaseData failed:', result.error);
+      return null;
     } catch (e) {
       console.warn('⚠️ refreshSupabaseData:', e instanceof Error ? e.message : String(e));
+      return null;
     } finally {
-      setSupabaseDataLoading(false);
+      if (!skipIndicator) {
+        setSupabaseDataLoading(false);
+      }
     }
   }, []);
 
