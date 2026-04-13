@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList, FiImage } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -33,6 +34,27 @@ import Lottie from "lottie-react";
 import syncAnimationData from "./loading.json";
 
 const PRODUCT_SCROLL_KEY = "productScroll";
+
+const fabDialSpring = { type: "spring" as const, stiffness: 460, damping: 26, mass: 0.85 };
+
+/** Products tab speed-dial: stagger by index (0 = nearer main FAB). */
+const fabDialItem = {
+  hidden: { opacity: 0, y: 24, scale: 0.84, rotate: -6 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    rotate: 0,
+    transition: { ...fabDialSpring, delay: i * 0.08 },
+  }),
+  leave: (i: number) => ({
+    opacity: 0,
+    y: 12,
+    scale: 0.9,
+    rotate: 4,
+    transition: { duration: 0.17, ease: [0.4, 0, 1, 1] as const, delay: (1 - i) * 0.052 },
+  }),
+};
 
 /** Read exact scroll: prefer main (the real list scroller); fallback to window if needed. */
 function readProductsListScrollY(scrollEl: HTMLElement | null): number {
@@ -199,6 +221,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [sortBy, setSortBy] = useState("");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Products tab: speed-dial open state (+ → single vs bulk create) */
+  const [productFabExpanded, setProductFabExpanded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewList, setPreviewList] = useState([]);
@@ -1152,7 +1176,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           visible.length === 0 &&
           startupPhase === "done" &&
           catalogueFirstLoadSettled && (
-          <EmptyStateIntro onCreateProduct={() => navigate("/create")} />
+          <EmptyStateIntro
+            onCreateProduct={() => navigate("/create")}
+            onBulkAddFromGallery={() => navigate("/create-bulk")}
+          />
         )}
 
         {tab === "products" && visible.length > 0 && (
@@ -1588,16 +1615,130 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       <MainAppBottomNav active={pathname === "/catalogues" ? "catalogues" : "products"} />
 
       {tab === "products" && (
-        <button
-          onClick={async () => {
-            await Haptics.impact({ style: ImpactStyle.Medium });
-            navigate("/create");
-          }}
-          className="fixed right-4 z-40 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:scale-105 transition"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)' }}
-        >
-          <FiPlus size={24} />
-        </button>
+        <>
+          {/* Sibling of FAB column so z-40 is not trapped under in-parent z-35 scrim */}
+          <AnimatePresence>
+            {productFabExpanded && (
+              <motion.div
+                key="fab-scrim"
+                role="presentation"
+                className="fixed inset-0 z-[35] cursor-default bg-slate-900/45 backdrop-blur-[2px]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                onClick={() => setProductFabExpanded(false)}
+              />
+            )}
+          </AnimatePresence>
+
+          <div
+            className="fixed right-4 z-40 flex flex-col items-end gap-3"
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)" }}
+          >
+          <AnimatePresence>
+            {productFabExpanded && (
+              <motion.div
+                key="fab-actions"
+                className="flex min-h-0 flex-col-reverse items-end gap-2.5"
+                initial={false}
+                aria-hidden={false}
+              >
+                <motion.button
+                  type="button"
+                  custom={0}
+                  variants={fabDialItem}
+                  initial="hidden"
+                  animate="visible"
+                  exit="leave"
+                  onClick={async () => {
+                    await Haptics.impact({ style: ImpactStyle.Medium });
+                    setProductFabExpanded(false);
+                    navigate("/create-bulk");
+                  }}
+                  className="group flex min-h-[52px] items-center gap-3 rounded-2xl py-2 pl-4 pr-2 text-left text-white shadow-xl shadow-indigo-500/35 ring-1 ring-white/15 transition-[box-shadow,filter] hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-indigo-500/40 hover:brightness-105 active:scale-[0.98] active:brightness-95 sm:pl-5"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #7c3aed 0%, #4f46e5 45%, #4338ca 100%)",
+                  }}
+                  title="Bulk add from gallery"
+                  aria-label="Bulk add from gallery"
+                >
+                  <div className="min-w-0 pr-1 text-right">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-white/70">
+                      Gallery
+                    </div>
+                    <div className="text-[15px] font-bold tracking-tight">Bulk import</div>
+                  </div>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 shadow-inner ring-1 ring-white/25 backdrop-blur-sm transition-transform group-hover:scale-105">
+                    <FiImage size={20} className="opacity-95" strokeWidth={2.25} />
+                  </span>
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  custom={1}
+                  variants={fabDialItem}
+                  initial="hidden"
+                  animate="visible"
+                  exit="leave"
+                  onClick={async () => {
+                    await Haptics.impact({ style: ImpactStyle.Medium });
+                    setProductFabExpanded(false);
+                    navigate("/create");
+                  }}
+                  className="group flex min-h-[52px] items-center gap-3 rounded-2xl py-2 pl-4 pr-2 text-left text-white shadow-xl shadow-sky-500/35 ring-1 ring-white/15 transition-[box-shadow,filter] hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-sky-500/40 hover:brightness-105 active:scale-[0.98] active:brightness-95 sm:pl-5"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #0ea5e9 0%, #2563eb 50%, #1d4ed8 100%)",
+                  }}
+                  title="Create one product"
+                  aria-label="Create one product"
+                >
+                  <div className="min-w-0 pr-1 text-right">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-white/70">
+                      New
+                    </div>
+                    <div className="text-[15px] font-bold tracking-tight">Single product</div>
+                  </div>
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 shadow-inner ring-1 ring-white/25 backdrop-blur-sm transition-transform group-hover:scale-105">
+                    <FiPlus size={22} className="opacity-95" strokeWidth={2.5} />
+                  </span>
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <motion.button
+            type="button"
+            onClick={async () => {
+              await Haptics.impact({ style: ImpactStyle.Light });
+              setProductFabExpanded((v) => !v);
+            }}
+            animate={{ rotate: productFabExpanded ? 45 : 0 }}
+            whileTap={{ scale: 0.92 }}
+            transition={{
+              rotate: { type: "spring", stiffness: 400, damping: 24 },
+            }}
+            className="relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-2xl shadow-blue-600/45 ring-2 ring-white/20 ring-offset-2 ring-offset-transparent hover:shadow-blue-500/55"
+            style={{
+              background: "linear-gradient(145deg, #38bdf8 0%, #2563eb 42%, #1e40af 100%)",
+            }}
+            aria-expanded={productFabExpanded}
+            aria-haspopup="menu"
+            aria-label={productFabExpanded ? "Close create options" : "Create product"}
+            title="Create"
+          >
+            <FiPlus size={26} strokeWidth={2.75} />
+            {productFabExpanded && (
+              <span
+                className="pointer-events-none absolute inset-0 rounded-full bg-white/10"
+                aria-hidden
+              />
+            )}
+          </motion.button>
+          </div>
+        </>
       )}
 
       <SideDrawer

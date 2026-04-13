@@ -38,6 +38,7 @@ import { useSubscription } from "../context/SubscriptionContext";
 import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
+import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -987,14 +988,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     if (commonFields.includes(name)) {
       setFormData((prev) => ({ ...prev, [name]: value }));
-      return;
-    }
-    if (name === 'orderQuantityStep') {
-      const digits = String(value).replace(/\D/g, '');
-      const n = parseInt(digits, 10);
-      updateCatalogueData({
-        orderQuantityStep: !digits || !Number.isFinite(n) || n < 1 ? 1 : Math.min(n, 999999),
-      });
       return;
     }
     updateCatalogueData({ [name]: value });
@@ -2049,12 +2042,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       Qty step
                     </label>
                     <div className="flex-1 min-w-0">
-                      <input
+                      <OrderQuantityStepInput
                         name="orderQuantityStep"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        value={String(getCatalogueFormData().orderQuantityStep ?? 1)}
-                        onChange={handleChange}
+                        value={getCatalogueFormData().orderQuantityStep ?? 1}
+                        onCommit={(n) => updateCatalogueData({ orderQuantityStep: n })}
                         className="border border-gray-300 dark:border-gray-700 p-2 w-full max-w-[120px] rounded text-xs bg-white dark:bg-gray-800"
                       />
                       <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">

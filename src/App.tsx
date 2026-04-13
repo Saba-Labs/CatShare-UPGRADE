@@ -32,6 +32,7 @@ import { supabase } from "./supabaseClient";
 
 const CatalogueApp = lazy(() => import("./CatalogueApp"));
 const CreateProduct = lazy(() => import("./CreateProduct"));
+const CreateBulk = lazy(() => import("./pages/CreateBulk"));
 const Shelf = lazy(() => import("./Shelf"));
 const Retail = lazy(() => import("./Retail"));
 const Settings = lazy(() => import("./Settings"));
@@ -1773,6 +1774,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <CreateProduct />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/create-bulk"
+          element={
+            <ProtectedRoute>
+              <CreateBulk />
             </ProtectedRoute>
           }
         />

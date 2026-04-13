@@ -8,6 +8,7 @@ export const ANALYTICS_EVENTS = {
   PRODUCT_EDITED: "product_edited",
   PRODUCT_DELETED: "product_deleted",
   BULK_EDIT: "bulk_edit",
+  BULK_IMPORT_IMAGES: "bulk_import_images",
 
   // Image Rendering
   RENDER_STARTED: "render_started",
@@ -98,6 +99,14 @@ export const logBulkEdit = (productCount?: number) => {
   logAnalyticsEvent(ANALYTICS_EVENTS.BULK_EDIT, {
     timestamp: Date.now(),
     ...(productCount && { product_count: productCount }),
+  });
+};
+
+export const logBulkImportImages = (count: number, framing?: string) => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.BULK_IMPORT_IMAGES, {
+    timestamp: Date.now(),
+    count,
+    ...(framing && { framing }),
   });
 };
 

@@ -5,6 +5,8 @@ import {
   persistAuthUserIdsForStorage,
   clearAuthUserIdsFromStorage,
   setSupabaseRlsUserId,
+  recoverSupabaseSession,
+  CATSHARE_AUTH_RESTORED_EVENT,
 } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
 import { authService } from '../services/authService';
@@ -202,38 +204,75 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return run;
     };
 
-    const initSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (cancelled) return;
+    const applySignedInSession = (sessionUser: SupabaseUser) => {
+      const appUser = mapSupabaseUserToApp(sessionUser);
+      setUser(appUser);
+      persistAuthUserIdsForStorage(sessionUser.id);
+      setSupabaseRlsUserId(sessionUser.id);
+    };
 
-        if (session?.user) {
-          const appUser = mapSupabaseUserToApp(session.user);
-          setUser(appUser);
-          persistAuthUserIdsForStorage(session.user.id);
-          setSupabaseRlsUserId(session.user.id);
-          // Unblock UI immediately; profile loads in background (startup still gates on supabaseDataLoading)
-          setLoading(false);
-          void loadUserData(session.user.id);
-        } else {
-          setUser(null);
-          clearAuthUserIdsFromStorage();
-          setSupabaseRlsUserId(null);
-          setSupabaseData(null);
-          setLoading(false);
-        }
-      } catch (err) {
+    const clearSignedOutState = () => {
+      setUser(null);
+      clearAuthUserIdsFromStorage();
+      setSupabaseRlsUserId(null);
+      setSupabaseData(null);
+      setSupabaseDataLoading(false);
+      inFlightProfileByUid.current.clear();
+      activeProfileLoadsRef.current = 0;
+    };
+
+    const initSession = async () => {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      for (let attempt = 0; attempt < 3; attempt++) {
         if (cancelled) return;
-        console.warn('⚠️ initSession failed:', err instanceof Error ? err.message : String(err));
-        setUser(null);
-        clearAuthUserIdsFromStorage();
-        setSupabaseRlsUserId(null);
-        setSupabaseData(null);
-        setLoading(false);
+        if (attempt > 0) await sleep(120 * attempt);
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (session?.user) {
+            applySignedInSession(session.user);
+            setLoading(false);
+            void loadUserData(session.user.id);
+            return;
+          }
+        } catch (err) {
+          console.warn('⚠️ initSession attempt failed:', err instanceof Error ? err.message : String(err));
+        }
       }
+
+      if (cancelled) return;
+      const recovered = await recoverSupabaseSession();
+      if (cancelled) return;
+      if (recovered?.user) {
+        applySignedInSession(recovered.user);
+        setLoading(false);
+        void loadUserData(recovered.user.id);
+        return;
+      }
+
+      clearSignedOutState();
+      setLoading(false);
     };
 
     void initSession();
+
+    const syncAfterLocalAuthRestore = () => {
+      void (async () => {
+        if (authService.isOfflineGuest() || cancelled) return;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user) {
+          applySignedInSession(session.user);
+          void loadUserData(session.user.id);
+        }
+      })();
+    };
+
+    window.addEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (authService.isOfflineGuest()) return;
@@ -249,13 +288,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           void loadUserData(session.user.id);
         }
       } else {
-        setUser(null);
-        clearAuthUserIdsFromStorage();
-        setSupabaseRlsUserId(null);
-        setSupabaseData(null);
-        setSupabaseDataLoading(false);
-        inFlightProfileByUid.current.clear();
-        activeProfileLoadsRef.current = 0;
+        const recovered = await recoverSupabaseSession();
+        if (recovered?.user) {
+          const appUser = mapSupabaseUserToApp(recovered.user);
+          setUser(appUser);
+          persistAuthUserIdsForStorage(recovered.user.id);
+          setSupabaseRlsUserId(recovered.user.id);
+          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+            void loadUserData(recovered.user.id);
+          }
+          return;
+        }
+        clearSignedOutState();
       }
     });
 
@@ -263,6 +307,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       cancelled = true;
       sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
+      window.removeEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
     };
   }, []);
 

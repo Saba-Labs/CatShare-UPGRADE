@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiPlus, FiChevronDown } from 'react-icons/fi';
+import { FiPlus, FiChevronDown, FiImage } from 'react-icons/fi';
 import {
   RiShoppingBag3Line,
   RiImageAddLine,
@@ -13,9 +13,10 @@ import {
 
 interface EmptyStateIntroProps {
   onCreateProduct: () => void;
+  onBulkAddFromGallery?: () => void;
 }
 
-export default function EmptyStateIntro({ onCreateProduct }: EmptyStateIntroProps) {
+export default function EmptyStateIntro({ onCreateProduct, onBulkAddFromGallery }: EmptyStateIntroProps) {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const toggleSection = (section: string) => {
@@ -246,6 +247,7 @@ export default function EmptyStateIntro({ onCreateProduct }: EmptyStateIntroProp
             'Mark stock IN or OUT per catalogue',
             'Drag to reorder products',
             'Bulk edit items at once',
+            'Add many products from gallery photos',
             'Render product images automatically',
             'ZIP backup & restore',
             'Organize with categories',
@@ -266,13 +268,25 @@ export default function EmptyStateIntro({ onCreateProduct }: EmptyStateIntroProp
         <p className="mb-4 text-xs text-gray-300">
           Create your first product in just a few seconds
         </p>
-        <button
-          onClick={onCreateProduct}
-          className="inline-flex items-center gap-2 bg-gray-300 text-gray-700 font-semibold px-6 py-2 rounded-full hover:bg-gray-200 transition-colors shadow hover:shadow-md text-sm"
-        >
-          <FiPlus size={18} />
-          Create Your First Product
-        </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={onCreateProduct}
+            className="inline-flex items-center gap-2 bg-gray-300 text-gray-700 font-semibold px-6 py-2 rounded-full hover:bg-gray-200 transition-colors shadow hover:shadow-md text-sm"
+          >
+            <FiPlus size={18} />
+            Create Your First Product
+          </button>
+          {onBulkAddFromGallery && (
+            <button
+              type="button"
+              onClick={onBulkAddFromGallery}
+              className="inline-flex items-center gap-2 bg-indigo-500/90 text-white font-semibold px-6 py-2 rounded-full hover:bg-indigo-400 transition-colors shadow hover:shadow-md text-sm"
+            >
+              <FiImage size={18} />
+              Bulk add from gallery
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tips */}

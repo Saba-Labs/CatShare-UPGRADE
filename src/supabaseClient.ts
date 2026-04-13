@@ -2,7 +2,10 @@
  * Single Supabase browser client. Session JWT is sent automatically on requests
  * so RLS policies using auth.uid() work when user_id matches auth.users(id).
  */
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, type Session } from '@supabase/supabase-js';
+
+/** Dispatched after backup restore re-applies Supabase auth keys so AuthContext can re-sync. */
+export const CATSHARE_AUTH_RESTORED_EVENT = 'catshare:supabase-auth-restored';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -130,6 +133,35 @@ export async function refreshSupabaseSessionFromStorage(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Re-resolve session after transient null (storage race, backup restore, token refresh timing).
+ * If tokens are revoked or the user signed out, returns null.
+ */
+export async function recoverSupabaseSession(): Promise<Session | null> {
+  const tryOnce = async (): Promise<Session | null> => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) return session;
+    } catch {
+      /* ignore */
+    }
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (!error && data.session?.user) return data.session;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  };
+
+  const first = await tryOnce();
+  if (first) return first;
+  await new Promise((r) => setTimeout(r, 120));
+  return tryOnce();
 }
 
 /** @deprecated Use persistAuthUserIdsForStorage — kept for any stray imports */

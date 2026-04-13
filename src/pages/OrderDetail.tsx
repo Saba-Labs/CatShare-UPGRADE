@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
@@ -11,7 +11,13 @@ import { OpenInvoicePdf } from '../plugins/openInvoicePdf';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
-import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import {
+  getCatalogueData,
+  isProductEnabledForCatalogue,
+  normalizeOrderQuantityStep,
+  type ProductWithCatalogueData,
+} from '../config/catalogueProductUtils';
+import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
@@ -200,6 +206,87 @@ function normalizeOrderFromApi(o: Order): Order {
   return {
     ...o,
     items: (o.items || []).map((it) => normalizeOrderItemFromApi(it)),
+  };
+}
+
+/**
+ * Orders do not store catalogue_id. Infer the catalogue from line items: every line
+ * must reference a product enabled in that catalogue; tie-break with price match.
+ */
+function resolveOrderCatalogueId(
+  orderItems: OrderItem[],
+  products: ProductWithCatalogueData[],
+  catalogues: Catalogue[]
+): string | null {
+  const ids = orderItems.map((it) => it.productId).filter(Boolean) as string[];
+  if (ids.length === 0) return null;
+  const productById = new Map<string, ProductWithCatalogueData>();
+  for (const p of products) {
+    if (p?.id != null) productById.set(String(p.id), p);
+  }
+  const candidates: string[] = [];
+  for (const cat of catalogues) {
+    let ok = true;
+    for (const pid of ids) {
+      const p = productById.get(String(pid));
+      if (!p || !isProductEnabledForCatalogue(p, cat.id)) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) candidates.push(cat.id);
+  }
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  let best = candidates[0];
+  let bestScore = Infinity;
+  for (const catId of candidates) {
+    const cat = catalogues.find((c) => c.id === catId);
+    if (!cat) continue;
+    let score = 0;
+    for (const it of orderItems) {
+      if (!it.productId) continue;
+      const p = productById.get(String(it.productId));
+      if (!p) continue;
+      const catData = getCatalogueData(p, catId);
+      const expected = parseFloat(String(catData[cat.priceField] ?? '0')) || 0;
+      score += Math.abs(expected - (it.unitPrice || 0));
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      best = catId;
+    }
+  }
+  return best;
+}
+
+function buildOrderItemFromProduct(product: ProductWithCatalogueData, catalogue: Catalogue): OrderItem {
+  const catData = getCatalogueData(product, catalogue.id);
+  const unitPrice = parseFloat(String(catData[catalogue.priceField] ?? '0')) || 0;
+  const priceUnit = catData[catalogue.priceUnitField];
+  const quantityStep = normalizeOrderQuantityStep(
+    (catData as { orderQuantityStep?: unknown }).orderQuantityStep
+  );
+  const qty = quantityStep;
+  const rawImg = product.imageUrl ?? (product as { image?: string }).image;
+  const imageUrl = typeof rawImg === 'string' && rawImg.trim() ? rawImg.trim() : undefined;
+  const imageVersion =
+    typeof product.imageVersion === 'number' && Number.isFinite(product.imageVersion)
+      ? product.imageVersion
+      : undefined;
+  return {
+    productId: String(product.id),
+    name: product.name || 'Product',
+    quantity: qty,
+    unitPrice,
+    rowTotal: unitPrice * qty,
+    category: Array.isArray(product.category) ? product.category[0] : undefined,
+    subtitle: typeof product.subtitle === 'string' ? product.subtitle : undefined,
+    imageUrl,
+    imageVersion,
+    priceUnit,
+    quantityStep,
   };
 }
 
@@ -1009,9 +1096,8 @@ function QtyStepper({ value, step, onChange }: { value: number; step: number; on
             onChange(0);
           } else {
             const num = parseInt(digits, 10);
-            // Round to nearest valid step value
-            const rounded = Math.max(0, Math.round(num / normalizedStep) * normalizedStep);
-            onChange(rounded);
+            // Manual typing should allow exact override (not forced to quantity step)
+            onChange(Math.max(0, num));
           }
         }}
         aria-label="Quantity"
@@ -1097,6 +1183,8 @@ export default function OrderDetail() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareImageLoading, setShareImageLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [addItemsOpen, setAddItemsOpen] = useState(false);
+  const [addItemsSearch, setAddItemsSearch] = useState('');
   const isSwipeProcessingRef = useRef(false);
   const pdfProcessingRef = useRef(false);
   const shareImageProcessingRef = useRef(false);
@@ -1123,6 +1211,71 @@ useEffect(() => {
   window.addEventListener('popstate', onPopState);
   return () => window.removeEventListener('popstate', onPopState);
 }, []);
+
+  const localProducts = useMemo(() => {
+    const cloud = supabaseData?.products;
+    if (Array.isArray(cloud) && cloud.length > 0) return cloud as ProductWithCatalogueData[];
+    if (!user?.uid) return [] as ProductWithCatalogueData[];
+    return safeGetFromStorage(getStorageKey('products', user.uid), []) as ProductWithCatalogueData[];
+  }, [supabaseData?.products, user?.uid]);
+
+  const orderCatalogueId = useMemo(
+    () =>
+      order
+        ? resolveOrderCatalogueId(
+            (order.items || []) as OrderItem[],
+            localProducts,
+            getAllCatalogues(user?.uid)
+          )
+        : null,
+    [order, localProducts, user?.uid]
+  );
+
+  const orderCatalogueConfig = useMemo(
+    () =>
+      orderCatalogueId && user?.uid
+        ? getAllCatalogues(user.uid).find((c) => c.id === orderCatalogueId) || null
+        : null,
+    [orderCatalogueId, user?.uid]
+  );
+
+  const addableCatalogueProducts = useMemo(() => {
+    if (!orderCatalogueId || !orderCatalogueConfig || !localProducts.length) return [];
+    const inOrder = new Set(editItems.map((it) => it.productId).filter(Boolean).map(String));
+    const q = addItemsSearch.trim().toLowerCase();
+    return localProducts.filter((p) => {
+      if (!isProductEnabledForCatalogue(p, orderCatalogueId)) return false;
+      if (inOrder.has(String(p.id))) return false;
+      if (q) {
+        const name = (p.name || '').toLowerCase();
+        if (!name.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [orderCatalogueId, orderCatalogueConfig, localProducts, editItems, addItemsSearch]);
+
+  useEffect(() => {
+    if (!editMode) {
+      setAddItemsOpen(false);
+      setAddItemsSearch('');
+    }
+  }, [editMode]);
+
+  const handleAddProductFromCatalogue = useCallback(
+    (product: ProductWithCatalogueData) => {
+      if (!orderCatalogueConfig) return;
+      const line = buildOrderItemFromProduct(product, orderCatalogueConfig);
+      setEditItems((prev) => [
+        ...prev,
+        {
+          ...line,
+          _key: `k-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        },
+      ]);
+      void safeHapticsLight();
+    },
+    [orderCatalogueConfig]
+  );
 
   const swipeHandlers = useSwipeable({
     onSwipedRight: async () => {
@@ -1202,12 +1355,21 @@ useEffect(() => {
     }
   };
 
+  const handleEnterEditMode = useCallback(() => {
+    if (!order) return;
+    setEditName(order.customer_name || '');
+    setEditPhone((order as any).customer_whatsapp || '');
+    setEditItems((order.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
+    setEditModeSync(true);
+  }, [order]);
+
   const handleSaveEdit = async () => {
     if (!order) return;
     setSaveLoading(true);
     try {
-      const total = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
-      const itemsToSave = editItems.map(({ _key, ...item }) => ({
+      const persistedEditItems = editItems.filter((it) => it.quantity > 0);
+      const total = persistedEditItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
+      const itemsToSave = persistedEditItems.map(({ _key, ...item }) => ({
         ...item,
         rowTotal: (item.unitPrice || 0) * item.quantity,
       })) as any[];
@@ -1215,7 +1377,7 @@ useEffect(() => {
         items: itemsToSave as any,
         customer_name: editName,
         customer_whatsapp: editPhone,
-        total_amount: total > 0 ? total : order.total_amount,
+        total_amount: total,
       });
 
       if (error) {
@@ -1224,16 +1386,17 @@ useEffect(() => {
         return;
       }
 
-      const updatedItems = editItems.map(item => ({
+      const updatedItems = persistedEditItems.map(item => ({
         ...item,
         rowTotal: (item.unitPrice || 0) * item.quantity,
       }));
+      setEditItems(updatedItems.map((it, i) => ({ ...it, _key: String(i) })));
       setOrder({
         ...order,
         items: updatedItems,
         customer_name: editName,
         customer_whatsapp: editPhone,
-        total_amount: total > 0 ? total : order.total_amount,
+        total_amount: total,
       } as any);
       setEditModeSync(false);
       showToast('Order saved', 'success');
@@ -1789,7 +1952,16 @@ useEffect(() => {
                   {editItems.map((it, i) => (
                     <div key={it._key}>
                       {i > 0 && <Divider />}
-                      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '12px 0',
+                          gap: 12,
+                          opacity: it.quantity === 0 ? 0.45 : 1,
+                          transition: 'opacity 0.2s ease',
+                        }}
+                      >
                         <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} imageVersion={it.imageVersion} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
@@ -1797,13 +1969,15 @@ useEffect(() => {
                             <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
                           ) : null}
                         </div>
-                        <QtyStepper value={it.quantity} step={it.quantityStep ?? 1} onChange={qty => {
-                          if (qty === 0) {
-                            setEditItems(prev => prev.filter(x => x._key !== it._key));
-                          } else {
-                            setEditItems(prev => prev.map(x => x._key === it._key ? { ...x, quantity: qty } : x));
-                          }
-                        }} />
+                        <QtyStepper
+                          value={it.quantity}
+                          step={it.quantityStep ?? 1}
+                          onChange={(qty) => {
+                            setEditItems((prev) =>
+                              prev.map((x) => (x._key === it._key ? { ...x, quantity: qty } : x))
+                            );
+                          }}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1813,6 +1987,166 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
+                {orderCatalogueConfig && orderCatalogueId ? (
+                  <div
+                    style={{
+                      borderTop: `1px solid ${COLORS.border}`,
+                      padding: '12px 16px 16px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void safeHapticsLight();
+                        setAddItemsOpen((o) => !o);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: 12,
+                        border: '1px dashed rgba(0, 0, 0, 0.1)',
+                        background: addItemsOpen ? 'rgba(10, 132, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        color: COLORS.muted,
+                        fontFamily: FONT,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ color: addItemsOpen ? COLORS.blue : COLORS.subtle, display: 'flex' }}>
+                        <Ic.Plus />
+                      </span>
+                      Add items
+                      {orderCatalogueConfig.label ? (
+                        <span style={{ fontWeight: 500, color: COLORS.muted, fontSize: 13 }}>
+                          ({orderCatalogueConfig.label})
+                        </span>
+                      ) : null}
+                    </button>
+                    {addItemsOpen && (
+                      <div style={{ marginTop: 12 }}>
+                        <input
+                          type="search"
+                          value={addItemsSearch}
+                          onChange={(e) => setAddItemsSearch(e.target.value)}
+                          placeholder="Search products…"
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            border: `1.5px solid ${COLORS.border}`,
+                            fontSize: 14,
+                            background: '#FAFAFA',
+                            fontFamily: FONT,
+                            marginBottom: 10,
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                        <div
+                          style={{
+                            maxHeight: 280,
+                            overflowY: 'auto',
+                            borderRadius: 10,
+                            border: `1px solid ${COLORS.border}`,
+                            background: COLORS.surface,
+                          }}
+                        >
+                          {addableCatalogueProducts.length === 0 ? (
+                            <div
+                              style={{
+                                padding: '16px 12px',
+                                textAlign: 'center',
+                                color: COLORS.subtle,
+                                fontSize: 13,
+                              }}
+                            >
+                              {addItemsSearch.trim()
+                                ? 'No matching products'
+                                : 'All catalogue products are already in this order'}
+                            </div>
+                          ) : (
+                            addableCatalogueProducts.map((p) => {
+                              const catData = getCatalogueData(p, orderCatalogueId);
+                              const unit =
+                                parseFloat(String(catData[orderCatalogueConfig.priceField] ?? '0')) || 0;
+                              const thumbUrl =
+                                (typeof p.imageUrl === 'string' && p.imageUrl.trim()) ||
+                                (typeof (p as { image?: string }).image === 'string'
+                                  ? (p as { image: string }).image.trim()
+                                  : undefined);
+                              return (
+                                <button
+                                  key={String(p.id)}
+                                  type="button"
+                                  onClick={() => handleAddProductFromCatalogue(p)}
+                                  style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '10px 12px',
+                                    border: 'none',
+                                    borderBottom: `1px solid ${COLORS.border}`,
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    fontFamily: FONT,
+                                  }}
+                                >
+                                  <ProductThumb
+                                    url={thumbUrl}
+                                    name={p.name || ''}
+                                    imageVersion={p.imageVersion}
+                                  />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: COLORS.text,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {p.name}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: COLORS.muted }}>
+                                      {symbol}
+                                      {unit}{' '}
+                                      / {getOrderUnitLabel(catData[orderCatalogueConfig.priceUnitField])}
+                                    </div>
+                                  </div>
+                                  <span
+                                    style={{
+                                      flexShrink: 0,
+                                      padding: '6px 12px',
+                                      borderRadius: 10,
+                                      border: '1px dashed rgba(0, 0, 0, 0.1)',
+                                      background: 'rgba(255, 255, 255, 0.85)',
+                                      boxShadow: '0 1px 0 rgba(0, 0, 0, 0.04)',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      color: COLORS.muted,
+                                      letterSpacing: '0.02em',
+                                    }}
+                                  >
+                                    Add
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </Card>
             </>
           ) : (
@@ -2024,7 +2358,7 @@ useEffect(() => {
                 </div>
 
                 <button
-                  onClick={() => setEditModeSync(true)}
+                  onClick={handleEnterEditMode}
                   style={{
                     width: '100%', padding: '14px', borderRadius: 14,
                     border: `1.5px solid ${COLORS.border}`, background: COLORS.surface,

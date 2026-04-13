@@ -32,6 +32,7 @@ import {
   snapshotSupabaseAuthFromLocalStorage,
   restoreSupabaseAuthToLocalStorage,
   refreshSupabaseSessionFromStorage,
+  CATSHARE_AUTH_RESTORED_EVENT,
 } from "./supabaseClient";
 import { useSync } from "./context/SyncContext";
 
@@ -55,6 +56,13 @@ export default function SideDrawer({
   const [showCategories, setShowCategories] = useState(false);
    const [showMediaLibrary, setShowMediaLibrary] = useState(false);
    const [showBulkEdit, setShowBulkEdit] = useState(false);
+const [bulkEditLaunchOptions, setBulkEditLaunchOptions] = useState({
+  catalogueId: null,
+  autoSelectAllFields: false,
+  autoStartEdit: false,
+  scrollToProductIds: [],
+  showOnlyProductIds: false,
+});
 const [showRenderConfirm, setShowRenderConfirm] = useState(false);
 const [clickCountN, setClickCountN] = useState(0);
 const [showHiddenFeatures, setShowHiddenFeatures] = useState(false);
@@ -125,6 +133,17 @@ const navigate = useNavigate();
     }
   }, [showBackupPopup]);
 
+  const openBulkEdit = (opts = {}) => {
+    setBulkEditLaunchOptions({
+      catalogueId: opts.catalogueId || null,
+      autoSelectAllFields: !!opts.autoSelectAllFields,
+      autoStartEdit: !!opts.autoStartEdit,
+      scrollToProductIds: Array.isArray(opts.scrollToProductIds) ? opts.scrollToProductIds : [],
+      showOnlyProductIds: !!opts.showOnlyProductIds,
+    });
+    setShowBulkEdit(true);
+  };
+
   // Expose all modal states globally for back button handlers
   useEffect(() => {
     window.__sideDrawerState = {
@@ -137,6 +156,7 @@ const navigate = useNavigate();
       setShowRenderAfterRestore,
       setShowCategories,
       setShowBulkEdit,
+      openBulkEdit,
       setShowMediaLibrary,
     };
   }, [showBackupPopup, showRenderAfterRestore, showCategories, showBulkEdit, showMediaLibrary]);
@@ -998,7 +1018,8 @@ const exportProductsToCSV = (products) => {
         }
       });
       restoreSupabaseAuthToLocalStorage(supabaseAuthSnapshotBrowse);
-      void refreshSupabaseSessionFromStorage();
+      await refreshSupabaseSessionFromStorage();
+      window.dispatchEvent(new CustomEvent(CATSHARE_AUTH_RESTORED_EVENT));
       console.log("✅ Preserved settings restored with auto-detected fields");
 
       // Log currency and price units restoration
@@ -1470,7 +1491,8 @@ const restoreFromDetectedBackup = async (backupFile) => {
           }
         });
         restoreSupabaseAuthToLocalStorage(supabaseAuthSnapshotZip);
-        void refreshSupabaseSessionFromStorage();
+        await refreshSupabaseSessionFromStorage();
+        window.dispatchEvent(new CustomEvent(CATSHARE_AUTH_RESTORED_EVENT));
 
         const cleanedProducts = rebuilt.map(p => {
           const clean = { ...p };
@@ -1823,7 +1845,7 @@ setShowBrowseForBackup(false);
 )}
 
 <button
-  onClick={() => setShowBulkEdit(true)}
+  onClick={() => openBulkEdit()}
   className="w-full flex items-center gap-3 px-5 py-3 mb-3 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition shadow-sm"
 >
   <RiEdit2Line className="text-gray-500 text-[18px]" />
@@ -2266,8 +2288,22 @@ setShowBrowseForBackup(false);
           allProducts={allProductsCached}
           imageMap={imageMap}
           setProducts={setProducts}
-          onClose={() => setShowBulkEdit(false)}
+          onClose={() => {
+            setShowBulkEdit(false);
+            setBulkEditLaunchOptions({
+              catalogueId: null,
+              autoSelectAllFields: false,
+              autoStartEdit: false,
+              scrollToProductIds: [],
+              showOnlyProductIds: false,
+            });
+          }}
           triggerRender={handleRenderAllImages}
+          catalogueId={bulkEditLaunchOptions.catalogueId || undefined}
+          autoSelectAllFields={bulkEditLaunchOptions.autoSelectAllFields}
+          autoStartEdit={bulkEditLaunchOptions.autoStartEdit}
+          scrollToProductIds={bulkEditLaunchOptions.scrollToProductIds}
+          showOnlyProductIds={bulkEditLaunchOptions.showOnlyProductIds}
         />
       )}
 
@@ -2374,19 +2410,20 @@ function CategoryModal({ onClose }) {
 
   return (
     <div
-  className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-  onClick={onClose} // close when clicking outside
->
-  <div
-    className="bg-white w-full max-w-md p-5 rounded-xl shadow-lg relative animate-fadeIn"
-    onClick={(e) => e.stopPropagation()} // prevent close when clicking inside
-  >
-
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-md p-5 rounded-xl shadow-lg relative animate-fadeIn"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h3 className="text-xl font-bold mb-4 text-center">Manage Categories</h3>
 
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-2 right-4 text-2xl text-gray-500 hover:text-red-500"
+          aria-label="Close"
         >
           &times;
         </button>
@@ -2396,12 +2433,14 @@ function CategoryModal({ onClose }) {
           <input
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()}
             placeholder="New category"
             className="flex-1 border px-3 py-2 rounded text-sm"
           />
           <button
+            type="button"
             onClick={add}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-red-600"
+            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
           >
             Add
           </button>
@@ -2427,10 +2466,10 @@ function CategoryModal({ onClose }) {
                           {...provided.draggableProps}
                           className="flex items-center justify-between bg-gray-100 p-2 rounded text-sm shadow"
                         >
-                          <div className="flex items-center gap-2 flex-grow">
+                          <div className="flex items-center gap-2 flex-grow min-w-0">
                             <span
                               {...provided.dragHandleProps}
-                              className="cursor-move text-gray-500"
+                              className="cursor-move text-gray-500 shrink-0"
                               title="Drag"
                             >
                               ☰
@@ -2439,23 +2478,25 @@ function CategoryModal({ onClose }) {
                               <input
                                 value={editText}
                                 onChange={(e) => setEditText(e.target.value)}
-                                className="flex-1 border px-2 py-1 rounded"
+                                className="flex-1 min-w-0 border px-2 py-1 rounded"
                               />
                             ) : (
-                              <span className="flex-1">{cat}</span>
+                              <span className="flex-1 min-w-0 truncate">{cat}</span>
                             )}
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 shrink-0">
                             {editIndex === i ? (
                               <>
                                 <button
+                                  type="button"
                                   onClick={update}
                                   className="text-blue-600 hover:underline"
                                 >
                                   Save
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => setEditIndex(null)}
                                   className="text-gray-500 hover:underline"
                                 >
@@ -2465,6 +2506,7 @@ function CategoryModal({ onClose }) {
                             ) : (
                               <>
                                 <button
+                                  type="button"
                                   onClick={() => {
                                     setEditIndex(i);
                                     setEditText(cat);
@@ -2474,6 +2516,7 @@ function CategoryModal({ onClose }) {
                                   Edit
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => remove(i)}
                                   className="text-red-600 hover:underline"
                                 >
