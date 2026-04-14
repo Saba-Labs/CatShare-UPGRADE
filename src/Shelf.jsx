@@ -54,7 +54,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
     if (isStrictMode() && user?.uid) {
       try {
-        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, { onlyProductIds: [product.id] });
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
         console.log(`✅ Product ${product.id} restored and synced to cloud`);
