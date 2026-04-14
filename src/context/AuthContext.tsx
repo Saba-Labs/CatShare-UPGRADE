@@ -78,6 +78,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseData, setSupabaseData] = useState<SupabaseUserData | null>(null);
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
+  const intentionalLogoutRef = useRef(false);
+
   const refreshSupabaseData = useCallback(async (opts?: { skipLoadingIndicator?: boolean }): Promise<SupabaseUserData | null> => {
     if (authService.isOfflineGuest()) return null;
 
@@ -288,6 +290,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           void loadUserData(session.user.id);
         }
       } else {
+        // If logout was intentional, don't try to recover — clear immediately
+        if (intentionalLogoutRef.current) {
+          clearSignedOutState();
+          return;
+        }
+
         const recovered = await recoverSupabaseSession();
         if (recovered?.user) {
           const appUser = mapSupabaseUserToApp(recovered.user);
@@ -314,6 +322,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = async () => {
     try {
       setError(null);
+      intentionalLogoutRef.current = true;
 
       if (authService.isOfflineGuest()) {
         authService.logoutOfflineGuest();
@@ -334,6 +343,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
       throw err;
+    } finally {
+      intentionalLogoutRef.current = false;
     }
   };
 
