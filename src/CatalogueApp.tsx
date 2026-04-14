@@ -1332,14 +1332,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       setProducts(freshProducts);
                       setDeletedProducts(freshDeleted);
 
+                      // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
                       window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-
-                      if (isStrictMode() && user?.uid) {
-                        syncProductsToCloud(freshProducts, freshDeleted, { onlyProductIds: [productToShelf.id] }).then(cloudData => {
-                          setProducts(cloudData.products);
-                          setDeletedProducts(cloudData.deletedProducts);
-                        }).catch(err => console.error('Strict sync failed:', err));
-                      }
 
                       // If currently previewing this item, move to next
                       if (previewProduct && previewProduct.id === productToShelf.id) {
@@ -1379,14 +1373,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     setPreviewProduct(null);
                     setPreviewList([]);
 
+                    // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
                     window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-
-                    if (isStrictMode() && user?.uid) {
-                      syncProductsToCloud([], freshDeleted).then(cloudData => {
-                        setProducts(cloudData.products);
-                        setDeletedProducts(cloudData.deletedProducts);
-                      }).catch(err => console.error('Strict sync failed:', err));
-                    }
 
                     setShowShelfConfirm(false);
                     setShelfTarget(null);
@@ -1583,14 +1571,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               setProducts(freshProducts);
               setDeletedProducts(freshDeleted);
 
+              // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
               window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-
-              if (isStrictMode() && user?.uid) {
-                syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
-                  setProducts(cloudData.products);
-                  setDeletedProducts(cloudData.deletedProducts);
-                }).catch(err => console.error('Strict sync failed:', err));
-              }
 
               // Move to next item in preview
               const idx = previewList.findIndex(p => p.id === productToShelf.id);
