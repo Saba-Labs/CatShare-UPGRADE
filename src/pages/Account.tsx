@@ -212,10 +212,9 @@ export default function Account() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
       console.warn('Logout error:', err);
-      // Still navigate away as session is invalid
-    } finally {
-      navigate('/login', { replace: true });
+      // Don't show error toast - user will be redirected by ProtectedRoute anyway
     }
+    // Don't reset isLoading - let ProtectedRoute redirect immediately
   };
 
   const busy = isLoading || businessSaving || logoUploading;
