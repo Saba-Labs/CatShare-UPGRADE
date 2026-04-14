@@ -208,12 +208,11 @@ export default function Account() {
     try {
       await logout();
       showToast('Logged out successfully', 'success');
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
       showToast(errorMessage, 'error');
-    } finally {
       setIsLoading(false);
     }
   };
