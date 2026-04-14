@@ -206,10 +206,10 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
               <div
                 key={p.id}
                 onClick={() => setPreviewProduct(p)}
-                className="flex justify-between items-center border p-3 rounded bg-gray-100 cursor-pointer"
+                className="flex justify-between items-center gap-3 border p-3 rounded bg-gray-100 cursor-pointer min-h-[60px]"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded overflow-hidden border bg-white flex items-center justify-center">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-12 h-12 shrink-0 rounded overflow-hidden border bg-white flex items-center justify-center">
                     {imageMap[p.id] ? (
                       <img
                         src={imageMap[p.id]}
@@ -232,7 +232,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
                     <div className="text-xs text-gray-500 truncate">{p.field1 || p.color}</div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
