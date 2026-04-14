@@ -962,24 +962,46 @@ function AppWithBackHandler() {
   // stock toggled, or other mutations that need syncing
   // ──────────────────────────────────────────────────────
   useEffect(() => {
-    const handleSyncToSupabase = async () => {
-      if (!user?.uid) return;
+    const handleSyncToSupabase = async (e: any) => {
+      console.log('📤 sync-to-supabase event fired', {
+        userId: user?.uid,
+        detail: e.detail,
+        strict: isStrictMode()
+      });
+
+      if (!user?.uid) {
+        console.warn('⚠️ sync-to-supabase: no user ID');
+        return;
+      }
+
       try {
-        const uid = user.uid;
-        const freshProducts = safeGetFromStorage(getProductsKey(uid), []);
-        const freshDeleted = safeGetFromStorage(getDeletedProductsKey(uid), []);
+        // Use data from event detail (passed from CatalogueApp) or fall back to localStorage
+        const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
+        const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
+
+        console.log('📝 sync-to-supabase: processing', {
+          productsCount: freshProducts.length,
+          deletedCount: freshDeleted.length,
+          strict: isStrictMode()
+        });
 
         if (isStrictMode()) {
           // In strict mode, sync immediately to cloud
+          console.log('🔄 sync-to-supabase: calling syncProductsToCloud (strict mode)');
           const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+          console.log('✅ sync-to-supabase: syncProductsToCloud completed', {
+            productsCount: cloudData.products.length,
+            deletedCount: cloudData.deletedProducts.length
+          });
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         } else {
           // In non-strict mode, just ensure local state is updated
+          console.log('🔄 sync-to-supabase: updating local state + background sync (non-strict mode)');
           setProducts(freshProducts);
           setDeletedProducts(freshDeleted);
           // Background sync will happen via refreshFromCloud
-          refreshFromCloud().catch(err => console.warn('Background sync failed:', err));
+          refreshFromCloud().catch(err => console.warn('⚠️ Background sync failed:', err));
         }
       } catch (e) {
         console.error('❌ sync-to-supabase failed:', e);

@@ -1318,6 +1318,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-800 transition"
                   onClick={async () => {
                     if (shelfTarget) {
+                      console.log('🗑️ Shelf button clicked for product:', shelfTarget.id);
                       await Haptics.impact({ style: ImpactStyle.Heavy });
                       // ✅ CRITICAL: Get the complete product object from the products array, not from stale shelfTarget
                       // This ensures all product data (including catalogueData, fields, etc.) is preserved
@@ -1329,11 +1330,19 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
                       const freshProducts = products.filter((x) => x.id !== productToShelf.id);
                       const freshDeleted = [productToShelf, ...deletedProducts];
+                      console.log('📦 Shelf state updated:', {
+                        productName: productToShelf.name,
+                        productsCount: freshProducts.length,
+                        deletedCount: freshDeleted.length
+                      });
                       setProducts(freshProducts);
                       setDeletedProducts(freshDeleted);
 
-                      // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
-                      window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+                      // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
+                      console.log('📤 Dispatching sync-to-supabase event');
+                      window.dispatchEvent(new CustomEvent("sync-to-supabase", {
+                        detail: { products: freshProducts, deletedProducts: freshDeleted }
+                      }));
 
                       // If currently previewing this item, move to next
                       if (previewProduct && previewProduct.id === productToShelf.id) {
@@ -1373,8 +1382,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     setPreviewProduct(null);
                     setPreviewList([]);
 
-                    // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
-                    window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+                    // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
+                    window.dispatchEvent(new CustomEvent("sync-to-supabase", {
+                      detail: { products: [], deletedProducts: freshDeleted }
+                    }));
 
                     setShowShelfConfirm(false);
                     setShelfTarget(null);
@@ -1571,8 +1582,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               setProducts(freshProducts);
               setDeletedProducts(freshDeleted);
 
-              // Dispatch event to trigger sync (handled by App.tsx sync-to-supabase listener)
-              window.dispatchEvent(new CustomEvent("sync-to-supabase"));
+              // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
+              window.dispatchEvent(new CustomEvent("sync-to-supabase", {
+                detail: { products: freshProducts, deletedProducts: freshDeleted }
+              }));
 
               // Move to next item in preview
               const idx = previewList.findIndex(p => p.id === productToShelf.id);
