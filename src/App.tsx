@@ -958,6 +958,60 @@ function AppWithBackHandler() {
   }, [refreshFromCloud, isStrictMode, user?.uid]);
 
   // ──────────────────────────────────────────────────────
+  // SYNC TO SUPABASE EVENT: triggered when products are moved to shelf,
+  // stock toggled, or other mutations that need syncing
+  // ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleSyncToSupabase = async (e: any) => {
+      console.log('📤 sync-to-supabase event fired', {
+        userId: user?.uid,
+        detail: e.detail,
+        strict: isStrictMode()
+      });
+
+      if (!user?.uid) {
+        console.warn('⚠️ sync-to-supabase: no user ID');
+        return;
+      }
+
+      try {
+        // Use data from event detail (passed from CatalogueApp) or fall back to localStorage
+        const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
+        const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
+
+        console.log('📝 sync-to-supabase: processing', {
+          productsCount: freshProducts.length,
+          deletedCount: freshDeleted.length,
+          strict: isStrictMode()
+        });
+
+        if (isStrictMode()) {
+          // In strict mode, sync immediately to cloud
+          console.log('🔄 sync-to-supabase: calling syncProductsToCloud (strict mode)');
+          const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+          console.log('✅ sync-to-supabase: syncProductsToCloud completed', {
+            productsCount: cloudData.products.length,
+            deletedCount: cloudData.deletedProducts.length
+          });
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        } else {
+          // In non-strict mode, just ensure local state is updated
+          console.log('🔄 sync-to-supabase: updating local state + background sync (non-strict mode)');
+          setProducts(freshProducts);
+          setDeletedProducts(freshDeleted);
+          // Background sync will happen via refreshFromCloud
+          refreshFromCloud().catch(err => console.warn('⚠️ Background sync failed:', err));
+        }
+      } catch (e) {
+        console.error('❌ sync-to-supabase failed:', e);
+      }
+    };
+    window.addEventListener('sync-to-supabase', handleSyncToSupabase as any);
+    return () => window.removeEventListener('sync-to-supabase', handleSyncToSupabase as any);
+  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode]);
+
+  // ──────────────────────────────────────────────────────
   // PERSIST products/deletedProducts to localStorage on change
   // (but NO auto-sync to Supabase -- that's done at mutation points)
   // ──────────────────────────────────────────────────────
