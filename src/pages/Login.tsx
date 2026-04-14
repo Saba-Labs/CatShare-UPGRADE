@@ -352,13 +352,13 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-200/40"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? (
-                      <FiEyeOff className="h-5 w-5" />
+                      <FiEyeOff className="h-4 w-4" />
                     ) : (
-                      <FiEye className="h-5 w-5" />
+                      <FiEye className="h-4 w-4" />
                     )}
                   </button>
                 </div>
