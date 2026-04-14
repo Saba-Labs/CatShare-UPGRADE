@@ -54,7 +54,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
     if (isStrictMode() && user?.uid) {
       try {
-        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, { onlyProductIds: [product.id] });
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
         console.log(`✅ Product ${product.id} restored and synced to cloud`);
@@ -161,7 +161,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
           />
         )}
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
-        <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+        <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 min-h-14 flex items-center gap-3 px-4 relative">
         <button
           onClick={() => setMenuOpen(true)}
           className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700"
@@ -178,7 +178,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Shelf</h1>
+        <h1 className="text-xl font-bold flex-1 text-center">Shelf</h1>
         {showHiddenShelfActions && deletedProducts.length > 0 && (
           <button
             onClick={() => setShowDeleteAllConfirm(true)}
@@ -206,10 +206,10 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
               <div
                 key={p.id}
                 onClick={() => setPreviewProduct(p)}
-                className="flex justify-between items-center border p-3 rounded bg-gray-100 cursor-pointer"
+                className="flex justify-between items-center gap-3 border p-3 rounded bg-gray-100 cursor-pointer min-h-[60px]"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded overflow-hidden border bg-white flex items-center justify-center">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-12 h-12 shrink-0 rounded overflow-hidden border bg-white flex items-center justify-center">
                     {imageMap[p.id] ? (
                       <img
                         src={imageMap[p.id]}
@@ -227,12 +227,12 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
                       <span className="text-[10px] text-gray-400">Loading...</span>
                     )}
                   </div>
-                  <div>
-                    <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs text-gray-500">{p.field1 || p.color}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{p.name}</div>
+                    <div className="text-xs text-gray-500 truncate">{p.field1 || p.color}</div>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

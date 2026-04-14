@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiMail, FiLock, FiAlertCircle, FiShoppingBag, FiZap, FiImage } from 'react-icons/fi';
+import { FiMail, FiLock, FiAlertCircle, FiShoppingBag, FiZap, FiImage, FiEye, FiEyeOff } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
   const postAuthRedirectDoneRef = useRef(false);
@@ -340,14 +341,26 @@ export default function Login() {
                   <FiLock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input
                     id="login-password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    className="w-full min-h-[44px] pl-11 pr-4 py-3 text-base text-slate-900 placeholder:text-slate-400 bg-slate-50/80 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-shadow"
+                    className="w-full min-h-[44px] pl-11 pr-12 py-3 text-base text-slate-900 placeholder:text-slate-400 bg-slate-50/80 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-shadow"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-500 transition-colors"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <FiEyeOff className="h-4 w-4" />
+                    ) : (
+                      <FiEye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
 

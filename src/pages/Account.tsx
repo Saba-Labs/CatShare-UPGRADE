@@ -208,14 +208,13 @@ export default function Account() {
     try {
       await logout();
       showToast('Logged out successfully', 'success');
-      navigate('/login');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setIsLoading(false);
+      console.warn('Logout error:', err);
+      // Don't show error toast - user will be redirected by ProtectedRoute anyway
     }
+    // Don't reset isLoading - let ProtectedRoute redirect immediately
   };
 
   const busy = isLoading || businessSaving || logoUploading;

@@ -1335,7 +1335,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       window.dispatchEvent(new CustomEvent("sync-to-supabase"));
 
                       if (isStrictMode() && user?.uid) {
-                        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                        syncProductsToCloud(freshProducts, freshDeleted, { onlyProductIds: [productToShelf.id] }).then(cloudData => {
                           setProducts(cloudData.products);
                           setDeletedProducts(cloudData.deletedProducts);
                         }).catch(err => console.error('Strict sync failed:', err));
