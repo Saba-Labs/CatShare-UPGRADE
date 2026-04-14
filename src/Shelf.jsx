@@ -227,9 +227,9 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
                       <span className="text-[10px] text-gray-400">Loading...</span>
                     )}
                   </div>
-                  <div>
-                    <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs text-gray-500">{p.field1 || p.color}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{p.name}</div>
+                    <div className="text-xs text-gray-500 truncate">{p.field1 || p.color}</div>
                   </div>
                 </div>
                 <div className="flex gap-2">
