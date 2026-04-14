@@ -161,7 +161,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
           />
         )}
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
-        <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+        <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 min-h-14 flex items-center gap-3 px-4 relative">
         <button
           onClick={() => setMenuOpen(true)}
           className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700"
@@ -178,7 +178,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Shelf</h1>
+        <h1 className="text-xl font-bold flex-1 text-center">Shelf</h1>
         {showHiddenShelfActions && deletedProducts.length > 0 && (
           <button
             onClick={() => setShowDeleteAllConfirm(true)}
