@@ -5,6 +5,7 @@ import { MdOutlineHome } from "react-icons/md";
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { logThemeChanged } from "./config/analyticsEvents";
+import { useSubscription } from "./context/SubscriptionContext";
 import SideDrawer from "./SideDrawer";
 
 export default function Settings({
@@ -33,6 +34,7 @@ export default function Settings({
   const [localDarkMode, setLocalDarkMode] = useState(darkMode);
 
   const navigate = useNavigate();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
 
   // Update localDarkMode when darkMode prop changes
   useEffect(() => {
@@ -287,13 +289,25 @@ export default function Settings({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="text-base flex-shrink-0">✨</span>
-                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">On Free Trial</h3>
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100">
+                      {isPaidPro ? "Pro Plan Active" : isTrialActive ? "On Free Trial" : "Free Plan"}
+                    </h3>
                   </div>
-                  <p className="text-xs text-green-700 dark:text-green-300">Subscribe to continue using premium features</p>
+                  <p className="text-xs text-green-700 dark:text-green-300">
+                    {isPaidPro
+                      ? "You have access to all premium features"
+                      : isTrialActive
+                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString()}`
+                      : "Subscribe to unlock premium features"}
+                  </p>
                 </div>
                 <div className="flex-shrink-0">
-                  <span className="bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 text-[10px] font-bold px-2 py-0.5 rounded border border-green-300 dark:border-green-700">
-                    PRO
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    isPro
+                      ? "bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+                  }`}>
+                    {isPro ? "PRO" : "FREE"}
                   </span>
                 </div>
               </div>

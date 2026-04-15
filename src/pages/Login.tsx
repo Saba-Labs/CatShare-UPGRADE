@@ -41,6 +41,7 @@ export default function Login() {
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
   const postAuthRedirectDoneRef = useRef(false);
@@ -143,12 +144,12 @@ export default function Login() {
 
     try {
       await authService.loginWithEmail(email, password);
+      setIsRedirecting(true);
       setHasJustLoggedIn(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
       showToast(errorMessage, 'error');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -159,13 +160,13 @@ export default function Login() {
     try {
       const user = await authService.loginWithGoogle();
       if (user) {
+        setIsRedirecting(true);
         setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
       setError(errorMessage);
       showToast(errorMessage, 'error');
-    } finally {
       setAuthLoading(null);
     }
   };
@@ -293,10 +294,19 @@ export default function Login() {
             className={[
               'rounded-2xl bg-white border border-slate-200/80 shadow-xl shadow-slate-200/40 p-5 sm:p-8',
               isNativeApp ? 'shadow-slate-300/30' : '',
+              isRedirecting ? 'relative pointer-events-none opacity-60' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
+            {isRedirecting && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-10 w-10 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
+                  <p className="text-sm font-medium text-slate-700">Signing in...</p>
+                </div>
+              </div>
+            )}
             <div className="hidden lg:block mb-8">
               <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h2>
               <p className="text-slate-500 text-sm mt-1.5">Sign in to continue to your catalogues</p>
