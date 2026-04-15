@@ -216,7 +216,7 @@ export default function Login() {
           </p>
 
           <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Create Your Catalogue in Minutes. Share It Anywhere. Sell Through Your Online Store.
+            Create. Share. Sell. — All in Minutes.
           </h1>
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
