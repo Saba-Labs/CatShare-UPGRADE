@@ -440,7 +440,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Active products -> products table
       if (productsForSync.length > 0) {
         setDetail('Saving products to cloud…');
-        const res = await syncProducts(userId, productsForSync);
+        const res = await syncProducts(userId, productsForSync, {
+          fullListForPosition: options?.fullListForPosition ?? productsForSync,
+        });
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
 
