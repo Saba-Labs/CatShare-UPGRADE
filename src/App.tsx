@@ -978,17 +978,23 @@ function AppWithBackHandler() {
         // Use data from event detail (passed from CatalogueApp) or fall back to localStorage
         const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
         const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
+        const onlyProductIds = e.detail?.onlyProductIds; // Optional: for partial sync optimization
 
         console.log('📝 sync-to-supabase: processing', {
           productsCount: freshProducts.length,
           deletedCount: freshDeleted.length,
+          partialSync: onlyProductIds ? `${onlyProductIds.length} product(s)` : 'full',
           strict: isStrictMode()
         });
 
         if (isStrictMode()) {
           // In strict mode, sync immediately to cloud
           console.log('🔄 sync-to-supabase: calling syncProductsToCloud (strict mode)');
-          const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+          const cloudData = await syncProductsToCloud(
+            freshProducts,
+            freshDeleted,
+            onlyProductIds ? { onlyProductIds } : undefined
+          );
           console.log('✅ sync-to-supabase: syncProductsToCloud completed', {
             productsCount: cloudData.products.length,
             deletedCount: cloudData.deletedProducts.length

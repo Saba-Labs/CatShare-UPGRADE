@@ -1339,9 +1339,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       setDeletedProducts(freshDeleted);
 
                       // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
-                      console.log('📤 Dispatching sync-to-supabase event');
+                      console.log('📤 Dispatching sync-to-supabase event with partial sync for shelved product');
                       window.dispatchEvent(new CustomEvent("sync-to-supabase", {
-                        detail: { products: freshProducts, deletedProducts: freshDeleted }
+                        detail: {
+                          products: freshProducts,
+                          deletedProducts: freshDeleted,
+                          onlyProductIds: [productToShelf.id] // Only sync the shelved product
+                        }
                       }));
 
                       // If currently previewing this item, move to next
@@ -1584,7 +1588,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
               // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
               window.dispatchEvent(new CustomEvent("sync-to-supabase", {
-                detail: { products: freshProducts, deletedProducts: freshDeleted }
+                detail: {
+                  products: freshProducts,
+                  deletedProducts: freshDeleted,
+                  onlyProductIds: [productToShelf.id] // Only sync the shelved product
+                }
               }));
 
               // Move to next item in preview
