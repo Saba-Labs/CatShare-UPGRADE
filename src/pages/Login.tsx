@@ -221,7 +221,7 @@ export default function Login() {
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
           <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Set up your storefront in minutes; sell catalogues, process orders, and grow your business.
+            Build your catalogue fast, share it anywhere, and sell it in your online store while managing orders seamlessly. All in one app.  
           </p>
 
           {/* Desktop: full intro */}
