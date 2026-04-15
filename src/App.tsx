@@ -979,11 +979,10 @@ function AppWithBackHandler() {
         const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
         const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
 
-        // Sync to cloud in both strict and non-strict mode
-        // (In non-strict mode, syncProductsToCloud handles persistence properly)
         const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
           background: true,
           skipFullCloudRefresh: true,
+          fullListForPosition: freshProducts,
         });
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
