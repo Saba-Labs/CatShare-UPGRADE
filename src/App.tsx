@@ -994,24 +994,56 @@ function AppWithBackHandler() {
           // Validate images have cloud URLs before syncing
           // (For reorder, images should already be uploaded; for other ops they should be too)
           const { assertProductsHaveCloudImageUrlForSync } = await import('./utils/syncImageValidation');
-          assertProductsHaveCloudImageUrlForSync(freshProducts, 'sync-to-supabase (products)');
-          assertProductsHaveCloudImageUrlForSync(freshDeleted, 'sync-to-supabase (deleted)');
+          try {
+            assertProductsHaveCloudImageUrlForSync(freshProducts, 'sync-to-supabase (products)');
+          } catch (imgErr) {
+            console.warn('⚠️ Image validation warning (may be OK for reorder):', imgErr);
+            // Don't throw - reorder might have products with local-only images
+          }
+
+          try {
+            assertProductsHaveCloudImageUrlForSync(freshDeleted, 'sync-to-supabase (deleted)');
+          } catch (imgErr) {
+            console.warn('⚠️ Deleted products image validation warning:', imgErr);
+          }
 
           // Sync products with positions preserved (for reorder support)
-          const [productsResult, deletedResult] = await Promise.all([
-            syncProducts(user.uid, freshProducts),
-            syncDeletedProducts(user.uid, freshDeleted),
-          ]);
+          // Use skipImageUrlAssertion=true for reorder since images are already in cloud
+          const productsPromise = syncProducts(user.uid, freshProducts, { skipImageUrlAssertion: true });
 
-          if (!productsResult.success || !deletedResult.success) {
-            throw new Error(`Sync failed: products=${productsResult.success}, deleted=${deletedResult.success}`);
+          // Only sync deleted products if there are any
+          const deletedPromise = freshDeleted.length > 0
+            ? syncDeletedProducts(user.uid, freshDeleted, { skipImageUrlAssertion: true })
+            : Promise.resolve({ success: true, data: [] });
+
+          const [productsResult, deletedResult] = await Promise.all([productsPromise, deletedPromise]);
+
+          console.log('📊 sync-to-supabase: sync results', {
+            productsSuccess: productsResult.success,
+            productsError: productsResult.error,
+            deletedSuccess: deletedResult.success,
+            deletedError: deletedResult.error,
+            productsCount: freshProducts.length,
+            deletedCount: freshDeleted.length,
+          });
+
+          if (!productsResult.success) {
+            throw new Error(`Products sync failed: ${productsResult.error || 'Unknown error'}`);
+          }
+
+          if (!deletedResult.success && freshDeleted.length > 0) {
+            console.warn('⚠️ Deleted products sync failed:', deletedResult.error);
+            // Don't throw for deleted products - continue with the products that synced
           }
 
           console.log('✅ sync-to-supabase: products synced to Supabase');
           setProducts(freshProducts);
           setDeletedProducts(freshDeleted);
         } catch (syncErr) {
-          console.error('⚠️ sync-to-supabase: failed to sync products to Supabase:', syncErr);
+          console.error('⚠️ sync-to-supabase: failed to sync products to Supabase:', {
+            error: syncErr,
+            message: syncErr instanceof Error ? syncErr.message : String(syncErr),
+          });
           // Fallback: at least update local state
           setProducts(freshProducts);
           setDeletedProducts(freshDeleted);

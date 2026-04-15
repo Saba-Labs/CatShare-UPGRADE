@@ -91,8 +91,13 @@ export async function syncProducts(
         id: p.product_id,
         name: p.name,
         hasImageUrl: !!p.data?.imageUrl,
-        imageUrl: p.data?.imageUrl || 'N/A'
-      }))
+        imageUrl: p.data?.imageUrl || 'N/A',
+        position: p.position,
+      })),
+      firstRowStructure: upsertData[0] ? {
+        keys: Object.keys(upsertData[0]),
+        dataKeys: upsertData[0].data ? Object.keys(upsertData[0].data).slice(0, 5) : 'N/A',
+      } : 'No data',
     });
 
     const { data, error } = await getSupabaseClient()
@@ -101,8 +106,14 @@ export async function syncProducts(
       .select();
 
     if (error) {
-      console.error('❌ Error syncing products to Supabase:', error);
-      return { success: false, error: error.message };
+      const errorMsg = error.message || JSON.stringify(error);
+      console.error('❌ Error syncing products to Supabase:', {
+        message: errorMsg,
+        code: error.code || 'N/A',
+        details: error.details || 'N/A',
+        fullError: error,
+      });
+      return { success: false, error: errorMsg };
     }
 
     console.log(`✅ Synced ${cleanedProducts.length} products to Supabase`, {
@@ -111,8 +122,11 @@ export async function syncProducts(
     });
     return { success: true, data };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('❌ Exception in syncProducts:', errorMessage);
+    const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+    console.error('❌ Exception in syncProducts:', {
+      message: errorMessage,
+      error: err,
+    });
     return { success: false, error: errorMessage };
   }
 }
@@ -197,15 +211,24 @@ export async function syncDeletedProducts(
       .select();
 
     if (error) {
-      console.error('❌ Error syncing deleted products:', error);
-      return { success: false, error: error.message };
+      const errorMsg = error.message || JSON.stringify(error);
+      console.error('❌ Error syncing deleted products:', {
+        message: errorMsg,
+        code: error.code || 'N/A',
+        details: error.details || 'N/A',
+        fullError: error,
+      });
+      return { success: false, error: errorMsg };
     }
 
     console.log(`✅ Synced ${deletedProducts.length} deleted products (with full data) to Supabase`);
     return { success: true, data };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('❌ Exception in syncDeletedProducts:', errorMessage);
+    const errorMessage = err instanceof Error ? err.message : JSON.stringify(err);
+    console.error('❌ Exception in syncDeletedProducts:', {
+      message: errorMessage,
+      error: err,
+    });
     return { success: false, error: errorMessage };
   }
 }
