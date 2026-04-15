@@ -27,15 +27,10 @@ export type RefreshFromCloudOptions = {
 /** When true, updates `syncStatusDetail` during sync (full-screen overlay). Default false — routine saves stay on “Please wait…”. */
 export type SyncProductsToCloudOptions = {
   detailedStatus?: boolean;
-  /**
-   * Upsert only these product IDs (positions taken from the full `products` array order).
-   * Skips full-table sync, deleted-products upsert, table cleanup, and full cloud refresh — faster for single saves.
-   */
   onlyProductIds?: string[];
-  /** No global sync overlay / isSyncing — for drag reorder and other non-blocking syncs. */
   background?: boolean;
-  /** After upserts + cleanup, skip `refreshFromCloud` (local state is already correct — e.g. reorder). */
   skipFullCloudRefresh?: boolean;
+  fullListForPosition?: any[];   // ← add this line
 };
 
 interface SyncContextType {
@@ -445,7 +440,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Active products -> products table
       if (productsForSync.length > 0) {
         setDetail('Saving products to cloud…');
-        const res = await syncProducts(userId, productsForSync);
+        const res = await syncProducts(userId, productsForSync, {
+          fullListForPosition: options?.fullListForPosition ?? productsForSync,
+        });
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }
 

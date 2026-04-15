@@ -1191,14 +1191,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             const newVisible = reorderList(visible, source.index, destination.index);
             const copy = applyVisibleOrderToProducts(products, visible, newVisible);
             setProducts(copy);
-            window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-
-            if (isStrictMode() && user?.uid) {
-              void syncProductsToCloud(copy, deletedProducts, {
-                background: true,
-                skipFullCloudRefresh: true,
-              }).catch((err) => console.error('Strict sync failed:', err));
-            }
+            window.dispatchEvent(new CustomEvent("sync-to-supabase", {
+              detail: { products: copy, deletedProducts },
+            }));
           }}>
             <Droppable droppableId="product-list">
               {(provided) => (

@@ -979,30 +979,13 @@ function AppWithBackHandler() {
         const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
         const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
 
-        console.log('📝 sync-to-supabase: processing', {
-          productsCount: freshProducts.length,
-          deletedCount: freshDeleted.length,
-          strict: isStrictMode()
+        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
+          background: true,
+          skipFullCloudRefresh: true,
+          fullListForPosition: freshProducts,
         });
-
-        if (isStrictMode()) {
-          // In strict mode, sync immediately to cloud
-          console.log('🔄 sync-to-supabase: calling syncProductsToCloud (strict mode)');
-          const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
-          console.log('✅ sync-to-supabase: syncProductsToCloud completed', {
-            productsCount: cloudData.products.length,
-            deletedCount: cloudData.deletedProducts.length
-          });
-          setProducts(cloudData.products);
-          setDeletedProducts(cloudData.deletedProducts);
-        } else {
-          // In non-strict mode, just ensure local state is updated
-          console.log('🔄 sync-to-supabase: updating local state + background sync (non-strict mode)');
-          setProducts(freshProducts);
-          setDeletedProducts(freshDeleted);
-          // Background sync will happen via refreshFromCloud
-          refreshFromCloud().catch(err => console.warn('⚠️ Background sync failed:', err));
-        }
+        setProducts(cloudData.products);
+        setDeletedProducts(cloudData.deletedProducts);
       } catch (e) {
         console.error('❌ sync-to-supabase failed:', e);
       }
