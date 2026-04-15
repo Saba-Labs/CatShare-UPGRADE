@@ -985,23 +985,36 @@ function AppWithBackHandler() {
           strict: isStrictMode()
         });
 
-        if (isStrictMode()) {
-          // In strict mode, sync immediately to cloud
-          console.log('🔄 sync-to-supabase: calling syncProductsToCloud (strict mode)');
-          const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
-          console.log('✅ sync-to-supabase: syncProductsToCloud completed', {
-            productsCount: cloudData.products.length,
-            deletedCount: cloudData.deletedProducts.length
-          });
-          setProducts(cloudData.products);
-          setDeletedProducts(cloudData.deletedProducts);
-        } else {
-          // In non-strict mode, just ensure local state is updated
-          console.log('🔄 sync-to-supabase: updating local state + background sync (non-strict mode)');
+        // Always sync to cloud (both strict and non-strict mode)
+        // This ensures reorder and other mutations persist to Supabase
+        console.log('🔄 sync-to-supabase: calling syncProductsToCloud');
+
+        const { syncProducts, syncDeletedProducts } = await import('./services/supabaseSync');
+        try {
+          // Validate images have cloud URLs before syncing
+          // (For reorder, images should already be uploaded; for other ops they should be too)
+          const { assertProductsHaveCloudImageUrlForSync } = await import('./utils/syncImageValidation');
+          assertProductsHaveCloudImageUrlForSync(freshProducts, 'sync-to-supabase (products)');
+          assertProductsHaveCloudImageUrlForSync(freshDeleted, 'sync-to-supabase (deleted)');
+
+          // Sync products with positions preserved (for reorder support)
+          const [productsResult, deletedResult] = await Promise.all([
+            syncProducts(user.uid, freshProducts),
+            syncDeletedProducts(user.uid, freshDeleted),
+          ]);
+
+          if (!productsResult.success || !deletedResult.success) {
+            throw new Error(`Sync failed: products=${productsResult.success}, deleted=${deletedResult.success}`);
+          }
+
+          console.log('✅ sync-to-supabase: products synced to Supabase');
           setProducts(freshProducts);
           setDeletedProducts(freshDeleted);
-          // Background sync will happen via refreshFromCloud
-          refreshFromCloud().catch(err => console.warn('⚠️ Background sync failed:', err));
+        } catch (syncErr) {
+          console.error('⚠️ sync-to-supabase: failed to sync products to Supabase:', syncErr);
+          // Fallback: at least update local state
+          setProducts(freshProducts);
+          setDeletedProducts(freshDeleted);
         }
       } catch (e) {
         console.error('❌ sync-to-supabase failed:', e);
