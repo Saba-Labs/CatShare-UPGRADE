@@ -1338,14 +1338,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       setProducts(freshProducts);
                       setDeletedProducts(freshDeleted);
 
-                      // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
-                      console.log('📤 Dispatching sync-to-supabase event for shelved product');
-                      window.dispatchEvent(new CustomEvent("sync-to-supabase", {
-                        detail: {
-                          products: freshProducts,
-                          deletedProducts: freshDeleted
-                        }
-                      }));
+                      // Direct sync like updateProduct for faster response
+                      if (isStrictMode() && user?.uid) {
+                        console.log('📤 Direct sync for shelved product');
+                        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                          setProducts(cloudData.products);
+                          setDeletedProducts(cloudData.deletedProducts);
+                        }).catch(err => console.error('Shelf sync failed:', err));
+                      }
 
                       // If currently previewing this item, move to next
                       if (previewProduct && previewProduct.id === productToShelf.id) {
@@ -1385,10 +1385,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     setPreviewProduct(null);
                     setPreviewList([]);
 
-                    // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
-                    window.dispatchEvent(new CustomEvent("sync-to-supabase", {
-                      detail: { products: [], deletedProducts: freshDeleted }
-                    }));
+                    // Direct sync like updateProduct for faster response
+                    if (isStrictMode() && user?.uid) {
+                      console.log('📤 Direct sync for shelf all');
+                      syncProductsToCloud([], freshDeleted).then(cloudData => {
+                        setProducts(cloudData.products);
+                        setDeletedProducts(cloudData.deletedProducts);
+                      }).catch(err => console.error('Shelf all sync failed:', err));
+                    }
 
                     setShowShelfConfirm(false);
                     setShelfTarget(null);
@@ -1585,13 +1589,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               setProducts(freshProducts);
               setDeletedProducts(freshDeleted);
 
-              // Dispatch event to trigger sync with updated data (handled by App.tsx sync-to-supabase listener)
-              window.dispatchEvent(new CustomEvent("sync-to-supabase", {
-                detail: {
-                  products: freshProducts,
-                  deletedProducts: freshDeleted
-                }
-              }));
+              // Direct sync like updateProduct for faster response
+              if (isStrictMode() && user?.uid) {
+                console.log('📤 Direct sync for shelved product from preview');
+                syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                  setProducts(cloudData.products);
+                  setDeletedProducts(cloudData.deletedProducts);
+                }).catch(err => console.error('Preview shelf sync failed:', err));
+              }
 
               // Move to next item in preview
               const idx = previewList.findIndex(p => p.id === productToShelf.id);
