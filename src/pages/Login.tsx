@@ -217,12 +217,12 @@ export default function Login() {
           </p>
 
           <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Build your own store — sell direct, any time.
+            Create. Share. Sell.
           </h1>
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
           <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Set up your storefront in minutes; sell catalogues, process orders, and grow your business.
+            Create your catalogue in minutes. Share as images, PDFs, links, or your online store — and start taking orders.
           </p>
 
           {/* Desktop: full intro */}

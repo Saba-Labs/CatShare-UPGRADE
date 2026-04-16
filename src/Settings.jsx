@@ -282,7 +282,7 @@ export default function Settings({
           {/* Pro Plan Card */}
           <div className="mt-4">
             <div
-              onClick={() => navigate("/settings/pro")}
+              onClick={() => navigate("/settings/pro?from=settings")}
               className="w-full bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800 shadow-[0_0_15px_rgba(34,197,94,0.2)] hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] transition cursor-pointer text-left p-4"
             >
               <div className="flex items-center justify-between gap-2">
@@ -297,7 +297,7 @@ export default function Settings({
                     {isPaidPro
                       ? "You have access to all premium features"
                       : isTrialActive
-                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString()}`
+                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString('en-GB')}`
                       : "Subscribe to unlock premium features"}
                   </p>
                 </div>

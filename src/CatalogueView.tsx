@@ -57,6 +57,21 @@ const ProductCard = React.memo(({
   onMouseLeave,
 }: any) => {
   const catData = getProductCatalogueData(p);
+  const imageSrc = imageMap[p.id];
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [imageSrc]);
+
+  useEffect(() => {
+    if (!imageSrc) return;
+    const imgEl = imageRef.current;
+    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+      setImageLoaded(true);
+    }
+  }, [imageSrc]);
 
   return (
     <div
@@ -75,13 +90,33 @@ const ProductCard = React.memo(({
   onMouseLeave={onMouseLeave}
 >
       <div className="relative aspect-square overflow-hidden bg-gray-100 group">
+        {!!imageSrc && !imageLoaded && (
+          <div className="absolute inset-0 z-[1] flex items-center justify-center bg-gray-100">
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{
+              width: 36, height: 36,
+              borderRadius: "50%",
+              border: "3px solid rgba(0,0,0,0.1)",
+              borderTopColor: "rgba(0,0,0,0.4)",
+              animation: "spin 0.8s linear infinite",
+            }} />
+          </div>
+        )}
         <img
-  src={imageMap[p.id]}
+  ref={imageRef}
+  src={imageSrc}
   alt={p.name}
-  className="w-full h-full object-cover"
+  className={`w-full h-full object-cover transition-opacity duration-150 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
   draggable={false}
   onDragStart={(e) => e.preventDefault()}
+  onLoad={() => {
+    setImageLoaded(true);
+  }}
+  onError={() => {
+    setImageLoaded(false);
+  }}
 />
+      
         {!p[stockField] && (
           <div className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-15deg] bg-red-500 bg-opacity-60 text-white text-center py-0.5 shadow-md">
             <span className="block text-sm font-bold tracking-wider">

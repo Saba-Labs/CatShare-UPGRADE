@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { syncUserSettings } from '../services/supabaseSync';
 import { uploadProductImageToR2 } from '../services/r2Upload';
 import { parseWhatsAppNumber } from '../data/whatsappCountryCodes';
@@ -46,6 +47,7 @@ export default function Account() {
   const navigate = useNavigate();
   const { user, logout, supabaseData, refreshSupabaseData } = useAuth();
   const { showToast } = useToast();
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
 
   const [isLoading, setIsLoading] = useState(false);
   const [businessSaving, setBusinessSaving] = useState(false);
@@ -227,9 +229,13 @@ export default function Account() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              navigate("/");
+              // Open the sidemenu
+              window.dispatchEvent(new CustomEvent("toggle-menu"));
+            }}
             className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
-            title="Go back"
+            title="Go to dashboard"
           >
             <FiArrowLeft className="text-gray-700 w-5 h-5" />
           </button>
@@ -290,6 +296,42 @@ export default function Account() {
                 </div>
               </div>
             </div>
+          </SectionCard>
+
+          {/* Pro Plan Card */}
+          <SectionCard>
+            <button
+              type="button"
+              onClick={() => navigate('/settings/pro?from=account')}
+              className="w-full text-left p-4 sm:p-5 bg-green-50 hover:bg-green-100 active:bg-green-100/80 transition-colors touch-manipulation"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-base flex-shrink-0">✨</span>
+                    <h3 className="text-sm font-semibold text-green-900">
+                      {isPaidPro ? 'Pro Plan Active' : isTrialActive ? 'On Free Trial' : 'Free Plan'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-green-700">
+                    {isPaidPro
+                      ? 'You have access to all premium features'
+                      : isTrialActive
+                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString('en-GB')}`
+                      : 'Subscribe to unlock premium features'}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    isPro
+                      ? 'bg-green-200 text-green-800 border-green-300'
+                      : 'bg-gray-200 text-gray-800 border-gray-300'
+                  }`}>
+                    {isPro ? 'PRO' : 'FREE'}
+                  </span>
+                </div>
+              </div>
+            </button>
           </SectionCard>
 
           {/* WhatsApp — directly under intro */}

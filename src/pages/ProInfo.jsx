@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { MdArrowBack, MdStar, MdOutlineHome } from "react-icons/md";
 import { Capacitor } from "@capacitor/core";
 import { BillingPlugin } from "capacitor-billing";
@@ -29,7 +29,12 @@ function formatTrialEndDate(iso) {
 
 export default function ProInfo() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, refresh } = useSubscription();
+
+  // Get the referrer from query params
+  const params = new URLSearchParams(location.search);
+  const referrer = params.get('from') || 'settings'; // default to settings if not specified
   const trialDaysDisplay = trialDays ?? TRIAL_DAYS_UI_FALLBACK;
   const [loading, setLoading] = useState(false);
   const [prices, setPrices] = useState({});
@@ -261,7 +266,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
       {/* Header */}
       <header className="sticky top-[40px] z-40 bg-white/70 backdrop-blur-md border-b border-gray-200/50 h-14 flex items-center gap-3 px-4 relative">
         <button
-          onClick={() => navigate("/settings")}
+          onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
           className="w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-200 rounded-md transition"
           aria-label="Back"
         >
@@ -401,7 +406,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   </button>
                 ) : (
                   <button
-                    onClick={() => navigate("/settings")}
+                    onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
                     className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition mb-6"
                   >
                     Manage Account
@@ -563,7 +568,7 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
                   )
                 ) : (
                   <button
-                    onClick={() => navigate("/settings")}
+                    onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
                     className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg mb-6 shadow-lg hover:shadow-xl"
                   >
                     Manage Account
@@ -753,10 +758,10 @@ console.error("querySkuDetails [inapp] price", sku, next[sku]);
           )}
 <div className="pt-4 border-t border-gray-200 flex gap-3">
     <button
-      onClick={() => navigate("/settings")}
+      onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
       className="flex-1 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition"
     >
-      Back to Settings
+      Back to {referrer === 'account' ? 'Account' : 'Settings'}
     </button>
   </div>
           

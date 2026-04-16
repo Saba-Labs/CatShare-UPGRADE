@@ -115,6 +115,7 @@ export default function ProductPreviewModal_Glass({
 
   const [direction, setDirection] = useState(0);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState(() => getCurrentCurrencySymbol());
   const [imageScale, setImageScale] = useState(1);
   const [shareResult, setShareResult] = useState(null);
@@ -199,6 +200,7 @@ export default function ProductPreviewModal_Glass({
 
   useEffect(() => {
     const loadImage = async () => {
+      setImageLoaded(false);
       const withVersion = (url, version) => {
         const raw = typeof url === "string" ? url.trim() : "";
         if (!raw) return "";
@@ -441,14 +443,43 @@ export default function ProductPreviewModal_Glass({
                     }}
                     onClick={handleImageClick}
                   >
+                    {!imageLoaded && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: product.imageBgColor || "white",
+                          zIndex: 5,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: "50%",
+                            border: "3px solid rgba(0,0,0,0.1)",
+                            borderTopColor: "rgba(0,0,0,0.4)",
+                            animation: "spin 0.8s linear infinite",
+                          }}
+                        />
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                      </div>
+                    )}
                     <img
                       src={imageUrl}
                       alt={product.name}
+                      onLoad={() => setImageLoaded(true)}
+                      onError={() => setImageLoaded(true)}
                       style={{
                         width: "100%",
                         height: "100%",
                         objectFit: "contain",
                         margin: "0 auto",
+                        opacity: imageLoaded ? 1 : 0,
+                        transition: "opacity 0.2s ease",
                       }}
                     />
 
