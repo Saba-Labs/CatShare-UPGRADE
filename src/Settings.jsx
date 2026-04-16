@@ -297,7 +297,7 @@ export default function Settings({
                     {isPaidPro
                       ? "You have access to all premium features"
                       : isTrialActive
-                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString()}`
+                      ? `Trial expires ${new Date(trialEndsAt).toLocaleDateString('en-GB')}`
                       : "Subscribe to unlock premium features"}
                   </p>
                 </div>
