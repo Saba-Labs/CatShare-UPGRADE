@@ -298,7 +298,7 @@ export default function Account() {
           <SectionCard>
             <button
               type="button"
-              onClick={() => navigate('/settings/pro')}
+              onClick={() => navigate('/settings/pro?from=account')}
               className="w-full text-left p-4 sm:p-5 bg-green-50 hover:bg-green-100 active:bg-green-100/80 transition-colors touch-manipulation"
             >
               <div className="flex items-center justify-between gap-2">
