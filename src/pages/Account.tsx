@@ -229,7 +229,11 @@ export default function Account() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => {
+              navigate("/");
+              // Open the sidemenu
+              window.dispatchEvent(new CustomEvent("toggle-menu"));
+            }}
             className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
             title="Go to dashboard"
           >
