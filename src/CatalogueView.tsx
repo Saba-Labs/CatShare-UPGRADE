@@ -92,7 +92,14 @@ const ProductCard = React.memo(({
       <div className="relative aspect-square overflow-hidden bg-gray-100 group">
         {!!imageSrc && !imageLoaded && (
           <div className="absolute inset-0 z-[1] flex items-center justify-center bg-gray-100">
-            <div className="h-7 w-7 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{
+              width: 36, height: 36,
+              borderRadius: "50%",
+              border: "3px solid rgba(0,0,0,0.1)",
+              borderTopColor: "rgba(0,0,0,0.4)",
+              animation: "spin 0.8s linear infinite",
+            }} />
           </div>
         )}
         <img
@@ -109,11 +116,7 @@ const ProductCard = React.memo(({
     setImageLoaded(false);
   }}
 />
-        {!imageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-        )}
+      
         {!p[stockField] && (
           <div className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-15deg] bg-red-500 bg-opacity-60 text-white text-center py-0.5 shadow-md">
             <span className="block text-sm font-bold tracking-wider">
