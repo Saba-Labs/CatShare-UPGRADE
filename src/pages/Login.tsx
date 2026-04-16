@@ -222,7 +222,7 @@ export default function Login() {
 
           {/* Mobile / tablet: one line — keeps sign-in above the fold */}
           <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Create your catalogue in minutes. Share as images, PDFs, links, or your online store—and start taking orders.
+            Create your catalogue in minutes. Share as images, PDFs, links, or your online store — and start taking orders.
           </p>
 
           {/* Desktop: full intro */}
