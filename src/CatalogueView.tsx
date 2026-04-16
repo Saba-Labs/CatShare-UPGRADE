@@ -57,6 +57,12 @@ const ProductCard = React.memo(({
   onMouseLeave,
 }: any) => {
   const catData = getProductCatalogueData(p);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Reset loading state when image src changes
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [imageMap[p.id]]);
 
   return (
     <div
@@ -81,7 +87,14 @@ const ProductCard = React.memo(({
   className="w-full h-full object-cover"
   draggable={false}
   onDragStart={(e) => e.preventDefault()}
+  onLoad={() => setImageLoaded(true)}
+  onError={() => setImageLoaded(true)}
 />
+        {!imageLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="w-8 h-8 border-3 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+          </div>
+        )}
         {!p[stockField] && (
           <div className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-15deg] bg-red-500 bg-opacity-60 text-white text-center py-0.5 shadow-md">
             <span className="block text-sm font-bold tracking-wider">
