@@ -58,12 +58,19 @@ const ProductCard = React.memo(({
 }: any) => {
   const catData = getProductCatalogueData(p);
   const imageSrc = imageMap[p.id];
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageErrored, setImageErrored] = useState(false);
 
   useEffect(() => {
     setImageLoaded(false);
-    setImageErrored(false);
+  }, [imageSrc]);
+
+  useEffect(() => {
+    if (!imageSrc) return;
+    const imgEl = imageRef.current;
+    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+      setImageLoaded(true);
+    }
   }, [imageSrc]);
 
   return (
@@ -83,16 +90,13 @@ const ProductCard = React.memo(({
   onMouseLeave={onMouseLeave}
 >
       <div className="relative aspect-square overflow-hidden bg-gray-100 group">
-      {!imageLoaded && (
+        {!!imageSrc && !imageLoaded && (
           <div className="absolute inset-0 z-[1] flex items-center justify-center bg-gray-100">
-            {!imageErrored ? (
-              <div className="h-7 w-7 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
-            ) : (
-              <FiImage className="w-6 h-6 text-gray-400" />
-            )}
+            <div className="h-7 w-7 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
           </div>
         )}
         <img
+  ref={imageRef}
   src={imageSrc}
   alt={p.name}
   className={`w-full h-full object-cover transition-opacity duration-150 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
@@ -100,11 +104,9 @@ const ProductCard = React.memo(({
   onDragStart={(e) => e.preventDefault()}
   onLoad={() => {
     setImageLoaded(true);
-    setImageErrored(false);
   }}
   onError={() => {
     setImageLoaded(false);
-    setImageErrored(true);
   }}
 />
         {!imageLoaded && (
