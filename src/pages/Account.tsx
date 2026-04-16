@@ -229,9 +229,9 @@ export default function Account() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/")}
             className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
-            title="Go back"
+            title="Go to dashboard"
           >
             <FiArrowLeft className="text-gray-700 w-5 h-5" />
           </button>
