@@ -57,12 +57,14 @@ const ProductCard = React.memo(({
   onMouseLeave,
 }: any) => {
   const catData = getProductCatalogueData(p);
+  const imageSrc = imageMap[p.id];
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageErrored, setImageErrored] = useState(false);
 
-  // Reset loading state when image src changes
   useEffect(() => {
     setImageLoaded(false);
-  }, [imageMap[p.id]]);
+    setImageErrored(false);
+  }, [imageSrc]);
 
   return (
     <div
@@ -81,14 +83,29 @@ const ProductCard = React.memo(({
   onMouseLeave={onMouseLeave}
 >
       <div className="relative aspect-square overflow-hidden bg-gray-100 group">
+      {!imageLoaded && (
+          <div className="absolute inset-0 z-[1] flex items-center justify-center bg-gray-100">
+            {!imageErrored ? (
+              <div className="h-7 w-7 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
+            ) : (
+              <FiImage className="w-6 h-6 text-gray-400" />
+            )}
+          </div>
+        )}
         <img
-  src={imageMap[p.id]}
+  src={imageSrc}
   alt={p.name}
-  className="w-full h-full object-cover"
+  className={`w-full h-full object-cover transition-opacity duration-150 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
   draggable={false}
   onDragStart={(e) => e.preventDefault()}
-  onLoad={() => setImageLoaded(true)}
-  onError={() => setImageLoaded(true)}
+  onLoad={() => {
+    setImageLoaded(true);
+    setImageErrored(false);
+  }}
+  onError={() => {
+    setImageLoaded(false);
+    setImageErrored(true);
+  }}
 />
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
