@@ -904,15 +904,46 @@ if (migratedProduct.suggestedColors?.length > 0) {
   };
 
   useEffect(() => {
-    if (imagePreview) {
-      const img = new Image();
-      img.src = imagePreview;
-      img.onload = () => {
+  if (imagePreview) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = imagePreview;
+    img.onload = () => {
+      try {
         const palette = getPalette(img, 12);
         setSuggestedColors(palette);
-      };
-    }
-  }, [imagePreview]);
+      } catch (error) {
+        console.warn('[CatShare] Palette extraction failed:', error);
+      }
+
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let r = 0, g = 0, b = 0;
+          for (let i = 0; i < data.length; i += 16) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+          }
+          const numPixels = data.length / 16;
+          const luminance = (0.299 * (r / numPixels) + 0.587 * (g / numPixels) + 0.114 * (b / numPixels));
+          setImageBgOverride(luminance < 128 ? 'transparent' : 'white');
+        }
+      } catch (error) {
+        console.warn('[CatShare] Brightness detection failed:', error);
+        setImageBgOverride('white');
+      }
+    };
+    img.onerror = () => {
+      console.warn('[CatShare] Image failed to load');
+    };
+  }
+}, [imagePreview]);
 
   // Calculate and update scale when preview content changes
   const calculateScale = () => {
