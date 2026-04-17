@@ -1,6 +1,7 @@
 import { PushNotifications, type Token } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { getSupabaseClient } from '../supabaseClient';
+import { getDeviceId } from './deviceIdService';
 
 /** Set after a token is saved; used to prefer server FCM over duplicate local notifications. */
 export const PUSH_REGISTERED_STORAGE_KEY = 'catshare_push_registered';
@@ -18,14 +19,16 @@ export async function initPushTokenForLoggedInUser(userId: string): Promise<() =
 
   const h1 = await PushNotifications.addListener('registration', async (t: Token) => {
     try {
+      const deviceId = await getDeviceId();
       const { error } = await getSupabaseClient().from('user_push_tokens').upsert(
         {
           user_id: userId,
+          device_id: deviceId,
           token: t.value,
           platform: Capacitor.getPlatform(),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'user_id,token' },
+        { onConflict: 'user_id,device_id' },
       );
       if (error) {
         console.warn('[CatShare] push token save failed:', error.message);

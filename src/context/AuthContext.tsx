@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import {
   supabase,
+  getSupabaseClient,
   persistAuthUserIdsForStorage,
   clearAuthUserIdsFromStorage,
   setSupabaseRlsUserId,
@@ -10,6 +11,7 @@ import {
 } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
 import { authService } from '../services/authService';
+import { getDeviceId } from '../services/deviceIdService';
 
 /** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
@@ -323,6 +325,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setError(null);
       intentionalLogoutRef.current = true;
+
+      // Delete push token for this device before logout
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          const deviceId = await getDeviceId();
+          await getSupabaseClient()
+            .from('user_push_tokens')
+            .delete()
+            .eq('user_id', session.user.id)
+            .eq('device_id', deviceId);
+        }
+      } catch (err) {
+        console.warn('[CatShare] Failed to delete push token on logout:', err);
+        // Continue with logout even if token deletion fails
+      }
 
       if (authService.isOfflineGuest()) {
         authService.logoutOfflineGuest();
