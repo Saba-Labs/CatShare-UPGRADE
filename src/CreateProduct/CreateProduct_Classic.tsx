@@ -898,15 +898,29 @@ if (migratedProduct.suggestedColors?.length > 0) {
   useEffect(() => {
     if (imagePreview) {
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       img.src = imagePreview;
       img.onload = () => {
-        const palette = getPalette(img, 12);
-        setSuggestedColors(palette);
+        try {
+          const palette = getPalette(img, 12);
+          setSuggestedColors(palette);
+        } catch (error) {
+          console.warn('[CatShare] Palette extraction failed:', error);
+        }
 
         // Auto-detect and set image background color based on brightness
-        const isBright = getImageBrightness(img);
-        const newBg = isBright ? 'transparent' : 'white';
-        setImageBgOverride(newBg);
+        try {
+          const isBright = getImageBrightness(img);
+          const newBg = isBright ? 'transparent' : 'white';
+          setImageBgOverride(newBg);
+        } catch (error) {
+          console.warn('[CatShare] Brightness detection failed:', error);
+          // Default to white if detection fails
+          setImageBgOverride('white');
+        }
+      };
+      img.onerror = () => {
+        console.warn('[CatShare] Image failed to load');
       };
     }
   }, [imagePreview]);
