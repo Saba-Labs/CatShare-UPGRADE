@@ -805,6 +805,54 @@ if (migratedProduct.suggestedColors?.length > 0) {
     }
   };
 
+  /**
+   * Analyze image brightness using canvas sampling
+   * Returns true if image is bright (light), false if dark
+   */
+  const getImageBrightness = (img: HTMLImageElement): boolean => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+
+      // Set canvas size to image size
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      // Draw image on canvas
+      ctx.drawImage(img, 0, 0);
+
+      // Get image data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      let r = 0, g = 0, b = 0;
+
+      // Sample every 4th pixel (stride=4) for performance, instead of every pixel
+      for (let i = 0; i < data.length; i += 16) {
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+      }
+
+      // Calculate average
+      const numPixels = data.length / 16;
+      const avgR = r / numPixels;
+      const avgG = g / numPixels;
+      const avgB = b / numPixels;
+
+      // Calculate luminance (perceptual brightness)
+      // Using standard formula: 0.299*R + 0.587*G + 0.114*B
+      const luminance = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
+
+      // If luminance > 128 (on 0-255 scale), consider it bright
+      return luminance > 128;
+    } catch (error) {
+      console.warn('[CatShare] Brightness detection error:', error);
+      return false; // Default to dark if error
+    }
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -854,6 +902,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
       img.onload = () => {
         const palette = getPalette(img, 12);
         setSuggestedColors(palette);
+
+        // Auto-detect and set image background color based on brightness
+        const isBright = getImageBrightness(img);
+        const newBg = isBright ? 'transparent' : 'white';
+        setImageBgOverride(newBg);
       };
     }
   }, [imagePreview]);
