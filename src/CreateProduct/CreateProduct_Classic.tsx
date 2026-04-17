@@ -845,8 +845,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
       // Using standard formula: 0.299*R + 0.587*G + 0.114*B
       const luminance = (0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
 
-      // If luminance > 128 (on 0-255 scale), consider it bright
-      return luminance > 128;
+      // If luminance < 128 (on 0-255 scale), consider it bright
+      return luminance < 128;
     } catch (error) {
       console.warn('[CatShare] Brightness detection error:', error);
       return false; // Default to dark if error
