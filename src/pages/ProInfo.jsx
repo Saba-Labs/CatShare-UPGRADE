@@ -236,15 +236,6 @@ export default function ProInfo() {
                 )}
               </div>
             </div>
-            {/* Status dot */}
-            <div style={{
-              width: 44, height: 44, borderRadius: 14,
-              background: isPro ? "linear-gradient(135deg,#dbeafe,#ede9fe)" : "#f3f4f6",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 22,
-            }}>
-              {isPaidPro ? "💎" : isTrialActive ? "⏳" : isPro ? "✨" : "🆓"}
-            </div>
           </div>
 
           {/* Info rows */}
@@ -302,14 +293,12 @@ export default function ProInfo() {
                 {isPro ? (
                   ["Unlimited products & catalogues", "Glass Theme access", "Watermark control", "Unlimited PDF exports", "Unlimited order links", "Email support"].map(b => (
                     <div key={b} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "#2563eb", fontWeight: 700, fontSize: 13 }}>✓</span>
                       <span style={{ fontSize: 13, color: "#1e40af" }}>{b}</span>
                     </div>
                   ))
                 ) : (
                   [`Up to ${FREE_MAX_PRODUCTS} products`, `Up to ${FREE_MAX_CATALOGUES} catalogues`, `${FREE_MAX_PDF_PER_DAY} PDF/day`, `${FREE_MAX_SHARE_LINK_PER_DAY} order link/day`].map(b => (
                     <div key={b} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "#9ca3af", fontSize: 13 }}>·</span>
                       <span style={{ fontSize: 13, color: "#4b5563" }}>{b}</span>
                     </div>
                   ))
@@ -354,12 +343,10 @@ export default function ProInfo() {
                   <h3 style={{ fontSize: 20, fontWeight: 800, color: "#111827", margin: 0 }}>Free</h3>
                   <p style={{ fontSize: 28, fontWeight: 800, color: "#111827", margin: "4px 0 0" }}>{currencySymbol}0 <span style={{ fontSize: 14, fontWeight: 500, color: "#9ca3af" }}>forever</span></p>
                 </div>
-                <div style={{ fontSize: 32 }}>🆓</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
                 {[`${FREE_MAX_PRODUCTS} products`, `${FREE_MAX_CATALOGUES} catalogues`, `${FREE_MAX_PDF_PER_DAY} PDF/day`, "Basic themes"].map(f => (
                   <div key={f} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: "#10b981", fontWeight: 700 }}>✓</span>
                     <span style={{ fontSize: 13, color: "#4b5563" }}>{f}</span>
                   </div>
                 ))}
@@ -411,7 +398,6 @@ export default function ProInfo() {
                       <p style={{ fontSize: 16, fontWeight: 700, color: "#16a34a", margin: "4px 0 0" }}>✓ Active Subscription</p>
                     )}
                   </div>
-                  <div style={{ fontSize: 32 }}>💎</div>
                 </div>
 
                 {/* Billing toggle */}
@@ -447,7 +433,6 @@ export default function ProInfo() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                   {["Unlimited products & catalogues", "Glass Theme access", "Watermark control", "Unlimited PDF exports", "Unlimited order links", "Email support"].map(f => (
                     <div key={f} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ color: "#2563eb", fontWeight: 700 }}>✓</span>
                       <span style={{ fontSize: 13, color: "#374151" }}>{f}</span>
                     </div>
                   ))}
@@ -522,7 +507,7 @@ export default function ProInfo() {
             {!isAndroid && (
               <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "12px 14px" }}>
                 <p style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 500, margin: 0 }}>
-                  💡 Payments are available on the Android app. Tap buttons here to see a reminder.
+                  Payments are available on the Android app. Tap buttons here to see a reminder.
                 </p>
               </div>
             )}
@@ -550,14 +535,10 @@ export default function ProInfo() {
               >
                 <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{feature.name}</span>
                 <div style={{ textAlign: "center" }}>
-                  {feature.locked ? (
-                    <span style={{ fontSize: 12, color: "#f59e0b" }}>🔒 {feature.free}</span>
-                  ) : (
-                    <span style={{ fontSize: 12, color: "#6b7280" }}>{feature.free}</span>
-                  )}
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>{feature.free}</span>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>✓ {feature.pro}</span>
+                  <span style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>{feature.pro}</span>
                 </div>
               </div>
             ))}
