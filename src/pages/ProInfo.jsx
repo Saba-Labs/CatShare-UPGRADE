@@ -379,13 +379,13 @@ useEffect(() => {
 
         {/* HERO SECTION - FROM OLD CODE */}
           <div className="text-center space-y-3 mb-8">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900">Choose Your Plan</h2>
-            <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-gray-900">Choose Your Plan</h2>
+            <p className="text-gray-600 text-sm sm:text-base md:text-lg max-w-2xl mx-auto">
               Select the plan that fits your needs. Upgrade anytime to unlock unlimited features.
             </p>
             {isTrialActive && trialEndsAt && (
-              <div className="inline-block mt-4 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl max-w-xl mx-auto text-left">
-                <p className="text-sm font-semibold text-amber-900">
+              <div className="inline-block mt-4 px-3 sm:px-4 py-2 sm:py-3 bg-amber-50 border border-amber-300 rounded-xl max-w-xl mx-auto text-left">
+                <p className="text-xs sm:text-sm font-semibold text-amber-900">
                   {trialDaysDisplay}-day Pro trial — full access
                 </p>
                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
@@ -396,8 +396,8 @@ useEffect(() => {
               </div>
             )}
             {isPaidPro && (
-              <div className="inline-block mt-4 px-4 py-2 bg-green-100 border border-green-300 rounded-full">
-                <p className="text-sm font-semibold text-green-700">You are on Pro Plan</p>
+              <div className="inline-block mt-4 px-3 sm:px-4 py-2 bg-green-100 border border-green-300 rounded-full">
+                <p className="text-xs sm:text-sm font-semibold text-green-700">You are on Pro Plan</p>
               </div>
             )}
           </div>
@@ -436,25 +436,25 @@ useEffect(() => {
             {/* FREE PLAN CARD */}
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative h-full p-8 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col">
+              <div className="relative h-full p-5 sm:p-8 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col">
                 {/* Badge */}
                 {!isPro && (
-                  <div className="absolute -top-3 left-4 px-3 py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded-full">
+                  <div className="absolute -top-3 left-4 px-2 sm:px-3 py-0.5 sm:py-1 bg-gray-200 text-gray-700 text-xs font-semibold rounded-full">
                     Current Plan
                   </div>
                 )}
 
                 {/* Plan Name */}
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Free</h3>
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Free</h3>
 
                 {/* Price */}
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">{currencySymbol}0</span>
-                  <span className="text-gray-600 ml-2 text-lg">Forever</span>
+                  <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">{currencySymbol}0</span>
+                  <span className="text-gray-600 ml-2 text-base sm:text-lg">Forever</span>
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+                <p className="text-xs sm:text-sm text-gray-600 mb-6 leading-relaxed">
                   Perfect for getting started with CatShare's core features.
                 </p>
 
@@ -462,23 +462,23 @@ useEffect(() => {
                 {!isPro ? (
                   <button
                     disabled
-                    className="w-full py-3 px-4 bg-gray-200 text-gray-600 font-semibold rounded-lg mb-6 cursor-not-allowed"
+                    className="w-full py-2 sm:py-3 px-4 bg-gray-200 text-gray-600 font-semibold text-sm sm:text-base rounded-lg mb-6 cursor-not-allowed"
                   >
                     Current Plan
                   </button>
                 ) : (
                   <button
                     onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
-                    className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition mb-6"
+                    className="w-full py-2 sm:py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold text-sm sm:text-base rounded-lg hover:bg-gray-50 transition mb-6"
                   >
                     Manage Account
                   </button>
                 )}
 
                 {/* Features */}
-                <div className="space-y-4 flex-1">
+                <div className="space-y-3 sm:space-y-4 flex-1">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Included</p>
-                  <ul className="space-y-3 text-sm">
+                  <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                     <li className="flex items-start gap-3">
                       <span className="text-green-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Up to {FREE_MAX_PRODUCTS} products</span>
@@ -517,17 +517,17 @@ useEffect(() => {
               {/* Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 to-purple-400/30 rounded-2xl blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-              <div className="relative h-full p-8 bg-white/80 backdrop-blur-xl border-2 border-transparent bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-2xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden">
+              <div className="relative h-full p-5 sm:p-8 bg-white/80 backdrop-blur-xl border-2 border-transparent bg-gradient-to-br from-white to-gray-50/50 rounded-2xl shadow-2xl hover:shadow-2xl transition-all duration-300 flex flex-col overflow-hidden">
                 {/* Gradient Border Effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-purple-500/10 to-transparent rounded-2xl pointer-events-none"></div>
 
                 {/* Badge */}
-                <div className="relative z-10 absolute -top-3 right-4 px-4 py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold rounded-full">
+                <div className="relative z-10 absolute -top-2 sm:-top-3 right-3 sm:right-4 px-2 sm:px-4 py-0.5 sm:py-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold rounded-full">
                   Most Popular
                 </div>
 
                 {/* Plan Name */}
-                <h3 className="relative z-10 text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                <h3 className="relative z-10 text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
                   Pro
                 </h3>
 
@@ -537,33 +537,33 @@ useEffect(() => {
                     isAndroid ? (
                       billingFrequency === "monthly" && prices?.[SUBSCRIPTION_SKUS.monthly] ? (
                         <>
-                          <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.monthly]}</span>
-                          <span className="text-gray-600 ml-2">/month</span>
+                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.monthly]}</span>
+                          <span className="text-gray-600 ml-2 text-sm sm:text-base">/month</span>
                         </>
                       ) : billingFrequency === "yearly" && prices?.[SUBSCRIPTION_SKUS.yearly] ? (
                         <>
-                          <span className="text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.yearly]}</span>
-                          <span className="text-gray-600 ml-2">/year</span>
+                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">{prices[SUBSCRIPTION_SKUS.yearly]}</span>
+                          <span className="text-gray-600 ml-2 text-sm sm:text-base">/year</span>
                         </>
                       ) : (
-                        <span className="text-lg font-semibold text-gray-500">Loading price...</span>
+                        <span className="text-base sm:text-lg font-semibold text-gray-500">Loading price...</span>
                       )
                     ) : (
                       <>
-                        <span className="text-4xl font-bold text-gray-900">{currencySymbol}9.99</span>
-                        <span className="text-gray-600 ml-2">/month</span>
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">{currencySymbol}9.99</span>
+                        <span className="text-gray-600 ml-2 text-sm sm:text-base">/month</span>
                       </>
                     )
                   ) : (
                     <>
-                      <span className="text-4xl font-bold text-gray-900">Pro</span>
-                      <span className="text-gray-600 ml-2">Active</span>
+                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">Pro</span>
+                      <span className="text-gray-600 ml-2 text-sm sm:text-base">Active</span>
                     </>
                   )}
                 </div>
 
                 {/* Description */}
-                <p className="relative z-10 text-sm text-gray-600 mb-6 leading-relaxed">
+                <p className="relative z-10 text-xs sm:text-sm text-gray-600 mb-6 leading-relaxed">
                   Unlock unlimited possibilities and professional features.
                 </p>
 
@@ -572,7 +572,7 @@ useEffect(() => {
                   <div className="md:hidden flex gap-2 mb-6">
                     <button
                       onClick={() => setBillingFrequency("monthly")}
-                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm ${
+                      className={`flex-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-semibold transition text-xs sm:text-sm ${
                         billingFrequency === "monthly"
                           ? "bg-blue-600 text-white shadow-lg"
                           : "bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-300"
@@ -582,7 +582,7 @@ useEffect(() => {
                     </button>
                     <button
                       onClick={() => setBillingFrequency("yearly")}
-                      className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm relative ${
+                      className={`flex-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-semibold transition text-xs sm:text-sm relative ${
                         billingFrequency === "yearly"
                           ? "bg-purple-600 text-white shadow-lg"
                           : "bg-white border-2 border-gray-200 text-gray-700 hover:border-purple-300"
@@ -610,7 +610,7 @@ useEffect(() => {
                         }
                       }}
                       disabled={loading}
-                      className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-bold rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
+                      className="relative z-10 w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-bold text-sm sm:text-base rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
                     >
                       {loading ? "Processing..." : `Upgrade Now${
                         billingFrequency === "monthly" && prices?.[SUBSCRIPTION_SKUS.monthly]
@@ -623,7 +623,7 @@ useEffect(() => {
                   ) : (
                     <button
                       onClick={() => alert("Payments are only available on the Android app. Please open CatShare on your Android device to upgrade.")}
-                      className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
+                      className="relative z-10 w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
                     >
                       Upgrade Now
                     </button>
@@ -631,16 +631,16 @@ useEffect(() => {
                 ) : (
                   <button
                     onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
-                    className="relative z-10 w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg mb-6 shadow-lg hover:shadow-xl"
+                    className="relative z-10 w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm sm:text-base rounded-lg mb-6 shadow-lg hover:shadow-xl"
                   >
                     Manage Account
                   </button>
                 )}
 
                 {/* Features */}
-                <div className="relative z-10 space-y-4 flex-1">
+                <div className="relative z-10 space-y-3 sm:space-y-4 flex-1">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Everything in Free, plus:</p>
-                  <ul className="space-y-3 text-sm">
+                  <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Unlimited Products</span>
@@ -681,14 +681,14 @@ useEffect(() => {
 
           {/* FEATURE COMPARISON TABLE */}
           <div className="mt-12 mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Feature Comparison</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 text-center">Feature Comparison</h3>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b-2 border-gray-200">
-                    <th className="text-left py-4 px-6 font-bold text-gray-900">Feature</th>
-                    <th className="text-center py-4 px-6 font-bold text-gray-700">Free</th>
-                    <th className="text-center py-4 px-6 font-bold text-gray-700">Pro</th>
+                    <th className="text-left py-3 sm:py-4 px-3 sm:px-6 font-bold text-xs sm:text-sm md:text-base text-gray-900">Feature</th>
+                    <th className="text-center py-3 sm:py-4 px-3 sm:px-6 font-bold text-xs sm:text-sm md:text-base text-gray-700">Free</th>
+                    <th className="text-center py-3 sm:py-4 px-3 sm:px-6 font-bold text-xs sm:text-sm md:text-base text-gray-700">Pro</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -699,7 +699,7 @@ useEffect(() => {
                         idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                       }`}
                     >
-                      <td className="py-4 px-6 font-medium text-gray-800">{feature.name}</td>
+                      <td className="py-3 sm:py-4 px-3 sm:px-6 font-medium text-xs sm:text-sm text-gray-800">{feature.name}</td>
                       <td className="text-center py-4 px-6">
                         <span className="text-gray-700 text-sm">{feature.free}</span>
                       </td>
