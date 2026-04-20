@@ -60,7 +60,8 @@ function formatLineCalculationDetail(
   if (!Number.isFinite(unit)) return null;
   const label = getOrderUnitLabel(item.priceUnit);
   const priceStr = formatUnitPrice(item.price, currencySymbol);
-  return `${q} ${label} × ${priceStr}`;
+  const qstep = normalizeOrderQuantityStep(item.quantityStep);
+  return `${q} ${label} (${Math.round(q / qstep)}) × ${priceStr}`;
 }
 
 function isPublicHttpUrl(url: string): boolean {
