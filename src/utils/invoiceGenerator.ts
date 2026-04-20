@@ -276,11 +276,12 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     pdf.setDrawColor(241, 245, 249);
     pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
 
-    // 1. Item Name + Subtitle
-    addUniformText(pdf, item.name, MARGIN + 4, currentY + 5.5, 4.75, '#000000', false);
-    if (item.subtitle) {
-      addUniformText(pdf, item.subtitle, MARGIN + 4, currentY + 11.5, 3.6, '#64748B', false);
-    }
+    // 1. Serial No + Item Name + Subtitle
+addUniformText(pdf, `${index + 1}.`, MARGIN + 4, currentY + 5.5, 4.75, '#363a3fff', false);
+addUniformText(pdf, item.name, MARGIN + 11, currentY + 5.5, 4.75, '#000000', false);
+if (item.subtitle) {
+  addUniformText(pdf, item.subtitle, MARGIN + 11, currentY + 11.5, 3.6, '#64748B', false);
+}
 
     // 2. Qty + Unit
     const qtyLabel = formatQuantityLabel(item.quantity, item.priceUnit);
