@@ -1975,15 +1975,20 @@ useEffect(() => {
                             <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
                           ) : null}
                         </div>
-                        <QtyStepper
-                          value={it.quantity}
-                          step={it.quantityStep ?? 1}
-                          onChange={(qty) => {
-                            setEditItems((prev) =>
-                              prev.map((x) => (x._key === it._key ? { ...x, quantity: qty } : x))
-                            );
-                          }}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <div style={{ fontSize: 11, color: COLORS.muted }}>
+                            ({Math.round(it.quantity / (it.quantityStep ?? 1))} sets)
+                          </div>
+                          <QtyStepper
+                            value={it.quantity}
+                            step={it.quantityStep ?? 1}
+                            onChange={(qty) => {
+                              setEditItems((prev) =>
+                                prev.map((x) => (x._key === it._key ? { ...x, quantity: qty } : x))
+                              );
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
