@@ -453,6 +453,204 @@ function EditItemRow({
   );
 }
 
+// ─── Date Range Picker ────────────────────────────────────────────────────────
+function DateRangePicker({
+  startDate,
+  endDate,
+  onChange,
+}: {
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
+}) {
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [hoverDate, setHoverDate] = useState<string>('');
+
+  const toStr = (d: Date) => d.toISOString().split('T')[0];
+
+  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const handleDayClick = (dateStr: string) => {
+    if (!startDate || (startDate && endDate)) {
+      onChange(dateStr, '');
+    } else {
+      if (dateStr < startDate) onChange(dateStr, startDate);
+      else onChange(startDate, dateStr);
+    }
+  };
+
+  const isStart = (d: string) => d === startDate;
+  const isEnd = (d: string) => d === endDate;
+  const isInRange = (d: string) => {
+    const compareEnd = endDate || hoverDate;
+    if (!startDate || !compareEnd) return false;
+    const [s, e] = startDate < compareEnd ? [startDate, compareEnd] : [compareEnd, startDate];
+    return d > s && d < e;
+  };
+  const isRangeEdge = (d: string) => isStart(d) || isEnd(d);
+
+  const days: (string | null)[] = [];
+  const firstDay = firstDayOfMonth(viewYear, viewMonth);
+  for (let i = 0; i < firstDay; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth(viewYear, viewMonth); i++) {
+    days.push(toStr(new Date(viewYear, viewMonth, i)));
+  }
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 1,
+      paddingTop: 14,
+      borderTop: '1px solid rgba(255,255,255,0.15)',
+      animation: 'slideDown 0.2s ease-out',
+    }}>
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+      {/* Month Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <button
+          onClick={prevMonth}
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.2)',
+            background: 'rgba(255,255,255,0.1)',
+            color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', letterSpacing: '0.2px' }}>
+          {monthNames[viewMonth]} {viewYear}
+        </span>
+        <button
+          onClick={nextMonth}
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.2)',
+            background: 'rgba(255,255,255,0.1)',
+            color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Day Names */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 }}>
+        {dayNames.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', padding: '4px 0', letterSpacing: '0.5px' }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Days Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px 0' }}>
+        {days.map((dateStr, i) => {
+          if (!dateStr) return <div key={`empty-${i}`} />;
+
+          const edge = isRangeEdge(dateStr);
+          const inRange = isInRange(dateStr);
+          const isToday = dateStr === toStr(today);
+          const isStartDay = isStart(dateStr);
+          const isEndDay = isEnd(dateStr);
+
+          return (
+            <div
+              key={dateStr}
+              onClick={() => handleDayClick(dateStr)}
+              onMouseEnter={() => { if (startDate && !endDate) setHoverDate(dateStr); }}
+              onMouseLeave={() => setHoverDate('')}
+              style={{
+                position: 'relative',
+                height: 34,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+                background: inRange ? 'rgba(255,255,255,0.15)' : 'transparent',
+                borderRadius: isStartDay ? '50% 0 0 50%' : isEndDay ? '0 50% 50% 0' : 0,
+              }}
+            >
+              <div style={{
+                width: 30, height: 30,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '50%',
+                background: edge ? '#fff' : 'transparent',
+                border: isToday && !edge ? '1px solid rgba(255,255,255,0.4)' : 'none',
+                fontSize: 12,
+                fontWeight: edge ? 700 : 400,
+                color: edge ? '#1e40af' : inRange ? '#fff' : 'rgba(255,255,255,0.85)',
+                transition: 'all 0.1s',
+              }}>
+                {new Date(dateStr + 'T00:00:00').getDate()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>
+          {startDate && endDate
+            ? `${formatDate(startDate)} – ${formatDate(endDate)}`
+            : startDate
+            ? 'Select end date'
+            : 'Select start date'}
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => onChange('', '')}
+            style={{
+              padding: '5px 12px',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.25)',
+              borderRadius: 100,
+              fontSize: 11, fontFamily: 'inherit',
+              color: 'rgba(255,255,255,0.7)',
+              cursor: 'pointer', fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)';
+              (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)';
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Main Orders Component ────────────────────────────────────────────────────
 export default function Orders() {
@@ -468,6 +666,9 @@ export default function Orders() {
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
+  const [dateRangeStart, setDateRangeStart] = useState<string>('');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
+  const [showDateFilters, setShowDateFilters] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -642,6 +843,18 @@ export default function Orders() {
       .reduce((s, o) => s + (o.total_amount || 0), 0),
   };
   const symbol = orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹';
+
+  // Calculate sales within date range
+  const filteredSales = orders
+    .filter(o => o.status === 'completed' && o.total_amount)
+    .filter(o => {
+      if (!dateRangeStart && !dateRangeEnd) return true;
+      const orderDate = new Date(o.created_at || '').getTime();
+      const startTime = dateRangeStart ? new Date(dateRangeStart).getTime() : 0;
+      const endTime = dateRangeEnd ? new Date(dateRangeEnd).getTime() + 86400000 : Infinity; // Add 1 day to end date
+      return orderDate >= startTime && orderDate <= endTime;
+    })
+    .reduce((s, o) => s + (o.total_amount || 0), 0);
 
   const shouldRestoreScroll =
     location.pathname === '/orders' && !loading && !error;
@@ -890,8 +1103,115 @@ export default function Orders() {
       {/* Content */}
       <main
         ref={scrollRef}
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70, paddingTop: 50 }}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
+        {/* Sales Box at Top of Scrollable Content */}
+        <div style={{
+          background: '#fff',
+          borderBottom: '1px solid #E2E8F0',
+          padding: '55px 16px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}>
+          {/* Sales Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)',
+            borderRadius: '16px',
+            padding: '24px',
+            color: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            boxShadow: '0 10px 30px rgba(37, 99, 235, 0.15)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Background accent */}
+            <div style={{
+              position: 'absolute',
+              top: -20,
+              right: -20,
+              width: 120,
+              height: 120,
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              pointerEvents: 'none',
+            }} />
+
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+  <div>
+    <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 500, letterSpacing: '0.3px' }}>Total Sales Revenue</div>
+    <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-1px', marginTop: 4 }}>
+      {formatMoney(filteredSales, symbol)}
+    </div>
+  </div>
+  <div style={{ display: 'flex', alignItems: 'flex-end', alignSelf: 'stretch' }}>
+    <button
+      onClick={() => setShowDateFilters(!showDateFilters)}
+      style={{
+        width: 28, height: 28,
+        background: 'rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.25)',
+        borderRadius: '50%',
+        color: '#fff',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.2s',
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.25)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
+      }}
+    >
+      <svg
+        width="14" height="14" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+        style={{
+          transition: 'transform 0.2s ease',
+          transform: showDateFilters ? 'rotate(180deg)' : 'rotate(0deg)',
+        }}
+      >
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+            {(dateRangeStart || dateRangeEnd) && (
+              <div style={{
+                fontSize: 12,
+                opacity: 0.8,
+                fontWeight: 500,
+                position: 'relative',
+                zIndex: 1,
+              }}>
+                {dateRangeStart && dateRangeEnd
+                  ? `${formatDate(dateRangeStart)} to ${formatDate(dateRangeEnd)}`
+                  : dateRangeStart
+                  ? `From ${formatDate(dateRangeStart)}`
+                  : `Until ${formatDate(dateRangeEnd)}`
+                }
+              </div>
+            )}
+
+            {/* Collapsible Date Range Filter */}
+            {showDateFilters && (
+  <DateRangePicker
+    startDate={dateRangeStart}
+    endDate={dateRangeEnd}
+    onChange={(start, end) => {
+      setDateRangeStart(start);
+      setDateRangeEnd(end);
+    }}
+  />
+)}
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
