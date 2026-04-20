@@ -1787,7 +1787,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   </label>
 
                   <label className="flex items-center gap-1 text-xs">
-                    Image BG:
+                    Badge:
                     {["white", "transparent"].map((color) => (
                       <div
                         key={color}
