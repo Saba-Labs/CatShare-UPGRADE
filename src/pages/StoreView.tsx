@@ -568,6 +568,7 @@ export default function StoreView() {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
+      const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
       const rowTotal = unitPrice * quantity;
       const pr = product as Record<string, unknown>;
       const iv = pr.imageVersion ?? pr.image_version;
@@ -578,6 +579,7 @@ export default function StoreView() {
         unitPrice,
         rowTotal,
         priceUnit,
+        quantityStep,
         imageUrl: pickProductImageSrc(product),
         imageVersion: typeof iv === 'number' && Number.isFinite(iv) ? iv : undefined,
         subtitle: product.subtitle,
@@ -1026,10 +1028,7 @@ export default function StoreView() {
               <>
                 <div className="sv-review-list">
                   {reviewSummary.items.map((item: any) => {
-                    const product = allProducts.find((p) => p.id === item.productId);
-                    const catData = product && store?.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-                    const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
-                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, qstep);
+                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
                     return (
                       <div key={item.productId} className="sv-rcard">
                         <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
