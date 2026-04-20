@@ -1008,7 +1008,7 @@ export default function CreateOrder() {
                             marginTop: 2,
                           }}>
                             <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
-                              {quantity} {getOrderUnitLabel(priceUnit)} × ₹{price.toLocaleString('en-IN')}
+                              {quantity} {getOrderUnitLabel(priceUnit)} ({Math.round(quantity / quantityStep)}) × ₹{price.toLocaleString('en-IN')}
                             </span>
                             <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
                             <span style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
