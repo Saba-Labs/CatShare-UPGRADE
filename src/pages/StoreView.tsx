@@ -279,9 +279,9 @@ function unitLabel(u?: string): string {
   return c;
 }
 function fmt(n: number, sym: string) { return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`; }
-function fmtCalc(qty: number, price: number, u: string | undefined, sym: string): string | null {
+function fmtCalc(qty: number, price: number, u: string | undefined, sym: string, qstep: number = 1): string | null {
   if (qty <= 0 || !Number.isFinite(price)) return null;
-  return `${qty} ${unitLabel(u)} × ${fmt(price, sym)}`;
+  return `${qty} ${unitLabel(u)} (${Math.round(qty / qstep)}) × ${fmt(price, sym)}`;
 }
 function isPublicUrl(url?: string): boolean {
   if (!url) return false;
@@ -879,7 +879,7 @@ export default function StoreView() {
               const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
               const imgUrl = displayStoreProductImage(product);
-              const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
+              const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
               return (
                 <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
                   <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
@@ -1026,7 +1026,10 @@ export default function StoreView() {
               <>
                 <div className="sv-review-list">
                   {reviewSummary.items.map((item: any) => {
-                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
+                    const product = allProducts.find((p) => p.id === item.productId);
+                    const catData = product && store?.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+                    const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, qstep);
                     return (
                       <div key={item.productId} className="sv-rcard">
                         <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
@@ -1080,7 +1083,7 @@ export default function StoreView() {
           const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
-          const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol) : null;
+          const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             const value = (drawerProduct as Record<string, unknown>)[`field${n}`];
             if (value == null || String(value).trim() === '') return null;
