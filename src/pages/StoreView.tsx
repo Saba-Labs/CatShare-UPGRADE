@@ -979,7 +979,7 @@ export default function StoreView() {
                         {orderSummary.items.map((item: any) => {
                           const catData = store?.catalogueId ? getCatalogueData(allProducts.find(p => p.id === item.productId), store.catalogueId) : null;
                           const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
-                          const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol);
+                          const cd = item.quantity > 0 ? fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep) : null;
                           return (
                             <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px', opacity: item.quantity === 0 ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
                               <div style={{ display: 'flex', gap: 12 }}>
