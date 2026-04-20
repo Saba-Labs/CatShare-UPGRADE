@@ -1962,6 +1962,12 @@ useEffect(() => {
                           transition: 'opacity 0.2s ease',
                         }}
                       >
+                        <div style={{
+  fontSize: 13, fontWeight: 700, color: '#94A3B8',
+  flexShrink: 0, minWidth: 20, marginRight: -12,
+}}>
+  {i + 1}.
+</div>
                         <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} imageVersion={it.imageVersion} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
@@ -2231,6 +2237,12 @@ useEffect(() => {
                       <div key={i}>
                         {i > 0 && <Divider />}
                         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0', gap: 12 }}>
+                          <div style={{
+  fontSize: 13, fontWeight: 700, color: '#94A3B8',
+  flexShrink: 0, minWidth: 20, marginRight: -12,
+}}>
+  {i + 1}.
+</div>
                           <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} imageVersion={item.imageVersion} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
