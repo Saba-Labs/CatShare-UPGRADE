@@ -82,6 +82,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [supabaseDataLoading, setSupabaseDataLoading] = useState(false);
 
   const intentionalLogoutRef = useRef(false);
+  const intentionalLogoutResetTimerRef = useRef<number | null>(null);
+  const clearIntentionalLogoutResetTimer = useCallback(() => {
+    if (intentionalLogoutResetTimerRef.current !== null) {
+      window.clearTimeout(intentionalLogoutResetTimerRef.current);
+      intentionalLogoutResetTimerRef.current = null;
+    }
+  }, []);
 
   const refreshSupabaseData = useCallback(async (opts?: { skipLoadingIndicator?: boolean }): Promise<SupabaseUserData | null> => {
     if (authService.isOfflineGuest()) return null;
@@ -295,7 +302,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         // If logout was intentional, don't try to recover — clear immediately
         if (intentionalLogoutRef.current) {
+          clearIntentionalLogoutResetTimer();
           clearSignedOutState();
+          intentionalLogoutRef.current = false;
           return;
         }
 
@@ -316,16 +325,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     return () => {
       cancelled = true;
+      clearIntentionalLogoutResetTimer();
       sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
       window.removeEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
     };
-  }, []);
+  }, [clearIntentionalLogoutResetTimer]);
 
   const logout = async () => {
     try {
       setError(null);
+      clearIntentionalLogoutResetTimer();
       intentionalLogoutRef.current = true;
+      intentionalLogoutResetTimerRef.current = window.setTimeout(() => {
+        intentionalLogoutRef.current = false;
+        intentionalLogoutResetTimerRef.current = null;
+      }, 3000);
 
       // Delete push token for this device before logout
       try {
@@ -365,8 +380,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);
       throw err;
-    } finally {
-      intentionalLogoutRef.current = false;
     }
   };
 

@@ -13,7 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { initializeFieldSystem } from "./config/initializeFields";
-import { getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
+import { DEFAULT_FIELDS, getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
 import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
@@ -69,7 +69,7 @@ import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
-import { getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
+import { DEFAULT_CATALOGUES, getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
 import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
@@ -124,6 +124,8 @@ function AppWithBackHandler() {
   const [offlineDeleteLoading, setOfflineDeleteLoading] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
   const [syncProgressPercent, setSyncProgressPercent] = useState(0);
+  const cloudMigrationMarkingRef = useRef<Set<string>>(new Set());
+  const [cloudGateTimedOutUid, setCloudGateTimedOutUid] = useState<string | null>(null);
 
   useEffect(() => {
     (window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress =
@@ -151,6 +153,125 @@ function AppWithBackHandler() {
     startupPhase === "pending";
 
   const isNative = Capacitor.getPlatform() !== "web";
+  const OFFLINE_MIGRATION_PENDING_PREFIX = "offlineMigrationPending::";
+
+  const parseJsonSafe = useCallback((raw: string | null): any | null => {
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const toCatalogueSignature = useCallback((catalogue: any) => {
+    if (!catalogue || typeof catalogue !== "object") return null;
+    return {
+      id: String(catalogue.id ?? ""),
+      label: String(catalogue.label ?? ""),
+      priceField: String(catalogue.priceField ?? ""),
+      priceUnitField: String(catalogue.priceUnitField ?? ""),
+      stockField: String(catalogue.stockField ?? ""),
+      folder: String(catalogue.folder ?? ""),
+      order: Number(catalogue.order ?? 0),
+      isDefault: Boolean(catalogue.isDefault),
+      heroImage: String(catalogue.heroImage ?? ""),
+      description: String(catalogue.description ?? ""),
+    };
+  }, []);
+
+  const isMeaningfulCataloguesDefinition = useCallback((definition: any): boolean => {
+    const catalogues = Array.isArray(definition?.catalogues) ? definition.catalogues : [];
+    if (catalogues.length === 0) return false;
+    if (catalogues.length !== DEFAULT_CATALOGUES.length) return true;
+
+    const normalizedCurrent = catalogues
+      .map((c: any) => toCatalogueSignature(c))
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.id.localeCompare(b.id));
+    const normalizedDefault = DEFAULT_CATALOGUES
+      .map((c) => toCatalogueSignature(c))
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.id.localeCompare(b.id));
+
+    return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedDefault);
+  }, [toCatalogueSignature]);
+
+  const toFieldSignature = useCallback((field: any) => {
+    if (!field || typeof field !== "object") return null;
+    return {
+      key: String(field.key ?? ""),
+      label: String(field.label ?? ""),
+      type: String(field.type ?? ""),
+      enabled: field.enabled !== false,
+      visible: field.visible !== false,
+      unitsEnabled: field.unitsEnabled === true,
+      unitField: String(field.unitField ?? ""),
+      defaultUnit: String(field.defaultUnit ?? ""),
+      unitOptions: Array.isArray(field.unitOptions) ? field.unitOptions.map((u: any) => String(u)) : [],
+      visibility: {
+        shareImage: field.visibility?.shareImage !== false,
+        pdf: field.visibility?.pdf !== false,
+        orderLink: field.visibility?.orderLink !== false,
+        onlineStore: field.visibility?.onlineStore !== false,
+      },
+    };
+  }, []);
+
+  const isMeaningfulFieldsDefinition = useCallback((definition: any): boolean => {
+    const fields = Array.isArray(definition?.fields) ? definition.fields : [];
+    if (fields.length === 0) return false;
+    if (fields.length !== DEFAULT_FIELDS.length) return true;
+
+    const normalizedCurrent = fields
+      .map((f: any) => toFieldSignature(f))
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.key.localeCompare(b.key));
+    const normalizedDefault = DEFAULT_FIELDS
+      .map((f) => toFieldSignature(f))
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.key.localeCompare(b.key));
+
+    return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedDefault);
+  }, [toFieldSignature]);
+
+  const markOfflineMigrationCompletedInCloud = useCallback(async (uid: string) => {
+    if (!uid) return false;
+    if (cloudMigrationMarkingRef.current.has(uid)) return false;
+    const pendingKey = `${OFFLINE_MIGRATION_PENDING_PREFIX}${uid}`;
+    cloudMigrationMarkingRef.current.add(uid);
+    try {
+      const { syncUserSettings } = await import("./services/supabaseSync");
+      const result = await syncUserSettings(uid, {
+        data: {
+          offline_migration_completed: true,
+          offline_migration_completed_at: new Date().toISOString(),
+        },
+      });
+      if (!result.success) {
+        console.warn("⚠️ Failed to mark offline migration completed in cloud:", result.error);
+        localStorage.setItem(pendingKey, "1");
+        return false;
+      }
+      localStorage.removeItem(pendingKey);
+      return true;
+    } catch (err) {
+      console.warn("⚠️ Failed to mark offline migration completed in cloud:", err);
+      localStorage.setItem(pendingKey, "1");
+      return false;
+    } finally {
+      cloudMigrationMarkingRef.current.delete(uid);
+    }
+  }, []);
+
+  // Retry any pending cloud migration marker write (e.g. temporary network failure).
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid) return;
+    const pendingKey = `${OFFLINE_MIGRATION_PENDING_PREFIX}${uid}`;
+    if (localStorage.getItem(pendingKey) !== "1") return;
+    void markOfflineMigrationCompletedInCloud(uid);
+  }, [user?.uid, markOfflineMigrationCompletedInCloud]);
 
   // Prefetch CatalogueApp JS while auth + Supabase profile load — same chunk as lazy route, faster time-to-interactive.
   useEffect(() => {
@@ -234,6 +355,7 @@ function AppWithBackHandler() {
       startupRanForUserRef.current = null;
       strictBootstrapRanRef.current = null;
       setCatalogueFirstLoadSettled(false);
+      setCloudGateTimedOutUid(null);
       setProducts([]);
       setDeletedProducts([]);
       return;
@@ -390,9 +512,41 @@ function AppWithBackHandler() {
       return;
     }
 
+    // For one-time migration policy, wait briefly for auth snapshot so cloud migration flag is reliable.
+    // Safety net: never block startup forever if profile load hangs.
+    if (supabaseDataLoading) {
+      if (cloudGateTimedOutUid !== userId) {
+        const timer = window.setTimeout(() => {
+          setCloudGateTimedOutUid(userId);
+        }, 2000);
+        return () => window.clearTimeout(timer);
+      }
+      console.warn("⚠️ [startup] Proceeding after cloud profile wait timeout");
+    } else if (cloudGateTimedOutUid === userId) {
+      setCloudGateTimedOutUid(null);
+    }
+
     // Only run step 3/4 once per user (strict path above does not set this ref).
     if (startupRanForUserRef.current === userId) return;
     startupRanForUserRef.current = userId;
+
+    const cloudMigrationCompleted =
+      supabaseData?.userSettings?.data?.offline_migration_completed === true;
+    const hasCloudAccountData = Boolean(
+      (Array.isArray(supabaseData?.products) && supabaseData.products.length > 0) ||
+      (Array.isArray(supabaseData?.deletedProducts) && supabaseData.deletedProducts.length > 0) ||
+      (Array.isArray(supabaseData?.categories) && supabaseData.categories.length > 0) ||
+      supabaseData?.fieldsDefinition ||
+      supabaseData?.cataloguesDefinition ||
+      supabaseData?.userSettings
+    );
+
+    // Existing online account without migration flag: mark once and never ask again.
+    if (!cloudMigrationCompleted && hasCloudAccountData) {
+      void markOfflineMigrationCompletedInCloud(userId);
+      localStorage.setItem('offlineLegacyResolved::device', 'true');
+      localStorage.setItem('strictOnlineMode::device', 'true');
+    }
 
     // Step 3: Check for legacy offline data (ANY type, not just products).
     const hasLegacyProducts = (() => {
@@ -411,11 +565,26 @@ function AppWithBackHandler() {
         return Array.isArray(c) && c.length > 0;
       } catch { return false; }
     })();
-    const hasLegacyFields = Boolean(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
-    const hasLegacyCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
+    const hasLegacyFields = (() => {
+      const keyed = parseJsonSafe(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
+      const unkeyed = parseJsonSafe(localStorage.getItem('fieldsDefinition'));
+      return isMeaningfulFieldsDefinition(keyed) || isMeaningfulFieldsDefinition(unkeyed);
+    })();
+    const hasLegacyCatalogues = (() => {
+      const keyed = parseJsonSafe(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
+      const unkeyed = parseJsonSafe(localStorage.getItem('cataloguesDefinition'));
+      return isMeaningfulCataloguesDefinition(keyed) || isMeaningfulCataloguesDefinition(unkeyed);
+    })();
     const hasAnyOfflineData = hasLegacyProducts || hasLegacyDeleted || hasLegacyCategories || hasLegacyFields || hasLegacyCatalogues;
 
-    if (!legacyResolved && hasAnyOfflineData) {
+    const shouldShowOfflineSyncPrompt =
+      !supabaseDataLoading &&
+      !cloudMigrationCompleted &&
+      !hasCloudAccountData &&
+      !legacyResolved &&
+      hasAnyOfflineData;
+
+    if (shouldShowOfflineSyncPrompt) {
       // Step 3a: Offline data found, needs resolution. Show popup and block.
       setStartupPhase('resolving');
       setShowOfflineSyncModal(true);
@@ -491,7 +660,19 @@ function AppWithBackHandler() {
     setCatalogueFirstLoadSettled(true);
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
-  }, [loading, user?.uid, supabaseData, supabaseDataLoading, clearLegacyUnkeyedProductCaches, refreshFromCloud]);
+  }, [
+    loading,
+    user?.uid,
+    supabaseData,
+    supabaseDataLoading,
+    clearLegacyUnkeyedProductCaches,
+    refreshFromCloud,
+    parseJsonSafe,
+    isMeaningfulFieldsDefinition,
+    isMeaningfulCataloguesDefinition,
+    markOfflineMigrationCompletedInCloud,
+    cloudGateTimedOutUid,
+  ]);
 
   // Strict-mode: hydrate React state from local cache while Supabase profile is still loading.
   // Startup splash for returning users is capped at 2s; refreshFromCloud may still run afterward.
@@ -664,7 +845,7 @@ function AppWithBackHandler() {
         { percentFrom: 28, percentTo: 40, detailPrefix: 'Uploading shelf images' }
       );
 
-      setSyncPhase(42, 'Syncing categories…');
+      setSyncPhase(42, 'Reading local metadata…');
       let localCategories: any[] = [];
       try {
         const keyed = localStorage.getItem(getStorageKey('categories', userId));
@@ -673,21 +854,22 @@ function AppWithBackHandler() {
         localCategories = Array.isArray(raw) ? raw : [];
       } catch { localCategories = []; }
 
-      // Read catalogues/fields from keyed storage, fall back to unkeyed for legacy
-      let localCataloguesDefinition = getCataloguesDefinition(userId);
-      if (!localCataloguesDefinition || !localCataloguesDefinition.catalogues?.length) {
-        const unkeyedCat = localStorage.getItem('cataloguesDefinition');
-        if (unkeyedCat) {
-          try { localCataloguesDefinition = JSON.parse(unkeyedCat); } catch { /* keep default */ }
-        }
-      }
-      let localFieldsDefinition = getFieldsDefinition(userId);
-      if (!localFieldsDefinition) {
-        const unkeyedFields = localStorage.getItem('fieldsDefinition');
-        if (unkeyedFields) {
-          try { localFieldsDefinition = JSON.parse(unkeyedFields); } catch { /* keep null */ }
-        }
-      }
+      // Read raw local metadata first. Avoid treating bootstrap defaults as offline edits.
+      const keyedCataloguesRaw = parseJsonSafe(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
+      const unkeyedCataloguesRaw = parseJsonSafe(localStorage.getItem('cataloguesDefinition'));
+      const localCataloguesDefinition =
+        (keyedCataloguesRaw && typeof keyedCataloguesRaw === 'object' ? keyedCataloguesRaw : null) ||
+        (unkeyedCataloguesRaw && typeof unkeyedCataloguesRaw === 'object' ? unkeyedCataloguesRaw : null);
+
+      const keyedFieldsRaw = parseJsonSafe(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
+      const unkeyedFieldsRaw = parseJsonSafe(localStorage.getItem('fieldsDefinition'));
+      const localFieldsDefinition =
+        (keyedFieldsRaw && typeof keyedFieldsRaw === 'object' ? keyedFieldsRaw : null) ||
+        (unkeyedFieldsRaw && typeof unkeyedFieldsRaw === 'object' ? unkeyedFieldsRaw : null);
+
+      const shouldSyncCategories = Array.isArray(localCategories) && localCategories.length > 0;
+      const shouldSyncCatalogues = isMeaningfulCataloguesDefinition(localCataloguesDefinition);
+      const shouldSyncFields = isMeaningfulFieldsDefinition(localFieldsDefinition);
 
       const localShowWatermark = safeGetFromStorage('showWatermark', true);
       const localWatermarkText = safeGetFromStorage('watermarkText', 'Created using CatShare');
@@ -696,7 +878,22 @@ function AppWithBackHandler() {
       const localPriceUnits = safeGetFromStorage('priceFieldUnits', ['/ piece', '/ dozen', '/ set', '/ kg']);
       const localCustomCurrencies = safeGetFromStorage('customCurrencies', {});
 
-      {
+      setSyncPhase(50, 'Checking cloud snapshot…');
+      const remoteSnapshot = await fetchAllUserData(userId);
+      if (!remoteSnapshot.success || !remoteSnapshot.data) {
+        throw new Error(remoteSnapshot.error || 'Failed to fetch remote snapshot for merge');
+      }
+      const remoteData = remoteSnapshot.data;
+      const remoteProducts = Array.isArray(remoteData.products) ? remoteData.products : [];
+      const remoteDeleted = Array.isArray(remoteData.deletedProducts) ? remoteData.deletedProducts : [];
+      const hasCloudMetadata =
+        (Array.isArray(remoteData.categories) && remoteData.categories.length > 0) ||
+        Boolean(remoteData.cataloguesDefinition) ||
+        Boolean(remoteData.fieldsDefinition) ||
+        Boolean(remoteData.userSettings);
+
+      if (shouldSyncCategories) {
+        setSyncProgress('Syncing categories...');
         const categoriesForSync = localCategories.map((cat: any) =>
           typeof cat === 'string' ? { id: cat, name: cat } : cat
         );
@@ -704,19 +901,30 @@ function AppWithBackHandler() {
         if (!res.success) throw new Error(res.error || 'Categories sync failed');
       }
 
-      setSyncProgress('Syncing catalogues...');
-      if (localCataloguesDefinition) {
+      if (shouldSyncCatalogues) {
+        setSyncProgress('Syncing catalogues...');
         const res = await syncCataloguesDefinition(userId, localCataloguesDefinition);
         if (!res.success) throw new Error(res.error || 'Catalogues definition sync failed');
       }
 
-      setSyncProgress('Syncing fields...');
-      if (localFieldsDefinition) {
+      if (shouldSyncFields) {
+        setSyncProgress('Syncing fields...');
         const res = await syncFieldsDefinition(userId, localFieldsDefinition);
         if (!res.success) throw new Error(res.error || 'Fields definition sync failed');
       }
 
-      setSyncProgress('Syncing settings...');
+      const shouldSyncSettings =
+        shouldSyncCategories ||
+        shouldSyncCatalogues ||
+        shouldSyncFields ||
+        localProducts.length > 0 ||
+        localDeletedUpdated.length > 0 ||
+        !hasCloudMetadata;
+
+      if (shouldSyncSettings) {
+        setSyncProgress('Syncing settings...');
+      }
+      if (shouldSyncSettings) {
       {
         const res = await syncUserSettings(userId, {
           watermark_enabled: !!localShowWatermark,
@@ -727,14 +935,9 @@ function AppWithBackHandler() {
         });
         if (!res.success) throw new Error(res.error || 'User settings sync failed');
       }
-
-      setSyncPhase(68, 'Fetching cloud snapshot…');
-      const remoteSnapshot = await fetchAllUserData(userId);
-      if (!remoteSnapshot.success || !remoteSnapshot.data) {
-        throw new Error(remoteSnapshot.error || 'Failed to fetch remote snapshot for merge');
       }
-      const remoteProducts = Array.isArray(remoteSnapshot.data.products) ? remoteSnapshot.data.products : [];
-      const remoteDeleted = Array.isArray(remoteSnapshot.data.deletedProducts) ? remoteSnapshot.data.deletedProducts : [];
+
+      setSyncPhase(68, 'Merging with cloud snapshot…');
       const deletedIds = new Set<string>();
       for (const p of localDeletedUpdated) {
         if (p?.id != null) deletedIds.add(String(p.id));
@@ -795,6 +998,7 @@ function AppWithBackHandler() {
       localStorage.removeItem('fieldsDefinition');
       localStorage.setItem('offlineLegacyResolved::device', 'true');
       localStorage.setItem('strictOnlineMode::device', 'true');
+      void markOfflineMigrationCompletedInCloud(userId);
       clearAllOfflineCaches();
 
       setSyncPhase(100, 'Done');
@@ -819,7 +1023,7 @@ function AppWithBackHandler() {
         KeepAwake.allowSleep().catch(() => {});
       }
     }
-  }, [user, clearAllOfflineCaches, refreshFromCloud, showToast]);
+  }, [user, clearAllOfflineCaches, refreshFromCloud, showToast, parseJsonSafe, isMeaningfulCataloguesDefinition, isMeaningfulFieldsDefinition, markOfflineMigrationCompletedInCloud]);
 
   // ──────────────────────────────────────────────────────
   // R2 CLEANUP QUEUE (process orphaned images on startup)
@@ -837,6 +1041,7 @@ function AppWithBackHandler() {
   useEffect(() => {
     if (loading) return;
     if (startupPhase !== 'done') return;
+    if (supabaseDataLoading) return;
 
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
@@ -858,10 +1063,36 @@ function AppWithBackHandler() {
     const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/privacy', '/terms', '/website', '/o/'];
     const isOnPublicPage = publicPages.some(p => location.pathname.includes(p));
 
-    if (isNewUser && !hasPersistedFieldDefinition && !hasCompletedOnboarding && !isOnPublicPage) {
-      navigate('/welcome');
+    if (!(isNewUser && !hasPersistedFieldDefinition && !hasCompletedOnboarding && !isOnPublicPage)) {
+      return;
     }
-  }, [navigate, location.pathname, loading, startupPhase, supabaseData?.fieldsDefinition, user?.uid]);
+
+    // Safety net against auth/profile timing races:
+    // before redirecting to Welcome, verify once from cloud snapshot.
+    let cancelled = false;
+    void (async () => {
+      const latest = await refreshSupabaseData({ skipLoadingIndicator: true });
+      if (cancelled) return;
+
+      // If cloud refresh is uncertain/failed, do not force Welcome.
+      // Staying on home is safer than misclassifying an existing user as new.
+      if (!latest) {
+        console.warn("⚠️ [onboarding] Skipping Welcome redirect due to unresolved cloud snapshot");
+        return;
+      }
+
+      const hasCloudFields = Boolean(latest?.fieldsDefinition);
+      if (hasCloudFields) {
+        safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
+        return;
+      }
+      navigate('/welcome');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, location.pathname, loading, startupPhase, supabaseDataLoading, supabaseData?.fieldsDefinition, user?.uid, refreshSupabaseData]);
 
   // ──────────────────────────────────────────────────────
   // NATIVE: after fast refreshFromCloud, background image cache wrote imagePath — reload state
@@ -1560,6 +1791,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
 
                 localStorage.setItem('offlineLegacyResolved::device', 'true');
                 localStorage.setItem('strictOnlineMode::device', 'true');
+                void markOfflineMigrationCompletedInCloud(user.uid);
                 clearAllOfflineCaches();
                 clearLegacyUnkeyedProductCaches();
 
