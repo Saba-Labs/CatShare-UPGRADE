@@ -10,6 +10,18 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  for (const v of values) {
+    if (typeof v === 'string' && v.trim() !== '') return v.trim();
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
 /**
  * RPC may return jsonb as object or string; unwrap common shapes.
  */
@@ -149,6 +161,8 @@ export interface Store {
   isLive: boolean;
   /** Optional WhatsApp for public storefront (persisted as `stores.store_whatsapp`). */
   storeWhatsapp: string | null;
+  /** Optional minimum order total required to place orders on storefront. */
+  minimumOrderValue: number | null;
 }
 
 export interface StorePublic {
@@ -176,12 +190,24 @@ export interface StorePublic {
   twitter?: string | null;
   facebook?: string | null;
   website?: string | null;
+  minimumOrderValue?: number | null;
   /** False = seller paused the storefront (from `get_store_by_slug`). */
   isLive?: boolean;
 }
 
+function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
+  if (raw == null) return null;
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  if (!Number.isFinite(n)) return null;
+  if (n <= 0) return null;
+  return n;
+}
+
 function mapStoreRow(row: Record<string, unknown>): Store {
   const wa = row.store_whatsapp;
+  const minimumOrderValue = normalizeOptionalNonNegativeNumber(
+    row.minimum_order_value ?? row.minimumOrderValue
+  );
   return {
     id: String(row.id ?? ''),
     sellerUserId: String(row.seller_user_id ?? ''),
@@ -191,6 +217,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
     isLive: row.is_live !== false,
     storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
+    minimumOrderValue,
   };
 }
 
@@ -206,6 +233,24 @@ export function normalizeStoreWhatsappInput(raw: string): { ok: true; value: str
     return { ok: false, error: 'Number looks too long. Check and try again.' };
   }
   return { ok: true, value: t };
+}
+
+/** Trim; empty/0 => null. Must be a non-negative numeric amount. */
+export function normalizeStoreMinimumOrderValueInput(
+  raw: string
+): { ok: true; value: number | null } | { ok: false; error: string } {
+  const t = raw.trim();
+  if (!t) return { ok: true, value: null };
+  const cleaned = t.replace(/,/g, '');
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) {
+    return { ok: false, error: 'Enter a valid amount (numbers only).' };
+  }
+  if (n < 0) {
+    return { ok: false, error: 'Minimum order cannot be negative.' };
+  }
+  if (n === 0) return { ok: true, value: null };
+  return { ok: true, value: Number(n.toFixed(2)) };
 }
 
 /**
@@ -376,26 +421,138 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       }
     }
     const row = parsed as Record<string, unknown>;
+    let businessProfile =
+      asRecord(row.businessProfile) ??
+      asRecord(row.business_profile) ??
+      asRecord(row.seller_business_profile);
+
+    const sellerUserId =
+      firstNonEmptyString(row.sellerUserId, row.seller_user_id) ?? '';
+
+    const missingSocialsInRpc =
+      !firstNonEmptyString(
+        row.instagram,
+        row.sellerInstagram,
+        row.seller_instagram,
+        businessProfile?.instagram,
+      ) ||
+      !firstNonEmptyString(
+        row.twitter,
+        row.sellerTwitter,
+        row.seller_twitter,
+        businessProfile?.twitter,
+      ) ||
+      !firstNonEmptyString(
+        row.facebook,
+        row.sellerFacebook,
+        row.seller_facebook,
+        businessProfile?.facebook,
+      );
+
+    if (!businessProfile || missingSocialsInRpc) {
+      try {
+        const { data: userSettingsRow } = await client
+          .from('user_settings')
+          .select('data')
+          .eq('user_id', sellerUserId)
+          .maybeSingle();
+        const profileFromSettings = asRecord(
+          asRecord((userSettingsRow as Record<string, unknown> | null)?.data)?.businessProfile
+        );
+        if (profileFromSettings) {
+          businessProfile = { ...(businessProfile ?? {}), ...profileFromSettings };
+        }
+      } catch {
+        /* ignore; keep RPC-provided data only */
+      }
+    }
+
     let waRaw = row.whatsapp ?? row.store_whatsapp ?? row.storeWhatsapp;
     let whatsapp: string | undefined =
       typeof waRaw === 'string' && waRaw.trim() !== '' ? waRaw.trim() : undefined;
+    let minimumOrderValue = normalizeOptionalNonNegativeNumber(
+      row.minimumOrderValue ?? row.minimum_order_value ?? row.store_minimum_order_value
+    );
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp) {
+    if (!whatsapp || minimumOrderValue == null) {
       const { data: storeRow } = await client
         .from('stores')
-        .select('store_whatsapp')
+        .select('*')
         .eq('store_slug', normalizedSlug)
         .maybeSingle();
-      const col = storeRow && (storeRow as Record<string, unknown>).store_whatsapp;
+      const storeRecord = storeRow as Record<string, unknown> | null;
+      const col = storeRecord?.store_whatsapp;
       if (typeof col === 'string' && col.trim() !== '') {
         whatsapp = col.trim();
+      }
+      if (minimumOrderValue == null) {
+        minimumOrderValue = normalizeOptionalNonNegativeNumber(
+          storeRecord?.minimum_order_value ?? storeRecord?.minimumOrderValue
+        );
       }
     }
 
     const normalized: StorePublic = {
       ...(parsed as StorePublic),
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
+      sellerWebsite: firstNonEmptyString(
+        row.sellerWebsite,
+        row.seller_website,
+        businessProfile?.website,
+      ) ?? null,
+      sellerAbout: firstNonEmptyString(
+        row.sellerAbout,
+        row.seller_about,
+        businessProfile?.about,
+      ) ?? null,
+      sellerPhone: firstNonEmptyString(
+        row.sellerPhone,
+        row.seller_phone,
+        businessProfile?.phone,
+      ) ?? null,
+      sellerEmail: firstNonEmptyString(
+        row.sellerEmail,
+        row.seller_email,
+        businessProfile?.email,
+      ) ?? null,
+      sellerAddress: firstNonEmptyString(
+        row.sellerAddress,
+        row.seller_address,
+        businessProfile?.address,
+      ) ?? null,
+      sellerDescription: firstNonEmptyString(
+        row.sellerDescription,
+        row.seller_description,
+        businessProfile?.description,
+      ) ?? null,
+      instagram: firstNonEmptyString(
+        row.instagram,
+        row.sellerInstagram,
+        row.seller_instagram,
+        businessProfile?.instagram,
+      ) ?? null,
+      twitter: firstNonEmptyString(
+        row.twitter,
+        row.sellerTwitter,
+        row.seller_twitter,
+        businessProfile?.twitter,
+      ) ?? null,
+      facebook: firstNonEmptyString(
+        row.facebook,
+        row.sellerFacebook,
+        row.seller_facebook,
+        businessProfile?.facebook,
+      ) ?? null,
+      website: firstNonEmptyString(
+        row.website,
+        row.publicWebsite,
+        row.public_website,
+        row.sellerWebsite,
+        row.seller_website,
+        businessProfile?.website,
+      ) ?? null,
+      minimumOrderValue: minimumOrderValue ?? null,
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
@@ -585,6 +742,42 @@ export async function updateStoreWhatsapp(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreWhatsapp:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreMinimumOrderValue(
+  sellerUserId: string,
+  minimumOrderValue: number | null
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        minimum_order_value: minimumOrderValue,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store minimum order value:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreMinimumOrderValue:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);

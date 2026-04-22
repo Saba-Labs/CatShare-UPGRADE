@@ -5,6 +5,7 @@ import { FileSharer } from "@byteowls/capacitor-filesharer";
 import type { BusinessProfile } from "../config/businessProfile";
 import { EMPTY_BUSINESS_PROFILE } from "../config/businessProfile";
 import { fetchUrlAsDataUrl } from "./fetchImageCrossPlatform";
+import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 
 interface ProductWithImage {
   id: string | number;
@@ -665,19 +666,10 @@ export async function generateProductPDF(
     const detailsX = margin + imageWidth + 16;
     const detailsMaxWidth = contentWidth - imageWidth - 24;
 
-    const fieldKeys = [
-      "field1",
-      "field2",
-      "field3",
-      "field4",
-      "field5",
-      "field6",
-      "field7",
-      "field8",
-      "field9",
-      "field10",
-    ];
-    const activeFields = fieldKeys.filter((f) => product[f]);
+    const visiblePdfFieldKeys = getAllFields()
+      .filter((f) => f.enabled && f.key.startsWith("field") && isFieldVisibleOnSurface(f, "pdf"))
+      .map((f) => f.key);
+    const activeFields = visiblePdfFieldKeys.filter((f) => product[f]);
     const useColumns = activeFields.length > 5;
     const pRows = useColumns
       ? Math.ceil(activeFields.length / 2)

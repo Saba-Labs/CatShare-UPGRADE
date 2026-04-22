@@ -1,5 +1,5 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
-import { getAllFields } from '../config/fieldConfig';
+import { getAllFields, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { getCurrencyData } from '../utils/currencyUtils';
 
@@ -77,7 +77,7 @@ export function productToShareLinkItem(
   catalogueId = 'cat1'
 ): ShareLinkItem {
   const enabledFields = getAllFields().filter(
-    (f) => f.enabled && f.key.startsWith('field')
+    (f) => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'orderLink')
   );
 
   // Get catalogue-specific data if available

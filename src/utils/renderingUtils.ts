@@ -6,7 +6,7 @@ import { renderProductToCanvasGlass } from "./canvasRenderer-glass";
 import { getCatalogueData } from "../config/catalogueProductUtils";
 import { getPersistedAuthUserId } from "./authUserId";
 import { safeGetFromStorage } from "./safeStorage";
-import { getAllFields } from "../config/fieldConfig";
+import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getThemeById } from "../config/themeConfig";
 
 /**
@@ -151,7 +151,7 @@ export async function renderProductImageOnTheFly(
 
     // Add all enabled fields dynamically
     getAllFields()
-      .filter(f => f.enabled && f.key.startsWith('field'))
+      .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
       .forEach(field => {
         productData[field.key] = catalogueData[field.key] || "";
         const unitKey = `${field.key}Unit`;
@@ -199,7 +199,7 @@ export async function renderProductImageOnTheFly(
 
       // Add all enabled fields dynamically for fallback too
       getAllFields()
-        .filter(f => f.enabled && f.key.startsWith('field'))
+        .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
         .forEach(field => {
           fallbackProductData[field.key] = product[field.key] || "";
           const unitKey = `${field.key}Unit`;

@@ -30,7 +30,7 @@ import {
   type CatalogueData,
   type ProductWithCatalogueData
 } from "../config/catalogueProductUtils";
-import { getFieldConfig, getAllFields } from "../config/fieldConfig";
+import { getFieldConfig, getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
@@ -622,7 +622,7 @@ export default function CreateProduct() {
 
     // Check for any field values
     const hasFieldValue = getAllFields()
-      .filter(f => f.enabled && f.key.startsWith('field'))
+      .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
       .some(field => {
         const val = catData[field.key];
         const visibilityKey = `${field.key}Visible`;
@@ -1534,7 +1534,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       {/* Fields */}
                       <div style={{ flex: 1, marginBottom: 8, color: fontColor || "white", fontSize: 13, width: "100%", paddingLeft: 20, paddingRight: 20 }}>
                         {getAllFields()
-                          .filter(f => f.enabled && f.key.startsWith('field'))
+                          .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
                           .map(field => {
                             const catData = getCatalogueFormData();
                             const val = catData[field.key];
@@ -2003,8 +2003,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
               {/* Catalogue Details */}
               {isCatalogueEnabled(selectedCatalogue) && (
                 <div className="space-y-4 mb-5 pb-4 border-b border-gray-200 dark:border-gray-800">
-                  {getAllFields()
-                    .filter(f => f.enabled && f.key.startsWith('field'))
+                        {getAllFields()
+                          .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
                     .map(field => {
                       const catData = getCatalogueFormData();
                       return (

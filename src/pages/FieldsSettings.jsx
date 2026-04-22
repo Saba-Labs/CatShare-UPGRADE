@@ -7,7 +7,8 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import {
   getFieldsDefinition,
   setFieldsDefinition,
-  resetToDefaultFields
+  resetToDefaultFields,
+  DEFAULT_FIELD_VISIBILITY,
 } from "../config/fieldConfig";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { INDUSTRY_PRESETS } from "../config/industryPresets";
@@ -283,6 +284,27 @@ export default function FieldsSettings() {
     const newFields = definition.fields.map(f =>
       f.key === key ? { ...f, unitsEnabled: !f.unitsEnabled } : f
     );
+    setDefinition({ ...definition, fields: newFields });
+  };
+
+  const updateFieldSurfaceVisibility = async (key, surface) => {
+    if (!definition) return;
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch (e) {}
+
+    const newFields = definition.fields.map((f) => {
+      if (f.key !== key) return f;
+      const current = f.visibility || DEFAULT_FIELD_VISIBILITY;
+      return {
+        ...f,
+        visibility: {
+          ...DEFAULT_FIELD_VISIBILITY,
+          ...current,
+          [surface]: !(current?.[surface] ?? true),
+        },
+      };
+    });
     setDefinition({ ...definition, fields: newFields });
   };
 
@@ -884,6 +906,45 @@ export default function FieldsSettings() {
                                                     </div>
                                                   ) : null;
                                                 })()
+                                              )}
+
+                                              {field.key.startsWith('field') && (
+                                                <div className="space-y-2">
+                                                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                                    Show In
+                                                  </label>
+                                                  <div className="grid grid-cols-2 gap-2">
+                                                    {[
+                                                      { key: 'shareImage', label: 'Share Image' },
+                                                      { key: 'pdf', label: 'PDF' },
+                                                      { key: 'orderLink', label: 'Order Link' },
+                                                      { key: 'onlineStore', label: 'Online Store' },
+                                                    ].map((surface) => {
+                                                      const currentVisibility = field.visibility || DEFAULT_FIELD_VISIBILITY;
+                                                      const enabled = (currentVisibility?.[surface.key] ?? true) === true;
+                                                      return (
+                                                        <motion.button
+                                                          key={surface.key}
+                                                          type="button"
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            updateFieldSurfaceVisibility(field.key, surface.key);
+                                                          }}
+                                                          whileHover={{ scale: 1.02 }}
+                                                          whileTap={{ scale: 0.98 }}
+                                                          className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center justify-between ${
+                                                            enabled
+                                                              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                                                              : "border-gray-200 bg-white text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                                                          }`}
+                                                        >
+                                                          <span>{surface.label}</span>
+                                                          {enabled ? <MdVisibility size={16} /> : <MdVisibilityOff size={16} />}
+                                                        </motion.button>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
                                               )}
 
                                               {field.key.startsWith('field') && (

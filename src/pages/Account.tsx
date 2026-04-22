@@ -12,6 +12,9 @@ import {
   FiPhone,
   FiMessageCircle,
   FiChevronDown,
+  FiInstagram,
+  FiFacebook,
+  FiTwitter,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -552,6 +555,45 @@ export default function Account() {
                       value={businessProfile.website}
                       onChange={(e) => updateBusiness({ website: e.target.value.trim() })}
                       placeholder="https://"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiInstagram className="text-gray-500 w-4 h-4" />
+                      Instagram
+                    </label>
+                    <input
+                      type="url"
+                      value={businessProfile.instagram}
+                      onChange={(e) => updateBusiness({ instagram: e.target.value.trim() })}
+                      placeholder="https://instagram.com/yourstore"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiFacebook className="text-gray-500 w-4 h-4" />
+                      Facebook
+                    </label>
+                    <input
+                      type="url"
+                      value={businessProfile.facebook}
+                      onChange={(e) => updateBusiness({ facebook: e.target.value.trim() })}
+                      placeholder="https://facebook.com/yourstore"
+                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
+                      <FiTwitter className="text-gray-500 w-4 h-4" />
+                      Twitter / X
+                    </label>
+                    <input
+                      type="url"
+                      value={businessProfile.twitter}
+                      onChange={(e) => updateBusiness({ twitter: e.target.value.trim() })}
+                      placeholder="https://x.com/yourstore"
                       className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
                     />
                   </div>

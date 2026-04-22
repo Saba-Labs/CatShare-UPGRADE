@@ -51,14 +51,23 @@ self.addEventListener('notificationclick', (event) => {
   // Open or focus the app window
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then((clientList) => {
+      const appPath = '/';
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url === '/' && 'focus' in client) {
+        try {
+          const url = new URL(client.url);
+          if (url.pathname === appPath && 'focus' in client) {
+            return client.focus();
+          }
+        } catch {
+          // Fall through to opening the app.
+        }
+        if ('focus' in client) {
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow('/');
+        return clients.openWindow(appPath);
       }
     })
   );

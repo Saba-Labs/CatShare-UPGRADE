@@ -9,7 +9,9 @@ import {
   updateStoreCatalogue,
   updateStoreLiveStatus,
   updateStoreWhatsapp,
+  updateStoreMinimumOrderValue,
   normalizeStoreWhatsappInput,
+  normalizeStoreMinimumOrderValueInput,
   deleteStore,
   validateStoreSlug,
   type Store,
@@ -532,7 +534,7 @@ export default function StorePage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'whatsapp' | null>(null);
+  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'whatsapp' | 'minimumOrder' | null>(null);
   const [isLive, setIsLive] = useState(true);
   const [liveTogglePending, setLiveTogglePending] = useState(false);
 
@@ -543,6 +545,7 @@ export default function StorePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [formWhatsapp, setFormWhatsapp] = useState('');
+  const [formMinimumOrder, setFormMinimumOrder] = useState('');
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
 
@@ -554,6 +557,9 @@ export default function StorePage() {
       if (result.success && result.data) {
         setStore(result.data);
         setFormWhatsapp(result.data.storeWhatsapp || '');
+        setFormMinimumOrder(
+          result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+        );
         setShowCreateForm(false);
         setIsLive(result.data.isLive);
       } else {
@@ -584,6 +590,9 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setFormWhatsapp(result.data.storeWhatsapp || '');
+      setFormMinimumOrder(
+        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+      );
       setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
       showToast('Store created!', 'success');
@@ -604,6 +613,9 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
+      setFormMinimumOrder(
+        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+      );
       setEditingField(null);
       showToast('Store link updated', 'success');
     } else {
@@ -619,6 +631,9 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
+      setFormMinimumOrder(
+        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+      );
       setEditingField(null);
       showToast('Products list updated', 'success');
     }
@@ -641,6 +656,34 @@ export default function StorePage() {
       setEditingField(null);
       showToast(n.value ? 'WhatsApp updated for your store' : 'WhatsApp removed from your store', 'success');
     } else showToast(result.error || 'Failed to save', 'error');
+    setIsSubmitting(false);
+  };
+
+  const handleSaveMinimumOrder = async () => {
+    if (!user?.uid) return;
+    const normalized = normalizeStoreMinimumOrderValueInput(formMinimumOrder);
+    if (normalized.ok === false) {
+      showToast(normalized.error, 'error');
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await updateStoreMinimumOrderValue(user.uid, normalized.value);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setFormWhatsapp(result.data.storeWhatsapp || '');
+      setFormMinimumOrder(
+        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+      );
+      setEditingField(null);
+      showToast(
+        normalized.value != null
+          ? 'Minimum order value updated'
+          : 'Minimum order value removed',
+        'success'
+      );
+    } else {
+      showToast(result.error || 'Failed to save', 'error');
+    }
     setIsSubmitting(false);
   };
 
@@ -667,6 +710,9 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setFormWhatsapp(result.data.storeWhatsapp || '');
+      setFormMinimumOrder(
+        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
+      );
       showToast(
         next ? 'Store is now live' : 'Store is offline — visitors see a paused message',
         next ? 'success' : 'info'
@@ -920,6 +966,64 @@ export default function StorePage() {
                 ) : (
                   <div className="info-value" style={{ fontWeight: store.storeWhatsapp ? 600 : 400, color: store.storeWhatsapp ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                     {store.storeWhatsapp || 'Not set'}
+                  </div>
+                )}
+              </div>
+
+              <div className="info-card section-gap">
+                <div className="info-card-row">
+                  <div className="info-card-label">Minimum order value</div>
+                  {editingField !== 'minimumOrder' && (
+                    <button
+                      type="button"
+                      className="edit-btn"
+                      onClick={() => {
+                        setEditingField('minimumOrder');
+                        setFormMinimumOrder(
+                          store.minimumOrderValue != null ? String(store.minimumOrderValue) : ''
+                        );
+                      }}
+                    >
+                      <IconEdit /> {store.minimumOrderValue != null ? 'Change' : 'Add'}
+                    </button>
+                  )}
+                </div>
+                <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'minimumOrder' ? 10 : 8 }}>
+                  Customers can place order only if cart total reaches this value. Leave empty for no minimum.
+                </p>
+                {editingField === 'minimumOrder' ? (
+                  <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      className="field-input"
+                      style={{ flex: '1 1 200px' }}
+                      placeholder="e.g. 500"
+                      value={formMinimumOrder}
+                      onChange={(e) => setFormMinimumOrder(e.target.value)}
+                      aria-label="Minimum order value"
+                    />
+                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => void handleSaveMinimumOrder()}>
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="cancel-btn"
+                      onClick={() => {
+                        setEditingField(null);
+                        setFormMinimumOrder(
+                          store.minimumOrderValue != null ? String(store.minimumOrderValue) : ''
+                        );
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="info-value" style={{ fontWeight: store.minimumOrderValue != null ? 600 : 400, color: store.minimumOrderValue != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    {store.minimumOrderValue != null ? store.minimumOrderValue : 'Not set'}
                   </div>
                 )}
               </div>

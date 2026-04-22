@@ -15,6 +15,13 @@ export async function initPushTokenForLoggedInUser(userId: string): Promise<() =
     return () => {};
   }
 
+  // Clear stale state before each registration attempt.
+  try {
+    localStorage.removeItem(PUSH_REGISTERED_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+
   const handles: Array<{ remove: () => Promise<void> }> = [];
 
   const h1 = await PushNotifications.addListener('registration', async (t: Token) => {
@@ -46,9 +53,38 @@ export async function initPushTokenForLoggedInUser(userId: string): Promise<() =
 
   const h2 = await PushNotifications.addListener('registrationError', (err) => {
     console.warn('[CatShare] Push registration error:', err);
+    try {
+      localStorage.removeItem(PUSH_REGISTERED_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
   });
 
-  handles.push(h1, h2);
+  const h3 = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('catsharePushReceived', {
+          detail: notification,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  });
+
+  const h4 = await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('catsharePushAction', {
+          detail: action,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  });
+
+  handles.push(h1, h2, h3, h4);
 
   try {
     const perm = await PushNotifications.requestPermissions();

@@ -4,7 +4,7 @@ import { safeGetFromStorage } from "./utils/safeStorage";
 import { renderProductToCanvas, canvasToBase64 } from "./utils/canvasRenderer";
 import { renderProductToCanvasGlass } from "./utils/canvasRenderer-glass";
 import { getAllCatalogues } from "./config/catalogueConfig";
-import { getAllFields } from "./config/fieldConfig";
+import { getAllFields, isFieldVisibleOnSurface } from "./config/fieldConfig";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
@@ -351,7 +351,7 @@ export async function saveRenderedImage(product, type, units = {}) {
 
     // Add all enabled fields dynamically
     getAllFields()
-      .filter(f => f.enabled && f.key.startsWith('field'))
+      .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
       .forEach(field => {
         productData[field.key] = catalogueData[field.key] || "";
         const unitKey = `${field.key}Unit`;

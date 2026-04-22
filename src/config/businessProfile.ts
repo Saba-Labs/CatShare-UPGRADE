@@ -11,6 +11,9 @@ export type BusinessProfile = {
   email: string;
   phone: string;
   website: string;
+  instagram: string;
+  facebook: string;
+  twitter: string;
   /** Short intro / tagline. */
   about: string;
   /** Longer description. */
@@ -24,6 +27,9 @@ export const EMPTY_BUSINESS_PROFILE: BusinessProfile = {
   email: '',
   phone: '',
   website: '',
+  instagram: '',
+  facebook: '',
+  twitter: '',
   about: '',
   description: '',
 };
@@ -38,6 +44,9 @@ export function parseBusinessProfile(raw: unknown): BusinessProfile {
     email: typeof o.email === 'string' ? o.email : '',
     phone: typeof o.phone === 'string' ? o.phone : '',
     website: typeof o.website === 'string' ? o.website : '',
+    instagram: typeof o.instagram === 'string' ? o.instagram : '',
+    facebook: typeof o.facebook === 'string' ? o.facebook : '',
+    twitter: typeof o.twitter === 'string' ? o.twitter : '',
     about: typeof o.about === 'string' ? o.about : '',
     description: typeof o.description === 'string' ? o.description : '',
   };
@@ -48,7 +57,18 @@ export function businessProfileFromUserSettings(userSettings: any | null | undef
 }
 
 function businessProfileHasVisibleDetail(bp: BusinessProfile): boolean {
-  return [bp.businessName, bp.address, bp.email, bp.phone, bp.website, bp.about, bp.description].some(
+  return [
+    bp.businessName,
+    bp.address,
+    bp.email,
+    bp.phone,
+    bp.website,
+    bp.instagram,
+    bp.facebook,
+    bp.twitter,
+    bp.about,
+    bp.description,
+  ].some(
     (s) => typeof s === 'string' && s.trim().length > 0
   );
 }

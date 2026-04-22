@@ -10,7 +10,7 @@ import { useToast } from "../context/ToastContext";
 import { useTheme } from "../context/ThemeContext";
 import { getCatalogueData } from "../config/catalogueProductUtils";
 import { getAllCatalogues } from "../config/catalogueConfig";
-import { getFieldConfig, getAllFields } from "../config/fieldConfig";
+import { getFieldConfig, getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { safeGetFromStorage } from "../utils/safeStorage";
 import { useSubscription } from "../context/SubscriptionContext";
 import {
@@ -698,7 +698,9 @@ export default function ProductPreviewModal_Classic({
   }, [product.id, product]);
 
   // Get all enabled product fields dynamically
-  const enabledFields = getAllFields().filter(f => f.enabled && f.key.startsWith('field'));
+  const enabledFields = getAllFields().filter(
+    (f) => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage')
+  );
 
   return (
     <>

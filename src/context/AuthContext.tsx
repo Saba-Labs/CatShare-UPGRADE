@@ -12,6 +12,7 @@ import {
 import { fetchAllUserData } from '../services/supabaseSync';
 import { authService } from '../services/authService';
 import { getDeviceId } from '../services/deviceIdService';
+import { PUSH_REGISTERED_STORAGE_KEY } from '../services/pushTokenService';
 
 /** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
@@ -359,6 +360,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.removeItem('products');
       localStorage.removeItem('deletedProducts');
       localStorage.removeItem('retailProducts');
+      localStorage.removeItem(PUSH_REGISTERED_STORAGE_KEY);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to logout';
       setError(errorMessage);

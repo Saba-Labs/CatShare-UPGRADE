@@ -30,7 +30,7 @@ import {
   type CatalogueData,
   type ProductWithCatalogueData
 } from "../config/catalogueProductUtils";
-import { getFieldConfig, getAllFields } from "../config/fieldConfig";
+import { getFieldConfig, getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
@@ -566,7 +566,7 @@ export default function CreateProduct() {
 
     // Check for any field values
     const hasFieldValue = getAllFields()
-      .filter(f => f.enabled && f.key.startsWith('field'))
+      .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
       .some(field => {
         const val = catData[field.key];
         const visibilityKey = `${field.key}Visible`;
@@ -1434,7 +1434,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     )}
                     <div className="text-sm mt-2 space-y-1">
                       {getAllFields()
-                        .filter(f => f.enabled && f.key.startsWith('field'))
+                        .filter(f => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'shareImage'))
                         .map(field => {
                           const catData = getCatalogueFormData();
                           const val = catData[field.key];

@@ -163,6 +163,17 @@ const billText = (order: Order, symbol: string) => {
   return lines.join('\n');
 };
 
+const CATSHARE_SHARE_PROMO_LINE =
+  'Grow your business online 🚀\nDownload CatShare and create your own online store easily.\n\n📲 https://play.google.com/store/apps/details?id=com.catshare.official';
+
+function buildInvoiceShareText(customerName: string): string {
+  return `Hi ${customerName}, please find your invoice attached.\n\n${CATSHARE_SHARE_PROMO_LINE}`;
+}
+
+function buildOrderImageShareText(customerName: string): string {
+  return `Hi ${customerName}, here is your order summary.\n\n${CATSHARE_SHARE_PROMO_LINE}`;
+}
+
 /** Safe PDF filename for device storage (avoid path separators and reserved chars). */
 function invoicePdfFileName(order: Order): string {
   const idPart = order.id.substring(0, 8);
@@ -622,21 +633,19 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
     const waLink = customerRow.querySelector('[data-order-customer-text-snapshot] a[href*="wa.me"]');
     if (waLink instanceof HTMLElement) {
       forceSnapshotCloneAncestorsOverflowVisible(doc, waLink);
-      waLink.style.setProperty('display', 'flex', imp);
-      waLink.style.setProperty('flex-direction', 'row', imp);
-      waLink.style.setProperty('align-items', 'center', imp);
+      waLink.style.setProperty('display', 'inline', imp);
       waLink.style.setProperty('justify-content', 'flex-start', imp);
       waLink.style.setProperty('gap', '0', imp);
       waLink.style.setProperty('margin-top', '2px', imp);
       waLink.style.setProperty('font-size', '13px', imp);
       waLink.style.setProperty('white-space', 'nowrap', imp);
       waLink.style.setProperty('overflow', 'visible', imp);
-      waLink.style.setProperty('color', COLORS.subtle, imp);
+      // Snapshot-only: number should be gray (not WhatsApp green)
+      waLink.style.setProperty('color', COLORS.muted, imp);
       waLink.style.setProperty('text-decoration', 'none', imp);
-      const svg = waLink.querySelector(':scope > svg');
-      if (svg instanceof SVGElement) {
-        svg.style.setProperty('display', 'none', imp);
-      }
+      waLink.querySelectorAll('svg').forEach((icon) => {
+        if (icon instanceof SVGElement) icon.style.setProperty('display', 'none', imp);
+      });
     }
   }
 
@@ -1507,14 +1516,14 @@ useEffect(() => {
                 path: uri,
                 dialogTitle: 'Send invoice',
                 title: `Invoice — ${order.customer_name}`,
-                text: `Hi ${order.customer_name}, please find your invoice attached.`,
+                text: buildInvoiceShareText(order.customer_name),
               });
             } catch (nativeShareErr) {
               console.error('OpenInvoicePdf.shareFile failed, falling back to Share plugin:', nativeShareErr);
               try {
                 await Share.share({
                   title: `Invoice — ${order.customer_name}`,
-                  text: `Hi ${order.customer_name}, please find your invoice attached.`,
+                  text: buildInvoiceShareText(order.customer_name),
                   url: uri,
                   dialogTitle: 'Send invoice',
                 });
@@ -1539,7 +1548,7 @@ useEffect(() => {
           if (navigator.share) {
             await navigator.share({
               title: `Invoice - ${order.customer_name}`,
-              text: `Hi ${order.customer_name}, please find your invoice attached. 📎`,
+              text: buildInvoiceShareText(order.customer_name),
               files: [new File([pdfBlob], fileName, { type: 'application/pdf' })],
             });
             showToast('Invoice shared!', 'success');
@@ -1702,13 +1711,13 @@ useEffect(() => {
                 path: uri,
                 dialogTitle: 'Share order',
                 title: `Order — ${order.customer_name}`,
-                text: `Hi ${order.customer_name}, here is your order summary.`,
+                text: buildOrderImageShareText(order.customer_name),
               });
             } catch (nativeShareErr) {
               console.error('OpenInvoicePdf.shareFile failed:', nativeShareErr);
               await Share.share({
                 title: `Order — ${order.customer_name}`,
-                text: `Hi ${order.customer_name}, here is your order summary.`,
+                text: buildOrderImageShareText(order.customer_name),
                 url: uri,
                 dialogTitle: 'Share order',
               });
@@ -1726,7 +1735,7 @@ useEffect(() => {
           if (navigator.share) {
             await navigator.share({
               title: `Order — ${order.customer_name}`,
-              text: `Hi ${order.customer_name}, here is your order summary.`,
+              text: buildOrderImageShareText(order.customer_name),
               files: [new File([blob], fileName, { type: 'image/png' })],
             });
             showToast('Shared!', 'success');

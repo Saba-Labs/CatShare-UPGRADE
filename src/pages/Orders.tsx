@@ -3,9 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
+import { initPushTokenForLoggedInUser } from '../services/pushTokenService';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
@@ -689,6 +691,29 @@ export default function Orders() {
     return () => window.removeEventListener('catshareNewOrder', handler);
   }, [user?.uid, user?.isAnonymous]);
 
+  // Ask notification permission and register push token only after user opens Orders.
+  useEffect(() => {
+    if (!user?.uid || user.isAnonymous) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    let cancelled = false;
+    let cleanupPush: (() => void) | undefined;
+
+    void (async () => {
+      const cleanup = await initPushTokenForLoggedInUser(user.uid);
+      if (cancelled) {
+        await cleanup();
+      } else {
+        cleanupPush = cleanup;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      void cleanupPush?.();
+    };
+  }, [user?.uid, user?.isAnonymous]);
+
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
       searchInputRef.current.focus();
@@ -1105,160 +1130,164 @@ export default function Orders() {
         ref={scrollRef}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
-        {/* Sales Box at Top of Scrollable Content */}
-        <div style={{
-          background: '#fff',
-          borderBottom: '1px solid #E2E8F0',
-          padding: '55px 16px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}>
-          {/* Sales Card */}
+        {/* Sales Box at Top of Scrollable Content (All tab only) */}
+        {tab === 'all' && (
           <div style={{
-            background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)',
-            borderRadius: '16px',
-            padding: '24px',
-            color: '#fff',
+            background: '#fff',
+            borderBottom: '1px solid #E2E8F0',
+            padding: '55px 16px 16px',
             display: 'flex',
             flexDirection: 'column',
             gap: 16,
-            boxShadow: '0 10px 30px rgba(37, 99, 235, 0.15)',
-            position: 'relative',
-            overflow: 'hidden',
           }}>
-            {/* Background accent */}
+            {/* Sales Card */}
             <div style={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 120,
-              height: 120,
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              pointerEvents: 'none',
-            }} />
-
-            <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-  <div>
-    <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 500, letterSpacing: '0.3px' }}>Total Sales Revenue</div>
-    <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-1px', marginTop: 4 }}>
-      {formatMoney(filteredSales, symbol)}
-    </div>
-  </div>
-  <div style={{ display: 'flex', alignItems: 'flex-end', alignSelf: 'stretch' }}>
-    <button
-      onClick={() => setShowDateFilters(!showDateFilters)}
-      style={{
-        width: 28, height: 28,
-        background: 'rgba(255, 255, 255, 0.15)',
-        border: '1px solid rgba(255, 255, 255, 0.25)',
-        borderRadius: '50%',
-        color: '#fff',
-        cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.2s',
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.25)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
-      }}
-    >
-      <svg
-        width="14" height="14" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-        style={{
-          transition: 'transform 0.2s ease',
-          transform: showDateFilters ? 'rotate(180deg)' : 'rotate(0deg)',
-        }}
-      >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
-    </button>
-  </div>
-</div>
-
-            {(dateRangeStart || dateRangeEnd) && (
+              background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)',
+              borderRadius: '16px',
+              padding: '24px',
+              color: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              boxShadow: '0 10px 30px rgba(37, 99, 235, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {/* Background accent */}
               <div style={{
-                fontSize: 12,
-                opacity: 0.8,
-                fontWeight: 500,
-                position: 'relative',
-                zIndex: 1,
-              }}>
-                {dateRangeStart && dateRangeEnd
-                  ? `${formatDate(dateRangeStart)} to ${formatDate(dateRangeEnd)}`
-                  : dateRangeStart
-                  ? `From ${formatDate(dateRangeStart)}`
-                  : `Until ${formatDate(dateRangeEnd)}`
-                }
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 120,
+                height: 120,
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: '50%',
+                pointerEvents: 'none',
+              }} />
+
+              <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 500, letterSpacing: '0.3px' }}>Total Sales Revenue</div>
+                  <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-1px', marginTop: 4 }}>
+                    {formatMoney(filteredSales, symbol)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', alignSelf: 'stretch' }}>
+                  <button
+                    onClick={() => setShowDateFilters(!showDateFilters)}
+                    style={{
+                      width: 28, height: 28,
+                      background: 'rgba(255, 255, 255, 0.15)',
+                      border: '1px solid rgba(255, 255, 255, 0.25)',
+                      borderRadius: '50%',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.25)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255, 255, 255, 0.15)';
+                    }}
+                  >
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                      style={{
+                        transition: 'transform 0.2s ease',
+                        transform: showDateFilters ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            )}
 
-            {/* Collapsible Date Range Filter */}
-            {showDateFilters && (
-  <DateRangePicker
-    startDate={dateRangeStart}
-    endDate={dateRangeEnd}
-    onChange={(start, end) => {
-      setDateRangeStart(start);
-      setDateRangeEnd(end);
-    }}
-  />
-)}
-          </div>
-        </div>
+              {(dateRangeStart || dateRangeEnd) && (
+                <div style={{
+                  fontSize: 12,
+                  opacity: 0.8,
+                  fontWeight: 500,
+                  position: 'relative',
+                  zIndex: 1,
+                }}>
+                  {dateRangeStart && dateRangeEnd
+                    ? `${formatDate(dateRangeStart)} to ${formatDate(dateRangeEnd)}`
+                    : dateRangeStart
+                    ? `From ${formatDate(dateRangeStart)}`
+                    : `Until ${formatDate(dateRangeEnd)}`
+                  }
+                </div>
+              )}
 
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            <span style={{ color: '#94A3B8', fontSize: 13 }}>Loading orders…</span>
-          </div>
-        ) : error ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12, padding: 24 }}>
-            <div style={{ fontSize: 32 }}>⚠️</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#DC2626' }}>{error}</div>
-            {user?.isAnonymous ? (
-              <button onClick={() => handleNavigate('/login')} style={{
-                padding: '10px 20px', borderRadius: 100, border: 'none',
-                background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}>Sign In</button>
-            ) : (
-              <button onClick={loadOrders} style={{
-                padding: '10px 20px', borderRadius: 100, border: 'none',
-                background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}>Retry</button>
-            )}
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, padding: 24 }}>
-            <div style={{ fontSize: 36, marginBottom: 4 }}>{search ? '🔍' : '📦'}</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>
-              {search ? 'No results found' : `No ${tab !== 'all' ? tab : ''} orders yet`}
-            </div>
-            <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center' }}>
-              {search ? 'Try a different name or product' : 'Orders will appear here when customers place them'}
+              {/* Collapsible Date Range Filter */}
+              {showDateFilters && (
+                <DateRangePicker
+                  startDate={dateRangeStart}
+                  endDate={dateRangeEnd}
+                  onChange={(start, end) => {
+                    setDateRangeStart(start);
+                    setDateRangeEnd(end);
+                  }}
+                />
+              )}
             </div>
           </div>
-        ) : (
-          filteredOrders.map(order => (
-            <OrderRow
-              key={order.id}
-              order={order}
-              currencySymbol={symbol}
-              onStatusChange={handleStatusChange}
-              onClick={async () => {
-                await Haptics.impact({ style: ImpactStyle.Light });
-                persistListScroll(ORDERS_LIST_SCROLL_KEY, scrollRef.current);
-                navigate(`/orders/${order.id}`);
-              }}
-            />
-          ))
         )}
+
+        <div style={{ paddingTop: tab === 'all' ? 0 : 50 }}>
+          {loading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+              <span style={{ color: '#94A3B8', fontSize: 13 }}>Loading orders…</span>
+            </div>
+          ) : error ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12, padding: 24 }}>
+              <div style={{ fontSize: 32 }}>⚠️</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#DC2626' }}>{error}</div>
+              {user?.isAnonymous ? (
+                <button onClick={() => handleNavigate('/login')} style={{
+                  padding: '10px 20px', borderRadius: 100, border: 'none',
+                  background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>Sign In</button>
+              ) : (
+                <button onClick={loadOrders} style={{
+                  padding: '10px 20px', borderRadius: 100, border: 'none',
+                  background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>Retry</button>
+              )}
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, padding: 24 }}>
+              <div style={{ fontSize: 36, marginBottom: 4 }}>{search ? '🔍' : '📦'}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>
+                {search ? 'No results found' : `No ${tab !== 'all' ? tab : ''} orders yet`}
+              </div>
+              <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center' }}>
+                {search ? 'Try a different name or product' : 'Orders will appear here when customers place them'}
+              </div>
+            </div>
+          ) : (
+            filteredOrders.map(order => (
+              <OrderRow
+                key={order.id}
+                order={order}
+                currencySymbol={symbol}
+                onStatusChange={handleStatusChange}
+                onClick={async () => {
+                  await Haptics.impact({ style: ImpactStyle.Light });
+                  persistListScroll(ORDERS_LIST_SCROLL_KEY, scrollRef.current);
+                  navigate(`/orders/${order.id}`);
+                }}
+              />
+            ))
+          )}
+        </div>
       </main>
 
       <MainAppBottomNav active="orders" />

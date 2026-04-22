@@ -13,7 +13,7 @@ import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
-import { getFieldsDefinition } from '../config/fieldConfig';
+import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +73,22 @@ const CSS = `
 .sv-socials { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
 .sv-social-btn { width: 34px; height: 34px; border-radius: var(--r-sm); background: var(--c-surface2); border: 1px solid var(--c-border); display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--c-text2); transition: all var(--trans); cursor: pointer; font-size: 11px; font-weight: 700; font-style: normal; font-family: var(--f-body); }
 .sv-social-btn:hover { background: var(--c-surface3); border-color: var(--c-border2); color: var(--c-text); }
+.sv-footer { margin: 14px 12px 26px; padding: 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.sv-footer-title { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--c-text3); margin-bottom: 10px; }
+.sv-footer .sv-biz-chips { margin-top: 0; }
+.sv-footer .sv-socials { margin-top: 10px; }
+.sv-footer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sv-footer-brand { font-family: var(--f-head); font-size: 22px; line-height: 1.1; letter-spacing: -0.3px; color: var(--c-text); }
+.sv-footer-note { font-size: 12px; color: var(--c-text3); margin-top: 4px; line-height: 1.5; max-width: 520px; }
+.sv-footer-status { display: inline-flex; align-items: center; gap: 6px; background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.2); border-radius: var(--r-full); padding: 5px 11px; font-size: 11px; font-weight: 600; color: var(--c-accent); white-space: nowrap; }
+.sv-footer-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.sv-footer-col { background: var(--c-surface2); border: 1px solid var(--c-border); border-radius: var(--r-md); padding: 12px; }
+.sv-footer-col-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--c-text2); margin-bottom: 8px; }
+.sv-footer-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.sv-footer-item { font-size: 12px; color: var(--c-text2); line-height: 1.45; }
+.sv-footer-link { color: var(--c-text2); text-decoration: none; border-bottom: 1px dashed transparent; transition: border-color var(--trans), color var(--trans); }
+.sv-footer-link:hover { color: var(--c-text); border-bottom-color: var(--c-border2); }
+.sv-footer-muted { font-size: 11px; color: var(--c-text3); margin-top: 10px; text-align: center; }
 
 /* ── Sticky nav ── */
 .sv-nav { position: sticky; top: 0; z-index: 80; background: rgba(247,247,245,0.96); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--c-border); padding: 11px 14px; display: flex; flex-direction: column; gap: 9px; }
@@ -133,13 +149,16 @@ const CSS = `
 
 /* ── Floating cart ── */
 .sv-cart { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 14px 24px; pointer-events: none; z-index: 200; }
-.sv-cart-inner { display: flex; align-items: center; justify-content: space-between; background: var(--c-text); border-radius: var(--r-xl); padding: 10px 10px 10px 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.1); pointer-events: all; gap: 12px; cursor: pointer; animation: sv-cart-in 0.28s cubic-bezier(0.34,1.4,0.64,1); }
+.sv-cart-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; background: var(--c-text); border-radius: var(--r-xl); padding: 10px 10px 10px 18px; box-shadow: 0 8px 32px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.1); pointer-events: all; column-gap: 12px; row-gap: 2px; cursor: pointer; animation: sv-cart-in 0.28s cubic-bezier(0.34,1.4,0.64,1); }
 @keyframes sv-cart-in { from{transform:translateY(14px);opacity:0} to{transform:translateY(0);opacity:1} }
 .sv-cart-info { display: flex; flex-direction: column; gap: 1px; }
 .sv-cart-count { font-size: 11px; color: rgba(255,255,255,0.55); font-weight: 500; }
 .sv-cart-total { font-family: var(--f-body); font-size: 19px; font-weight: 700; color: white; letter-spacing: -0.4px; }
-.sv-cart-cta { flex-shrink: 0; height: 40px; padding: 0 18px; border-radius: var(--r-full); background: var(--c-accent); color: white; font-size: 13px; font-weight: 600; font-family: var(--f-body); border: none; cursor: pointer; letter-spacing: 0.1px; transition: opacity var(--trans); white-space: nowrap; }
+.sv-cart-note { font-size: 10.5px; color: rgba(255,255,255,0.72); font-weight: 500; margin-top: 1px; }
+.sv-cart-note--below { grid-column: 1 / -1; margin-top: 2px; padding-right: 10px; text-align: left; }
+.sv-cart-cta { flex-shrink: 0; justify-self: end; align-self: start; height: 40px; padding: 0 18px; border-radius: var(--r-full); background: var(--c-accent); color: white; font-size: 13px; font-weight: 600; font-family: var(--f-body); border: none; cursor: pointer; letter-spacing: 0.1px; transition: opacity var(--trans); white-space: nowrap; }
 .sv-cart-cta:hover { opacity: 0.88; }
+.sv-cart-cta:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ── Seller WhatsApp FAB (public contact) ── */
 .sv-fab-wa { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 210; width: 56px; height: 56px; border-radius: 50%; background: #25d366; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(37, 211, 102, 0.45); transition: transform 0.2s ease, box-shadow 0.2s ease; text-decoration: none; pointer-events: all; }
@@ -264,6 +283,75 @@ const CSS = `
 .sv-offline-icon { width: 60px; height: 60px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 28px; }
 .sv-offline-title { font-family: var(--f-head); font-size: 20px; font-weight: 400; color: var(--c-text); letter-spacing: -0.2px; margin-bottom: 8px; }
 .sv-offline-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
+
+/* ── Desktop responsiveness ── */
+@media (min-width: 900px) {
+  .sv-page {
+    max-width: 1200px;
+    padding: 20px 20px 36px;
+  }
+
+  .sv-hero {
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .sv-hero-inner {
+    padding: 28px 30px 24px;
+  }
+
+  .sv-store-name {
+    font-size: 34px;
+  }
+
+  .sv-store-tagline,
+  .sv-store-desc {
+    max-width: 760px;
+  }
+
+  .sv-nav {
+    top: 12px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-lg);
+    margin-top: 14px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .sv-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    padding: 8px 0 160px;
+  }
+
+  .sv-footer {
+    margin: 18px 0 10px;
+    padding: 16px 18px;
+  }
+
+  .sv-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .sv-cart {
+    max-width: 1200px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .sv-footer-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sv-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
 `;
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -413,6 +501,9 @@ const IconLoc = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none
 const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 010 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z" /></svg>;
 const IconMail = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
 const IconLink = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" /></svg>;
+const IconInstagram = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="3.5" y="3.5" width="17" height="17" rx="5" ry="5" /><circle cx="12" cy="12" r="4.1" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg>;
+const IconTwitterX = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.244 2H21l-6.02 6.88L22 22h-5.563l-4.36-5.89L6.92 22H4.16l6.44-7.36L2 2h5.704l3.94 5.31L18.244 2zm-.968 18.21h1.54L6.87 3.69H5.217L17.276 20.21z" /></svg>;
+const IconFacebook = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M22 12.07C22 6.51 17.52 2 12 2S2 6.51 2 12.07c0 5.02 3.66 9.18 8.44 9.93v-7.03H7.9v-2.9h2.54V9.85c0-2.52 1.49-3.91 3.78-3.91 1.09 0 2.24.2 2.24.2v2.47H15.2c-1.24 0-1.63.78-1.63 1.57v1.89h2.77l-.44 2.9h-2.33V22c4.78-.75 8.43-4.91 8.43-9.93z" /></svg>;
 const IconWA = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: 0.7 }}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
 const IconWAFab = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.096.544 4.142 1.577 5.94L.057 23.882l6.066-1.59A11.955 11.955 0 0012 24c6.626 0 12-5.374 12-12S18.626 0 12 0zm0 21.818a9.819 9.819 0 01-5.003-1.372l-.359-.214-3.72.975.993-3.624-.235-.373A9.818 9.818 0 012.182 12C2.182 6.57 6.57 2.182 12 2.182c5.43 0 9.818 4.388 9.818 9.818 0 5.43-4.388 9.818-9.818 9.818z"/></svg>;
 
@@ -590,6 +681,12 @@ export default function StoreView() {
   }, [selectedProducts, store, catalogue, allProducts]);
 
   const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
+  const minimumOrderValue = useMemo(() => {
+    const n = store?.minimumOrderValue;
+    return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0;
+  }, [store?.minimumOrderValue]);
+  const minimumOrderMet = orderSummary.total >= minimumOrderValue;
+  const remainingToMinimum = Math.max(0, minimumOrderValue - orderSummary.total);
 
   /** Digits for wa.me — same bar as hero chip (any digits); wa.me prefers full country code. */
   const sellerWhatsappDigits = useMemo(() => {
@@ -626,6 +723,15 @@ export default function StoreView() {
 
   const handlePlaceOrder = async () => {
     if (!store?.catalogueId) return;
+    if (minimumOrderValue > 0 && reviewSummary.total < minimumOrderValue) {
+      alert(
+        `Minimum order value is ${fmt(minimumOrderValue, currencySymbol)}. Please add ${fmt(
+          minimumOrderValue - reviewSummary.total,
+          currencySymbol
+        )} more to place the order.`
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
@@ -672,6 +778,15 @@ export default function StoreView() {
   };
 
   const handlePanelAction = () => {
+    if (minimumOrderValue > 0 && orderSummary.total < minimumOrderValue) {
+      alert(
+        `Minimum order value is ${fmt(minimumOrderValue, currencySymbol)}. Please add ${fmt(
+          minimumOrderValue - orderSummary.total,
+          currencySymbol
+        )} more.`
+      );
+      return;
+    }
     if (step === 'customer') {
       if (!customerName.trim()) { alert('Please enter your name'); return; }
       if (!customerWhatsapp.trim()) { alert('Please enter your WhatsApp number'); return; }
@@ -701,7 +816,6 @@ export default function StoreView() {
   const displayPhone = store?.sellerPhone?.trim() || store?.phone?.trim();
   const displayLocation = store?.sellerAddress?.trim() || store?.location?.trim();
   const displayEmail = store?.sellerEmail?.trim();
-
   /* ── Loading ── */
   if (storeLoading) {
     return (
@@ -776,13 +890,116 @@ export default function StoreView() {
 
   /* ── Social links ── */
   type SocialLink = { label: string; url: string; icon: React.ReactNode };
+  const ig = store.instagram?.trim();
+  const tw = store.twitter?.trim();
+  const fb = store.facebook?.trim();
   const siteWeb = (store.sellerWebsite || store.website)?.trim();
   const socialLinks: SocialLink[] = [
-    store.instagram && { label: 'Instagram', url: store.instagram, icon: 'IG' },
-    store.twitter && { label: 'Twitter/X', url: store.twitter, icon: '𝕏' },
-    store.facebook && { label: 'Facebook', url: store.facebook, icon: 'FB' },
+    ig && { label: 'Instagram', url: webHref(ig), icon: <IconInstagram /> },
+    tw && { label: 'Twitter/X', url: webHref(tw), icon: <IconTwitterX /> },
+    fb && { label: 'Facebook', url: webHref(fb), icon: <IconFacebook /> },
     siteWeb && { label: 'Website', url: webHref(siteWeb), icon: <IconLink /> },
   ].filter(Boolean) as SocialLink[];
+
+  const hasFooterDetails = Boolean(
+    displayLocation ||
+    displayPhone ||
+    displayEmail ||
+    store?.whatsapp ||
+    socialLinks.length > 0
+  );
+
+  const renderStoreFooter = () => (
+    <footer className="sv-footer">
+      <div className="sv-footer-head">
+        <div>
+          <div className="sv-footer-brand">{storeDisplayName}</div>
+          {heroSubtitle.primary ? <div className="sv-footer-note">{heroSubtitle.primary}</div> : null}
+        </div>
+        <div className="sv-footer-status">
+          <span className="sv-open-dot" />
+          Open now
+        </div>
+      </div>
+
+      <div className="sv-footer-grid">
+        <section className="sv-footer-col">
+          <div className="sv-footer-col-title">Location</div>
+          <ul className="sv-footer-list">
+            <li className="sv-footer-item">
+              {displayLocation || 'Address not provided'}
+            </li>
+          </ul>
+        </section>
+
+        <section className="sv-footer-col">
+          <div className="sv-footer-col-title">Contact</div>
+          <ul className="sv-footer-list">
+            {displayPhone ? (
+              <li className="sv-footer-item">
+                <a className="sv-footer-link" href={`tel:${displayPhone}`}>Call: {displayPhone}</a>
+              </li>
+            ) : null}
+            {displayEmail ? (
+              <li className="sv-footer-item">
+                <a className="sv-footer-link" href={`mailto:${displayEmail}`}>Email: {displayEmail}</a>
+              </li>
+            ) : null}
+            {store.whatsapp ? (
+              <li className="sv-footer-item">
+                <a
+                  className="sv-footer-link"
+                  href={`https://wa.me/${store.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  WhatsApp: {store.whatsapp}
+                </a>
+              </li>
+            ) : null}
+            {!displayPhone && !displayEmail && !store.whatsapp ? (
+              <li className="sv-footer-item">Contact details not provided</li>
+            ) : null}
+          </ul>
+        </section>
+
+        <section className="sv-footer-col">
+          <div className="sv-footer-col-title">Store Info</div>
+          <ul className="sv-footer-list">
+            <li className="sv-footer-item">Currency: {store.sellerCurrencyCode || 'INR'}</li>
+            {minimumOrderValue > 0 ? (
+              <li className="sv-footer-item">Minimum order: {fmt(minimumOrderValue, currencySymbol)}</li>
+            ) : null}
+            <li className="sv-footer-item">
+              {storeProducts.length} item{storeProducts.length === 1 ? '' : 's'} listed
+            </li>
+            <li className="sv-footer-item">
+              {availableCategories.length} categor{availableCategories.length === 1 ? 'y' : 'ies'}
+            </li>
+          </ul>
+        </section>
+
+        <section className="sv-footer-col">
+          <div className="sv-footer-col-title">Follow</div>
+          {socialLinks.length > 0 ? (
+            <div className="sv-socials">
+              {socialLinks.map((s) => (
+                <a key={s.label} className="sv-social-btn" href={s.url} target="_blank" rel="noreferrer" title={s.label}>
+                  {s.icon}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <ul className="sv-footer-list">
+              <li className="sv-footer-item">No social links added</li>
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <div className="sv-footer-muted">Powered by CatShare storefront</div>
+    </footer>
+  );
 
   /* ── Main render ── */
   return (
@@ -810,29 +1027,6 @@ export default function StoreView() {
               <div className="sv-store-name">{storeDisplayName}</div>
               {heroSubtitle.primary ? <div className="sv-store-tagline">{heroSubtitle.primary}</div> : null}
               {heroSubtitle.secondary ? <div className="sv-store-desc">{heroSubtitle.secondary}</div> : null}
-
-              <div className="sv-biz-chips">
-                {displayLocation ? <span className="sv-biz-chip"><IconLoc />{displayLocation}</span> : null}
-                {displayPhone ? <a className="sv-biz-chip" href={`tel:${displayPhone}`}><IconPhone />{displayPhone}</a> : null}
-                {displayEmail ? (
-                  <a className="sv-biz-chip" href={`mailto:${displayEmail}`}><IconMail />{displayEmail}</a>
-                ) : null}
-                {store.whatsapp && (
-                  <a className="sv-biz-chip" href={`https://wa.me/${store.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">
-                    <IconWA />WhatsApp
-                  </a>
-                )}
-              </div>
-
-              {socialLinks.length > 0 && (
-                <div className="sv-socials">
-                  {socialLinks.map((s) => (
-                    <a key={s.label} className="sv-social-btn" href={s.url} target="_blank" rel="noreferrer" title={s.label}>
-                      {s.icon}
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -918,15 +1112,30 @@ export default function StoreView() {
             })}
           </div>
 
+          {hasFooterDetails && renderStoreFooter()}
+
           {/* ══ FLOATING CART BAR ══ */}
           {selectedProductCount > 0 && step === 'products' && (
             <div className="sv-cart">
-              <div className="sv-cart-inner" onClick={() => setStep('customer')}>
+              <div
+                className="sv-cart-inner"
+                onClick={() => {
+                  if (!minimumOrderMet && minimumOrderValue > 0) return;
+                  setStep('customer');
+                }}
+              >
                 <div className="sv-cart-info">
-                  <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'} selected</span>
+                  <span className="sv-cart-count">{selectedProductCount} item{selectedProductCount === 1 ? '' : 's'}</span>
                   <span className="sv-cart-total">{fmt(orderSummary.total, currencySymbol)}</span>
                 </div>
-                <button type="button" className="sv-cart-cta">Place Order →</button>
+                <button type="button" className="sv-cart-cta" disabled={!minimumOrderMet && minimumOrderValue > 0}>
+                  {!minimumOrderMet && minimumOrderValue > 0 ? 'Minimum not reached' : 'Place Order →'}
+                </button>
+                {minimumOrderValue > 0 && !minimumOrderMet ? (
+                  <span className="sv-cart-note sv-cart-note--below">
+                    Add {fmt(remainingToMinimum, currencySymbol)} more to place order
+                  </span>
+                ) : null}
               </div>
             </div>
           )}
@@ -943,7 +1152,15 @@ export default function StoreView() {
                 <div className="sv-panel-title">{step === 'customer' ? 'Your details' : 'Review order'}</div>
                 <div className="sv-panel-subtitle">{step === 'customer' ? 'Almost there — just a few details' : 'Confirm everything looks right'}</div>
               </div>
-              <button className="sv-panel-cta" onClick={handlePanelAction} disabled={step === 'customer' ? !customerName.trim() || !customerWhatsapp.trim() : isSubmitting}>
+              <button
+                className="sv-panel-cta"
+                onClick={handlePanelAction}
+                disabled={
+                  step === 'customer'
+                    ? !customerName.trim() || !customerWhatsapp.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
+                    : isSubmitting || (minimumOrderValue > 0 && !minimumOrderMet)
+                }
+              >
                 {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
               </button>
             </div>
@@ -957,6 +1174,11 @@ export default function StoreView() {
                 {(!customerName.trim() || !customerWhatsapp.trim()) && (
                   <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
                     ⚠️ Name and WhatsApp should be filled to continue
+                  </div>
+                )}
+                {minimumOrderValue > 0 && !minimumOrderMet && (
+                  <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
+                    ⚠️ Minimum order is {fmt(minimumOrderValue, currencySymbol)}. Add {fmt(remainingToMinimum, currencySymbol)} more to continue.
                   </div>
                 )}
                 <div className="sv-field">
@@ -998,13 +1220,15 @@ export default function StoreView() {
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                     <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
-                                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-accent)' }}>{fmt(item.rowTotal, currencySymbol)}</span>
                                   </div>
                                 </div>
                               </div>
                               {cd && (
-                                <div style={{ fontSize: '11.5px', color: 'var(--c-text3)', paddingTop: 4, borderTop: '1px solid var(--c-border)' }}>
-                                  {cd}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: '11.5px', color: 'var(--c-text3)', paddingTop: 4, borderTop: '1px solid var(--c-border)' }}>
+                                  <span>{cd}</span>
+                                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-accent)' }}>
+                                    {fmt(item.rowTotal, currencySymbol)}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -1061,6 +1285,7 @@ export default function StoreView() {
                 </div>
               </>
             )}
+            {hasFooterDetails && renderStoreFooter()}
           </div>
         )}
 
@@ -1078,12 +1303,20 @@ export default function StoreView() {
 
         {/* ══ PRODUCT DETAIL DRAWER ══ */}
         {drawerProduct && (() => {
+          const fieldDefinition = getFieldsDefinition();
+          const visibleStoreFieldNumbers = new Set(
+            fieldDefinition.fields
+              .filter((f) => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'onlineStore'))
+              .map((f) => Number(String(f.key).replace('field', '')))
+              .filter((n) => Number.isFinite(n))
+          );
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
           const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+            if (!visibleStoreFieldNumbers.has(n)) return null;
             const value = (drawerProduct as Record<string, unknown>)[`field${n}`];
             if (value == null || String(value).trim() === '') return null;
             const { label, unitSuffix } = fieldLU(drawerProduct, n);

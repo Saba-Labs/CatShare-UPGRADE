@@ -25,7 +25,24 @@ export interface FieldConfig {
   unitsEnabled?: boolean; // Whether units are enabled for this field
   unitOptions?: string[]; // Available units for this field
   defaultUnit?: string; // Default unit
+  visibility?: FieldVisibilityConfig; // Per-surface visibility controls
 }
+
+export type FieldSurface = 'shareImage' | 'pdf' | 'orderLink' | 'onlineStore';
+
+export interface FieldVisibilityConfig {
+  shareImage: boolean;
+  pdf: boolean;
+  orderLink: boolean;
+  onlineStore: boolean;
+}
+
+export const DEFAULT_FIELD_VISIBILITY: FieldVisibilityConfig = {
+  shareImage: true,
+  pdf: true,
+  orderLink: true,
+  onlineStore: true,
+};
 
 export interface FieldsDefinition {
   version: number; // Version of field definition
@@ -136,6 +153,31 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
 ];
 
+function normalizeFieldVisibility(visibility?: Partial<FieldVisibilityConfig>): FieldVisibilityConfig {
+  return {
+    shareImage: visibility?.shareImage !== false,
+    pdf: visibility?.pdf !== false,
+    orderLink: visibility?.orderLink !== false,
+    onlineStore: visibility?.onlineStore !== false,
+  };
+}
+
+function normalizeFieldConfig(field: FieldConfig): FieldConfig {
+  return {
+    ...field,
+    visibility: normalizeFieldVisibility(field.visibility),
+  };
+}
+
+function normalizeFieldsDefinition(definition: FieldsDefinition): FieldsDefinition {
+  return {
+    ...definition,
+    fields: Array.isArray(definition.fields)
+      ? definition.fields.map((f) => normalizeFieldConfig(f as FieldConfig))
+      : DEFAULT_FIELDS.map((f) => normalizeFieldConfig(f)),
+  };
+}
+
 /**
  * Get current field definition from localStorage
  * Falls back to default if not found
@@ -168,18 +210,18 @@ export function getFieldsDefinition(userId?: string): FieldsDefinition {
           return true;
         });
       }
-      return parsed;
+      return normalizeFieldsDefinition(parsed);
     }
   } catch (err) {
     console.warn('Failed to parse fieldsDefinition:', err);
   }
 
   // Return default with current timestamp
-  return {
+  return normalizeFieldsDefinition({
     version: 1,
-    fields: DEFAULT_FIELDS,
+    fields: DEFAULT_FIELDS.map((f) => normalizeFieldConfig(f)),
     lastUpdated: Date.now(),
-  };
+  });
 }
 
 /**
@@ -195,11 +237,13 @@ export function setFieldsDefinition(definition: FieldsDefinition, userId?: strin
       // Use default fields instead
       definition = {
         version: 1,
-        fields: DEFAULT_FIELDS,
+        fields: DEFAULT_FIELDS.map((f) => normalizeFieldConfig(f)),
         industry: definition?.industry || 'General Products (Custom)',
         lastUpdated: Date.now(),
       };
     }
+
+    definition = normalizeFieldsDefinition(definition);
 
     // Determine storage key
     const effectiveUserId = userId || getPersistedAuthUserId() || '';
@@ -274,11 +318,15 @@ export function getAllFields(): FieldConfig[] {
 export function resetToDefaultFields(): void {
   const definition: FieldsDefinition = {
     version: 1,
-    fields: DEFAULT_FIELDS,
+    fields: DEFAULT_FIELDS.map((f) => normalizeFieldConfig(f)),
     industry: 'General Products (Custom)',
     lastUpdated: Date.now(),
   };
   setFieldsDefinition(definition);
+}
+
+export function isFieldVisibleOnSurface(field: FieldConfig, surface: FieldSurface): boolean {
+  return normalizeFieldVisibility(field.visibility)[surface];
 }
 
 /**

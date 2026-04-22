@@ -15,15 +15,7 @@ export const initializeFirebaseMessaging = async () => {
   try {
     const isNative = Capacitor.getPlatform() !== "web";
 
-    if (isNative) {
-      // For native apps, request local notification permissions
-      try {
-        const permission = await LocalNotifications.requestPermissions();
-        console.log("Local notification permission:", permission);
-      } catch (error) {
-        console.warn("Could not request local notification permissions:", error);
-      }
-    } else {
+    if (!isNative) {
       // For web, request FCM notification permissions
       try {
         const token = await requestNotificationPermission();

@@ -286,7 +286,7 @@ export default function Login() {
           className="w-full max-w-[420px] mx-auto lg:my-auto"
         >
           <div className="lg:hidden text-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Welcome back</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Welcome</h2>
             <p className="text-sm text-slate-500 mt-1">Sign in to your catalogues</p>
           </div>
 
@@ -308,7 +308,7 @@ export default function Login() {
               </div>
             )}
             <div className="hidden lg:block mb-8">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome</h2>
               <p className="text-slate-500 text-sm mt-1.5">Sign in to continue to your catalogues</p>
             </div>
 
