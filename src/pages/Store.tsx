@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   getSellerStore,
   createStore,
@@ -18,76 +18,99 @@ import {
 } from '../services/storeService';
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
+import { syncUserSettings } from '../services/supabaseSync';
+import { uploadProductImageToR2 } from '../services/r2Upload';
+import {
+  type BusinessProfile,
+  EMPTY_BUSINESS_PROFILE,
+  businessProfileFromUserSettings,
+} from '../config/businessProfile';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 
-/* ─── tiny icons ─────────────────────────────────────────────── */
+const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
+
+/* ─── Icons ─────────────────────────────────────────────── */
 const IconCopy = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="9" y="9" width="13" height="13" rx="2" />
     <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
   </svg>
 );
 const IconEdit = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
+const IconCheck = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+const IconX = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
 const IconTrash = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="3 6 5 6 21 6" />
     <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2" />
   </svg>
 );
 const IconChevron = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M6 9l6 6 6-6" />
   </svg>
 );
 const IconStore = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
     <path d="M3 9l1-5h16l1 5" />
     <path d="M3 9a2 2 0 004 0 2 2 0 004 0 2 2 0 004 0 2 2 0 004 0" />
     <path d="M5 9v11h14V9" />
     <path d="M10 14h4v6H10z" />
   </svg>
 );
-const IconLink = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-    <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+const IconExternalLink = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
   </svg>
 );
 
-/* ─── css — aligned with Orders page (Plus Jakarta Sans, slate palette) ─── */
+/* ─── CSS ─── */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #F8FAFC;
+    --bg:rgb(224, 238, 243);
     --card: #FFFFFF;
     --border: #E2E8F0;
+    --border-focus: #2563EB;
     --text-primary: #0F172A;
     --text-secondary: #64748B;
     --text-muted: #94A3B8;
     --accent: #2563EB;
-    --accent-soft: #EFF6FF;
-    --accent-dark: #1D4ED8;
-    --green: #16A34A;
-    --green-soft: #F0FDF4;
-    --green-border: #BBF7D0;
-    --red: #DC2626;
-    --red-soft: #FEF2F2;
-    --red-border: #FECACA;
-    --shadow-sm: 0 1px 3px rgba(15,23,42,0.06);
-    --shadow-md: 0 4px 16px rgba(15,23,42,0.08);
+    --accent-hover: #1D4ED8;
+    --green: #1A7A4A;
+    --green-bg: #F0FAF5;
+    --green-border: #C3E8D5;
+    --green-dot: #34C97A;
+    --red: #C0392B;
+    --red-bg: #FDF4F3;
+    --red-border: #F5C6C2;
+    --amber: #92641A;
+    --amber-bg: #FDF8EE;
+    --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 4px 12px rgba(15,23,42,0.04);
+    --shadow-lg: 0 8px 28px rgba(15,23,42,0.12);
     --radius: 16px;
     --radius-sm: 10px;
-    --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --radius-xs: 8px;
+    --font: 'DM Sans', system-ui, sans-serif;
+    --mono: 'DM Mono', 'Menlo', monospace;
   }
 
-  body { font-family: var(--font); background: var(--bg); }
+  body { font-family: var(--font); background: var(--bg); -webkit-font-smoothing: antialiased; }
 
   .store-root {
     display: flex;
@@ -100,435 +123,871 @@ const CSS = `
   .status-bar {
     position: fixed;
     inset: 0 0 auto 0;
-    height: 40px;
+    height: 44px;
     background: #0F172A;
     z-index: 60;
   }
 
+  /* ── Header ── */
   .header {
     position: sticky;
-    top: 40px;
+    top: 44px;
     z-index: 50;
     background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 12px 16px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 0 20px;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
-    min-height: 52px;
+    justify-content: space-between;
+    height: 52px;
     border-bottom: 1px solid var(--border);
   }
   .header-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.3px;
-    line-height: 1.2;
-    display: flex;
-    align-items: center;
-  }
-  .header-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: var(--font);
-    letter-spacing: 0.2px;
-    transition: all 0.2s;
-    margin-left: auto;
-  }
-  .header-badge.live {
-    background: rgba(21,128,61,0.15);
-    color: #15803D;
-    border: 1px solid rgba(21,128,61,0.3);
-  }
-  .header-badge.offline {
-    background: #F1F5F9;
-    color: #64748B;
-    border: 1px solid #E2E8F0;
-  }
-  .badge-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-  .badge-dot.live { background: #4ADE80; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); animation: pulse-dot 2s infinite; }
-  .badge-dot.offline { background: rgba(255,255,255,0.3); }
-  @keyframes pulse-dot {
-    0%, 100% { box-shadow: 0 0 0 3px rgba(74,222,128,0.3); }
-    50% { box-shadow: 0 0 0 5px rgba(74,222,128,0.1); }
-  }
-
-  .main {
-    flex: 1;
-    padding: 16px 16px 100px;
-    padding-top: 72px;
-    max-width: 520px;
-    margin: 0 auto;
-    width: 100%;
-  }
-
-  /* live toggle card */
-  .toggle-card {
-    background: var(--card);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    padding: 18px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    box-shadow: var(--shadow-sm);
-    transition: border-color 0.2s;
-  }
-  .toggle-card.live-on { border-color: var(--green-border); background: var(--green-soft); }
-  .toggle-info { display: flex; flex-direction: column; gap: 2px; }
-  .toggle-label { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text-primary); }
-  .toggle-sub { font-size: 12px; color: var(--text-secondary); }
-  .toggle-sub.live { color: var(--green); }
-
-  /* toggle switch */
-  .switch { position: relative; width: 52px; height: 28px; flex-shrink: 0; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider {
-    position: absolute; inset: 0;
-    background: #D1CBC3;
-    border-radius: 28px;
-    cursor: pointer;
-    transition: background 0.25s;
-  }
-  .slider::before {
-    content: '';
-    position: absolute;
-    width: 22px; height: 22px;
-    left: 3px; top: 3px;
-    background: white;
-    border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
-  }
-  input:checked + .slider { background: var(--green); }
-  input:checked + .slider::before { transform: translateX(24px); }
-  .switch.pending .slider { cursor: wait; opacity: 0.88; }
-
-  /* info card */
-  .info-card {
-    background: var(--card);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    padding: 18px 20px;
-    margin-bottom: 12px;
-    box-shadow: var(--shadow-sm);
-  }
-  .info-card-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-  .info-card-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    font-family: var(--font);
-  }
-  .edit-btn {
-    display: flex; align-items: center; gap: 4px;
-    background: none; border: none;
-    font-size: 12px; font-weight: 600; color: var(--accent);
-    cursor: pointer; font-family: var(--font);
-    padding: 4px 8px; border-radius: 6px;
-    transition: background 0.15s;
-  }
-  .edit-btn:hover { background: var(--accent-soft); }
-  .info-value {
-    font-family: var(--font);
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.2px;
   }
-  .mono { font-family: 'SFMono-Regular', 'Menlo', monospace; font-size: 15px; }
-
-  /* url row */
-  .url-row { display: flex; gap: 8px; align-items: center; }
-  .url-input {
-    flex: 1;
-    padding: 10px 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+  .live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 20px;
     font-size: 12px;
-    font-family: monospace;
-    color: var(--text-primary);
-    outline: none;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    transition: all 0.2s;
+  }
+  .live-pill.on {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid var(--green-border);
+  }
+  .live-pill.off {
+    background: #F5F3F0;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.7;
+  }
+  .live-pill.on .live-dot {
+    background: var(--green-dot);
+    opacity: 1;
+    animation: pulse-green 2s ease-in-out infinite;
+  }
+  @keyframes pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(52,201,122,0.4); }
+    50% { box-shadow: 0 0 0 3px rgba(52,201,122,0.1); }
+  }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    padding: 16px 16px 100px;
+    margin-top: 44px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
+  /* ── Store URL banner ── */
+  .url-banner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+  }
+  .url-banner-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0;
+  }
+  .url-banner-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .url-banner-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .url-text {
+    flex: 1;
     min-width: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.1;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
-  .copy-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 10px 14px;
+  .url-text svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+  }
+  .url-text:hover { color: var(--accent); }
+  .url-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  @media (max-width: 380px) {
+    .url-text { font-size: 11px; }
+  }
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border);
+    background: #F7F5F2;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover {
     background: var(--accent);
     color: white;
-    border: none; border-radius: var(--radius-sm);
-    font-size: 12px; font-weight: 700; cursor: pointer;
-    font-family: var(--font);
-    white-space: nowrap;
-    flex-shrink: 0;
-    transition: background 0.15s;
+    border-color: var(--accent);
+    transform: scale(1.04);
   }
-  .copy-btn:hover { background: var(--accent-dark); }
+  .icon-btn:active { transform: scale(0.97); }
 
-  /* edit row */
-  .edit-row { display: flex; gap: 8px; align-items: flex-start; }
-  .edit-row.catalogue-edit-row { align-items: center; flex-wrap: nowrap; }
-  .edit-row.catalogue-edit-row .select-wrap {
-    flex: 1 1 0;
-    min-width: 0;
-    width: auto;
+  /* ── Toggle card ── */
+  .toggle-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s, background 0.2s;
   }
-  .edit-row.catalogue-edit-row .save-btn,
-  .edit-row.catalogue-edit-row .cancel-btn {
-    padding-top: 9px;
-    padding-bottom: 9px;
-    align-self: center;
+  .toggle-card.on {
+    border-color: var(--green-border);
+    background: var(--green-bg);
   }
-  .field-input {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm);
+  .toggle-label-group {}
+  .toggle-title {
     font-size: 14px;
-    font-family: var(--font);
-    outline: none;
-    background: #fff;
-    transition: border-color 0.15s;
-    min-width: 0;
-  }
-  .field-input:focus { border-color: var(--accent); }
-  .field-input.error { border-color: var(--red); }
-  .save-btn {
-    padding: 10px 16px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: var(--accent);
-    color: #fff;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 700;
-    font-family: var(--font);
-    white-space: nowrap;
-    flex-shrink: 0;
-    transition: background 0.15s;
-  }
-  .save-btn:hover { background: var(--accent-dark); }
-  .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .cancel-btn {
-    padding: 10px 14px;
-    border-radius: var(--radius-sm);
-    border: 1.5px solid var(--border);
-    background: #fff;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    font-family: var(--font);
-    white-space: nowrap;
-    flex-shrink: 0;
-    transition: background 0.15s;
-  }
-  .cancel-btn:hover { background: var(--bg); }
-  .error-text { font-size: 12px; color: var(--red); margin-top: 6px; }
-
-  /* slug suggestions */
-  .suggestions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-  .sug-chip {
-    padding: 4px 10px;
-    border-radius: 20px;
-    border: 1.5px solid var(--border);
-    background: var(--bg);
-    font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
-    cursor: pointer;
-    font-family: var(--font);
-    transition: all 0.15s;
+    margin-bottom: 2px;
   }
-  .sug-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-
-  /* delete section */
-  .delete-btn {
-    width: 100%;
-    padding: 14px;
-    border-radius: var(--radius);
-    border: 1.5px solid var(--red-border);
-    background: var(--red-soft);
-    color: var(--red);
-    font-size: 14px; font-weight: 600;
-    cursor: pointer;
-    font-family: var(--font);
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    transition: all 0.15s;
-    margin-top: 4px;
-  }
-  .delete-btn:hover { background: #fee2e2; }
-  .confirm-card {
-    background: var(--red-soft);
-    border-radius: var(--radius);
-    border: 1.5px solid var(--red-border);
-    padding: 18px 20px;
-    margin-top: 4px;
-  }
-  .confirm-title { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 6px; }
-  .confirm-body { font-size: 13px; color: #991B1B; margin-bottom: 14px; line-height: 1.5; }
-  .confirm-row { display: flex; gap: 8px; }
-  .confirm-yes {
-    flex: 1; padding: 11px;
-    border-radius: var(--radius-sm); border: none;
-    background: var(--red); color: #fff;
-    font-size: 13px; font-weight: 700;
-    cursor: pointer; font-family: var(--font);
-    transition: opacity 0.15s;
-  }
-  .confirm-yes:disabled { opacity: 0.6; cursor: not-allowed; }
-  .confirm-no {
-    flex: 1; padding: 11px;
-    border-radius: var(--radius-sm);
-    border: 1.5px solid var(--red-border);
-    background: #fff; color: #991B1B;
-    font-size: 13px; font-weight: 600;
-    cursor: pointer; font-family: var(--font);
-  }
-
-  /* create form */
-  .create-hero { text-align: center; padding: 24px 0 20px; }
-  .create-icon {
-    width: 72px; height: 72px;
-    background: #18160F;
-    border-radius: 20px;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 16px;
-    color: #F4F3EF;
-  }
-  .create-title { font-family: var(--font); font-size: 24px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
-  .create-sub { font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
-
-  .form-group { margin-bottom: 16px; }
-  .form-label {
-    display: block;
-    font-size: 12px; font-weight: 700;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
+  .toggle-sub {
+    font-size: 12px;
     color: var(--text-secondary);
-    font-family: var(--font);
-    margin-bottom: 8px;
   }
-  .form-label span { color: var(--red); }
-  .slug-prefix {
-    display: flex; align-items: center; gap: 0;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    background: #fff;
-    transition: border-color 0.15s;
+  .toggle-card.on .toggle-sub { color: var(--green); }
+
+  /* iOS-style switch */
+  .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .slider {
+    position: absolute; inset: 0;
+    background: #D6D0CA;
+    border-radius: 26px;
+    cursor: pointer;
+    transition: background 0.22s;
   }
-  .slug-prefix:focus-within { border-color: var(--accent); }
-  .slug-prefix.error { border-color: var(--red); }
-  .slug-pre {
-    padding: 11px 10px 11px 14px;
-    font-size: 13px;
-    color: var(--text-muted);
-    background: var(--bg);
-    border-right: 1.5px solid var(--border);
-    white-space: nowrap;
-    font-family: monospace;
-  }
-  .slug-field {
-    flex: 1; padding: 11px 14px;
-    border: none; outline: none;
-    font-size: 14px; font-family: var(--font);
-    background: transparent;
-    min-width: 0;
-  }
-  .select-wrap {
-    position: relative;
-    display: block;
-    width: 100%;
-  }
-  .select-wrap svg {
+  .slider::before {
+    content: '';
     position: absolute;
-    right: 14px;
-    top: 50%;
+    width: 20px; height: 20px;
+    left: 3px; top: 3px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: transform 0.22s cubic-bezier(.34,1.56,.64,1);
+  }
+  input:checked + .slider { background: var(--green-dot); }
+  input:checked + .slider::before { transform: translateX(22px); }
+  .switch.pending .slider { cursor: wait; opacity: 0.7; }
+
+  /* ── Info cards ── */
+  .cards-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .info-row {
+    padding: 14px 16px;
+    position: relative;
+  }
+  .info-row + .info-row {
+    border-top: 1px solid var(--border);
+  }
+  .info-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .field-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .edit-trigger {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.15s;
+    margin: -6px -6px -6px 0;
+    outline: none;
+    box-shadow: none;
+  }
+  .edit-icon-swap {
+    position: relative;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .edit-icon-swap .icon-layer {
+    position: absolute;
+    inset: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 280ms ease, transform 480ms cubic-bezier(.22,1.4,.36,1);
+    transform-origin: 50% 55%;
+    will-change: transform, opacity;
+  }
+  .edit-icon-swap .icon-edit {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  .edit-icon-swap .icon-check {
+    opacity: 0;
+    transform: scale(0.35) rotate(-135deg);
+  }
+  .edit-trigger.active .edit-icon-swap .icon-edit {
+    opacity: 0;
+    transform: scale(0.35) rotate(135deg);
+  }
+  .edit-trigger.active .edit-icon-swap .icon-check {
+    opacity: 1;
+    transform: scale(1.12) rotate(0deg);
+  }
+  .edit-trigger:active .edit-icon-swap .icon-layer {
+    transform: scale(0.86);
+  }
+  .edit-trigger.active .edit-icon-swap .icon-check {
+    animation: check-pop 520ms cubic-bezier(.16,1.4,.3,1);
+  }
+  .edit-trigger:not(.active) .edit-icon-swap .icon-edit {
+    animation: pencil-pop 520ms cubic-bezier(.16,1.4,.3,1);
+  }
+  @keyframes check-pop {
+    0% { transform: scale(0.28) rotate(-150deg); }
+    55% { transform: scale(1.24) rotate(8deg); }
+    100% { transform: scale(1.12) rotate(0deg); }
+  }
+  @keyframes pencil-pop {
+    0% { transform: scale(0.28) rotate(150deg); }
+    55% { transform: scale(1.24) rotate(-8deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  .edit-trigger:hover {
+    background: #F0EDE9;
+    color: var(--text-primary);
+  }
+  .edit-trigger.active {
+    background: transparent;
+    color: var(--accent);
+  }
+  .edit-trigger.active:hover {
+    background: transparent;
+    color: var(--accent);
+  }
+  .edit-trigger:focus,
+  .edit-trigger:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .field-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .field-value.mono { font-family: var(--mono); font-size: 13.5px; }
+  .field-value.muted { color: var(--text-muted); font-weight: 400; }
+
+  /* Inline edit */
+  .edit-area { padding-top: 2px; }
+  .inline-input-wrap {
+    position: relative;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .inline-input-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1.5px;
+    background: var(--border-focus);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.2s ease;
+  }
+  .inline-input-wrap:focus-within::after { transform: scaleX(1); }
+  .inline-input-wrap.has-error::after { background: var(--red); transform: scaleX(1); }
+  .inline-input {
+    width: 100%;
+    padding: 4px 0 6px;
+    border: none !important;
+    background: transparent !important;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font);
+    color: var(--text-primary) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .inline-input::-webkit-outer-spin-button,
+  .inline-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .inline-input[type=number] { -moz-appearance: textfield; }
+  .inline-input.mono { font-family: var(--mono); font-size: 13.5px; }
+  .inline-input::placeholder { color: var(--text-muted); font-weight: 400; }
+  .inline-input:-webkit-autofill {
+    -webkit-text-fill-color: var(--text-primary);
+    -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+  }
+  .error-msg {
+    font-size: 12px;
+    color: var(--red);
+    margin-top: 6px;
+  }
+
+  /* Select inside edit */
+  .inline-select-wrap {
+    position: relative;
+    border-bottom: 1.5px solid var(--border);
+    padding-right: 22px;
+  }
+  .inline-select-wrap.open {
+    border-bottom-color: var(--border-focus);
+  }
+  .inline-select-wrap svg {
+    position: absolute;
+    right: 0; top: 50%;
     transform: translateY(-50%);
     pointer-events: none;
     color: var(--text-muted);
-    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
   }
-  .form-select,
-  .field-select {
+  .inline-select {
     width: 100%;
-    max-width: 100%;
-    min-height: 40px;
-    padding: 9px 38px 9px 12px;
+    padding: 4px 0 6px;
+    border: none !important;
+    border-radius: 0;
+    background: transparent !important;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font);
+    color: var(--text-primary) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+    text-align: left;
+  }
+  .inline-select-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 40;
+    padding: 4px;
+  }
+  .inline-select-option {
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 10px 11px;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font);
+    cursor: pointer;
+  }
+  .inline-select-option:hover {
+    background: #F1F5F9;
+  }
+  .inline-select-option.active {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    font-weight: 600;
+  }
+
+  /* Slug suggestions */
+  .sug-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .sug-chip {
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: #F7F5F2;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--mono);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sug-chip:hover {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: white;
+  }
+
+  /* ── Create form ── */
+  .create-hero {
+    text-align: center;
+    padding: 32px 8px 28px;
+  }
+  .create-icon-wrap {
+    width: 72px; height: 72px;
+    background: var(--accent);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px;
+    color: white;
+  }
+  .create-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.4px;
+    margin-bottom: 8px;
+  }
+  .create-sub {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    max-width: 280px;
+    margin: 0 auto;
+  }
+
+  .form-field { margin-bottom: 16px; }
+  .form-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-family: var(--font);
+    margin-bottom: 8px;
+  }
+  .form-label em { color: var(--red); font-style: normal; }
+
+  .slug-field-wrap {
+    display: flex;
+    align-items: stretch;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--card);
+    transition: border-color 0.15s;
+  }
+  .slug-field-wrap:focus-within { border-color: var(--accent); }
+  .slug-field-wrap.err { border-color: var(--red); }
+  .slug-prefix-text {
+    padding: 11px 10px 11px 13px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: #F7F5F2;
+    border-right: 1.5px solid var(--border);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+  }
+  .slug-text-input {
+    flex: 1;
+    padding: 11px 13px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-family: var(--font);
+    background: transparent;
+    color: var(--text-primary);
+    min-width: 0;
+  }
+  .slug-text-input::placeholder { color: var(--text-muted); }
+
+  .select-field-wrap {
+    position: relative;
+  }
+  .select-field-wrap svg {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-muted);
+  }
+  .form-select {
+    width: 100%;
+    padding: 11px 38px 11px 13px;
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: 14px;
     font-family: var(--font);
-    line-height: 1.4;
+    background: var(--card);
+    color: var(--text-primary);
     appearance: none;
     -webkit-appearance: none;
-    -moz-appearance: none;
-    background: #fff;
-    cursor: pointer;
     outline: none;
-    color: var(--text-primary);
+    cursor: pointer;
     transition: border-color 0.15s;
-    box-sizing: border-box;
   }
-  .form-select:focus,
-  .field-select:focus { border-color: var(--accent); }
-  .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .form-select:focus { border-color: var(--accent); }
+  .form-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    line-height: 1.45;
+  }
 
   .submit-btn {
-    width: 100%; padding: 14px;
-    border-radius: var(--radius);
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--radius-sm);
     border: none;
-    background: #18160F;
-    color: #F4F3EF;
-    font-size: 15px; font-weight: 700;
-    cursor: pointer; font-family: var(--font);
-    letter-spacing: 0.2px;
-    transition: opacity 0.15s, background 0.15s;
+    background: var(--accent);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font);
+    letter-spacing: -0.1px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 4px;
   }
+  .submit-btn:not(:disabled):hover { background: var(--accent-hover); }
   .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .submit-btn:not(:disabled):hover { background: #2c2a21; }
 
-  /* spinner */
+  /* ── Delete zone ── */
+  .delete-zone { margin-top: 4px; }
+  .delete-trigger {
+    width: 100%;
+    padding: 13px;
+    border-radius: var(--radius);
+    border: 1px solid var(--red-border);
+    background: var(--red-bg);
+    color: var(--red);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: all 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .delete-trigger:hover {
+    background: #FBE8E6;
+    border-color: #EEA8A1;
+    color: #A93226;
+  }
+  .confirm-box {
+    background: var(--red-bg);
+    border: 1px solid var(--red-border);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .confirm-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--red);
+    margin-bottom: 6px;
+  }
+  .confirm-body {
+    font-size: 13px;
+    color: #8B2E2E;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .confirm-btns { display: flex; gap: 8px; }
+  .confirm-yes {
+    flex: 1;
+    padding: 11px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--red);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .confirm-yes:disabled { opacity: 0.55; cursor: not-allowed; }
+  .confirm-no {
+    flex: 1;
+    padding: 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--red-border);
+    background: white;
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .confirm-no:hover { background: #FEF0EE; }
+
+  /* ── Loader ── */
+  .loader { display: flex; justify-content: center; align-items: center; height: 200px; }
   .spinner {
-    width: 28px; height: 28px;
+    width: 26px; height: 26px;
     border-radius: 50%;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    animation: spin 0.7s linear infinite;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--text-primary);
+    animation: spin 0.65s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .loader { display: flex; justify-content: center; align-items: center; height: 200px; }
 
-  /* section divider */
-  .section-gap { margin-bottom: 12px; }
+  /* ── Divider between card groups ── */
+  .gap { margin-bottom: 10px; }
+  .business-card {
+    background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 72%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px 16px;
+    margin-bottom: 10px;
+    box-shadow: var(--shadow);
+  }
+  .business-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+  }
+  .business-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.1px;
+    color: var(--text-primary);
+  }
+  .business-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .business-chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
+    transition: transform .2s ease;
+    flex-shrink: 0;
+  }
+  .business-chevron.open { transform: rotate(180deg); }
+  .business-body {
+    margin-top: 10px;
+  }
+  .business-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .business-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .business-logo-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .business-logo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .business-logo-empty {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .business-logo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .business-chip-btn {
+    height: 30px;
+    padding: 0 11px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+  }
+  .business-chip-btn.primary {
+    background: #0F172A;
+    border-color: #0F172A;
+    color: #fff;
+  }
+  .business-chip-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .business-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .business-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.55px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .business-input,
+  .business-textarea {
+    width: 100%;
+    border: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--text-primary);
+    font-family: var(--font);
+    outline: none !important;
+    padding: 5px 0 7px;
+    transition: border-color .18s ease;
+    box-shadow: none !important;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .business-input {
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .business-textarea {
+    font-size: 13.5px;
+    resize: vertical;
+    min-height: 58px;
+  }
+  .business-input::placeholder,
+  .business-textarea::placeholder {
+    color: var(--text-muted);
+  }
+  .business-input:focus,
+  .business-input:focus-visible,
+  .business-textarea:focus {
+    border-bottom-color: var(--accent);
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  .business-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+  }
+  .business-save {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid #1E293B;
+    background: #0F172A;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: opacity .15s ease, transform .12s ease;
+  }
+  .business-save:hover { opacity: 0.94; }
+  .business-save:active { transform: translateY(1px); }
+  .business-save:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
 `;
 
 export default function StorePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, supabaseData, refreshSupabaseData } = useAuth();
   const { showToast } = useToast();
 
   const [store, setStore] = useState<Store | null>(null);
@@ -546,6 +1005,13 @@ export default function StorePage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [formWhatsapp, setFormWhatsapp] = useState('');
   const [formMinimumOrder, setFormMinimumOrder] = useState('');
+  const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
+  const catalogueMenuRef = useRef<HTMLDivElement | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(EMPTY_BUSINESS_PROFILE);
+  const [businessSaving, setBusinessSaving] = useState(false);
+  const [businessProfileOpen, setBusinessProfileOpen] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
 
@@ -557,9 +1023,7 @@ export default function StorePage() {
       if (result.success && result.data) {
         setStore(result.data);
         setFormWhatsapp(result.data.storeWhatsapp || '');
-        setFormMinimumOrder(
-          result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-        );
+        setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
         setShowCreateForm(false);
         setIsLive(result.data.isLive);
       } else {
@@ -570,6 +1034,32 @@ export default function StorePage() {
     };
     load();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (editingField !== 'catalogue') setCatalogueMenuOpen(false);
+  }, [editingField]);
+
+  useEffect(() => {
+    setBusinessProfile(businessProfileFromUserSettings(supabaseData?.userSettings));
+  }, [supabaseData?.userSettings]);
+
+  useEffect(() => {
+    if (!catalogueMenuOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!catalogueMenuRef.current) return;
+      const target = event.target as Node;
+      if (!catalogueMenuRef.current.contains(target)) setCatalogueMenuOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCatalogueMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onEscape);
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onEscape);
+    };
+  }, [catalogueMenuOpen]);
 
   const validateAndSetSlug = (slug: string) => {
     setFormSlug(slug);
@@ -590,9 +1080,7 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setFormWhatsapp(result.data.storeWhatsapp || '');
-      setFormMinimumOrder(
-        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-      );
+      setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
       showToast('Store created!', 'success');
@@ -613,9 +1101,7 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
-      setFormMinimumOrder(
-        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-      );
+      setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setEditingField(null);
       showToast('Store link updated', 'success');
     } else {
@@ -631,30 +1117,24 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
-      setFormMinimumOrder(
-        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-      );
+      setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setEditingField(null);
       showToast('Products list updated', 'success');
-    }
-    else showToast(result.error || 'Failed', 'error');
+    } else showToast(result.error || 'Failed', 'error');
     setIsSubmitting(false);
   };
 
   const handleSaveWhatsapp = async () => {
     if (!user?.uid) return;
     const n = normalizeStoreWhatsappInput(formWhatsapp);
-    if (n.ok === false) {
-      showToast(n.error, 'error');
-      return;
-    }
+    if (n.ok === false) { showToast(n.error, 'error'); return; }
     setIsSubmitting(true);
     const result = await updateStoreWhatsapp(user.uid, n.value);
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setEditingField(null);
-      showToast(n.value ? 'WhatsApp updated for your store' : 'WhatsApp removed from your store', 'success');
+      showToast(n.value ? 'WhatsApp updated' : 'WhatsApp removed', 'success');
     } else showToast(result.error || 'Failed to save', 'error');
     setIsSubmitting(false);
   };
@@ -662,40 +1142,25 @@ export default function StorePage() {
   const handleSaveMinimumOrder = async () => {
     if (!user?.uid) return;
     const normalized = normalizeStoreMinimumOrderValueInput(formMinimumOrder);
-    if (normalized.ok === false) {
-      showToast(normalized.error, 'error');
-      return;
-    }
+    if (normalized.ok === false) { showToast(normalized.error, 'error'); return; }
     setIsSubmitting(true);
     const result = await updateStoreMinimumOrderValue(user.uid, normalized.value);
     if (result.success && result.data) {
       setStore(result.data);
       setFormWhatsapp(result.data.storeWhatsapp || '');
-      setFormMinimumOrder(
-        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-      );
+      setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setEditingField(null);
-      showToast(
-        normalized.value != null
-          ? 'Minimum order value updated'
-          : 'Minimum order value removed',
-        'success'
-      );
-    } else {
-      showToast(result.error || 'Failed to save', 'error');
-    }
+      showToast(normalized.value != null ? 'Minimum order updated' : 'Minimum order removed', 'success');
+    } else showToast(result.error || 'Failed to save', 'error');
     setIsSubmitting(false);
   };
 
-  const handleDeleteStore = async () => {
-    if (!user?.uid) return;
-    setIsSubmitting(true);
-    const result = await deleteStore(user.uid);
-    if (result.success) {
-      setStore(null); setShowCreateForm(true); setConfirmDelete(false);
-      showToast('Store deleted', 'success');
-    } else showToast(result.error || 'Failed', 'error');
-    setIsSubmitting(false);
+  const handleInlineSave = async () => {
+    if (!editingField) return;
+    if (editingField === 'slug') await handleUpdateSlug(formSlug);
+    else if (editingField === 'catalogue') await handleUpdateCatalogue(formCatalogue);
+    else if (editingField === 'whatsapp') await handleSaveWhatsapp();
+    else if (editingField === 'minimumOrder') await handleSaveMinimumOrder();
   };
 
   const handleLiveToggle = async () => {
@@ -710,34 +1175,116 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setFormWhatsapp(result.data.storeWhatsapp || '');
-      setFormMinimumOrder(
-        result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : ''
-      );
-      showToast(
-        next ? 'Store is now live' : 'Store is offline — visitors see a paused message',
-        next ? 'success' : 'info'
-      );
+      setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
+      showToast(next ? 'Store is now live' : 'Store paused', next ? 'success' : 'info');
     } else {
       setIsLive(prev);
       showToast(result.error || 'Could not update store status', 'error');
     }
   };
 
-  const publicWebBase = getPublicWebBaseUrl();
-  const storeUrlHostPrefix = publicWebBase
-    ? (() => {
-        try {
-          return new URL(publicWebBase).host;
-        } catch {
-          return publicWebBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
-        }
-      })()
-    : typeof window !== 'undefined'
-      ? window.location.host
-      : 'yourapp.com';
+  const updateBusiness = (patch: Partial<BusinessProfile>) => {
+    setBusinessProfile((prev) => ({ ...prev, ...patch }));
+  };
 
-  const getStoreUrl = () => (store ? `${publicWebBase}/store/${store.storeSlug}` : '');
-  const getCatalogueName = (id: string) => catalogues.find(c => c.id === id)?.label || id;
+  const handleSaveBusinessProfile = async () => {
+    if (!user?.uid) return;
+    setBusinessSaving(true);
+    const result = await syncUserSettings(user.uid, {
+      data: { businessProfile: { ...businessProfile } },
+    });
+    if (result.success) {
+      try {
+        localStorage.setItem('businessProfile', JSON.stringify(businessProfile));
+      } catch {
+        /* ignore local storage errors */
+      }
+      await refreshSupabaseData();
+      const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';
+      if (strictOnline) {
+        window.dispatchEvent(new CustomEvent('strict-refresh-from-cloud'));
+      }
+      showToast('Business profile saved', 'success');
+    } else {
+      showToast(result.error || 'Failed to save business profile', 'error');
+    }
+    setBusinessSaving(false);
+  };
+
+  const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please choose an image file', 'error');
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadProductImageToR2({
+        productId: BUSINESS_LOGO_PRODUCT_ID,
+        dataUrl,
+      });
+      updateBusiness({ logoUrl: url });
+      showToast('Logo uploaded — tap Save business profile', 'success');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Logo upload failed';
+      showToast(msg, 'error');
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
+  const publicWebBase = getPublicWebBaseUrl();
+  const hostPrefix = publicWebBase
+    ? (() => { try { return new URL(publicWebBase).host; } catch { return publicWebBase.replace(/^https?:\/\//, '').replace(/\/$/, ''); } })()
+    : (typeof window !== 'undefined' ? window.location.host : 'yourapp.com');
+
+  const storeUrl = store ? `${publicWebBase}/store/${store.storeSlug}` : '';
+  const getCatName = (id: string) => catalogues.find(c => c.id === id)?.label || id;
+
+  /* ── Helper: render a single info row ── */
+  const renderInfoRow = (
+    field: 'slug' | 'catalogue' | 'whatsapp' | 'minimumOrder',
+    label: string,
+    displayValue: React.ReactNode,
+    editContent: React.ReactNode,
+    onEditStart: () => void,
+  ) => {
+    const isEditing = editingField === field;
+    return (
+      <div className="info-row">
+        <div className="info-row-head">
+          <span className="field-label">{label}</span>
+          <button
+            type="button"
+            className={`edit-trigger${isEditing ? ' active' : ''}`}
+            aria-label={isEditing ? `Save ${label}` : `Edit ${label}`}
+            onClick={() => {
+              if (isEditing) { void handleInlineSave(); return; }
+              onEditStart();
+            }}
+          >
+            <span className="edit-icon-swap" aria-hidden>
+              <span className="icon-layer icon-edit"><IconEdit /></span>
+              <span className="icon-layer icon-check"><IconCheck /></span>
+            </span>
+          </button>
+        </div>
+        {isEditing ? (
+          <div className="edit-area">
+            {editContent}
+          </div>
+        ) : displayValue}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -745,12 +1292,11 @@ export default function StorePage() {
       <div className="store-root">
         <div className="status-bar" />
 
-        {/* Header */}
         <div className="header">
           <span className="header-title">My Store</span>
           {store && (
-            <span className={`header-badge ${isLive ? 'live' : 'offline'}`}>
-              <span className={`badge-dot ${isLive ? 'live' : 'offline'}`} />
+            <span className={`live-pill ${isLive ? 'on' : 'off'}`}>
+              <span className="live-dot" />
               {isLive ? 'Live' : 'Offline'}
             </span>
           )}
@@ -760,53 +1306,49 @@ export default function StorePage() {
           {loading ? (
             <div className="loader"><div className="spinner" /></div>
           ) : !store ? (
-            /* ── CREATE FORM ── */
+            /* ── Create form ── */
             <div>
               <div className="create-hero">
-                <div className="create-icon"><IconStore /></div>
-                <h2 className="create-title">Set Up Your Store</h2>
-                <p className="create-sub">Open a simple online shop with your own link that you can share anywhere.</p>
+                <div className="create-icon-wrap"><IconStore /></div>
+                <h2 className="create-title">Set up your store</h2>
+                <p className="create-sub">Share a simple link with customers so they can browse and order.</p>
               </div>
 
               <form onSubmit={handleCreateStore}>
-                <div className="form-group">
-                  <label className="form-label">Choose your store link name <span>*</span></label>
-                  <p className="form-hint" style={{ marginTop: 0, marginBottom: 10 }}>
-                    This is the ending of your address after <strong>/store/</strong>. Use small letters, numbers, and hyphens only—no spaces.
-                  </p>
-                  <div className={`slug-prefix${slugError ? ' error' : ''}`}>
-                    <span className="slug-pre">{storeUrlHostPrefix}/store/</span>
+                <div className="form-field">
+                  <label className="form-label">Store link <em>*</em></label>
+                  <div className={`slug-field-wrap${slugError ? ' err' : ''}`}>
+                    <span className="slug-prefix-text">{hostPrefix}/store/</span>
                     <input
                       type="text"
-                      className="slug-field"
+                      className="slug-text-input"
                       value={formSlug}
                       onChange={e => validateAndSetSlug(e.target.value)}
-                      placeholder="e.g. my-bakery"
+                      placeholder="my-bakery"
+                      autoCapitalize="none"
+                      autoCorrect="off"
                     />
                   </div>
-                  {slugError && <div className="error-text">{slugError}</div>}
+                  {slugError && <div className="error-msg">{slugError}</div>}
                   {slugSuggestions.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 8, marginBottom: 4 }}>Try one of these names:</div>
-                      <div className="suggestions">
-                        {slugSuggestions.map(s => (
-                          <button key={s} type="button" className="sug-chip" onClick={() => validateAndSetSlug(s)}>{s}</button>
-                        ))}
-                      </div>
+                    <div className="sug-row">
+                      {slugSuggestions.map(s => (
+                        <button key={s} type="button" className="sug-chip" onClick={() => validateAndSetSlug(s)}>{s}</button>
+                      ))}
                     </div>
                   )}
+                  <div className="form-hint">Only letters, numbers and hyphens.</div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Which products to show <span>*</span></label>
-                  <div className="select-wrap">
+                <div className="form-field">
+                  <label className="form-label">Products to show <em>*</em></label>
+                  <div className="select-field-wrap">
                     <select className="form-select" value={formCatalogue} onChange={e => setFormCatalogue(e.target.value)}>
-                      <option value="">— Pick a product list —</option>
+                      <option value="">— Choose a product list —</option>
                       {catalogues.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                     </select>
                     <IconChevron />
                   </div>
-                  <p className="form-hint">Only products from this list appear in your shop. You can change it later.</p>
                 </div>
 
                 <button
@@ -814,18 +1356,39 @@ export default function StorePage() {
                   className="submit-btn"
                   disabled={isSubmitting || !formSlug || !formCatalogue || !!slugError}
                 >
-                  {isSubmitting ? 'Creating…' : 'Create Store →'}
+                  {isSubmitting ? 'Creating…' : 'Create store →'}
                 </button>
               </form>
             </div>
           ) : (
-            /* ── STORE DETAILS ── */
+            /* ── Store details ── */
             <div>
-              {/* Live / Offline toggle */}
-              <div className={`toggle-card${isLive ? ' live-on' : ''}`}>
-                <div className="toggle-info">
-                  <div className="toggle-label">{isLive ? 'Store is Live' : 'Store is Offline'}</div>
-                  <div className={`toggle-sub${isLive ? ' live' : ''}`}>
+              {/* URL banner */}
+              <div className="url-banner gap">
+                <div className="url-banner-head">
+                  <div className="url-banner-label">Store link</div>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Copy store link"
+                    onClick={() => { navigator.clipboard.writeText(storeUrl); showToast('Link copied!', 'success'); }}
+                  >
+                    <IconCopy />
+                  </button>
+                </div>
+                <div className="url-banner-row">
+                  <a className="url-text" href={storeUrl} target="_blank" rel="noreferrer">
+                    {storeUrl}
+                    <IconExternalLink />
+                  </a>
+                </div>
+              </div>
+
+              {/* Live toggle */}
+              <div className={`toggle-card gap ${isLive ? 'on' : ''}`}>
+                <div className="toggle-label-group">
+                  <div className="toggle-title">{isLive ? 'Store is live' : 'Store is offline'}</div>
+                  <div className="toggle-sub">
                     {isLive ? 'Customers can browse and order' : 'Hidden from customers'}
                   </div>
                 </div>
@@ -840,218 +1403,332 @@ export default function StorePage() {
                 </label>
               </div>
 
-              <div className="info-card section-gap">
-                <div className="info-card-row">
-                  <div className="info-card-label"><IconLink /> &nbsp;Your store link</div>
-                </div>
-                <div className="url-row">
-                  <input type="text" className="url-input" value={getStoreUrl()} readOnly />
-                  <button
-                    className="copy-btn"
-                    onClick={() => { navigator.clipboard.writeText(getStoreUrl()); showToast('Copied!', 'success'); }}
-                  >
-                    <IconCopy /> Copy
-                  </button>
-                </div>
-              </div>
-
-              <div className="info-card section-gap">
-                <div className="info-card-row">
-                  <div className="info-card-label">Link name</div>
-                  {editingField !== 'slug' && (
-                    <button className="edit-btn" onClick={() => { setEditingField('slug'); setFormSlug(store.storeSlug); setSlugError(''); }}>
-                      <IconEdit /> Edit
-                    </button>
-                  )}
-                </div>
-
-                {editingField === 'slug' ? (
+              {/* Info fields */}
+              <div className="cards-group gap">
+                {/* Link name */}
+                {renderInfoRow(
+                  'slug',
+                  'Link name',
+                  <div className="field-value mono">{store.storeSlug}</div>,
                   <>
-                    <p className="form-hint" style={{ marginBottom: 10 }}>Small letters, numbers, and hyphens only. Changing this changes your full store address.</p>
-                    <div className="edit-row">
+                    <div className={`inline-input-wrap${slugError ? ' has-error' : ''}`}>
                       <input
                         type="text"
-                        className={`field-input${slugError ? ' error' : ''}`}
+                        className="inline-input mono"
                         value={formSlug}
-                        onChange={e => validateAndSetSlug(e.target.value)}
                         autoFocus
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        onChange={e => validateAndSetSlug(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleInlineSave(); } }}
                       />
-                      <button className="save-btn" disabled={isSubmitting || !formSlug || !!slugError} onClick={() => handleUpdateSlug(formSlug)}>Save</button>
-                      <button className="cancel-btn" onClick={() => { setEditingField(null); setFormSlug(''); setSlugError(''); }}>✕</button>
                     </div>
-                    {slugError && <div className="error-text">{slugError}</div>}
-                  </>
-                ) : (
-                  <>
-                    <div className="info-value mono">{store.storeSlug}</div>
-                    <p className="form-hint" style={{ marginTop: 10, marginBottom: 0 }}>
-                      The text at the end of your store address (after <strong>/store/</strong>).
-                    </p>
-                  </>
+                    {slugError && <div className="error-msg">{slugError}</div>}
+                    {slugSuggestions.length > 0 && (
+                      <div className="sug-row">
+                        {slugSuggestions.map(s => (
+                          <button key={s} type="button" className="sug-chip" onClick={() => validateAndSetSlug(s)}>{s}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>,
+                  () => { setEditingField('slug'); setFormSlug(store.storeSlug); setSlugError(''); },
                 )}
-              </div>
 
-              <div className="info-card section-gap">
-                <div className="info-card-row">
-                  <div className="info-card-label">Products shown</div>
-                  {editingField !== 'catalogue' && (
-                    <button className="edit-btn" onClick={() => { setEditingField('catalogue'); setFormCatalogue(store.catalogueId); }}>
-                      <IconEdit /> Change
-                    </button>
-                  )}
-                </div>
-
-                {editingField === 'catalogue' ? (
-                  <div className="edit-row catalogue-edit-row">
-                    <div className="select-wrap">
-                      <select className="field-select" value={formCatalogue} onChange={e => setFormCatalogue(e.target.value)} aria-label="Choose product list">
-                        {catalogues.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                      <IconChevron />
-                    </div>
-                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => handleUpdateCatalogue(formCatalogue)}>Save</button>
-                    <button type="button" className="cancel-btn" onClick={() => { setEditingField(null); setFormCatalogue(''); }}>Cancel</button>
-                  </div>
-                ) : (
-                  <div className="info-value">{getCatalogueName(store.catalogueId)}</div>
-                )}
-              </div>
-
-              <div className="info-card section-gap">
-                <div className="info-card-row">
-                  <div className="info-card-label">WhatsApp for customers</div>
-                  {editingField !== 'whatsapp' && (
+                {/* Products */}
+                {renderInfoRow(
+                  'catalogue',
+                  'Products shown',
+                  <div className="field-value">{getCatName(store.catalogueId)}</div>,
+                  <div className={`inline-select-wrap${catalogueMenuOpen ? ' open' : ''}`} ref={catalogueMenuRef}>
                     <button
                       type="button"
-                      className="edit-btn"
-                      onClick={() => {
-                        setEditingField('whatsapp');
-                        setFormWhatsapp(store.storeWhatsapp || '');
-                      }}
+                      className="inline-select"
+                      onClick={() => setCatalogueMenuOpen(v => !v)}
                     >
-                      <IconEdit /> {store.storeWhatsapp ? 'Change' : 'Add'}
+                      {getCatName(formCatalogue)}
                     </button>
-                  )}
-                </div>
-                <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'whatsapp' ? 10 : 8 }}>
-                  Customers will see a WhatsApp button. Format: +91 98xxxxxxxx
-                </p>
-                {editingField === 'whatsapp' ? (
-                  <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <IconChevron />
+                    {catalogueMenuOpen && (
+                      <div className="inline-select-menu">
+                        {catalogues.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className={`inline-select-option${formCatalogue === c.id ? ' active' : ''}`}
+                            onClick={() => {
+                              setFormCatalogue(c.id);
+                              setCatalogueMenuOpen(false);
+                            }}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>,
+                  () => { setEditingField('catalogue'); setFormCatalogue(store.catalogueId); },
+                )}
+
+                {/* WhatsApp */}
+                {renderInfoRow(
+                  'whatsapp',
+                  'WhatsApp for customers',
+                  <div className={`field-value${store.storeWhatsapp ? '' : ' muted'}`}>
+                    {store.storeWhatsapp || 'Not set'}
+                  </div>,
+                  <div className="inline-input-wrap">
                     <input
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
-                      className="field-input"
-                      style={{ flex: '1 1 200px' }}
+                      className="inline-input"
                       placeholder="+91 98xxxxxxxx"
                       value={formWhatsapp}
-                      onChange={(e) => setFormWhatsapp(e.target.value)}
-                      aria-label="WhatsApp number"
+                      autoFocus
+                      onChange={e => setFormWhatsapp(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleInlineSave(); } }}
                     />
-                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => void handleSaveWhatsapp()}>
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="cancel-btn"
-                      onClick={() => {
-                        setEditingField(null);
-                        setFormWhatsapp(store.storeWhatsapp || '');
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <div className="info-value" style={{ fontWeight: store.storeWhatsapp ? 600 : 400, color: store.storeWhatsapp ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                    {store.storeWhatsapp || 'Not set'}
-                  </div>
+                  </div>,
+                  () => { setEditingField('whatsapp'); setFormWhatsapp(store.storeWhatsapp || ''); },
                 )}
-              </div>
 
-              <div className="info-card section-gap">
-                <div className="info-card-row">
-                  <div className="info-card-label">Minimum order value</div>
-                  {editingField !== 'minimumOrder' && (
-                    <button
-                      type="button"
-                      className="edit-btn"
-                      onClick={() => {
-                        setEditingField('minimumOrder');
-                        setFormMinimumOrder(
-                          store.minimumOrderValue != null ? String(store.minimumOrderValue) : ''
-                        );
-                      }}
-                    >
-                      <IconEdit /> {store.minimumOrderValue != null ? 'Change' : 'Add'}
-                    </button>
-                  )}
-                </div>
-                <p className="form-hint" style={{ marginTop: 0, marginBottom: editingField === 'minimumOrder' ? 10 : 8 }}>
-                  Customers can place order only if cart total reaches this value. Leave empty for no minimum.
-                </p>
-                {editingField === 'minimumOrder' ? (
-                  <div className="edit-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Minimum order */}
+                {renderInfoRow(
+                  'minimumOrder',
+                  'Minimum order value',
+                  <div className={`field-value${store.minimumOrderValue != null ? '' : ' muted'}`}>
+                    {store.minimumOrderValue != null ? `₹${store.minimumOrderValue}` : 'Not set'}
+                  </div>,
+                  <div className="inline-input-wrap">
                     <input
                       type="number"
                       inputMode="decimal"
                       min="0"
                       step="0.01"
-                      className="field-input"
-                      style={{ flex: '1 1 200px' }}
+                      className="inline-input"
                       placeholder="e.g. 500"
                       value={formMinimumOrder}
-                      onChange={(e) => setFormMinimumOrder(e.target.value)}
-                      aria-label="Minimum order value"
+                      autoFocus
+                      onChange={e => setFormMinimumOrder(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleInlineSave(); } }}
                     />
-                    <button type="button" className="save-btn" disabled={isSubmitting} onClick={() => void handleSaveMinimumOrder()}>
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="cancel-btn"
-                      onClick={() => {
-                        setEditingField(null);
-                        setFormMinimumOrder(
-                          store.minimumOrderValue != null ? String(store.minimumOrderValue) : ''
-                        );
-                      }}
-                    >
-                      Cancel
-                    </button>
+                  </div>,
+                  () => {
+                    setEditingField('minimumOrder');
+                    setFormMinimumOrder(store.minimumOrderValue != null ? String(store.minimumOrderValue) : '');
+                  },
+                )}
+              </div>
+
+              <div className="business-card">
+                <button
+                  type="button"
+                  className="business-head"
+                  onClick={() => setBusinessProfileOpen((v) => !v)}
+                  aria-expanded={businessProfileOpen}
+                >
+                  <div>
+                    <div className="business-title">Business profile</div>
+                    <div className="business-sub">Shown in store footer, links and shared content</div>
                   </div>
-                ) : (
-                  <div className="info-value" style={{ fontWeight: store.minimumOrderValue != null ? 600 : 400, color: store.minimumOrderValue != null ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                    {store.minimumOrderValue != null ? store.minimumOrderValue : 'Not set'}
+                  <span className={`business-chevron${businessProfileOpen ? ' open' : ''}`}>
+                    <IconChevron />
+                  </span>
+                </button>
+                {businessProfileOpen && (
+                <div className="business-body">
+                <div className="business-grid">
+                  <div className="business-field">
+                    <label className="business-label">Logo</label>
+                    <div className="business-logo-row">
+                      <div className="business-logo-preview">
+                        {businessProfile.logoUrl ? (
+                          <img src={businessProfile.logoUrl} alt="" />
+                        ) : (
+                          <span className="business-logo-empty">No logo</span>
+                        )}
+                      </div>
+                      <div className="business-logo-actions">
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoFile}
+                          style={{ display: 'none' }}
+                        />
+                        <button
+                          type="button"
+                          className="business-chip-btn primary"
+                          disabled={logoUploading || businessSaving || isSubmitting}
+                          onClick={() => logoInputRef.current?.click()}
+                        >
+                          {logoUploading ? 'Uploading…' : 'Upload'}
+                        </button>
+                        {businessProfile.logoUrl ? (
+                          <button
+                            type="button"
+                            className="business-chip-btn"
+                            disabled={logoUploading || businessSaving || isSubmitting}
+                            onClick={() => updateBusiness({ logoUrl: '' })}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
+                  <div className="business-field">
+                    <label className="business-label">Business name</label>
+                    <input
+                      className="business-input"
+                      type="text"
+                      value={businessProfile.businessName || ''}
+                      onChange={(e) => updateBusiness({ businessName: e.target.value })}
+                      placeholder="Your business name"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Address</label>
+                    <textarea
+                      className="business-textarea"
+                      value={businessProfile.address || ''}
+                      onChange={(e) => updateBusiness({ address: e.target.value })}
+                      placeholder="Street, city, postal code"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Business email</label>
+                    <input
+                      className="business-input"
+                      type="email"
+                      value={businessProfile.email || ''}
+                      onChange={(e) => updateBusiness({ email: e.target.value })}
+                      placeholder="orders@yourstore.com"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Short about</label>
+                    <textarea
+                      className="business-textarea"
+                      value={businessProfile.about || ''}
+                      onChange={(e) => updateBusiness({ about: e.target.value })}
+                      placeholder="A short tagline for customers"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Full description</label>
+                    <textarea
+                      className="business-textarea"
+                      value={businessProfile.description || ''}
+                      onChange={(e) => updateBusiness({ description: e.target.value })}
+                      placeholder="Policies, what you offer, delivery notes..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Business phone</label>
+                    <input
+                      className="business-input"
+                      type="tel"
+                      value={businessProfile.phone || ''}
+                      onChange={(e) => updateBusiness({ phone: e.target.value })}
+                      placeholder="Customer-facing phone"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Website</label>
+                    <input
+                      className="business-input"
+                      type="url"
+                      value={businessProfile.website || ''}
+                      onChange={(e) => updateBusiness({ website: e.target.value.trim() })}
+                      placeholder="https://"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Instagram</label>
+                    <input
+                      className="business-input"
+                      type="url"
+                      value={businessProfile.instagram || ''}
+                      onChange={(e) => updateBusiness({ instagram: e.target.value.trim() })}
+                      placeholder="https://instagram.com/yourstore"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Facebook</label>
+                    <input
+                      className="business-input"
+                      type="url"
+                      value={businessProfile.facebook || ''}
+                      onChange={(e) => updateBusiness({ facebook: e.target.value.trim() })}
+                      placeholder="https://facebook.com/yourstore"
+                    />
+                  </div>
+                  <div className="business-field">
+                    <label className="business-label">Twitter / X</label>
+                    <input
+                      className="business-input"
+                      type="url"
+                      value={businessProfile.twitter || ''}
+                      onChange={(e) => updateBusiness({ twitter: e.target.value.trim() })}
+                      placeholder="https://x.com/yourstore"
+                    />
+                  </div>
+                </div>
+                <div className="business-actions">
+                  <button
+                    type="button"
+                    className="business-save"
+                    disabled={businessSaving || isSubmitting}
+                    onClick={() => void handleSaveBusinessProfile()}
+                  >
+                    {businessSaving ? 'Saving…' : 'Save business profile'}
+                  </button>
+                </div>
+                </div>
                 )}
               </div>
 
               {/* Delete */}
-              {!confirmDelete ? (
-                <button className="delete-btn" onClick={() => setConfirmDelete(true)}>
-                  <IconTrash /> Delete Store
-                </button>
-              ) : (
-                <div className="confirm-card">
-                  <div className="confirm-title">Delete this store?</div>
-                  <p className="confirm-body">This can't be undone. Your store link will stop working for customers right away.</p>
-                  <div className="confirm-row">
-                    <button className="confirm-yes" disabled={isSubmitting} onClick={handleDeleteStore}>
-                      {isSubmitting ? 'Deleting…' : 'Yes, Delete'}
-                    </button>
-                    <button className="confirm-no" onClick={() => setConfirmDelete(false)}>Keep It</button>
+              <div className="delete-zone">
+                {!confirmDelete ? (
+                  <button className="delete-trigger" onClick={() => setConfirmDelete(true)}>
+                    <IconTrash /> Delete store
+                  </button>
+                ) : (
+                  <div className="confirm-box">
+                    <div className="confirm-title">Delete this store?</div>
+                    <p className="confirm-body">This can't be undone. Your store link will stop working for customers right away.</p>
+                    <div className="confirm-btns">
+                      <button className="confirm-yes" disabled={isSubmitting} onClick={handleDeleteStore}>
+                        {isSubmitting ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button className="confirm-no" onClick={() => setConfirmDelete(false)}>Keep it</button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </main>
 
-        {/* Bottom Nav */}
         <MainAppBottomNav active="store" />
       </div>
     </>
   );
+
+  async function handleDeleteStore() {
+    if (!user?.uid) return;
+    setIsSubmitting(true);
+    const result = await deleteStore(user.uid);
+    if (result.success) {
+      setStore(null); setShowCreateForm(true); setConfirmDelete(false);
+      showToast('Store deleted', 'success');
+    } else showToast(result.error || 'Failed', 'error');
+    setIsSubmitting(false);
+  }
 }

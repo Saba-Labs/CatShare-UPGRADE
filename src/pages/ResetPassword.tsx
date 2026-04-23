@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FiLock, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import { supabase } from '../supabaseClient';
 import { useToast } from '../context/ToastContext';
+import { logPasswordResetCompleted } from '../config/analyticsEvents';
 
 /**
  * Landing page for Supabase password recovery email link (redirectTo must be /reset-password).
@@ -51,6 +52,7 @@ export default function ResetPassword() {
       const { error: updErr } = await supabase.auth.updateUser({ password });
       if (updErr) throw updErr;
       await supabase.auth.signOut();
+      logPasswordResetCompleted();
       setDone(true);
       showToast('Password updated. Sign in with your new password.', 'success');
     } catch (err) {

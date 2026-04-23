@@ -35,6 +35,15 @@ export const ANALYTICS_EVENTS = {
   // Mobile-Specific
   FILESHARER_ERROR: "filesharer_error",
   OFFLINE_USAGE: "offline_usage",
+
+  // Auth & Growth (Google Ads / audience)
+  SIGN_UP: "sign_up",
+  LOGIN: "login",
+  LOGOUT: "logout",
+  SIGN_UP_FAILED: "sign_up_failed",
+  LOGIN_FAILED: "login_failed",
+  PASSWORD_RESET_REQUESTED: "password_reset_requested",
+  PASSWORD_RESET_COMPLETED: "password_reset_completed",
 } as const;
 
 // Type definitions for event parameters
@@ -247,6 +256,60 @@ export const logOfflineUsage = (duration?: number) => {
   logAnalyticsEvent(ANALYTICS_EVENTS.OFFLINE_USAGE, {
     timestamp: Date.now(),
     ...(duration && { duration_ms: duration }),
+  });
+};
+
+export const logSignUp = (method: "email" | "google") => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.SIGN_UP, {
+    timestamp: Date.now(),
+    method,
+  });
+};
+
+export const logLogin = (method: "email" | "google") => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.LOGIN, {
+    timestamp: Date.now(),
+    method,
+  });
+};
+
+export const logLogout = () => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.LOGOUT, {
+    timestamp: Date.now(),
+  });
+};
+
+export const logSignUpFailed = (
+  method: "email" | "google",
+  reason: string
+) => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.SIGN_UP_FAILED, {
+    timestamp: Date.now(),
+    method,
+    reason,
+  });
+};
+
+export const logLoginFailed = (
+  method: "email" | "google",
+  reason: string
+) => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.LOGIN_FAILED, {
+    timestamp: Date.now(),
+    method,
+    reason,
+  });
+};
+
+export const logPasswordResetRequested = () => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.PASSWORD_RESET_REQUESTED, {
+    timestamp: Date.now(),
+  });
+};
+
+export const logPasswordResetCompleted = () => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.PASSWORD_RESET_COMPLETED, {
+    timestamp: Date.now(),
   });
 };
 

@@ -35,7 +35,7 @@ async function sendFcmToDevice(
   orderId: string,
   accessToken: string,
   projectId: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; permanentInvalid: boolean; status?: number; errorText?: string }> {
   const url =
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
   const res = await fetch(url, {
@@ -64,10 +64,16 @@ async function sendFcmToDevice(
   });
   if (!res.ok) {
     const t = await res.text();
-    console.error("FCM send failed", res.status, t);
-    return false;
+    const lower = t.toLowerCase();
+    const permanentInvalid =
+      lower.includes("unregistered") ||
+      lower.includes("requested entity was not found") ||
+      lower.includes("invalid registration token") ||
+      (res.status === 404 && lower.includes("not_found"));
+    console.error("FCM send failed", res.status, t.slice(0, 500));
+    return { ok: false, permanentInvalid, status: res.status, errorText: t };
   }
-  return true;
+  return { ok: true, permanentInvalid: false };
 }
 
 function shouldNotify(orderSource: unknown): boolean {
@@ -157,9 +163,10 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const tokens = (rows ?? [])
+  const tokens = [...new Set((rows ?? [])
     .map((r: { token?: string }) => r.token)
     .filter((t): t is string => typeof t === "string" && t.length > 0);
+  )];
 
   if (tokens.length === 0) {
     return new Response(JSON.stringify({ ok: true, sent: 0, reason: "no_tokens" }), {
@@ -195,8 +202,10 @@ Deno.serve(async (req: Request) => {
   const orderId = String(record.id ?? "");
 
   let sent = 0;
+  let failed = 0;
+  const invalidTokens: string[] = [];
   for (const t of tokens) {
-    const ok = await sendFcmToDevice(
+    const result = await sendFcmToDevice(
       t,
       title,
       body,
@@ -204,10 +213,30 @@ Deno.serve(async (req: Request) => {
       accessToken,
       projectId,
     );
-    if (ok) sent++;
+    if (result.ok) sent++;
+    else {
+      failed++;
+      if (result.permanentInvalid) invalidTokens.push(t);
+    }
   }
 
-  return new Response(JSON.stringify({ ok: true, sent, total: tokens.length }), {
+  if (invalidTokens.length > 0) {
+    const { error: cleanupErr } = await supabase
+      .from("user_push_tokens")
+      .delete()
+      .in("token", invalidTokens);
+    if (cleanupErr) {
+      console.error("Failed to cleanup invalid push tokens:", cleanupErr.message);
+    }
+  }
+
+  return new Response(JSON.stringify({
+    ok: true,
+    sent,
+    failed,
+    total: tokens.length,
+    invalidTokensRemoved: invalidTokens.length,
+  }), {
     headers: { "Content-Type": "application/json" },
   });
 });

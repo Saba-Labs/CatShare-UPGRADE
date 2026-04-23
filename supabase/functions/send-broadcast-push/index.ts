@@ -50,7 +50,7 @@ async function sendFcmBroadcast(
   data: Record<string, string>,
   accessToken: string,
   projectId: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; permanentInvalid: boolean; status?: number; errorText?: string }> {
   const url =
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
   const res = await fetch(url, {
@@ -76,10 +76,16 @@ async function sendFcmBroadcast(
   });
   if (!res.ok) {
     const t = await res.text();
+    const lower = t.toLowerCase();
+    const permanentInvalid =
+      lower.includes("unregistered") ||
+      lower.includes("requested entity was not found") ||
+      lower.includes("invalid registration token") ||
+      (res.status === 404 && lower.includes("not_found"));
     console.error("FCM broadcast failed", res.status, t.slice(0, 500));
-    return false;
+    return { ok: false, permanentInvalid, status: res.status, errorText: t };
   }
-  return true;
+  return { ok: true, permanentInvalid: false };
 }
 
 Deno.serve(async (req: Request) => {
@@ -204,20 +210,35 @@ Deno.serve(async (req: Request) => {
   const BATCH = 40;
   let sent = 0;
   let failed = 0;
+  const invalidTokens: string[] = [];
 
   for (let i = 0; i < tokens.length; i += BATCH) {
     const chunk = tokens.slice(i, i + BATCH);
     const results = await Promise.all(
-      chunk.map((t) =>
-        sendFcmBroadcast(t, title, text, extra, accessToken, projectId),
-      ),
+      chunk.map(async (t) => {
+        const result = await sendFcmBroadcast(t, title, text, extra, accessToken, projectId);
+        return { token: t, result };
+      }),
     );
-    for (const ok of results) {
-      if (ok) sent++;
-      else failed++;
+    for (const row of results) {
+      if (row.result.ok) sent++;
+      else {
+        failed++;
+        if (row.result.permanentInvalid) invalidTokens.push(row.token);
+      }
     }
     if (i + BATCH < tokens.length) {
       await new Promise((r) => setTimeout(r, 75));
+    }
+  }
+
+  if (invalidTokens.length > 0) {
+    const { error: cleanupErr } = await supabase
+      .from("user_push_tokens")
+      .delete()
+      .in("token", invalidTokens);
+    if (cleanupErr) {
+      console.error("Failed to cleanup invalid push tokens:", cleanupErr.message);
     }
   }
 
@@ -227,6 +248,7 @@ Deno.serve(async (req: Request) => {
       sent,
       failed,
       totalTokens: tokens.length,
+      invalidTokensRemoved: invalidTokens.length,
     }),
     { headers: { "Content-Type": "application/json" } },
   );

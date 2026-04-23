@@ -14,6 +14,7 @@ import {
   MdPhoneAndroid,
   MdInventory2,
   MdPalette,
+  MdStorefront,
   MdCheckCircle,
   MdMenu,
   MdClose,
@@ -42,8 +43,8 @@ export default function Website() {
       icon: <MdInventory2 className="w-7 h-7" />,
     },
     {
-      title: "Shareable order links",
-      subtitle: "Customers order clearly",
+      title: "Online store + order links",
+      subtitle: "Customers browse and order clearly",
       body: "Generate a link to a tidy order page: buyers pick quantities, see line totals and pack rules, then send the order to you on WhatsApp—less typing mistakes and fewer “how much?” chats.",
       icon: <MdShare className="w-7 h-7" />,
     },
@@ -56,6 +57,14 @@ export default function Website() {
   ];
 
   const features = [
+    {
+      id: "online-store",
+      icon: <MdStorefront className="w-7 h-7" />,
+      title: "Online store page",
+      blurb: "Your products in one public storefront link.",
+      detail:
+        "Create a shareable store URL with your profile, logo, social links, live/open status, and selected catalogue. Customers can browse products and place orders from one clean page.",
+    },
     {
       id: "order-links",
       icon: <MdShoppingBag className="w-7 h-7" />,
@@ -127,13 +136,13 @@ export default function Website() {
     },
     {
       n: "03",
-      title: "Render or share",
-      text: "Export polished images—or create an order link so customers choose qty and message you on WhatsApp.",
+      title: "Launch your store",
+      text: "Turn your catalogue into an online store page with your business profile and shareable link.",
     },
     {
       n: "04",
-      title: "Backup & grow",
-      text: "Snapshot your data, sync across devices, and iterate as your range grows.",
+      title: "Render, share & grow",
+      text: "Export polished images, share order links, take WhatsApp orders, and keep data safe with cloud sync.",
     },
   ];
 
@@ -281,6 +290,7 @@ export default function Website() {
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-300 text-pretty sm:mt-6 sm:text-lg lg:text-xl">
               CatShare keeps your products, prices, and pack rules organised—then turns them into{" "}
               <span className="font-semibold text-white">shareable order pages</span> and{" "}
+              <span className="font-semibold text-white">online storefront links</span> and{" "}
               <span className="font-semibold text-white">branded product images</span> so buyers know what to order and what it costs.
             </p>
             <div className="mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
@@ -309,6 +319,7 @@ export default function Website() {
             className="mt-10 grid gap-3 sm:mt-14 sm:grid-cols-3"
           >
             {[
+              { k: "Online store", v: "Public /store link for customers" },
               { k: "Order links", v: "Qty + line totals → WhatsApp" },
               { k: "Multi-catalogue", v: "Wholesale, custom price lists" },
               { k: "Renders", v: "Watermarks & batch export" },
@@ -410,7 +421,7 @@ export default function Website() {
               How it works
             </h2>
             <p className="mt-3 text-pretty text-sm text-slate-600 sm:text-base">
-              From empty catalogue to shared orders and images.
+              From empty catalogue to live store, orders, and share-ready visuals.
             </p>
           </motion.div>
 
@@ -466,6 +477,10 @@ export default function Website() {
               </li>
               <li className="flex gap-3">
                 <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
+                <span>Online store link, order links, and social/contact-ready business profile.</span>
+              </li>
+              <li className="flex gap-3">
+                <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
                 <span>Pro features available—start with a 14-day trial and upgrade when you need more.</span>
               </li>
             </ul>
@@ -480,7 +495,7 @@ export default function Website() {
             Try CatShare on your next catalogue update
           </h2>
           <p className="mt-4 text-base text-blue-100 text-pretty sm:text-lg">
-            Sign up in the app, add a few products, and share your first order link or render.
+            Sign up in the app, add a few products, and launch your online store, order link, or first render.
           </p>
           <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
             <Link

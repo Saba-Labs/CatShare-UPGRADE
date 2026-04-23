@@ -398,23 +398,45 @@ function AppWithBackHandler() {
     migrateUnkeyedDataToUserKeyed(userId);
 
     if (strictReturning) {
-      strictBootstrapRanRef.current = userId;
       // Returning strict-mode user: apply local cache and/or auth snapshot immediately, splash max 2s, then cloud refresh.
       const STARTUP_SPLASH_MS = 2000;
       void (async () => {
         try {
           const localProducts = safeGetFromStorage(getProductsKey(userId), []);
           const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
-          const useRemoteSnapshot = !supabaseDataLoading && supabaseData != null;
+          const hasLocalCache = localProducts.length > 0 || localDeleted.length > 0;
+          let sourceSnapshot = (!supabaseDataLoading && supabaseData != null)
+            ? supabaseData
+            : null;
+
+          // First app open after reinstall can hit a race where strict bootstrap runs
+          // before profile rows are ready. If local cache is empty, force one fresh read.
+          if (!sourceSnapshot && !hasLocalCache) {
+            try {
+              sourceSnapshot = await refreshSupabaseData({ skipLoadingIndicator: true });
+            } catch {
+              sourceSnapshot = null;
+            }
+          }
+
+          // On cold starts, auth/profile can still be settling. Don't lock strict bootstrap
+          // as "done" if neither local cache nor cloud snapshot is available yet.
+          if (!sourceSnapshot && !hasLocalCache) {
+            strictBootstrapRanRef.current = null;
+            return;
+          }
+
+          strictBootstrapRanRef.current = userId;
+          const useRemoteSnapshot = sourceSnapshot != null;
 
           let cloudProducts: any[];
           let cloudDeleted: any[];
           let rawCats: any[];
 
           if (useRemoteSnapshot) {
-            cloudProducts = Array.isArray(supabaseData!.products) ? supabaseData!.products : [];
-            cloudDeleted = Array.isArray(supabaseData!.deletedProducts) ? supabaseData!.deletedProducts : [];
-            rawCats = supabaseData?.categories || [];
+            cloudProducts = Array.isArray(sourceSnapshot!.products) ? sourceSnapshot!.products : [];
+            cloudDeleted = Array.isArray(sourceSnapshot!.deletedProducts) ? sourceSnapshot!.deletedProducts : [];
+            rawCats = sourceSnapshot?.categories || [];
           } else {
             cloudProducts = localProducts;
             cloudDeleted = localDeleted;
@@ -440,19 +462,19 @@ function AppWithBackHandler() {
           localStorage.setItem('categories', JSON.stringify(normalizedCats));
 
           if (useRemoteSnapshot) {
-            if (supabaseData?.fieldsDefinition) {
-              setFieldsDefinition(supabaseData.fieldsDefinition, userId);
+            if (sourceSnapshot?.fieldsDefinition) {
+              setFieldsDefinition(sourceSnapshot.fieldsDefinition, userId);
               window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
-                detail: { newDefinition: supabaseData.fieldsDefinition, template: supabaseData.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
+                detail: { newDefinition: sourceSnapshot.fieldsDefinition, template: sourceSnapshot.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
               }));
             }
-            if (supabaseData?.cataloguesDefinition) {
-              setCataloguesDefinition(supabaseData.cataloguesDefinition, userId);
+            if (sourceSnapshot?.cataloguesDefinition) {
+              setCataloguesDefinition(sourceSnapshot.cataloguesDefinition, userId);
               window.dispatchEvent(new CustomEvent('catalogues-changed', {
-                detail: { action: 'update', catalogues: supabaseData.cataloguesDefinition.catalogues }
+                detail: { action: 'update', catalogues: sourceSnapshot.cataloguesDefinition.catalogues }
               }));
             }
-            applyUserSettingsFromCloud(supabaseData?.userSettings);
+            applyUserSettingsFromCloud(sourceSnapshot?.userSettings);
           } else {
             const rawFd = localStorage.getItem(getStorageKey('fieldsDefinition', userId));
             if (rawFd) {
@@ -489,11 +511,33 @@ function AppWithBackHandler() {
           }, STARTUP_SPLASH_MS);
 
           void refreshFromCloud()
-            .then((cloudData) => {
+            .then(async (cloudData) => {
               if (cloudData) {
                 setProducts(cloudData.products);
                 setDeletedProducts(cloudData.deletedProducts);
               }
+
+              // Ensure strict first-launch also hydrates metadata/settings,
+              // not only products, when initial snapshot arrived late.
+              const latest = await refreshSupabaseData({ skipLoadingIndicator: true });
+              if (latest?.fieldsDefinition) {
+                setFieldsDefinition(latest.fieldsDefinition, userId);
+                window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+                  detail: {
+                    newDefinition: latest.fieldsDefinition,
+                    template: latest.fieldsDefinition?.industry || 'Custom',
+                    isBackupRestore: false,
+                  },
+                }));
+              }
+              if (latest?.cataloguesDefinition?.catalogues?.length) {
+                setCataloguesDefinition(latest.cataloguesDefinition, userId);
+                window.dispatchEvent(new CustomEvent('catalogues-changed', {
+                  detail: { action: 'update', catalogues: latest.cataloguesDefinition.catalogues },
+                }));
+              }
+              applyUserSettingsFromCloud(latest?.userSettings);
+
               setSupabaseSyncStatus('synced');
             })
             .catch((e) => {

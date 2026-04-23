@@ -223,6 +223,10 @@ export default function Account() {
   };
 
   const busy = isLoading || businessSaving || logoUploading;
+  const businessInputClass =
+    'w-full h-11 border-0 border-b border-slate-200 bg-transparent px-0 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-blue-500 focus:ring-0';
+  const businessTextareaClass =
+    'w-full border-0 border-b border-slate-200 bg-transparent px-0 py-2 text-[14px] text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-blue-500 focus:ring-0 resize-y';
 
   return (
     <div className="min-h-screen bg-gray-50 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -396,27 +400,27 @@ export default function Account() {
             <button
               type="button"
               onClick={() => setBusinessSectionOpen((o) => !o)}
-              className="sm:hidden w-full flex items-center justify-between gap-3 p-4 text-left touch-manipulation"
+              className="sm:hidden w-full flex items-center justify-between gap-3 p-4 text-left touch-manipulation bg-white"
               aria-expanded={businessSectionOpen}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FiBriefcase className="text-amber-600 shrink-0 w-5 h-5" />
+                <FiBriefcase className="text-slate-700 shrink-0 w-5 h-5" />
                 <div className="min-w-0">
-                  <span className="font-semibold text-gray-900 block">Business profile</span>
-                  <span className="text-xs text-gray-500">Logo, contact &amp; about — for PDFs &amp; links</span>
+                  <span className="font-semibold text-slate-900 block">Business profile</span>
+                  <span className="text-xs text-slate-500">Logo, contact and about for PDFs and links</span>
                 </div>
               </div>
               <FiChevronDown
-                className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${businessSectionOpen ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-slate-400 shrink-0 transition-transform ${businessSectionOpen ? 'rotate-180' : ''}`}
               />
             </button>
             <div className={`${businessSectionOpen ? 'block' : 'hidden'} sm:block`}>
-              <div className="px-4 pb-4 sm:px-5 sm:pb-5 sm:pt-5 space-y-4 border-t border-gray-100 sm:border-t-0">
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5 sm:pt-5 space-y-5 border-t border-slate-100 sm:border-t-0 bg-gradient-to-b from-slate-50/70 to-white">
                 <div className="hidden sm:flex items-start gap-2 mb-1">
-                  <FiBriefcase className="text-amber-600 mt-0.5 w-5 h-5" />
+                  <FiBriefcase className="text-slate-700 mt-0.5 w-5 h-5" />
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900">Business profile</h2>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <h2 className="text-base font-semibold text-slate-900">Business profile</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Shown on PDFs and shared links. Can differ from your login email.
                     </p>
                   </div>
@@ -428,7 +432,7 @@ export default function Account() {
                       type="button"
                       disabled={busy}
                       onClick={() => updateBusiness({ email: user.email || '' })}
-                      className="text-xs px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50 touch-manipulation"
+                      className="text-xs px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium disabled:opacity-50 touch-manipulation"
                     >
                       Use login email
                     </button>
@@ -438,7 +442,7 @@ export default function Account() {
                       type="button"
                       disabled={busy}
                       onClick={() => updateBusiness({ businessName: user.displayName || '' })}
-                      className="text-xs px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium disabled:opacity-50 touch-manipulation"
+                      className="text-xs px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium disabled:opacity-50 touch-manipulation"
                     >
                       Use profile name as business name
                     </button>
@@ -446,12 +450,12 @@ export default function Account() {
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-2">
-                    <FiImage className="text-gray-500 w-4 h-4" />
+                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                    <FiImage className="text-slate-500 w-4 h-4" />
                     Logo
                   </label>
                   <div className="flex flex-col sm:flex-row gap-3 items-start">
-                    <div className="w-20 h-20 rounded-xl border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="w-20 h-20 rounded-xl border border-dashed border-slate-300 bg-white flex items-center justify-center overflow-hidden shrink-0">
                       {businessProfile.logoUrl ? (
                         <img
                           src={businessProfile.logoUrl}
@@ -459,7 +463,7 @@ export default function Account() {
                           className="w-full h-full object-contain"
                         />
                       ) : (
-                        <span className="text-[10px] text-gray-400 px-1 text-center">No logo</span>
+                        <span className="text-[10px] text-slate-400 px-1 text-center">No logo</span>
                       )}
                     </div>
                     <div className="flex-1 w-full space-y-2">
@@ -475,7 +479,7 @@ export default function Account() {
                           type="button"
                           disabled={busy}
                           onClick={() => logoInputRef.current?.click()}
-                          className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50 touch-manipulation"
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50 touch-manipulation"
                         >
                           {logoUploading ? 'Uploading…' : 'Upload'}
                         </button>
@@ -484,43 +488,43 @@ export default function Account() {
                             type="button"
                             disabled={busy}
                             onClick={() => updateBusiness({ logoUrl: '' })}
-                            className="px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 touch-manipulation"
+                            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-700 touch-manipulation"
                           >
                             Remove
                           </button>
                         ) : null}
                       </div>
-                      <p className="text-[11px] text-gray-400">Save business details below to persist logo.</p>
+                      <p className="text-[11px] text-slate-400">Save business details below to persist logo.</p>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Business name</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1 block">Business name</label>
                   <input
                     type="text"
                     value={businessProfile.businessName}
                     onChange={(e) => updateBusiness({ businessName: e.target.value })}
                     placeholder="e.g. Your store name"
-                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                    className={businessInputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Address</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1 block">Address</label>
                   <textarea
                     value={businessProfile.address}
                     onChange={(e) => updateBusiness({ address: e.target.value })}
                     placeholder="Street, city, postal code"
                     rows={2}
-                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y min-h-[72px]"
+                    className={`${businessTextareaClass} min-h-[72px]`}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiMail className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiMail className="text-slate-500 w-4 h-4" />
                       Business email
                     </label>
                     <input
@@ -528,12 +532,12 @@ export default function Account() {
                       value={businessProfile.email}
                       onChange={(e) => updateBusiness({ email: e.target.value })}
                       placeholder="orders@…"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiPhone className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiPhone className="text-slate-500 w-4 h-4" />
                       Business phone
                     </label>
                     <input
@@ -542,12 +546,12 @@ export default function Account() {
                       onChange={(e) => updateBusiness({ phone: e.target.value })}
                       placeholder="Customer-facing phone"
                       inputMode="tel"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiGlobe className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiGlobe className="text-slate-500 w-4 h-4" />
                       Website
                     </label>
                     <input
@@ -555,12 +559,12 @@ export default function Account() {
                       value={businessProfile.website}
                       onChange={(e) => updateBusiness({ website: e.target.value.trim() })}
                       placeholder="https://"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiInstagram className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiInstagram className="text-slate-500 w-4 h-4" />
                       Instagram
                     </label>
                     <input
@@ -568,12 +572,12 @@ export default function Account() {
                       value={businessProfile.instagram}
                       onChange={(e) => updateBusiness({ instagram: e.target.value.trim() })}
                       placeholder="https://instagram.com/yourstore"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiFacebook className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiFacebook className="text-slate-500 w-4 h-4" />
                       Facebook
                     </label>
                     <input
@@ -581,12 +585,12 @@ export default function Account() {
                       value={businessProfile.facebook}
                       onChange={(e) => updateBusiness({ facebook: e.target.value.trim() })}
                       placeholder="https://facebook.com/yourstore"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-1.5">
-                      <FiTwitter className="text-gray-500 w-4 h-4" />
+                    <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                      <FiTwitter className="text-slate-500 w-4 h-4" />
                       Twitter / X
                     </label>
                     <input
@@ -594,32 +598,30 @@ export default function Account() {
                       value={businessProfile.twitter}
                       onChange={(e) => updateBusiness({ twitter: e.target.value.trim() })}
                       placeholder="https://x.com/yourstore"
-                      className="w-full px-3 py-3 rounded-xl border border-gray-200 text-base focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+                      className={businessInputClass}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Short about</label>
-                  <p className="text-[11px] text-gray-400 mb-1">One line for headers</p>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1 block">Short about</label>
                   <textarea
                     value={businessProfile.about}
                     onChange={(e) => updateBusiness({ about: e.target.value })}
                     placeholder="Brief tagline"
                     rows={2}
-                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y"
+                    className={businessTextareaClass}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-800 mb-1.5 block">Full description</label>
-                  <p className="text-[11px] text-gray-400 mb-1">For catalogues or PDFs</p>
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1 block">Full description</label>
                   <textarea
                     value={businessProfile.description}
                     onChange={(e) => updateBusiness({ description: e.target.value })}
                     placeholder="Policies, what you offer…"
                     rows={3}
-                    className="w-full px-3 py-3 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/30 focus:outline-none resize-y min-h-[88px]"
+                    className={`${businessTextareaClass} min-h-[88px]`}
                   />
                 </div>
 
@@ -627,7 +629,7 @@ export default function Account() {
                   type="button"
                   onClick={saveBusinessDetails}
                   disabled={busy}
-                  className="w-full py-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:bg-gray-300 text-white text-sm font-semibold transition-colors touch-manipulation"
+                  className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-900/90 disabled:bg-slate-300 text-white text-sm font-semibold transition-colors touch-manipulation"
                 >
                   {businessSaving ? 'Saving…' : 'Save business details'}
                 </button>

@@ -13,6 +13,29 @@ interface CataloguesListProps {
   renamingCatalogueIds?: Set<string>;
 }
 
+function seededHash(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function pickStableRandomItems<T>(items: T[], count: number, seedKey: string): T[] {
+  if (items.length <= count) return items;
+  const arr = [...items];
+  let seed = seededHash(seedKey) || 1;
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const j = seed % (i + 1);
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr.slice(0, count);
+}
+
 export default React.memo(function CataloguesList({
   catalogues,
   onSelectCatalogue,
@@ -95,10 +118,15 @@ export default React.memo(function CataloguesList({
               total: 0,
               inStock: 0,
             };
-            // Get first few product images for this catalogue (only enabled products)
-            const catalogueProducts = products
-              .filter((p) => isProductEnabledForCatalogue(p, catalogue.id))
-              .slice(0, 3);
+            // Pick a stable random set of product images for this catalogue
+            const enabledProducts = products.filter((p) =>
+              isProductEnabledForCatalogue(p, catalogue.id)
+            );
+            const catalogueProducts = pickStableRandomItems(
+              enabledProducts,
+              3,
+              `${catalogue.id}:${enabledProducts.map((p) => p.id).join(",")}`
+            );
 
             return (
               <button

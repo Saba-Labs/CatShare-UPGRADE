@@ -6,9 +6,6 @@ import {
   FiMail,
   FiLock,
   FiAlertCircle,
-  FiShoppingBag,
-  FiZap,
-  FiImage,
   FiEye,
   FiEyeOff,
   FiArrowLeft,
@@ -18,24 +15,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { safeGetFromStorage } from '../utils/safeStorage';
 import { supabase } from '../supabaseClient';
-
-const introHighlights = [
-  {
-    icon: FiShoppingBag,
-    title: 'Branded storefronts',
-    text: 'Showcase and sell your collection.',
-  },
-  {
-    icon: FiZap,
-    title: 'Easier days',
-    text: 'Your prices and packs carry through—less back-and-forth.',
-  },
-  {
-    icon: FiImage,
-    title: 'Smart catalogues',
-    text: 'Lists, renders, sync—aligned with what you stock.',
-  },
-];
+import { logLogin, logLoginFailed } from '../config/analyticsEvents';
 
 export default function Login() {
   const isNativeApp = Capacitor.isNativePlatform();
@@ -167,11 +147,13 @@ export default function Login() {
 
     try {
       await authService.loginWithEmail(email, password);
+      logLogin('email');
       setIsRedirecting(true);
       setHasJustLoggedIn(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Login failed';
       setError(errorMessage);
+      logLoginFailed('email', errorMessage);
       showToast(errorMessage, 'error');
       setIsLoading(false);
     }
@@ -183,37 +165,38 @@ export default function Login() {
     try {
       const user = await authService.loginWithGoogle();
       if (user) {
+        logLogin('google');
         setIsRedirecting(true);
         setHasJustLoggedIn(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
       setError(errorMessage);
+      logLoginFailed('google', errorMessage);
       showToast(errorMessage, 'error');
       setAuthLoading(null);
     }
   };
 
   const formColumnClassName = [
-    'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
-    mobileShowLoginForm ? 'flex' : 'hidden lg:flex',
-    'overflow-y-auto lg:overflow-visible',
+    'flex-1 flex flex-col min-h-0',
+    mobileShowLoginForm ? 'flex' : 'hidden',
+    'overflow-y-auto',
     'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-    'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
-    'lg:items-center lg:justify-center',
+    'pb-[max(2.75rem,env(safe-area-inset-bottom,0px))] pt-2',
   ].join(' ');
 
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col lg:flex-row bg-slate-950 lg:bg-slate-50',
-        'pt-[calc(40px+env(safe-area-inset-top,0px))] lg:pt-[env(safe-area-inset-top,0px)]',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black lg:hidden" aria-hidden />
+      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
       {/* Full-screen landing (layout only on small screens) — CatShare palette */}
       <motion.section
@@ -221,7 +204,7 @@ export default function Login() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45 }}
         className={[
-          'lg:hidden flex flex-col min-h-[100dvh] shrink-0 w-full relative overflow-hidden',
+          'flex flex-col min-h-[100dvh] shrink-0 w-full relative overflow-hidden',
           'bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
           mobileShowLoginForm ? 'hidden' : 'flex',
         ].join(' ')}
@@ -250,45 +233,48 @@ export default function Login() {
               <span className="text-base font-semibold tracking-tight text-white sm:text-lg">CatShare</span>
             </Link>
 
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200/90 sm:text-[11px] sm:tracking-[0.16em]">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-sky-200/90 sm:text-[12px] sm:tracking-[0.16em]">
               Share faster · Sell quicker
             </p>
 
-            <h1 className="max-w-[17.5rem] px-2 text-[1.4375rem] font-bold leading-tight tracking-tight text-white sm:max-w-none sm:text-[1.625rem] sm:leading-snug">
+            <h1 className="max-w-[17.5rem] px-2 text-[1.56rem] font-bold leading-tight tracking-tight text-white sm:max-w-none sm:text-[1.75rem] sm:leading-snug">
               Create. Share. Sell.
             </h1>
-            <p className="mt-2.5 max-w-[20rem] px-2 text-[13px] leading-relaxed text-blue-100/85 sm:mt-3 sm:max-w-[19rem] sm:text-sm">
-            Built for Instagram and WhatsApp sellers — Catalogues, storefront and orders all in one place.
+            <p className="mt-2.5 max-w-[20rem] px-2 text-[14px] leading-relaxed text-blue-100/85 sm:mt-3 sm:max-w-[19rem] sm:text-[15px]">
+            Built for Instagram and WhatsApp sellers — Catalogues, Online Store, Order management all in one app.
             </p>
           </div>
 
           <div className="mx-auto mt-auto w-full max-w-md space-y-2 pb-1 sm:space-y-2.5">
             <Link
               to="/register"
-              className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-indigo-950/45 ring-1 ring-sky-300/25 transition-colors hover:from-blue-500 hover:to-indigo-500 active:from-blue-700 active:to-indigo-700 sm:min-h-[46px] sm:py-2.5 sm:text-sm"
+              className="flex min-h-[52px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-[15px] font-semibold text-white shadow-lg shadow-indigo-950/45 ring-1 ring-sky-300/25 transition-colors hover:from-blue-500 hover:to-indigo-500 active:from-blue-700 active:to-indigo-700 sm:min-h-[54px] sm:py-3 sm:text-base"
             >
               Sign up free
             </Link>
             <button
               type="button"
               onClick={() => setMobileShowLoginForm(true)}
-              className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-sky-200/70 bg-sky-400/10 px-4 py-2 text-[13px] font-semibold text-sky-50 backdrop-blur-[2px] transition-colors hover:bg-sky-400/15 hover:border-sky-200/90 active:bg-sky-400/20 sm:min-h-[46px] sm:py-2.5 sm:text-sm"
+              className="flex min-h-[52px] w-full items-center justify-center rounded-xl border border-sky-200/70 bg-sky-400/10 px-5 py-3 text-[15px] font-semibold text-sky-50 backdrop-blur-[2px] transition-colors hover:bg-sky-400/15 hover:border-sky-200/90 active:bg-sky-400/20 sm:min-h-[54px] sm:py-3 sm:text-base"
             >
               Log in
             </button>
 
-            <div className="relative py-1.5 sm:py-2">
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-white/15" aria-hidden />
-              <p className="relative px-2 text-center text-[10px] font-medium uppercase tracking-wide text-blue-200/75 sm:text-[11px]">
-                Or continue with
-              </p>
+            <div className="py-1.5 sm:py-2">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-white/15" aria-hidden />
+                <span className="text-center text-[11px] font-medium uppercase tracking-wide text-blue-200/75 sm:text-[12px]">
+                  Or continue with
+                </span>
+                <div className="h-px flex-1 bg-white/15" aria-hidden />
+              </div>
             </div>
 
             <button
               type="button"
               onClick={handleGoogleLogin}
               disabled={authLoading !== null || isRedirecting}
-              className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 sm:min-h-[46px] sm:gap-2.5 sm:py-2.5 sm:text-sm"
+              className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200/90 bg-white px-5 py-3 text-[15px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 active:bg-slate-100 disabled:pointer-events-none disabled:opacity-50 sm:min-h-[54px] sm:gap-3 sm:py-3 sm:text-base"
             >
               <svg
                 className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5"
@@ -317,7 +303,7 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="relative z-10 mt-4 text-center text-[10px] text-blue-200/65 sm:mt-5 sm:text-xs">
+          <p className="relative z-10 mt-4 text-center text-[12px] text-blue-200/65 sm:mt-5 sm:text-sm">
             <Link
               to="/website"
               className="inline-block py-1.5 font-medium text-sky-200/90 underline-offset-4 hover:text-white hover:underline sm:py-2"
@@ -335,103 +321,16 @@ export default function Login() {
         )}
       </motion.section>
 
-      {/* Brand / intro — desktop only (unchanged split layout) */}
-      <motion.aside
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.45 }}
-        className="hidden lg:flex relative shrink-0 lg:w-[46%] xl:w-[44%] flex-col justify-center px-5 pt-2 pb-6 sm:px-8 lg:min-h-[100dvh] lg:py-10 lg:px-12 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
-      >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.35), transparent 45%), radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.25), transparent 40%)',
-          }}
-        />
-        <div className="relative z-10 max-w-md mx-auto lg:mx-0 w-full">
-          <Link
-            to="/website"
-            className="inline-flex items-center gap-2.5 sm:gap-3 group mb-4 lg:mb-10 min-h-[44px] -ml-1 pl-1 rounded-lg active:opacity-90"
-          >
-            <span className="inline-flex items-center justify-center shrink-0 rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-black/10">
-              <img
-                src="/CatShare_logo.png"
-                alt="CatShare"
-                className="h-8 w-auto sm:h-10 max-h-10 object-contain object-center"
-              />
-            </span>
-            <span className="text-lg sm:text-2xl font-semibold tracking-tight text-white group-active:text-blue-100 transition-colors">
-              CatShare
-            </span>
-          </Link>
-
-          <p className="text-sm font-medium tracking-wide text-sky-200/95 mb-3 lg:mb-4">
-            Share faster · Sell quicker
-          </p>
-
-          <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Create. Share. Sell.
-          </h1>
-
-          {/* Mobile / tablet: one line — keeps sign-in above the fold */}
-          <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Create your catalogue in minutes. Share as images, PDFs, links, or your online store — and start taking orders.
-          </p>
-
-          {/* Desktop: full intro */}
-          <p className="hidden lg:block text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
-            Create a branded storefront to showcase your products, manage inventory, and sell directly to customers with instant order management.
-          </p>
-
-          <ul className="hidden lg:block space-y-4">
-            {introHighlights.map(({ icon: Icon, title, text }, i) => (
-              <motion.li
-                key={title}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.12 + i * 0.08, duration: 0.35 }}
-                className="flex gap-3"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-                  <Icon className="h-5 w-5 text-sky-200" aria-hidden />
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-white">{title}</p>
-                  <p className="text-xs sm:text-sm text-blue-100/80 leading-snug mt-0.5">{text}</p>
-                </div>
-              </motion.li>
-            ))}
-          </ul>
-
-          <p className="mt-4 lg:mt-10 text-xs text-blue-200/70 hidden lg:block">
-            <Link
-              to="/website"
-              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
-            >
-              Learn more
-            </Link>
-            {' · '}
-            <Link
-              to="/register"
-              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
-            >
-              Create an account
-            </Link>
-          </p>
-        </div>
-      </motion.aside>
-
       {/* Sign-in — scrollable on small screens so keyboard / long forms don’t clip */}
       <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.05 }}
-          className="w-full max-w-[420px] mx-auto lg:my-auto"
+          className="w-full max-w-[420px] mx-auto"
         >
           {mobileShowLoginForm && (
-            <div className="mb-3 -mt-1 lg:hidden">
+            <div className="mb-3 -mt-1">
               <button
                 type="button"
                 onClick={() => setMobileShowLoginForm(false)}
@@ -443,14 +342,14 @@ export default function Login() {
             </div>
           )}
 
-          <div className="mb-3 text-center lg:mb-4 lg:hidden">
+          <div className="mb-3 text-center lg:mb-4">
             <h2
-              className={`text-base font-semibold sm:text-lg ${mobileShowLoginForm ? 'text-white' : 'text-slate-900'}`}
+              className={`text-xl font-semibold sm:text-2xl ${mobileShowLoginForm ? 'text-white' : 'text-slate-900'}`}
             >
               Welcome
             </h2>
             <p
-              className={`mt-0.5 text-xs sm:mt-1 sm:text-sm ${mobileShowLoginForm ? 'text-neutral-400' : 'text-slate-500'}`}
+              className={`mt-0.5 text-[15px] sm:mt-1 sm:text-base ${mobileShowLoginForm ? 'text-neutral-400' : 'text-slate-500'}`}
             >
               Sign in to your catalogues
             </p>
@@ -473,11 +372,6 @@ export default function Login() {
                 </div>
               </div>
             )}
-            <div className="hidden lg:block mb-8">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome</h2>
-              <p className="text-slate-500 text-sm mt-1.5">Sign in to continue to your catalogues</p>
-            </div>
-
             {error && (
               <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3 sm:mb-6 sm:gap-3 sm:p-3.5">
                 <FiAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 sm:h-[18px] sm:w-[18px]" />
@@ -489,7 +383,7 @@ export default function Login() {
               <div>
                 <label
                   htmlFor="login-email"
-                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
+                  className="mb-1 block text-[12px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-[13px]"
                 >
                   Email
                 </label>
@@ -506,7 +400,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     autoComplete="email"
-                    className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-4 text-[15px] text-slate-900 placeholder:text-[14px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[16px] sm:placeholder:text-[15px] lg:text-base"
+                    className="min-h-[46px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-4 text-[16px] text-slate-900 placeholder:text-[15px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[17px] sm:placeholder:text-[16px] lg:text-[17px]"
                     required
                   />
                 </div>
@@ -515,7 +409,7 @@ export default function Login() {
               <div>
                 <label
                   htmlFor="login-password"
-                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
+                  className="mb-1 block text-[12px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-[13px]"
                 >
                   Password
                 </label>
@@ -528,7 +422,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-12 text-[15px] text-slate-900 placeholder:text-[14px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[16px] sm:placeholder:text-[15px] lg:text-base"
+                    className="min-h-[46px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-12 text-[16px] text-slate-900 placeholder:text-[15px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[17px] sm:placeholder:text-[16px] lg:text-[17px]"
                     required
                   />
                   <button
@@ -556,13 +450,12 @@ export default function Login() {
             </form>
 
             <div className="relative mb-5 sm:mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-2 text-[11px] font-medium text-slate-500 sm:px-3 sm:text-xs lg:text-xs">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-slate-200" aria-hidden />
+                <span className="text-[12px] font-medium text-slate-500 sm:text-[13px] lg:text-[13px]">
                   Or continue with
                 </span>
+                <div className="h-px flex-1 bg-slate-200" aria-hidden />
               </div>
             </div>
 
@@ -570,7 +463,7 @@ export default function Login() {
               type="button"
               onClick={handleGoogleLogin}
               disabled={authLoading !== null}
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 active:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2.5 sm:py-3 sm:text-base"
+              className="flex min-h-[54px] w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3 text-[15px] font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 active:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:py-3.5 sm:text-[17px]"
             >
               <svg
                 className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5"
@@ -619,7 +512,7 @@ export default function Login() {
 
           <p
             className={[
-              'mt-3 pb-1 text-center text-[11px] sm:mt-4 sm:text-xs lg:hidden',
+              'mt-3 pb-1 text-center text-[11px] sm:mt-4 sm:text-xs',
               mobileShowLoginForm ? 'text-neutral-500' : 'text-slate-500',
             ].join(' ')}
           >

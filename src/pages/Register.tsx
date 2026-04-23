@@ -8,32 +8,12 @@ import {
   FiUser,
   FiAlertCircle,
   FiCheck,
-  FiShoppingCart,
-  FiZap,
-  FiImage,
   FiArrowLeft,
 } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-
-const introHighlights = [
-  {
-    icon: FiShoppingCart,
-    title: 'Order forms',
-    text: 'One link—qty, line totals, then WhatsApp.',
-  },
-  {
-    icon: FiZap,
-    title: 'Easier days',
-    text: 'Your prices and packs carry through—less back-and-forth.',
-  },
-  {
-    icon: FiImage,
-    title: 'Smart catalogues',
-    text: 'Lists, renders, sync—aligned with what you stock.',
-  },
-];
+import { logSignUp, logSignUpFailed } from '../config/analyticsEvents';
 
 function GoogleIcon() {
   return (
@@ -124,10 +104,12 @@ export default function Register() {
 
     try {
       await authService.registerWithEmail(formData.email, formData.password, formData.displayName);
+      logSignUp('email');
       setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);
+      logSignUpFailed('email', errorMessage);
       showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
@@ -140,10 +122,12 @@ export default function Register() {
 
     try {
       await authService.loginWithGoogle();
+      logSignUp('google');
       setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google signup failed';
       setError(errorMessage);
+      logSignUpFailed('google', errorMessage);
       showToast(errorMessage, 'error');
     } finally {
       setAuthLoading(null);
@@ -157,115 +141,33 @@ export default function Register() {
     isLoading || (hasJustSignedUp && supabaseDataLoading) || authLoading === 'google';
 
   const formColumnClassName = [
-    'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
+    'flex-1 flex flex-col min-h-0',
     'flex',
-    'overflow-y-auto lg:overflow-visible',
+    'overflow-y-auto',
     'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-    'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
-    'lg:items-center lg:justify-center',
+    'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2',
   ].join(' ');
 
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col lg:flex-row bg-slate-950 lg:bg-slate-50',
-        'pt-[calc(40px+env(safe-area-inset-top,0px))] lg:pt-[env(safe-area-inset-top,0px)]',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black lg:hidden" aria-hidden />
-
-      {/* Brand / intro — desktop only */}
-      <motion.aside
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.45 }}
-        className="hidden lg:flex relative shrink-0 lg:w-[46%] xl:w-[44%] flex-col justify-center px-5 pt-2 pb-6 sm:px-8 lg:min-h-[100dvh] lg:py-10 lg:px-12 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
-      >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 20% 20%, rgba(96, 165, 250, 0.35), transparent 45%), radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.25), transparent 40%)',
-          }}
-        />
-        <div className="relative z-10 max-w-md mx-auto lg:mx-0 w-full">
-          <Link
-            to="/website"
-            className="inline-flex items-center gap-2.5 sm:gap-3 group mb-4 lg:mb-10 min-h-[44px] -ml-1 pl-1 rounded-lg active:opacity-90"
-          >
-            <span className="inline-flex items-center justify-center shrink-0 rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-black/10">
-              <img
-                src="/CatShare_logo.png"
-                alt="CatShare"
-                className="h-8 w-auto sm:h-10 max-h-10 object-contain object-center"
-              />
-            </span>
-            <span className="text-lg sm:text-2xl font-semibold tracking-tight text-white group-active:text-blue-100 transition-colors">
-              CatShare
-            </span>
-          </Link>
-
-          <p className="text-sm font-medium tracking-wide text-sky-200/95 mb-3 lg:mb-4">
-            Share faster · Sell quicker
-          </p>
-
-          <h1 className="text-xl sm:text-2xl lg:text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-2 lg:mb-3">
-            Catalogues and order links—less busywork.
-          </h1>
-
-          <p className="text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
-            Shareable order forms from your catalogue—clear prices and subtotals, then one tap to WhatsApp.
-          </p>
-
-          <ul className="hidden lg:block space-y-4">
-            {introHighlights.map(({ icon: Icon, title, text }, i) => (
-              <motion.li
-                key={title}
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.12 + i * 0.08, duration: 0.35 }}
-                className="flex gap-3"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
-                  <Icon className="h-5 w-5 text-sky-200" aria-hidden />
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-white">{title}</p>
-                  <p className="text-xs sm:text-sm text-blue-100/80 leading-snug mt-0.5">{text}</p>
-                </div>
-              </motion.li>
-            ))}
-          </ul>
-
-          <p className="mt-4 lg:mt-10 text-xs text-blue-200/70 hidden lg:block">
-            <Link
-              to="/website"
-              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
-            >
-              Learn more
-            </Link>
-            {' · '}
-            <Link
-              to="/login"
-              className="text-sky-200 active:text-white underline-offset-4 hover:underline font-medium py-2 inline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </motion.aside>
+      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
       <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.05 }}
-          className="w-full max-w-[420px] mx-auto lg:my-auto"
+          className="w-full max-w-[420px] mx-auto"
         >
-          <div className="mb-3 -mt-1 lg:hidden">
+          <div className="mb-3 -mt-1">
             <Link
               to="/login"
               className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-white/90 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
@@ -275,9 +177,9 @@ export default function Register() {
             </Link>
           </div>
 
-          <div className="mb-3 text-center lg:mb-4 lg:hidden">
-            <h2 className="text-base font-semibold text-white sm:text-lg">Create account</h2>
-            <p className="mt-0.5 text-xs text-neutral-400 sm:mt-1 sm:text-sm">
+          <div className="mb-3 text-center lg:mb-4">
+            <h2 className="text-xl font-semibold text-white sm:text-2xl">Create account</h2>
+            <p className="mt-0.5 text-sm text-neutral-400 sm:mt-1 sm:text-base">
               Set up your CatShare workspace
             </p>
           </div>
@@ -305,11 +207,6 @@ export default function Register() {
                 </div>
               </div>
             )}
-            <div className="hidden lg:block mb-6">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Create account</h2>
-              <p className="text-slate-500 text-sm mt-1.5">Set up your CatShare workspace</p>
-            </div>
-
             {error && (
               <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3 sm:mb-6 sm:gap-3 sm:p-3.5">
                 <FiAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 sm:h-[18px] sm:w-[18px]" />
@@ -478,7 +375,7 @@ export default function Register() {
             </div>
           </div>
 
-          <p className="mt-3 pb-1 text-center text-[11px] text-neutral-500 sm:mt-4 sm:text-xs lg:hidden">
+          <p className="mt-3 pb-1 text-center text-[11px] text-neutral-500 sm:mt-4 sm:text-xs">
             <Link
               to="/website"
               className="inline-block py-1.5 font-medium text-neutral-400 hover:text-white active:text-white sm:py-2"

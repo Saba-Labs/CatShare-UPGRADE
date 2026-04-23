@@ -19,8 +19,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 
-        versionCode 79
-        versionName "4.3.2"
+        versionCode 80
+        versionName "4.3.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 

@@ -524,6 +524,26 @@ export default function FieldsSettings() {
     setEditingLabelValue("");
   };
 
+  const openSavedActiveTemplate = () => {
+    if (!savedDefinition) return;
+    // Reset editor state to persisted data so "Active Template"
+    // always opens the actual saved configuration.
+    setDefinition(savedDefinition);
+    setExpandedKey(null);
+    setEditingLabelKey(null);
+    setEditingLabelValue("");
+    setUnitsTextDraft({});
+    unitsTextDraftRef.current = {};
+    prevExpandedKeyRef.current = null;
+    setSearchParams(
+      {
+        industry: savedDefinition.industry || "General Products (Custom)",
+        view: "configure",
+      },
+      { replace: true }
+    );
+  };
+
   if (!definition) return null;
 
   const productFields = definition.fields.filter(f => f.key.startsWith('field'));
@@ -585,7 +605,7 @@ export default function FieldsSettings() {
             </div>
             <div className="bg-blue-600 dark:bg-blue-700 rounded-2xl border border-blue-500 dark:border-blue-800 shadow-lg shadow-blue-500/20 p-4">
               <button
-                onClick={() => setSearchParams({ industry: savedDefinition.industry || "General Products (Custom)", view: "configure" })}
+                onClick={openSavedActiveTemplate}
                 className="w-full flex items-center justify-between hover:opacity-90 transition-opacity cursor-pointer"
               >
                 <div className="flex items-center gap-4">

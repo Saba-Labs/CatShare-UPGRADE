@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { FiMail, FiAlertCircle, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
+import { logPasswordResetRequested } from '../config/analyticsEvents';
 
 export default function ForgotPassword() {
   const isNativeApp = Capacitor.isNativePlatform();
@@ -22,6 +23,7 @@ export default function ForgotPassword() {
 
     try {
       await authService.sendPasswordReset(email);
+      logPasswordResetRequested();
       setSubmitted(true);
       showToast('Password reset email sent!', 'success');
     } catch (err) {
@@ -36,72 +38,31 @@ export default function ForgotPassword() {
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col lg:flex-row bg-slate-950 lg:bg-slate-50',
-        'pt-[calc(40px+env(safe-area-inset-top,0px))] lg:pt-[env(safe-area-inset-top,0px)]',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black lg:hidden" aria-hidden />
-
-      <motion.aside
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.45 }}
-        className="hidden lg:flex relative shrink-0 lg:w-[46%] xl:w-[44%] flex-col justify-center px-6 py-10 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
-      >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.24]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 18% 22%, rgba(96, 165, 250, 0.24), transparent 45%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.16), transparent 42%)',
-          }}
-        />
-        <div className="relative z-10 max-w-md mx-auto lg:mx-0 w-full">
-          <Link
-            to="/website"
-            className="inline-flex items-center gap-3 group mb-10 min-h-[44px] -ml-1 pl-1 rounded-lg active:opacity-90"
-          >
-            <span className="inline-flex items-center justify-center shrink-0 rounded-xl bg-white p-1.5 shadow-sm ring-1 ring-black/10">
-              <img
-                src="/CatShare_logo.png"
-                alt="CatShare"
-                className="h-8 w-auto max-h-10 object-contain object-center"
-              />
-            </span>
-            <span className="text-2xl font-semibold tracking-tight text-white group-active:text-blue-100 transition-colors">
-              CatShare
-            </span>
-          </Link>
-
-          <p className="text-sm font-medium tracking-wide text-sky-200/95 mb-3">Account recovery</p>
-          <h1 className="text-[1.75rem] xl:text-3xl font-semibold tracking-tight leading-snug text-white mb-3">
-            Get back into your account.
-          </h1>
-          <p className="text-sm text-blue-100/90 leading-relaxed">
-            Enter your login email and we will send a secure reset link. It only takes a minute.
-          </p>
-        </div>
-      </motion.aside>
+      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
       <div
         style={{ WebkitOverflowScrolling: 'touch' }}
         className={[
-          'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
-          'overflow-y-auto lg:overflow-visible',
+          'flex-1 flex flex-col min-h-0',
+          'overflow-y-auto',
           'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
-          'lg:items-center lg:justify-center',
+          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2',
         ].join(' ')}
       >
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.05 }}
-          className="w-full max-w-[420px] mx-auto lg:my-auto"
+          className="w-full max-w-[420px] mx-auto"
         >
-          <div className="mb-2 -mt-1 lg:hidden">
+          <div className="mb-2 -mt-1">
             <Link
               to="/login"
               className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-white/90 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
@@ -111,7 +72,7 @@ export default function ForgotPassword() {
             </Link>
           </div>
 
-          <div className="mb-3 text-center lg:mb-4 lg:hidden">
+          <div className="mb-3 text-center lg:mb-4">
             <h2 className="text-lg font-semibold tracking-tight text-white">
               {submitted ? 'Check your email' : 'Reset password'}
             </h2>
@@ -137,17 +98,6 @@ export default function ForgotPassword() {
                 </div>
               </div>
             )}
-
-            <div className="hidden lg:block mb-6">
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-                {submitted ? 'Check your email' : 'Reset password'}
-              </h2>
-              <p className="text-slate-500 text-sm mt-1.5">
-                {submitted
-                  ? 'We sent you a password reset link'
-                  : 'Enter your email to receive a password reset link'}
-              </p>
-            </div>
 
             {submitted ? (
               <div className="space-y-4 sm:space-y-5">
@@ -240,7 +190,7 @@ export default function ForgotPassword() {
             )}
           </div>
 
-          <p className="mt-2 pb-1 text-center text-[11px] text-neutral-500 sm:mt-3 sm:text-xs lg:hidden">
+          <p className="mt-2 pb-1 text-center text-[11px] text-neutral-500 sm:mt-3 sm:text-xs">
             <Link
               to="/website"
               className="inline-block py-1.5 font-medium text-neutral-400 hover:text-white active:text-white sm:py-2"
