@@ -180,8 +180,10 @@ export default function Website() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900 antialiased [text-size-adjust:100%]">
+      <div className="fixed inset-x-0 top-0 z-[60] h-[40px] bg-black md:hidden" aria-hidden />
+
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80">
+      <header className="sticky top-[40px] z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80 md:top-0">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button

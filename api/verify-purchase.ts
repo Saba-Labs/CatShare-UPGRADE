@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { google } from "googleapis";
@@ -14,7 +15,7 @@ async function getGoogleAuthClient() {
     credentials: JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON!),
     scopes: ["https://www.googleapis.com/auth/androidpublisher"],
   });
-  return auth;
+  return auth.getClient();
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -28,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // ✅ Verify purchase with Google Play
     const auth = await getGoogleAuthClient();
-    const response = await androidPublisher.purchases.subscriptions.get({
+    const response = await (androidPublisher.purchases.subscriptions.get as any)({
       auth,
       packageName: process.env.ANDROID_PACKAGE_NAME!,
       subscriptionId: productId,
@@ -36,13 +37,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const subscription = response.data;
+    if (!subscription) {
+      return res.status(400).json({ error: "Subscription details not found" });
+    }
 
     // ✅ Check if payment is valid (paymentState 1 = received, 2 = free trial)
-    if (subscription.paymentState !== 1 && subscription.paymentState !== 2) {
+    if (
+      subscription.paymentState !== undefined &&
+      subscription.paymentState !== 1 &&
+      subscription.paymentState !== 2
+    ) {
       return res.status(400).json({ error: "Payment not completed" });
     }
 
     // ✅ Use real expiry from Google Play
+    if (!subscription.expiryTimeMillis) {
+      return res.status(400).json({ error: "Missing subscription expiry from Google Play" });
+    }
     const expiresAt = new Date(Number(subscription.expiryTimeMillis));
 
     const { error } = await supabase

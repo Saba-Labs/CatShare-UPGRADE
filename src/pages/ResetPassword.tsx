@@ -66,7 +66,7 @@ export default function ResetPassword() {
 
   if (checking) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+      <div className="min-h-[100dvh] min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
         <div className="text-sm text-slate-500">Loading…</div>
       </div>
     );
@@ -74,7 +74,7 @@ export default function ResetPassword() {
 
   if (!hasSession) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+      <div className="min-h-[100dvh] min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,7 +105,7 @@ export default function ResetPassword() {
 
   if (done) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+      <div className="min-h-[100dvh] min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -127,7 +127,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+    <div className="min-h-[100dvh] min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

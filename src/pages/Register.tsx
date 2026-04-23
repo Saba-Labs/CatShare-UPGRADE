@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { FiMail, FiLock, FiUser, FiAlertCircle, FiCheck, FiShoppingCart, FiZap, FiImage } from 'react-icons/fi';
+import {
+  FiMail,
+  FiLock,
+  FiUser,
+  FiAlertCircle,
+  FiCheck,
+  FiShoppingCart,
+  FiZap,
+  FiImage,
+  FiArrowLeft,
+} from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -28,7 +38,7 @@ const introHighlights = [
 function GoogleIcon() {
   return (
     <svg
-      className="h-5 w-5 shrink-0"
+      className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5"
       viewBox="0 0 24 24"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
@@ -57,7 +67,7 @@ export default function Register() {
   const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { supabaseData, supabaseDataLoading } = useAuth();
+  const { supabaseDataLoading } = useAuth();
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -141,23 +151,38 @@ export default function Register() {
   };
 
   const inputClass =
-    'w-full min-h-[44px] pl-11 pr-4 py-3 text-base text-slate-900 placeholder:text-slate-400 bg-slate-50/80 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-shadow';
+    'min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-4 text-[15px] text-slate-900 placeholder:text-[14px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[16px] sm:placeholder:text-[15px] lg:text-base';
+
+  const showRegisterOverlay =
+    isLoading || (hasJustSignedUp && supabaseDataLoading) || authLoading === 'google';
+
+  const formColumnClassName = [
+    'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
+    'flex',
+    'overflow-y-auto lg:overflow-visible',
+    'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
+    'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
+    'lg:items-center lg:justify-center',
+  ].join(' ');
 
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen bg-slate-50 flex flex-col lg:flex-row',
-        'pt-[env(safe-area-inset-top,0px)]',
+        'min-h-[100dvh] min-h-screen flex flex-col lg:flex-row bg-slate-950 lg:bg-slate-50',
+        'pt-[calc(40px+env(safe-area-inset-top,0px))] lg:pt-[env(safe-area-inset-top,0px)]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
+      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black lg:hidden" aria-hidden />
+
+      {/* Brand / intro — desktop only */}
       <motion.aside
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45 }}
-        className="relative shrink-0 lg:w-[46%] xl:w-[44%] flex flex-col justify-center px-5 pt-2 pb-6 sm:px-8 lg:min-h-[100dvh] lg:py-10 lg:px-12 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
+        className="hidden lg:flex relative shrink-0 lg:w-[46%] xl:w-[44%] flex-col justify-center px-5 pt-2 pb-6 sm:px-8 lg:min-h-[100dvh] lg:py-10 lg:px-12 xl:px-16 overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white"
       >
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.35]"
@@ -191,11 +216,7 @@ export default function Register() {
             Catalogues and order links—less busywork.
           </h1>
 
-          <p className="text-sm text-blue-100/90 leading-snug mb-0 lg:hidden">
-            Order links with live prices; buyers pick qty and message you on WhatsApp.
-          </p>
-
-          <p className="hidden lg:block text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
+          <p className="text-sm text-blue-100/90 leading-relaxed mb-6 lg:mb-8">
             Shareable order forms from your catalogue—clear prices and subtotals, then one tap to WhatsApp.
           </p>
 
@@ -237,52 +258,70 @@ export default function Register() {
         </div>
       </motion.aside>
 
-      <div
-        style={{ WebkitOverflowScrolling: 'touch' }}
-        className={[
-          'flex-1 flex flex-col min-h-0 lg:min-h-[100dvh]',
-          'overflow-y-auto lg:overflow-visible',
-          'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2 lg:pt-10 lg:pb-10 xl:p-12',
-          'lg:items-center lg:justify-center',
-        ].join(' ')}
-      >
+      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.05 }}
           className="w-full max-w-[420px] mx-auto lg:my-auto"
         >
-          <div className="lg:hidden text-center mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Create account</h2>
-            <p className="text-sm text-slate-500 mt-1">Set up your CatShare workspace</p>
+          <div className="mb-3 -mt-1 lg:hidden">
+            <Link
+              to="/login"
+              className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-white/90 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
+            >
+              <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+              Back
+            </Link>
+          </div>
+
+          <div className="mb-3 text-center lg:mb-4 lg:hidden">
+            <h2 className="text-base font-semibold text-white sm:text-lg">Create account</h2>
+            <p className="mt-0.5 text-xs text-neutral-400 sm:mt-1 sm:text-sm">
+              Set up your CatShare workspace
+            </p>
           </div>
 
           <div
             className={[
-              'rounded-2xl bg-white border border-slate-200/80 shadow-xl shadow-slate-200/40 p-5 sm:p-8',
-              isNativeApp ? 'shadow-slate-300/30' : '',
+              'rounded-2xl border border-slate-200/70 bg-white p-4 shadow-lg shadow-slate-300/20 sm:p-8 lg:p-8',
+              isNativeApp ? 'shadow-slate-300/15' : '',
+              showRegisterOverlay ? 'relative pointer-events-none opacity-60' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
+            {showRegisterOverlay && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-2.5 sm:gap-3">
+                  <div className="h-9 w-9 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 sm:h-10 sm:w-10" />
+                  <p className="text-xs font-medium text-slate-700 sm:text-sm">
+                    {isLoading
+                      ? 'Creating account…'
+                      : authLoading === 'google'
+                        ? 'Signing up…'
+                        : 'Setting up…'}
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="hidden lg:block mb-6">
               <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Create account</h2>
               <p className="text-slate-500 text-sm mt-1.5">Set up your CatShare workspace</p>
             </div>
 
             {error && (
-              <div className="mb-6 p-3.5 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
-                <FiAlertCircle className="text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-800 leading-snug">{error}</p>
+              <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3 sm:mb-6 sm:gap-3 sm:p-3.5">
+                <FiAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 sm:h-[18px] sm:w-[18px]" />
+                <p className="text-[13px] leading-snug text-red-800 sm:text-sm">{error}</p>
               </div>
             )}
 
-            <form onSubmit={handleRegister} className="space-y-4 mb-6">
+            <form onSubmit={handleRegister} className="mb-5 space-y-3.5 sm:mb-6 sm:space-y-4">
               <div>
                 <label
                   htmlFor="register-name"
-                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
                 >
                   Full name
                 </label>
@@ -305,7 +344,7 @@ export default function Register() {
               <div>
                 <label
                   htmlFor="register-email"
-                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
                 >
                   Email
                 </label>
@@ -332,7 +371,7 @@ export default function Register() {
               <div>
                 <label
                   htmlFor="register-password"
-                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
                 >
                   Password
                 </label>
@@ -351,19 +390,19 @@ export default function Register() {
                   />
                 </div>
                 {formData.password && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2.5 space-y-1.5 sm:mt-3 sm:space-y-2">
                     {[
                       { text: 'At least 6 characters', met: formData.password.length >= 6 },
                       { text: 'One uppercase letter', met: /[A-Z]/.test(formData.password) },
                       { text: 'One number', met: /[0-9]/.test(formData.password) },
                     ].map((req) => (
-                      <div key={req.text} className="flex items-center gap-2 text-xs">
+                      <div key={req.text} className="flex items-center gap-1.5 text-[11px] sm:gap-2 sm:text-xs">
                         <div
-                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${
+                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded sm:h-4 sm:w-4 ${
                             req.met ? 'bg-emerald-100' : 'bg-slate-100'
                           }`}
                         >
-                          {req.met && <FiCheck className="text-emerald-600 text-xs" />}
+                          {req.met && <FiCheck className="text-[10px] text-emerald-600 sm:text-xs" />}
                         </div>
                         <span className={req.met ? 'text-emerald-800' : 'text-slate-500'}>{req.text}</span>
                       </div>
@@ -375,7 +414,7 @@ export default function Register() {
               <div>
                 <label
                   htmlFor="register-confirm"
-                  className="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5"
+                  className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:mb-1.5 lg:text-xs"
                 >
                   Confirm password
                 </label>
@@ -398,18 +437,20 @@ export default function Register() {
               <button
                 type="submit"
                 disabled={isLoading || passwordRequirements.length > 0}
-                className="w-full mt-2 min-h-[48px] py-3.5 rounded-xl text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 active:from-blue-500 active:to-indigo-500 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed shadow-md shadow-blue-600/20 transition-all"
+                className="mt-1.5 flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition-all hover:from-blue-500 hover:to-indigo-500 active:from-blue-500 active:to-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 sm:mt-2 sm:py-3.5 sm:text-base"
               >
                 {isLoading ? 'Creating account…' : 'Create account'}
               </button>
             </form>
 
-            <div className="relative mb-6">
+            <div className="relative mb-5 sm:mb-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
               </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-white text-slate-500 font-medium">Or sign up with</span>
+              <div className="relative flex justify-center">
+                <span className="bg-white px-2 text-[11px] font-medium text-slate-500 sm:px-3 sm:text-xs lg:text-xs">
+                  Or sign up with
+                </span>
               </div>
             </div>
 
@@ -417,24 +458,31 @@ export default function Register() {
               type="button"
               onClick={handleGoogleSignUp}
               disabled={authLoading !== null}
-              className="w-full min-h-[48px] flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 text-base font-medium active:bg-slate-50 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 active:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:gap-2.5 sm:py-3 sm:text-base"
             >
               <GoogleIcon />
               {authLoading === 'google' ? 'Signing up…' : 'Google'}
             </button>
 
-            <div className="mt-8 pt-6 border-t border-slate-100 text-center text-sm">
-              <p className="text-slate-600">
+            <div className="mt-6 border-t border-slate-100 pt-5 text-center sm:mt-8 sm:pt-6">
+              <p className="text-xs leading-relaxed text-slate-600 sm:text-sm">
                 Already have an account?{' '}
-                <Link to="/login" className="text-blue-600 font-semibold hover:text-blue-500">
+                <Link
+                  to="/login"
+                  state={{ showLoginForm: true }}
+                  className="text-xs font-semibold text-blue-600 hover:text-blue-500 sm:text-sm"
+                >
                   Sign in
                 </Link>
               </p>
             </div>
           </div>
 
-          <p className="lg:hidden text-center text-xs text-slate-500 mt-4 pb-1">
-            <Link to="/website" className="text-blue-600 font-medium active:text-blue-700 py-2">
+          <p className="mt-3 pb-1 text-center text-[11px] text-neutral-500 sm:mt-4 sm:text-xs lg:hidden">
+            <Link
+              to="/website"
+              className="inline-block py-1.5 font-medium text-neutral-400 hover:text-white active:text-white sm:py-2"
+            >
               About CatShare
             </Link>
           </p>

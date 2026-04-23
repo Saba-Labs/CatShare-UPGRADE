@@ -2,6 +2,7 @@ import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { getCurrencyData } from '../utils/currencyUtils';
+import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
 
 /** PostgREST / Supabase when a column is not in the live schema cache. */
 function isLikelyMissingCurrencyColumnsError(err: { message?: string; code?: string }): boolean {
@@ -181,9 +182,7 @@ export async function createShareLink(options: {
     Date.now() + expiresInDays * 24 * 60 * 60 * 1000
   ).toISOString();
 
-  const baseUrl =
-    (import.meta as any).env?.VITE_PUBLIC_WEB_BASE_URL ||
-    'https://catshare.vercel.app';
+  const baseUrl = getPublicWebBaseUrl();
 
   const trimmedName = options.sellerBusinessName?.trim();
   const code = (options.sellerCurrencyCode || 'INR').trim() || 'INR';
