@@ -38,14 +38,33 @@ export default function ForgotPassword() {
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
         'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.38]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
+        }}
+      />
       <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
+
+      <div className="relative z-10 px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-2">
+        <div className="mb-3 -mt-1">
+          <Link
+            to="/login"
+            className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-sky-50 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
+          >
+            <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+            Back
+          </Link>
+        </div>
+      </div>
 
       <div
         style={{ WebkitOverflowScrolling: 'touch' }}
@@ -53,7 +72,8 @@ export default function ForgotPassword() {
           'flex-1 flex flex-col min-h-0',
           'overflow-y-auto',
           'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2',
+          'pb-[max(1rem,env(safe-area-inset-bottom,0px))]',
+          'relative z-10 justify-center items-center',
         ].join(' ')}
       >
         <motion.div
@@ -62,21 +82,12 @@ export default function ForgotPassword() {
           transition={{ duration: 0.4, delay: 0.05 }}
           className="w-full max-w-[420px] mx-auto"
         >
-          <div className="mb-2 -mt-1">
-            <Link
-              to="/login"
-              className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-white/90 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
-            >
-              <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
-              Back
-            </Link>
-          </div>
 
           <div className="mb-3 text-center lg:mb-4">
             <h2 className="text-lg font-semibold tracking-tight text-white">
               {submitted ? 'Check your email' : 'Reset password'}
             </h2>
-            <p className="mt-1 text-sm text-blue-100/80">
+            <p className="mt-1 text-sm text-blue-100/85">
               {submitted ? 'We sent you a reset link' : 'Enter your email to receive a reset link'}
             </p>
           </div>
@@ -190,10 +201,10 @@ export default function ForgotPassword() {
             )}
           </div>
 
-          <p className="mt-2 pb-1 text-center text-[11px] text-neutral-500 sm:mt-3 sm:text-xs">
+          <p className="mt-2 pb-1 text-center text-[11px] text-blue-200/65 sm:mt-3 sm:text-xs">
             <Link
               to="/website"
-              className="inline-block py-1.5 font-medium text-neutral-400 hover:text-white active:text-white sm:py-2"
+              className="inline-block py-1.5 font-medium text-sky-200/90 hover:text-white hover:underline active:text-white sm:py-2"
             >
               About CatShare
             </Link>

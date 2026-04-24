@@ -151,7 +151,7 @@ export default function Register() {
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
         'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
@@ -159,8 +159,15 @@ export default function Register() {
         .join(' ')}
     >
       <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.38]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
+        }}
+      />
 
-      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
+      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName + ' relative z-10'}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -170,7 +177,7 @@ export default function Register() {
           <div className="mb-3 -mt-1">
             <Link
               to="/login"
-              className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-white/90 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
+              className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-sky-50 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
             >
               <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
               Back
@@ -179,7 +186,7 @@ export default function Register() {
 
           <div className="mb-3 text-center lg:mb-4">
             <h2 className="text-xl font-semibold text-white sm:text-2xl">Create account</h2>
-            <p className="mt-0.5 text-sm text-neutral-400 sm:mt-1 sm:text-base">
+            <p className="mt-0.5 text-sm text-blue-100/85 sm:mt-1 sm:text-base">
               Set up your CatShare workspace
             </p>
           </div>
@@ -375,10 +382,10 @@ export default function Register() {
             </div>
           </div>
 
-          <p className="mt-3 pb-1 text-center text-[11px] text-neutral-500 sm:mt-4 sm:text-xs">
+          <p className="relative z-10 mt-3 pb-1 text-center text-[11px] text-blue-200/65 sm:mt-4 sm:text-xs">
             <Link
               to="/website"
-              className="inline-block py-1.5 font-medium text-neutral-400 hover:text-white active:text-white sm:py-2"
+              className="inline-block py-1.5 font-medium text-sky-200/90 hover:text-white hover:underline active:text-white sm:py-2"
             >
               About CatShare
             </Link>

@@ -189,13 +189,20 @@ export default function Login() {
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
         'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.38]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
+        }}
+      />
       <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
       {/* Full-screen landing (layout only on small screens) — CatShare palette */}
@@ -204,7 +211,7 @@ export default function Login() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45 }}
         className={[
-          'flex flex-col min-h-[100dvh] shrink-0 w-full relative overflow-hidden',
+          'flex flex-col flex-1 w-full relative overflow-hidden',
           'bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
           mobileShowLoginForm ? 'hidden' : 'flex',
         ].join(' ')}
@@ -217,7 +224,7 @@ export default function Login() {
               'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
           }}
         />
-        <div className="relative z-10 flex flex-1 flex-col px-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+        <div className="relative z-10 flex flex-col flex-1 px-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <div className="flex flex-1 flex-col items-center justify-center text-center pt-2 pb-6 min-h-0">
             <Link
               to="/website"
@@ -303,7 +310,7 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="relative z-10 mt-4 text-center text-[12px] text-blue-200/65 sm:mt-5 sm:text-sm">
+          <p className="relative z-10 mt-4 pb-4 text-center text-[12px] text-blue-200/65 sm:mt-5 sm:pb-5 sm:text-sm">
             <Link
               to="/website"
               className="inline-block py-1.5 font-medium text-sky-200/90 underline-offset-4 hover:text-white hover:underline sm:py-2"
@@ -322,7 +329,7 @@ export default function Login() {
       </motion.section>
 
       {/* Sign-in — scrollable on small screens so keyboard / long forms don’t clip */}
-      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
+      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName + ' relative z-10'}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
