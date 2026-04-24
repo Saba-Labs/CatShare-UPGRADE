@@ -218,7 +218,7 @@ export default function Login() {
           }}
         />
         <div className="relative z-10 flex flex-1 flex-col px-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
-          <div className="flex flex-1 flex-col items-center justify-center text-center pt-2 pb-6 min-h-0">
+          <div className="flex flex-col items-center justify-center text-center pt-2 pb-6 min-h-0">
             <Link
               to="/website"
               className="inline-flex flex-col items-center gap-3 active:opacity-90 mb-6 sm:mb-7"
