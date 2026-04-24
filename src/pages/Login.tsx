@@ -303,7 +303,7 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="relative z-10 mt-4 text-center text-[12px] text-blue-200/65 sm:mt-5 sm:text-sm">
+          <p className="relative z-10 mt-4 pb-4 text-center text-[12px] text-blue-200/65 sm:mt-5 sm:pb-5 sm:text-sm">
             <Link
               to="/website"
               className="inline-block py-1.5 font-medium text-sky-200/90 underline-offset-4 hover:text-white hover:underline sm:py-2"
