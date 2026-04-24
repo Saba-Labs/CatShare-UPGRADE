@@ -158,7 +158,7 @@ export default function Register() {
         .filter(Boolean)
         .join(' ')}
     >
-      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950" aria-hidden />
+      <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.38]"
         style={{
