@@ -54,13 +54,25 @@ export default function ForgotPassword() {
       />
       <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
+      <div className="relative z-10 px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] pt-2">
+        <div className="mb-3 -mt-1">
+          <Link
+            to="/login"
+            className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-sky-50 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
+          >
+            <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
+            Back
+          </Link>
+        </div>
+      </div>
+
       <div
         style={{ WebkitOverflowScrolling: 'touch' }}
         className={[
           'flex-1 flex flex-col min-h-0',
           'overflow-y-auto',
           'px-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))]',
-          'pb-[max(1rem,env(safe-area-inset-bottom,0px))] pt-2',
+          'pb-[max(1rem,env(safe-area-inset-bottom,0px))]',
           'relative z-10 justify-center items-center',
         ].join(' ')}
       >
@@ -70,15 +82,6 @@ export default function ForgotPassword() {
           transition={{ duration: 0.4, delay: 0.05 }}
           className="w-full max-w-[420px] mx-auto"
         >
-          <div className="mb-2 -mt-1">
-            <Link
-              to="/login"
-              className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-sky-50 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
-            >
-              <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
-              Back
-            </Link>
-          </div>
 
           <div className="mb-3 text-center lg:mb-4">
             <h2 className="text-lg font-semibold tracking-tight text-white">
