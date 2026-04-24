@@ -204,7 +204,7 @@ export default function Login() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45 }}
         className={[
-          'flex flex-col min-h-[100dvh] shrink-0 w-full relative overflow-hidden',
+          'flex flex-col flex-1 w-full relative overflow-hidden',
           'bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
           mobileShowLoginForm ? 'hidden' : 'flex',
         ].join(' ')}
@@ -217,7 +217,7 @@ export default function Login() {
               'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
           }}
         />
-        <div className="relative z-10 flex flex-1 flex-col px-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+        <div className="relative z-10 flex flex-col flex-1 px-[max(1.25rem,env(safe-area-inset-left,0px))] pr-[max(1.25rem,env(safe-area-inset-right,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <div className="flex flex-col items-center justify-center text-center pt-2 pb-6 min-h-0">
             <Link
               to="/website"
