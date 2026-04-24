@@ -189,13 +189,20 @@ export default function Login() {
   return (
     <div
       className={[
-        'min-h-[100dvh] min-h-screen flex flex-col bg-black',
+        'min-h-[100dvh] min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white',
         'pt-[40px]',
         isNativeApp ? 'overscroll-y-contain' : '',
       ]
         .filter(Boolean)
         .join(' ')}
     >
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.38]"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 20% 22%, rgba(96, 165, 250, 0.38), transparent 46%), radial-gradient(circle at 82% 78%, rgba(129, 140, 248, 0.28), transparent 42%), radial-gradient(circle at 50% 108%, rgba(59, 130, 246, 0.15), transparent 48%)',
+        }}
+      />
       <div className="fixed inset-x-0 top-0 z-50 h-[40px] bg-black" aria-hidden />
 
       {/* Full-screen landing (layout only on small screens) — CatShare palette */}
@@ -322,7 +329,7 @@ export default function Login() {
       </motion.section>
 
       {/* Sign-in — scrollable on small screens so keyboard / long forms don’t clip */}
-      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName}>
+      <div style={{ WebkitOverflowScrolling: 'touch' }} className={formColumnClassName + ' relative z-10'}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
