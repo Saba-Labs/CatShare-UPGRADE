@@ -87,43 +87,70 @@ export function computeSyncPercentFromDetail(message: string): number {
 
 function applyUserSettingsFromCloud(us: any) {
   if (!us) return;
+  const dataObj = us.data && typeof us.data === 'object' ? us.data : {};
 
-  if (typeof us.watermark_enabled === 'boolean') {
-    safeSetInStorage('showWatermark', us.watermark_enabled);
-  } else if (typeof us.showWatermark === 'boolean') {
-    safeSetInStorage('showWatermark', us.showWatermark);
+  const watermarkEnabled =
+    typeof us.watermark_enabled === 'boolean'
+      ? us.watermark_enabled
+      : typeof us.showWatermark === 'boolean'
+        ? us.showWatermark
+        : typeof dataObj.watermark_enabled === 'boolean'
+          ? dataObj.watermark_enabled
+          : typeof dataObj.showWatermark === 'boolean'
+            ? dataObj.showWatermark
+            : undefined;
+  if (typeof watermarkEnabled === 'boolean') {
+    safeSetInStorage('showWatermark', watermarkEnabled);
+    window.dispatchEvent(new CustomEvent('watermarkChanged', { detail: { value: watermarkEnabled } }));
   }
 
-  if (typeof us.watermark_text === 'string' && us.watermark_text.length > 0) {
-    safeSetInStorage('watermarkText', us.watermark_text);
-  } else if (typeof us.watermarkText === 'string' && us.watermarkText.length > 0) {
-    safeSetInStorage('watermarkText', us.watermarkText);
+  const watermarkText =
+    typeof us.watermark_text === 'string' && us.watermark_text.length > 0
+      ? us.watermark_text
+      : typeof us.watermarkText === 'string' && us.watermarkText.length > 0
+        ? us.watermarkText
+        : typeof dataObj.watermark_text === 'string' && dataObj.watermark_text.length > 0
+          ? dataObj.watermark_text
+          : typeof dataObj.watermarkText === 'string' && dataObj.watermarkText.length > 0
+            ? dataObj.watermarkText
+            : undefined;
+  if (typeof watermarkText === 'string' && watermarkText.length > 0) {
+    safeSetInStorage('watermarkText', watermarkText);
+    window.dispatchEvent(new CustomEvent('watermarkTextChanged', { detail: { text: watermarkText } }));
   }
 
   if (typeof us.currency === 'string' && us.currency.length > 0) {
     localStorage.setItem('defaultCurrency', us.currency);
   } else if (typeof us.defaultCurrency === 'string' && us.defaultCurrency.length > 0) {
     localStorage.setItem('defaultCurrency', us.defaultCurrency);
+  } else if (typeof dataObj.currency === 'string' && dataObj.currency.length > 0) {
+    localStorage.setItem('defaultCurrency', dataObj.currency);
+  } else if (typeof dataObj.defaultCurrency === 'string' && dataObj.defaultCurrency.length > 0) {
+    localStorage.setItem('defaultCurrency', dataObj.defaultCurrency);
   }
 
   if (Array.isArray(us.price_units)) {
     localStorage.setItem('priceFieldUnits', JSON.stringify(us.price_units));
+  } else if (Array.isArray(dataObj.price_units)) {
+    localStorage.setItem('priceFieldUnits', JSON.stringify(dataObj.price_units));
   }
 
   const watermarkPosition =
-    (us.data && typeof us.data === 'object' ? us.data.watermarkPosition : undefined) ||
+    dataObj.watermarkPosition ||
+    (typeof dataObj.watermark_position === 'string' ? dataObj.watermark_position : undefined) ||
     (typeof us.watermarkPosition === 'string' ? us.watermarkPosition : undefined);
   if (typeof watermarkPosition === 'string' && watermarkPosition.length > 0) {
     safeSetInStorage('watermarkPosition', watermarkPosition);
+    window.dispatchEvent(new CustomEvent('watermarkPositionChanged', { detail: { position: watermarkPosition } }));
   }
 
-  if (us.data && typeof us.data === 'object' && us.data.customCurrencies && typeof us.data.customCurrencies === 'object') {
-    safeSetInStorage('customCurrencies', us.data.customCurrencies);
+  if (dataObj.customCurrencies && typeof dataObj.customCurrencies === 'object') {
+    safeSetInStorage('customCurrencies', dataObj.customCurrencies);
   }
 
-  if (us.data && typeof us.data === 'object' && us.data.businessProfile && typeof us.data.businessProfile === 'object') {
+  if (dataObj.businessProfile && typeof dataObj.businessProfile === 'object') {
     try {
-      localStorage.setItem('businessProfile', JSON.stringify(us.data.businessProfile));
+      localStorage.setItem('businessProfile', JSON.stringify(dataObj.businessProfile));
     } catch {
       /* ignore */
     }

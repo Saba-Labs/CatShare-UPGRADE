@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { logWebsiteVisited } from "./config/analyticsEvents";
 import {
   MdArrowBack,
   MdAutoAwesome,
@@ -34,6 +35,10 @@ export default function Website() {
   const navigate = useNavigate();
   const [mobileNav, setMobileNav] = useState(false);
   const [openFeature, setOpenFeature] = useState<string | null>(null);
+
+  useEffect(() => {
+    logWebsiteVisited("in_app");
+  }, []);
 
   const pillars = [
     {

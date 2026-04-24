@@ -110,7 +110,7 @@ function applyVisibleOrderToProducts(products: any[], visibleBefore: any[], visi
   });
 }
 
-export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done', catalogueFirstLoadSettled = true }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done'; /** After first load path finished (incl. strict cloud refresh); empty list may show intro */ catalogueFirstLoadSettled?: boolean }) {
+export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done', catalogueFirstLoadSettled = true, startupStatusText = 'Fetching your catalogue' }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done'; /** After first load path finished (incl. strict cloud refresh); empty list may show intro */ catalogueFirstLoadSettled?: boolean; startupStatusText?: string }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { syncProductsToCloud, isStrictMode } = useSync();
@@ -289,6 +289,30 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [localIsRendering, setLocalIsRendering] = useState(false);
   const [localRenderProgress, setLocalRenderProgress] = useState(0);
   const [localRenderResult, setLocalRenderResult] = useState(null);
+  const [displayedStartupStatus, setDisplayedStartupStatus] = useState(startupStatusText);
+  const [statusDotCount, setStatusDotCount] = useState(0);
+
+  useEffect(() => {
+    if (startupPhase === "done" && catalogueFirstLoadSettled) {
+      setDisplayedStartupStatus(startupStatusText);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setDisplayedStartupStatus(startupStatusText);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [startupStatusText, startupPhase, catalogueFirstLoadSettled]);
+
+  useEffect(() => {
+    if (startupPhase === "done" && catalogueFirstLoadSettled) {
+      setStatusDotCount(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setStatusDotCount((prev) => (prev + 1) % 4);
+    }, 420);
+    return () => window.clearInterval(timer);
+  }, [startupPhase, catalogueFirstLoadSettled]);
 
   // Use passed props if available, otherwise use local state
   const isRendering = propIsRendering !== undefined ? propIsRendering : localIsRendering;
@@ -1168,7 +1192,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             <p className="text-gray-800 font-semibold text-lg mt-2 text-center px-4">
               Loading products…
             </p>
-            <p className="text-gray-500 text-sm mt-1 text-center px-4">Fetching your catalogue</p>
+            <p className="text-gray-500 text-sm mt-1 text-center px-4">
+              {displayedStartupStatus}
+              <span className="inline-block w-6 text-left">{'.'.repeat(statusDotCount)}</span>
+            </p>
           </div>
         )}
 

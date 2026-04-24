@@ -62,7 +62,6 @@ import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
 import { SyncProvider } from "./context/SyncContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { SplashLoadingLayout } from "./components/SplashLoadingLayout";
 import { authService } from "./services/authService";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
 import RenderingOverlay from "./RenderingOverlay";
@@ -125,7 +124,7 @@ function AppWithBackHandler() {
   const [syncProgress, setSyncProgress] = useState('');
   const [syncProgressPercent, setSyncProgressPercent] = useState(0);
   const cloudMigrationMarkingRef = useRef<Set<string>>(new Set());
-  const [cloudGateTimedOutUid, setCloudGateTimedOutUid] = useState<string | null>(null);
+  const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
 
   useEffect(() => {
     (window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress =
@@ -139,18 +138,13 @@ function AppWithBackHandler() {
   const startupRanForUserRef = useRef<string | null>(null);
   /** Strict returning-user bootstrap runs once per login; separate from startupRanForUserRef (step 3/4). */
   const strictBootstrapRanRef = useRef<string | null>(null);
+  /** Prevent repeated metadata refetch loops when initial snapshot misses definitions/settings. */
+  const metadataHydrationFetchForUserRef = useRef<string | null>(null);
   /** False until first catalogue hydrate finishes (strict: after refreshFromCloud settles). Avoids EmptyStateIntro while cloud still loading. */
   const [catalogueFirstLoadSettled, setCatalogueFirstLoadSettled] = useState(false);
+  const [startupStatusText, setStartupStatusText] = useState('Fetching your catalogue');
 
   const isHomeRoute = location.pathname === '/' || location.pathname === '';
-  const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
-  // Gate on startup phase only — not supabaseDataLoading, so cached local rows can show while cloud finishes.
-  const showCloudBootstrapOverlay =
-    isHomeRoute &&
-    !!user &&
-    !isGuestUser &&
-    !showOfflineSyncModal &&
-    startupPhase === "pending";
 
   const isNative = Capacitor.getPlatform() !== "web";
   const OFFLINE_MIGRATION_PENDING_PREFIX = "offlineMigrationPending::";
@@ -195,6 +189,17 @@ function AppWithBackHandler() {
       .sort((a: any, b: any) => a.id.localeCompare(b.id));
 
     return JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedDefault);
+  }, [toCatalogueSignature]);
+
+  const areCataloguesEquivalent = useCallback((a: any, b: any): boolean => {
+    const aList = Array.isArray(a?.catalogues) ? a.catalogues : [];
+    const bList = Array.isArray(b?.catalogues) ? b.catalogues : [];
+    const normalize = (list: any[]) =>
+      list
+        .map((c: any) => toCatalogueSignature(c))
+        .filter(Boolean)
+        .sort((x: any, y: any) => String(x.id).localeCompare(String(y.id)));
+    return JSON.stringify(normalize(aList)) === JSON.stringify(normalize(bList));
   }, [toCatalogueSignature]);
 
   const toFieldSignature = useCallback((field: any) => {
@@ -352,10 +357,11 @@ function AppWithBackHandler() {
     if (loading) return;
     if (!user?.uid) {
       setStartupPhase('pending');
+      setStartupStatusText('Fetching your catalogue');
       startupRanForUserRef.current = null;
       strictBootstrapRanRef.current = null;
+      metadataHydrationFetchForUserRef.current = null;
       setCatalogueFirstLoadSettled(false);
-      setCloudGateTimedOutUid(null);
       setProducts([]);
       setDeletedProducts([]);
       return;
@@ -367,6 +373,7 @@ function AppWithBackHandler() {
     if (isGuestUser) {
       if (startupRanForUserRef.current === userId) return;
       startupRanForUserRef.current = userId;
+      setStartupStatusText('Loading your local catalogue');
       // Guest users: load local data, skip everything else.
       const guestProducts = safeGetFromStorage(getProductsKey(userId), []);
       const guestDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
@@ -402,6 +409,7 @@ function AppWithBackHandler() {
       const STARTUP_SPLASH_MS = 2000;
       void (async () => {
         try {
+          setStartupStatusText('Fetching products from cloud');
           const localProducts = safeGetFromStorage(getProductsKey(userId), []);
           const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
           const hasLocalCache = localProducts.length > 0 || localDeleted.length > 0;
@@ -413,6 +421,7 @@ function AppWithBackHandler() {
           // before profile rows are ready. If local cache is empty, force one fresh read.
           if (!sourceSnapshot && !hasLocalCache) {
             try {
+              setStartupStatusText('Refreshing account snapshot');
               sourceSnapshot = await refreshSupabaseData({ skipLoadingIndicator: true });
             } catch {
               sourceSnapshot = null;
@@ -453,27 +462,34 @@ function AppWithBackHandler() {
           const deletedIds = new Set(cloudDeleted.map((p: any) => p.id));
           const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
 
+          setStartupStatusText('Applying products');
           setProducts(filteredProducts);
           safeSetInStorage(getProductsKey(userId), filteredProducts);
           setDeletedProducts(cloudDeleted);
           safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
 
           const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
-          localStorage.setItem('categories', JSON.stringify(normalizedCats));
+          const categoriesJson = JSON.stringify(normalizedCats);
+          setStartupStatusText('Fetching categories');
+          localStorage.setItem('categories', categoriesJson);
+          localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
 
           if (useRemoteSnapshot) {
             if (sourceSnapshot?.fieldsDefinition) {
+              setStartupStatusText('Fetching field definitions');
               setFieldsDefinition(sourceSnapshot.fieldsDefinition, userId);
               window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
                 detail: { newDefinition: sourceSnapshot.fieldsDefinition, template: sourceSnapshot.fieldsDefinition?.industry || 'Custom', isBackupRestore: false }
               }));
             }
             if (sourceSnapshot?.cataloguesDefinition) {
+              setStartupStatusText('Fetching catalogue definitions');
               setCataloguesDefinition(sourceSnapshot.cataloguesDefinition, userId);
               window.dispatchEvent(new CustomEvent('catalogues-changed', {
                 detail: { action: 'update', catalogues: sourceSnapshot.cataloguesDefinition.catalogues }
               }));
             }
+            setStartupStatusText('Fetching user settings');
             applyUserSettingsFromCloud(sourceSnapshot?.userSettings);
           } else {
             const rawFd = localStorage.getItem(getStorageKey('fieldsDefinition', userId));
@@ -512,6 +528,7 @@ function AppWithBackHandler() {
 
           void refreshFromCloud()
             .then(async (cloudData) => {
+              setStartupStatusText('Finalizing cloud sync');
               if (cloudData) {
                 setProducts(cloudData.products);
                 setDeletedProducts(cloudData.deletedProducts);
@@ -521,6 +538,7 @@ function AppWithBackHandler() {
               // not only products, when initial snapshot arrived late.
               const latest = await refreshSupabaseData({ skipLoadingIndicator: true });
               if (latest?.fieldsDefinition) {
+                setStartupStatusText('Refreshing field definitions');
                 setFieldsDefinition(latest.fieldsDefinition, userId);
                 window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
                   detail: {
@@ -531,11 +549,13 @@ function AppWithBackHandler() {
                 }));
               }
               if (latest?.cataloguesDefinition?.catalogues?.length) {
+                setStartupStatusText('Refreshing catalogue definitions');
                 setCataloguesDefinition(latest.cataloguesDefinition, userId);
                 window.dispatchEvent(new CustomEvent('catalogues-changed', {
                   detail: { action: 'update', catalogues: latest.cataloguesDefinition.catalogues },
                 }));
               }
+              setStartupStatusText('Refreshing user settings');
               applyUserSettingsFromCloud(latest?.userSettings);
 
               setSupabaseSyncStatus('synced');
@@ -556,18 +576,11 @@ function AppWithBackHandler() {
       return;
     }
 
-    // For one-time migration policy, wait briefly for auth snapshot so cloud migration flag is reliable.
-    // Safety net: never block startup forever if profile load hangs.
+    // Wait for auth snapshot to finish loading before deciding startup path.
+    // This avoids entering app with empty products/settings and never rehydrating.
     if (supabaseDataLoading) {
-      if (cloudGateTimedOutUid !== userId) {
-        const timer = window.setTimeout(() => {
-          setCloudGateTimedOutUid(userId);
-        }, 2000);
-        return () => window.clearTimeout(timer);
-      }
-      console.warn("⚠️ [startup] Proceeding after cloud profile wait timeout");
-    } else if (cloudGateTimedOutUid === userId) {
-      setCloudGateTimedOutUid(null);
+      setStartupStatusText('Fetching products, categories and settings');
+      return;
     }
 
     // Only run step 3/4 once per user (strict path above does not set this ref).
@@ -671,13 +684,24 @@ function AppWithBackHandler() {
       setDeletedProducts(localDeleted);
       }
 
+    if (Array.isArray(supabaseData?.categories)) {
+      const normalizedCats = supabaseData.categories
+        .map((c: any) => (typeof c === 'string' ? c : c?.name))
+        .filter(Boolean);
+      const categoriesJson = JSON.stringify(normalizedCats);
+      localStorage.setItem('categories', categoriesJson);
+      localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
+    }
+
     if (supabaseData?.fieldsDefinition && Array.isArray(supabaseData.fieldsDefinition?.fields)) {
-        const localFieldsDef = getFieldsDefinition();
+        setStartupStatusText('Applying field definitions');
+        const localFieldsDef = getFieldsDefinition(userId);
         const remoteFieldsDef = supabaseData.fieldsDefinition;
+        const hasPersistedLocalFields = Boolean(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
         const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
         const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
-        if (remoteLastUpdated > localLastUpdated) {
-          setFieldsDefinition(remoteFieldsDef);
+        if (!hasPersistedLocalFields || remoteLastUpdated > localLastUpdated) {
+          setFieldsDefinition(remoteFieldsDef, userId);
           window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
           detail: { newDefinition: remoteFieldsDef, template: remoteFieldsDef?.industry || 'Custom', isBackupRestore: false }
           }));
@@ -685,23 +709,30 @@ function AppWithBackHandler() {
       }
 
     if (supabaseData?.cataloguesDefinition) {
-        const localCataloguesDef = getCataloguesDefinition();
+        setStartupStatusText('Applying catalogue definitions');
+        const localCataloguesDef = getCataloguesDefinition(userId);
         const remoteCataloguesDef = supabaseData.cataloguesDefinition;
+        const hasPersistedLocalCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
         const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
         const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
-        if (remoteLastUpdated > localLastUpdated) {
-          setCataloguesDefinition(remoteCataloguesDef);
+        const sameCatalogues = areCataloguesEquivalent(localCataloguesDef, remoteCataloguesDef);
+        if (!hasPersistedLocalCatalogues || !sameCatalogues || remoteLastUpdated >= localLastUpdated) {
+          setCataloguesDefinition(remoteCataloguesDef, userId);
           window.dispatchEvent(new CustomEvent('catalogues-changed', {
           detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
           }));
         }
       }
 
+    setStartupStatusText('Applying user settings');
+    applyUserSettingsFromCloud(supabaseData?.userSettings);
+
     // Enable strict mode for all authenticated users going forward.
     localStorage.setItem('strictOnlineMode::device', 'true');
     localStorage.setItem('offlineLegacyResolved::device', 'true');
       setSupabaseSyncStatus('synced');
     setCatalogueFirstLoadSettled(true);
+    setStartupStatusText('Done');
     setStartupPhase('done');
     console.log('✅ [startup] Normal user startup complete');
   }, [
@@ -714,9 +745,120 @@ function AppWithBackHandler() {
     parseJsonSafe,
     isMeaningfulFieldsDefinition,
     isMeaningfulCataloguesDefinition,
+    areCataloguesEquivalent,
     markOfflineMigrationCompletedInCloud,
-    cloudGateTimedOutUid,
   ]);
+
+  // Ensure settings/definitions hydrate on first login even if the initial auth snapshot
+  // raced and only products were available at startup time.
+  useEffect(() => {
+    if (loading) return;
+    if (startupPhase !== 'done') return;
+    if (supabaseDataLoading) return;
+    if (!user?.uid) return;
+    if (isGuestUser) return;
+
+    const userId = user.uid;
+    let cancelled = false;
+
+    const applyCloudMetadata = (snapshot: any) => {
+      if (!snapshot) return false;
+      let applied = false;
+
+      if (Array.isArray(snapshot?.categories)) {
+        const normalizedCats = snapshot.categories
+          .map((c: any) => (typeof c === 'string' ? c : c?.name))
+          .filter(Boolean);
+        const categoriesJson = JSON.stringify(normalizedCats);
+        localStorage.setItem('categories', categoriesJson);
+        localStorage.setItem(getStorageKey('categories', userId), categoriesJson);
+        applied = true;
+      }
+
+      if (snapshot?.fieldsDefinition && Array.isArray(snapshot.fieldsDefinition?.fields)) {
+        const localFieldsDef = getFieldsDefinition(userId);
+        const remoteFieldsDef = snapshot.fieldsDefinition;
+        const hasPersistedLocalFields = Boolean(localStorage.getItem(getStorageKey('fieldsDefinition', userId)));
+        const localLastUpdated = localFieldsDef?.lastUpdated ? new Date(localFieldsDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteFieldsDef?.lastUpdated ? new Date(remoteFieldsDef.lastUpdated).getTime() : 0;
+        if (!hasPersistedLocalFields || remoteLastUpdated >= localLastUpdated) {
+          setFieldsDefinition(remoteFieldsDef, userId);
+          window.dispatchEvent(new CustomEvent('fieldDefinitionsChanged', {
+            detail: { newDefinition: remoteFieldsDef, template: remoteFieldsDef?.industry || 'Custom', isBackupRestore: false }
+          }));
+          applied = true;
+        }
+      }
+
+      if (snapshot?.cataloguesDefinition) {
+        const localCataloguesDef = getCataloguesDefinition(userId);
+        const remoteCataloguesDef = snapshot.cataloguesDefinition;
+        const hasPersistedLocalCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
+        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
+        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
+        const sameCatalogues = areCataloguesEquivalent(localCataloguesDef, remoteCataloguesDef);
+        if (!hasPersistedLocalCatalogues || !sameCatalogues || remoteLastUpdated >= localLastUpdated) {
+          setCataloguesDefinition(remoteCataloguesDef, userId);
+          window.dispatchEvent(new CustomEvent('catalogues-changed', {
+            detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
+          }));
+          applied = true;
+        }
+      }
+
+      if (snapshot?.userSettings) {
+        applyUserSettingsFromCloud(snapshot.userSettings);
+        applied = true;
+      }
+
+      return applied;
+    };
+
+    // If current snapshot already has metadata, apply immediately.
+    const hasSnapshotMetadata = Boolean(
+      supabaseData?.fieldsDefinition ||
+      supabaseData?.cataloguesDefinition ||
+      supabaseData?.userSettings
+    );
+    if (hasSnapshotMetadata) {
+      applyCloudMetadata(supabaseData);
+      return;
+    }
+
+    // Snapshot had no metadata; retry exactly once per login for this user.
+    if (metadataHydrationFetchForUserRef.current === userId) return;
+    metadataHydrationFetchForUserRef.current = userId;
+
+    void (async () => {
+      const latest = await refreshSupabaseData({ skipLoadingIndicator: true });
+      if (cancelled || !latest) return;
+      applyCloudMetadata(latest);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    loading,
+    startupPhase,
+    supabaseDataLoading,
+    supabaseData,
+    user?.uid,
+    isGuestUser,
+    areCataloguesEquivalent,
+    refreshSupabaseData,
+  ]);
+
+  // Apply user settings immediately when profile snapshot updates (watermark/currency/etc.),
+  // without waiting for the full startup metadata reconciliation pass.
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    if (isGuestUser) return;
+    if (supabaseDataLoading) return;
+    if (!supabaseData?.userSettings) return;
+    applyUserSettingsFromCloud(supabaseData.userSettings);
+  }, [loading, user?.uid, isGuestUser, supabaseDataLoading, supabaseData?.userSettings]);
 
   // Strict-mode: hydrate React state from local cache while Supabase profile is still loading.
   // Startup splash for returning users is capped at 2s; refreshFromCloud may still run afterward.
@@ -1938,13 +2080,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
         />
       )}
 
-      {/* Fills gap when native launch splash is gone but catalogue is not ready yet (esp. Android 12+ WebView first paint). */}
-      {showCloudBootstrapOverlay && !isSyncContextSyncing && (
-        <div className="fixed inset-0 z-[115] bg-white overflow-auto">
-          <SplashLoadingLayout />
-        </div>
-      )}
-
       <RenderingOverlay
         visible={isRendering}
         current={renderProgress}
@@ -2040,6 +2175,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
                 setShowTutorial={setShowTutorial}
                 startupPhase={startupPhase}
                 catalogueFirstLoadSettled={catalogueFirstLoadSettled}
+                startupStatusText={startupStatusText}
               />
             </ProtectedRoute>
           }
