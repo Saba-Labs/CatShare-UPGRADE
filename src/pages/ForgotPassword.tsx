@@ -21,7 +21,7 @@ export default function ForgotPassword() {
 
   React.useEffect(() => {
     if (!subdomainStoreSlug) return;
-    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+    navigate('/', { replace: true });
   }, [subdomainStoreSlug, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

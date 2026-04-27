@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getStoreBySlug, getStoreProducts, sortProductsBySupabaseRowOrder, type StorePublic } from '../services/storeService';
 import {
   isProductEnabledForCatalogue,
@@ -563,9 +563,18 @@ function SkeletonCard() {
 ───────────────────────────────────────────────────────────────────────────── */
 export default function StoreView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { slug } = useParams<{ slug: string }>();
   const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
   const effectiveSlug = slug || hostSlug || null;
+
+  // Canonical URL: when subdomain already identifies the store, keep path at "/".
+  useEffect(() => {
+    if (!hostSlug || !slug) return;
+    if (hostSlug !== slug) return;
+    if (location.pathname === '/') return;
+    navigate('/', { replace: true });
+  }, [hostSlug, slug, location.pathname, navigate]);
 
   const [step, setStep] = useState<Step>('products');
   const [store, setStore] = useState<StorePublic | null>(null);

@@ -25,7 +25,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!subdomainStoreSlug) return;
-    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+    navigate('/', { replace: true });
   }, [subdomainStoreSlug, navigate]);
 
   useEffect(() => {

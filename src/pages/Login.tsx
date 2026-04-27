@@ -43,7 +43,7 @@ export default function Login() {
 
   useEffect(() => {
     if (!subdomainStoreSlug) return;
-    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+    navigate('/', { replace: true });
   }, [subdomainStoreSlug, navigate]);
 
   useEffect(() => {
