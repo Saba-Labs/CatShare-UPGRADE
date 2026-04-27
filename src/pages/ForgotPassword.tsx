@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { FiMail, FiAlertCircle, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { logPasswordResetRequested } from '../config/analyticsEvents';
+import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 export default function ForgotPassword() {
   const isNativeApp = Capacitor.isNativePlatform();
+  const navigate = useNavigate();
   const { showToast } = useToast();
+  const subdomainStoreSlug = resolveStoreSlugFromHostname();
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  React.useEffect(() => {
+    if (!subdomainStoreSlug) return;
+    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+  }, [subdomainStoreSlug, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

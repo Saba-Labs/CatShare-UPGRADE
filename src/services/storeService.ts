@@ -9,6 +9,7 @@
 
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -260,8 +261,6 @@ export function normalizeStoreMinimumOrderValueInput(
  * - Not reserved word
  */
 export function validateStoreSlug(slug: string): { valid: boolean; error?: string } {
-  const reservedWords = ['admin', 'api', 'store', 'o', 'orders', 'create-order', 'account', 'login', 'register', 'logout', 'home', 'dashboard', 'settings', 'share'];
-  
   const trimmed = slug.trim().toLowerCase();
   
   if (!trimmed) {
@@ -288,7 +287,7 @@ export function validateStoreSlug(slug: string): { valid: boolean; error?: strin
     return { valid: false, error: 'Cannot use two hyphens in a row' };
   }
 
-  if (reservedWords.includes(trimmed)) {
+  if (RESERVED_STORE_SLUGS.includes(trimmed)) {
     return { valid: false, error: 'That name is reserved. Please choose a different one' };
   }
   

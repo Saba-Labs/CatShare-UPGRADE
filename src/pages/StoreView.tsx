@@ -15,6 +15,7 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    INLINE STYLES — clean, professional light storefront
@@ -563,6 +564,8 @@ function SkeletonCard() {
 export default function StoreView() {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
+  const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
+  const effectiveSlug = slug || hostSlug || null;
 
   const [step, setStep] = useState<Step>('products');
   const [store, setStore] = useState<StorePublic | null>(null);
@@ -589,10 +592,10 @@ export default function StoreView() {
   }, [drawerProduct]);
 
   useEffect(() => {
-    if (!slug) { setStoreError('Store not found'); setStoreLoading(false); return; }
+    if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
-    getStoreBySlug(slug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
-  }, [slug]);
+    getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
+  }, [effectiveSlug]);
 
   useEffect(() => {
     setLogoFailed(false);

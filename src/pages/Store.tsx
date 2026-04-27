@@ -17,7 +17,7 @@ import {
   type Store,
 } from '../services/storeService';
 import { getAllCatalogues } from '../config/catalogueConfig';
-import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
+import { buildStorefrontUrl, getStorefrontRootHost } from '../utils/storefrontDomain';
 import { syncUserSettings } from '../services/supabaseSync';
 import { uploadProductImageToR2 } from '../services/r2Upload';
 import {
@@ -1241,12 +1241,8 @@ export default function StorePage() {
     }
   };
 
-  const publicWebBase = getPublicWebBaseUrl();
-  const hostPrefix = publicWebBase
-    ? (() => { try { return new URL(publicWebBase).host; } catch { return publicWebBase.replace(/^https?:\/\//, '').replace(/\/$/, ''); } })()
-    : (typeof window !== 'undefined' ? window.location.host : 'yourapp.com');
-
-  const storeUrl = store ? `${publicWebBase}/store/${store.storeSlug}` : '';
+  const storefrontRootHost = getStorefrontRootHost();
+  const storeUrl = store ? buildStorefrontUrl(store.storeSlug) : '';
   const getCatName = (id: string) => catalogues.find(c => c.id === id)?.label || id;
 
   /* ── Helper: render a single info row ── */
@@ -1318,7 +1314,7 @@ export default function StorePage() {
                 <div className="form-field">
                   <label className="form-label">Store link <em>*</em></label>
                   <div className={`slug-field-wrap${slugError ? ' err' : ''}`}>
-                    <span className="slug-prefix-text">{hostPrefix}/store/</span>
+                    <span className="slug-prefix-text">https://</span>
                     <input
                       type="text"
                       className="slug-text-input"
@@ -1337,7 +1333,9 @@ export default function StorePage() {
                       ))}
                     </div>
                   )}
-                  <div className="form-hint">Only letters, numbers and hyphens.</div>
+                  <div className="form-hint">
+                    Only letters, numbers and hyphens. Your live link: https://{formSlug || 'your-store'}.{storefrontRootHost}
+                  </div>
                 </div>
 
                 <div className="form-field">

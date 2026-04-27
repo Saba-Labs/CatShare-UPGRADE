@@ -14,6 +14,7 @@ import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { logSignUp, logSignUpFailed } from '../config/analyticsEvents';
+import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 function GoogleIcon() {
   return (
@@ -46,6 +47,7 @@ function GoogleIcon() {
 export default function Register() {
   const isNativeApp = Capacitor.isNativePlatform();
   const navigate = useNavigate();
+  const subdomainStoreSlug = resolveStoreSlugFromHostname();
   const { showToast } = useToast();
   const { supabaseDataLoading } = useAuth();
 
@@ -59,6 +61,11 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustSignedUp, setHasJustSignedUp] = useState(false);
+
+  useEffect(() => {
+    if (!subdomainStoreSlug) return;
+    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+  }, [subdomainStoreSlug, navigate]);
 
   useEffect(() => {
     if (hasJustSignedUp && !supabaseDataLoading) {

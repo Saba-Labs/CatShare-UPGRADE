@@ -5,6 +5,7 @@ import { FiLock, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import { supabase } from '../supabaseClient';
 import { useToast } from '../context/ToastContext';
 import { logPasswordResetCompleted } from '../config/analyticsEvents';
+import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 /**
  * Landing page for Supabase password recovery email link (redirectTo must be /reset-password).
@@ -13,6 +14,7 @@ import { logPasswordResetCompleted } from '../config/analyticsEvents';
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const subdomainStoreSlug = resolveStoreSlugFromHostname();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -20,6 +22,11 @@ export default function ResetPassword() {
   const [hasSession, setHasSession] = useState(false);
   const [done, setDone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!subdomainStoreSlug) return;
+    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+  }, [subdomainStoreSlug, navigate]);
 
   useEffect(() => {
     let cancelled = false;

@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { safeGetFromStorage } from '../utils/safeStorage';
 import { supabase } from '../supabaseClient';
 import { logLogin, logLoginFailed } from '../config/analyticsEvents';
+import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 export default function Login() {
   const isNativeApp = Capacitor.isNativePlatform();
@@ -32,12 +33,18 @@ export default function Login() {
   const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const subdomainStoreSlug = resolveStoreSlugFromHostname();
   /** Mobile-only: full-screen landing → tap Log in to show the form (desktop unchanged). */
   const [mobileShowLoginForm, setMobileShowLoginForm] = useState(false);
 
   /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
   const postAuthRedirectDoneRef = useRef(false);
   const fieldsSyncAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    if (!subdomainStoreSlug) return;
+    navigate(`/store/${subdomainStoreSlug}`, { replace: true });
+  }, [subdomainStoreSlug, navigate]);
 
   useEffect(() => {
     postAuthRedirectDoneRef.current = false;
