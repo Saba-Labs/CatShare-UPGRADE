@@ -84,10 +84,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const intentionalLogoutRef = useRef(false);
   const intentionalLogoutResetTimerRef = useRef<number | null>(null);
+  const authNullRecoveryTimerRef = useRef<number | null>(null);
   const clearIntentionalLogoutResetTimer = useCallback(() => {
     if (intentionalLogoutResetTimerRef.current !== null) {
       window.clearTimeout(intentionalLogoutResetTimerRef.current);
       intentionalLogoutResetTimerRef.current = null;
+    }
+  }, []);
+  const clearAuthNullRecoveryTimer = useCallback(() => {
+    if (authNullRecoveryTimerRef.current !== null) {
+      window.clearTimeout(authNullRecoveryTimerRef.current);
+      authNullRecoveryTimerRef.current = null;
     }
   }, []);
 
@@ -291,6 +298,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (authService.isOfflineGuest()) return;
 
       if (session?.user) {
+        clearAuthNullRecoveryTimer();
         const appUser = mapSupabaseUserToApp(session.user);
         setUser(appUser);
         persistAuthUserIdsForStorage(session.user.id);
@@ -303,35 +311,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         // If logout was intentional, don't try to recover — clear immediately
         if (intentionalLogoutRef.current) {
+          clearAuthNullRecoveryTimer();
           clearIntentionalLogoutResetTimer();
           clearSignedOutState();
           intentionalLogoutRef.current = false;
           return;
         }
-
-        const recovered = await recoverSupabaseSession();
-        if (recovered?.user) {
-          const appUser = mapSupabaseUserToApp(recovered.user);
-          setUser(appUser);
-          persistAuthUserIdsForStorage(recovered.user.id);
-          setSupabaseRlsUserId(recovered.user.id);
-          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-            void loadUserData(recovered.user.id);
-          }
+        // Transient null sessions can happen on network/app-resume timing.
+        // Use a short grace window before force-clearing auth state.
+        if (authNullRecoveryTimerRef.current !== null) {
           return;
         }
-        clearSignedOutState();
+        authNullRecoveryTimerRef.current = window.setTimeout(async () => {
+          authNullRecoveryTimerRef.current = null;
+          const recovered = await recoverSupabaseSession();
+          if (recovered?.user) {
+            const appUser = mapSupabaseUserToApp(recovered.user);
+            setUser(appUser);
+            persistAuthUserIdsForStorage(recovered.user.id);
+            setSupabaseRlsUserId(recovered.user.id);
+            if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+              void loadUserData(recovered.user.id);
+            }
+            return;
+          }
+          clearSignedOutState();
+        }, 1200);
       }
     });
 
     return () => {
       cancelled = true;
+      clearAuthNullRecoveryTimer();
       clearIntentionalLogoutResetTimer();
       sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
       window.removeEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
     };
-  }, [clearIntentionalLogoutResetTimer]);
+  }, [clearAuthNullRecoveryTimer, clearIntentionalLogoutResetTimer]);
 
   const logout = async () => {
     try {

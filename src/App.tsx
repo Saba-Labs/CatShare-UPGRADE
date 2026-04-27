@@ -73,6 +73,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
+import { resolveStoreSlugFromHostname } from "./utils/storefrontDomain";
 
 /** Run non-critical work after first paint to shorten time-to-interactive. */
 function scheduleIdleTask(fn: () => void) {
@@ -145,6 +146,13 @@ function AppWithBackHandler() {
   const [startupStatusText, setStartupStatusText] = useState('Fetching your catalogue');
 
   const isHomeRoute = location.pathname === '/' || location.pathname === '';
+  const isStoreSubdomainHost = Boolean(resolveStoreSlugFromHostname());
+  const isStorefrontRootRoute = isStoreSubdomainHost && location.pathname === '/';
+  const isPublicStoreOrOrderRoute =
+    isStoreSubdomainHost ||
+    isStorefrontRootRoute ||
+    location.pathname.startsWith('/store/') ||
+    location.pathname.startsWith('/o/');
 
   const isNative = Capacitor.getPlatform() !== "web";
   const OFFLINE_MIGRATION_PENDING_PREFIX = "offlineMigrationPending::";
@@ -1663,6 +1671,8 @@ function AppWithBackHandler() {
 
   // Initialize Firebase messaging for notifications (deferred — not needed for first paint).
   useEffect(() => {
+    if (isPublicStoreOrOrderRoute) return;
+
     let cancelled = false;
 
     const setupFirebase = async () => {
@@ -1719,7 +1729,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
       cancelled = true;
       window.removeEventListener("firebaseNotification", handleFirebaseNotification);
     };
-  }, []);
+  }, [isPublicStoreOrOrderRoute]);
 
   // New orders: Realtime (if enabled) + REST polling (reliable when Realtime/RLS misses events)
   useEffect(() => {

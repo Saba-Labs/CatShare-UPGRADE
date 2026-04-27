@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -419,6 +419,8 @@ function EditItemRow({
             key={thumbSrc}
             src={thumbSrc}
             alt={item.name}
+            loading="lazy"
+            decoding="async"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
         ) : (
@@ -666,6 +668,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
@@ -692,24 +695,27 @@ export default function Orders() {
   }, [user?.uid, user?.isAnonymous]);
 
   // Ask notification permission and register push token only after user opens Orders.
+  // Delay a bit so initial orders list render remains snappy.
   useEffect(() => {
     if (!user?.uid || user.isAnonymous) return;
     if (!Capacitor.isNativePlatform()) return;
 
     let cancelled = false;
     let cleanupPush: (() => void) | undefined;
+    let startTimer: number | null = null;
 
-    void (async () => {
+    startTimer = window.setTimeout(() => void (async () => {
       const cleanup = await initPushTokenForLoggedInUser(user.uid);
       if (cancelled) {
         await cleanup();
       } else {
         cleanupPush = cleanup;
       }
-    })();
+    })(), 900);
 
     return () => {
       cancelled = true;
+      if (startTimer !== null) window.clearTimeout(startTimer);
       void cleanupPush?.();
     };
   }, [user?.uid, user?.isAnonymous]);
@@ -719,6 +725,12 @@ export default function Orders() {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
+
+  // Debounce search to reduce filtering work on every keypress.
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearchQuery(search.trim().toLowerCase()), 220);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
   // Handle mobile hardware back button
   useEffect(() => {
@@ -847,39 +859,49 @@ export default function Orders() {
     { key: 'cancelled', label: 'Cancelled' },
   ];
 
-  const filteredOrders = orders
-    .filter(o => tab === 'all' || o.status === tab)
-    .filter(o => {
-      if (!search.trim()) return true;
-      const s = search.toLowerCase();
-      return (
-        o.customer_name?.toLowerCase().includes(s) ||
-        (o.items || []).some((it: OrderItem) => it.name?.toLowerCase().includes(s))
-      );
-    });
+  const filteredOrders = useMemo(
+    () =>
+      orders
+        .filter(o => tab === 'all' || o.status === tab)
+        .filter(o => {
+          if (!searchQuery) return true;
+          return (
+            o.customer_name?.toLowerCase().includes(searchQuery) ||
+            (o.items || []).some((it: OrderItem) => it.name?.toLowerCase().includes(searchQuery))
+          );
+        }),
+    [orders, tab, searchQuery]
+  );
 
   // Summary stats
-  const stats = {
-    total: orders.length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    completed: orders.filter(o => o.status === 'completed').length,
-    revenue: orders
-      .filter(o => o.status === 'completed' && o.total_amount)
-      .reduce((s, o) => s + (o.total_amount || 0), 0),
-  };
-  const symbol = orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹';
+  const stats = useMemo(
+    () => ({
+      total: orders.length,
+      pending: orders.filter(o => o.status === 'pending').length,
+      completed: orders.filter(o => o.status === 'completed').length,
+      revenue: orders
+        .filter(o => o.status === 'completed' && o.total_amount)
+        .reduce((s, o) => s + (o.total_amount || 0), 0),
+    }),
+    [orders]
+  );
+  const symbol = useMemo(() => (orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹'), [orders]);
 
   // Calculate sales within date range
-  const filteredSales = orders
-    .filter(o => o.status === 'completed' && o.total_amount)
-    .filter(o => {
-      if (!dateRangeStart && !dateRangeEnd) return true;
-      const orderDate = new Date(o.created_at || '').getTime();
-      const startTime = dateRangeStart ? new Date(dateRangeStart).getTime() : 0;
-      const endTime = dateRangeEnd ? new Date(dateRangeEnd).getTime() + 86400000 : Infinity; // Add 1 day to end date
-      return orderDate >= startTime && orderDate <= endTime;
-    })
-    .reduce((s, o) => s + (o.total_amount || 0), 0);
+  const filteredSales = useMemo(
+    () =>
+      orders
+        .filter(o => o.status === 'completed' && o.total_amount)
+        .filter(o => {
+          if (!dateRangeStart && !dateRangeEnd) return true;
+          const orderDate = new Date(o.created_at || '').getTime();
+          const startTime = dateRangeStart ? new Date(dateRangeStart).getTime() : 0;
+          const endTime = dateRangeEnd ? new Date(dateRangeEnd).getTime() + 86400000 : Infinity; // Add 1 day to end date
+          return orderDate >= startTime && orderDate <= endTime;
+        })
+        .reduce((s, o) => s + (o.total_amount || 0), 0),
+    [orders, dateRangeStart, dateRangeEnd]
+  );
 
   const shouldRestoreScroll =
     location.pathname === '/orders' && !loading && !error;
