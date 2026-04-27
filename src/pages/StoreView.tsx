@@ -369,7 +369,7 @@ function unitLabel(u?: string): string {
 function fmt(n: number, sym: string) { return `${sym}${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`; }
 function fmtCalc(qty: number, price: number, u: string | undefined, sym: string, qstep: number = 1): string | null {
   if (qty <= 0 || !Number.isFinite(price)) return null;
-  return `${qty} ${unitLabel(u)} (${Math.round(qty / qstep)}) × ${fmt(price, sym)}`;
+  return `${qty} ${unitLabel(u)} × ${fmt(price, sym)}`;
 }
 function isPublicUrl(url?: string): boolean {
   if (!url) return false;

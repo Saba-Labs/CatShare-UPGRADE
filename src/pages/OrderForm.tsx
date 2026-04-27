@@ -61,7 +61,7 @@ function formatLineCalculationDetail(
   const label = getOrderUnitLabel(item.priceUnit);
   const priceStr = formatUnitPrice(item.price, currencySymbol);
   const qstep = normalizeOrderQuantityStep(item.quantityStep);
-  return `${q} ${label} (${Math.round(q / qstep)}) × ${priceStr}`;
+  return `${q} ${label} × ${priceStr}`;
 }
 
 function isPublicHttpUrl(url: string): boolean {

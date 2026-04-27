@@ -1,28 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { logWebsiteVisited } from "./config/analyticsEvents";
+import { logWebsiteCtaClicked, logWebsiteVisited } from "./config/analyticsEvents";
 import {
   MdArrowBack,
   MdAutoAwesome,
-  MdCloud,
-  MdSecurity,
-  MdSpeed,
-  MdImage,
-  MdEdit,
-  MdShoppingBag,
-  MdShare,
-  MdPhoneAndroid,
   MdInventory2,
-  MdPalette,
+  MdEdit,
   MdStorefront,
+  MdShare,
+  MdImage,
   MdCheckCircle,
   MdMenu,
   MdClose,
 } from "react-icons/md";
-
-const PLAY_STORE =
-  "https://play.google.com/store/apps/details?id=com.catshare.official";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -31,137 +22,88 @@ const fadeUp = {
   transition: { duration: 0.45 },
 };
 
+const softFloat = {
+  animate: { y: [0, -6, 0] },
+  transition: { duration: 3.8, repeat: Infinity, ease: "easeInOut" as const },
+};
+
 export default function Website() {
   const navigate = useNavigate();
   const [mobileNav, setMobileNav] = useState(false);
-  const [openFeature, setOpenFeature] = useState<string | null>(null);
 
   useEffect(() => {
     logWebsiteVisited("in_app");
   }, []);
 
-  const pillars = [
+  const aboutSections = [
     {
-      title: "Your catalogue",
-      subtitle: "Single source of truth",
-      body: "Products, photos, subtitles, and custom fields—organised by category. Multiple catalogues with different prices for wholesale, distributors, and every channel you sell through.",
+      title: "What is CatShare?",
+      subtitle: "A mobile-first catalogue + order workflow app",
+      body: "One app for products, prices, categories, and share links. Built for WhatsApp and Instagram sellers.",
       icon: <MdInventory2 className="w-7 h-7" />,
     },
     {
-      title: "Online store + order links",
-      subtitle: "Customers browse and order clearly",
-      body: "Generate a link to a tidy order page: buyers pick quantities, see line totals and pack rules, then send the order to you on WhatsApp—less typing mistakes and fewer “how much?” chats.",
+      title: "Who is it for?",
+      subtitle: "Sellers, wholesalers, resellers, and small teams",
+      body: "Perfect for teams that update prices often and sell daily through WhatsApp and Instagram.",
       icon: <MdShare className="w-7 h-7" />,
     },
     {
-      title: "Share-ready visuals",
-      subtitle: "Look professional",
-      body: "Render product tiles with your prices and watermarks. Batch output images you can drop into WhatsApp, Instagram, or PDFs—without redesigning every slide.",
+      title: "Why users stay",
+      subtitle: "Speed, clarity, and trust",
+      body: "Reduce order mistakes. Faster sharing. Better presentation. Less daily stress.",
       icon: <MdImage className="w-7 h-7" />,
     },
   ];
 
-  const features = [
+  const featureShowcase = [
     {
-      id: "online-store",
-      icon: <MdStorefront className="w-7 h-7" />,
-      title: "Online store page",
-      blurb: "Your products in one public storefront link.",
-      detail:
-        "Create a shareable store URL with your profile, logo, social links, live/open status, and selected catalogue. Customers can browse products and place orders from one clean page.",
+      icon: <MdInventory2 className="w-7 h-7" />,
+      title: "Fully Custom Product Fields",
+      blurb: "Set up the exact fields your business needs.",
+      detail: "Sizes, packaging, units, and custom labels for cleaner product communication.",
+      image: "/about-fields.png",
+      reverse: false,
     },
     {
-      id: "order-links",
-      icon: <MdShoppingBag className="w-7 h-7" />,
-      title: "Order forms & WhatsApp",
-      blurb: "Public order pages from your live catalogue.",
-      detail:
-        "Share a secure link; customers adjust quantity, see subtotals, and open WhatsApp with a structured message. You keep control of pricing and stock context.",
-    },
-    {
-      id: "multi-catalog",
-      icon: <MdAutoAwesome className="w-7 h-7" />,
-      title: "Multiple catalogues",
-      blurb: "Different price lists, one product set.",
-      detail:
-        "Wholesale, reseller, or custom catalogues—each with its own prices and units while you maintain one master list of products.",
-    },
-    {
-      id: "render",
-      icon: <MdPalette className="w-7 h-7" />,
-      title: "Image rendering & watermarks",
-      blurb: "Branded PNGs in bulk.",
-      detail:
-        "Render catalogue tiles with watermark text, placement, and styling. Batch-render many products at once for campaigns or price updates.",
-    },
-    {
-      id: "bulk",
       icon: <MdEdit className="w-7 h-7" />,
-      title: "Bulk editing",
-      blurb: "Update many SKUs at once.",
+      title: "Bulk Editor (Save Time)",
+      blurb: "Update many products in one go.",
+      detail: "Fast edits for prices, names, and values when supplier or seasonal changes happen.",
+      image: "/about-bulk.png",
+      reverse: true,
+    },
+    {
+      icon: <MdAutoAwesome className="w-7 h-7" />,
+      title: "Multi-Currency Support",
+      blurb: "Sell confidently in different pricing currencies.",
+      detail: "Switch and manage currency display cleanly for broader customer reach.",
+      image: "/about-currency.png",
+      reverse: false,
+    },
+    {
+      icon: <MdStorefront className="w-7 h-7" />,
+      title: "Online Store",
+      blurb: "Turn your catalogue into a live storefront link in minutes.",
       detail:
-        "Select multiple products to change categories, fields, or prices together—handy after supplier updates or seasonal changes.",
+        "Share one clean store URL where buyers can browse by category, check product details, and place orders without asking you for every item manually. Update products once in CatShare and your storefront stays current for all customers.",
+      image: "/about-store.png",
+      reverse: true,
     },
     {
-      id: "backup",
-      icon: <MdCloud className="w-7 h-7" />,
-      title: "Backup, restore & sync",
-      blurb: "Protect years of catalogue work.",
-      detail:
-        "Export full backups (including images and catalogue setup). Cloud sync helps you pick up on another phone or after a reinstall.",
+      icon: <MdShare className="w-7 h-7" />,
+      title: "Share Features",
+      blurb: "Share as image, PDF, link, or online store.",
+      detail: "One tap sharing options for faster sales conversations and better buyer clarity.",
+      image: "/about-share.png",
+      reverse: false,
     },
-    {
-      id: "speed",
-      icon: <MdSpeed className="w-7 h-7" />,
-      title: "Built for daily use",
-      blurb: "Fast on real devices.",
-      detail:
-        "Optimised lists, background rendering where it helps, and an interface tuned for shop-floor speed—not just demo screenshots.",
-    },
-    {
-      id: "security",
-      icon: <MdSecurity className="w-7 h-7" />,
-      title: "Your account, your data",
-      blurb: "Sign-in and sync you control.",
-      detail:
-        "Account-based access with encrypted traffic to sync servers. You choose what to share publicly (e.g. order links) vs. keep private in the app.",
-    },
-  ];
-
-  const steps = [
-    {
-      n: "01",
-      title: "Set up your fields",
-      text: "Pick the product fields that match your trade—sizes, SKUs, MOQ, or anything you track.",
-    },
-    {
-      n: "02",
-      title: "Build your catalogue",
-      text: "Add products, photos, categories, and prices. Spin up extra catalogues for different buyers or margins.",
-    },
-    {
-      n: "03",
-      title: "Launch your store",
-      text: "Turn your catalogue into an online store page with your business profile and shareable link.",
-    },
-    {
-      n: "04",
-      title: "Render, share & grow",
-      text: "Export polished images, share order links, take WhatsApp orders, and keep data safe with cloud sync.",
-    },
-  ];
-
-  const audiences = [
-    "Wholesale & distributors",
-    "Shops and teams using supplier price lists",
-    "Resellers and multi-channel sellers",
-    "Small brands sharing ranges on chat apps",
   ];
 
   const navItems = [
-    { href: "#pillars", label: "Overview" },
+    { href: "#about", label: "About" },
     { href: "#features", label: "Features" },
-    { href: "#how", label: "How it works" },
+    { href: "#start", label: "Start" },
   ] as const;
 
   const navLinkClass =
@@ -193,11 +135,11 @@ export default function Website() {
   );
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900 antialiased [text-size-adjust:100%]">
-      <div className="fixed inset-x-0 top-0 z-[60] h-[40px] bg-black md:hidden" aria-hidden />
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#edf4ff] via-[#f4f2ff] to-[#eef6ff] pb-24 text-slate-900 antialiased [text-size-adjust:100%] md:pb-0">
+      <div className="fixed inset-x-0 top-0 z-[60] h-[40px] bg-black" aria-hidden />
 
       {/* Header */}
-      <header className="sticky top-[40px] z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80 md:top-0">
+      <header className="sticky top-[40px] z-50 border-b border-blue-100/80 bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/65">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:gap-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -223,12 +165,14 @@ export default function Website() {
             <Link
               to="/login"
               className="min-h-10 rounded-full px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              onClick={() => logWebsiteCtaClicked("header_login", "website")}
             >
               Log in
             </Link>
             <Link
               to="/register"
               className="min-h-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:from-blue-500 hover:to-indigo-500"
+              onClick={() => logWebsiteCtaClicked("header_signup", "website")}
             >
               Sign up
             </Link>
@@ -254,14 +198,20 @@ export default function Website() {
               <Link
                 to="/login"
                 className="flex min-h-12 items-center justify-center rounded-xl text-center text-sm font-semibold text-slate-800 transition active:bg-slate-100"
-                onClick={() => setMobileNav(false)}
+                onClick={() => {
+                  setMobileNav(false);
+                  logWebsiteCtaClicked("mobile_menu_login", "website");
+                }}
               >
                 Log in
               </Link>
               <Link
                 to="/register"
                 className="flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-center text-sm font-semibold text-white transition active:opacity-90"
-                onClick={() => setMobileNav(false)}
+                onClick={() => {
+                  setMobileNav(false);
+                  logWebsiteCtaClicked("mobile_menu_signup", "website");
+                }}
               >
                 Sign up
               </Link>
@@ -271,96 +221,153 @@ export default function Website() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-slate-950 text-white">
+      <section className="relative overflow-hidden text-slate-900">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -left-16 top-8 h-44 w-44 rounded-full bg-blue-400/20 blur-3xl"
+          animate={{ x: [0, 20, 0], y: [0, -10, 0] }}
+          transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute right-0 top-24 h-52 w-52 rounded-full bg-indigo-400/20 blur-3xl"
+          animate={{ x: [0, -22, 0], y: [0, 10, 0] }}
+          transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-cyan-300/20 blur-3xl"
+          animate={{ x: [0, 14, 0], y: [0, -12, 0] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        />
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-0 opacity-90"
           style={{
             backgroundImage:
-              "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.45), transparent), radial-gradient(ellipse 60% 40% at 100% 50%, rgba(99, 102, 241, 0.25), transparent), radial-gradient(ellipse 50% 30% at 0% 80%, rgba(14, 165, 233, 0.2), transparent)",
+              "radial-gradient(ellipse 80% 50% at 20% 0%, rgba(59,130,246,0.2), transparent), radial-gradient(ellipse 80% 60% at 100% 0%, rgba(168,85,247,0.16), transparent), radial-gradient(ellipse 70% 50% at 60% 100%, rgba(14,165,233,0.12), transparent), linear-gradient(180deg, #eef4ff 0%, #f2f7ff 100%)",
           }}
         />
-        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-24 lg:py-28">
+        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:items-center lg:gap-10 lg:py-20">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="max-w-3xl"
           >
-            <p className="mb-3 text-xs font-semibold tracking-wide text-sky-300/90 sm:mb-4 sm:text-sm">
-              Share faster · Sell quicker
+            <p className="mb-3 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-bold tracking-wide text-blue-700 sm:mb-4 sm:text-sm">
+              About CatShare
             </p>
-            <h1 className="text-3xl font-bold leading-[1.15] tracking-tight text-balance sm:text-5xl lg:text-6xl">
-              The catalogue app for sellers who live on WhatsApp.
+            <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-balance text-slate-900 sm:text-5xl lg:text-6xl">
+              Share Faster<br />Sell Quicker
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-300 text-pretty sm:mt-6 sm:text-lg lg:text-xl">
-              CatShare keeps your products, prices, and pack rules organised—then turns them into{" "}
-              <span className="font-semibold text-white">shareable order pages</span> and{" "}
-              <span className="font-semibold text-white">online storefront links</span> and{" "}
-              <span className="font-semibold text-white">branded product images</span> so buyers know what to order and what it costs.
+            <p className="mt-5 max-w-2xl text-base leading-relaxed text-slate-600 text-pretty sm:mt-6 sm:text-lg">
+              CatShare keeps your catalogue, order flow, and sharing workflow in one clean mobile system.
             </p>
             <div className="mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
-              <Link
-                to="/register"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-white px-6 py-3.5 text-sm font-bold text-slate-900 shadow-lg transition hover:bg-slate-100 active:scale-[0.99] sm:w-auto"
-              >
-                Create free account
-              </Link>
-              <a
-                href={PLAY_STORE}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/15 active:scale-[0.99] sm:w-auto"
-              >
-                <MdPhoneAndroid className="h-5 w-5 shrink-0" />
-                Google Play
-              </a>
+              <motion.div {...softFloat} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                <Link
+                  to="/register"
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:from-blue-500 hover:to-indigo-500 sm:w-auto"
+                  onClick={() => logWebsiteCtaClicked("hero_signup", "website")}
+                >
+                  Create free account
+                </Link>
+              </motion.div>
+              <motion.div {...softFloat} transition={{ ...softFloat.transition, delay: 0.35 }} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                <Link
+                  to="/login"
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                  onClick={() => logWebsiteCtaClicked("hero_login", "website")}
+                >
+                  I already have an account
+                </Link>
+              </motion.div>
             </div>
+          </motion.div>
+          <motion.div
+            {...fadeUp}
+            className="overflow-hidden rounded-3xl border border-blue-100 bg-white p-3 shadow-xl shadow-blue-100/60"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
+            whileHover={{ y: -10, scale: 1.01 }}
+          >
+            <img
+              src="/about-store.png"
+              alt="CatShare storefront preview"
+              className="h-56 w-full rounded-2xl object-cover sm:h-72 lg:h-[22rem]"
+            />
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mt-10 grid gap-3 sm:mt-14 sm:grid-cols-3"
+            className="grid gap-3 sm:grid-cols-3 lg:col-span-2"
           >
-            {[
-              { k: "Online store", v: "Public /store link for customers" },
-              { k: "Order links", v: "Qty + line totals → WhatsApp" },
-              { k: "Multi-catalogue", v: "Wholesale, custom price lists" },
-              { k: "Renders", v: "Watermarks & batch export" },
-            ].map((s) => (
+              {[
+                { k: "Mobile first", v: "Designed for daily phone-based selling" },
+                { k: "All-in-one", v: "Catalogue + orders + store + visual sharing" },
+                { k: "Team speed", v: "Bulk operations and reusable configurations" },
+              ].map((s) => (
               <div
                 key={s.k}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 backdrop-blur-sm sm:py-4"
+                className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-[#f5f9ff] to-[#f4f2ff] px-4 py-3.5 shadow-sm sm:py-4"
               >
-                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-sky-200/80 sm:text-xs">{s.k}</div>
-                <div className="mt-1 text-sm font-medium leading-snug text-slate-200">{s.v}</div>
+                <div className="text-[0.65rem] font-bold uppercase tracking-wider text-blue-600 sm:text-xs">{s.k}</div>
+                <div className="mt-1 text-sm font-medium leading-snug text-slate-700">{s.v}</div>
               </div>
             ))}
           </motion.div>
         </div>
       </section>
 
-      {/* Three pillars */}
-      <section id="pillars" className="scroll-mt-[4.5rem] border-b border-slate-200 bg-white py-12 sm:scroll-mt-28 sm:py-20">
+      <section className="py-8 sm:py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <motion.div
+            {...fadeUp}
+            className="rounded-3xl border border-blue-100 bg-gradient-to-r from-white via-[#f6f9ff] to-[#eff4ff] p-4 shadow-md shadow-blue-100/40 sm:p-6"
+          >
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-blue-700 sm:text-sm">
+              <span className="rounded-full bg-blue-100 px-3 py-1">Trusted by growing sellers</span>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-700">Made for WhatsApp + Instagram selling</span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:mt-5 md:grid-cols-3">
+              {[
+                "Looks clean and professional while sharing with customers.",
+                "Daily catalogue updates are much faster with bulk edits.",
+                "Less confusion in orders because details are always clear.",
+              ].map((quote) => (
+                <div key={quote} className="rounded-2xl border border-blue-100 bg-white/90 p-4 text-sm text-slate-700 shadow-sm">
+                  <p>{quote}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <div aria-hidden className="mx-auto h-px w-full max-w-6xl bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+
+      {/* About blocks */}
+      <section id="about" className="scroll-mt-[4.5rem] bg-gradient-to-b from-[#f4f8ff] to-[#f4f3ff] py-12 sm:scroll-mt-28 sm:py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-balance sm:text-4xl">
-              What CatShare does
+              Why CatShare
             </h2>
             <p className="mt-3 text-pretty text-sm text-slate-600 sm:text-base">
-              Three connected ideas—so your range stays consistent whether you share a price list or take an order.
+              A friendly mobile workflow that helps teams look professional, move faster, and reduce costly order confusion.
             </p>
           </motion.div>
-          <div className="mt-10 grid gap-5 sm:mt-12 sm:gap-6 lg:grid-cols-3">
-            {pillars.map((p, i) => (
+          <div className="mt-8 grid gap-4 sm:mt-10 sm:gap-5 lg:grid-cols-3">
+            {aboutSections.map((p, i) => (
               <motion.article
                 key={p.title}
                 {...fadeUp}
                 transition={{ duration: 0.45, delay: i * 0.06 }}
-                className="group rounded-2xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md sm:p-6 lg:p-8"
+                className="group rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-[#f8fbff] to-[#f3f8ff] p-5 shadow-md shadow-blue-100/40 transition hover:-translate-y-0.5 hover:shadow-lg sm:p-6"
               >
-                <div className="mb-4 inline-flex rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 p-3 text-white shadow-lg shadow-blue-600/25">
+                <div className="mb-4 inline-flex rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-3 text-white shadow-lg shadow-blue-600/25">
                   {p.icon}
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">{p.title}</h3>
@@ -372,155 +379,136 @@ export default function Website() {
         </div>
       </section>
 
+      <div aria-hidden className="mx-auto h-px w-full max-w-6xl bg-gradient-to-r from-transparent via-indigo-200 to-transparent" />
+
       {/* Features grid */}
-      <section id="features" className="scroll-mt-[4.5rem] py-12 sm:scroll-mt-28 sm:py-20">
+      <section id="features" className="scroll-mt-[4.5rem] bg-gradient-to-b from-[#f3f6ff] to-[#eef5ff] py-12 sm:scroll-mt-28 sm:py-16">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-balance sm:text-4xl">
-              Everything in one place
+              Core Features
             </h2>
             <p className="mt-3 text-pretty text-sm text-slate-600 sm:text-base">
-              Tap a card for a bit more detail—no account required to read this page.
+              Core features designed to improve day-to-day selling and customer experience.
             </p>
           </motion.div>
 
-          <div className="mt-10 grid grid-cols-1 gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
-            {features.map((f, i) => {
-              const expanded = openFeature === f.id;
-              return (
-                <motion.button
-                  key={f.id}
-                  type="button"
-                  {...fadeUp}
-                  transition={{ duration: 0.4, delay: Math.min(i * 0.03, 0.24) }}
-                  onClick={() => setOpenFeature(expanded ? null : f.id)}
-                  className={`min-h-[5.5rem] rounded-2xl border p-4 text-left transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 sm:p-5 ${
-                    expanded
-                      ? "border-blue-400 bg-gradient-to-b from-blue-50 to-white shadow-md ring-1 ring-blue-100"
-                      : "border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow"
-                  }`}
-                >
-                  <div className={`mb-3 inline-flex rounded-lg p-2 ${expanded ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"}`}>
+          <div className="mt-8 space-y-4 sm:mt-10 sm:space-y-5">
+            {featureShowcase.map((f, i) => (
+              <motion.article
+                key={f.title}
+                {...fadeUp}
+                transition={{ duration: 0.4, delay: Math.min(i * 0.03, 0.24) }}
+                className={`grid overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-[#f8fbff] to-[#f2f5ff] shadow-md shadow-blue-100/40 transition hover:shadow-lg md:grid-cols-2 ${
+                  f.reverse ? "md:[&>*:first-child]:order-2 md:[&>*:last-child]:order-1" : ""
+                }`}
+              >
+                <div className="p-5 sm:p-6">
+                  <div className="mb-3 inline-flex rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 p-2 text-blue-700">
                     {f.icon}
                   </div>
-                  <h3 className="font-bold text-slate-900">{f.title}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">{f.title}</h3>
                   <p className="mt-1 text-sm text-slate-600">{f.blurb}</p>
-                  {expanded && (
-                    <p className="mt-3 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-600">{f.detail}</p>
-                  )}
-                  <span className="mt-3 inline-block text-xs font-semibold text-blue-600">
-                    {expanded ? "Tap to close" : "Tap for more"}
-                  </span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how" className="scroll-mt-[4.5rem] border-y border-slate-200 bg-gradient-to-b from-slate-100/80 to-white py-12 sm:scroll-mt-28 sm:py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-balance sm:text-4xl">
-              How it works
-            </h2>
-            <p className="mt-3 text-pretty text-sm text-slate-600 sm:text-base">
-              From empty catalogue to live store, orders, and share-ready visuals.
-            </p>
-          </motion.div>
-
-          <div className="mt-10 grid gap-4 sm:mt-12 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
-            {steps.map((s, i) => (
-              <motion.div
-                key={s.n}
-                {...fadeUp}
-                transition={{ duration: 0.45, delay: i * 0.05 }}
-                className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
-              >
-                <span className="text-3xl font-black tabular-nums text-blue-600/20">{s.n}</span>
-                <h3 className="mt-2 font-bold text-slate-900">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{s.text}</p>
-              </motion.div>
+                  <p className="mt-3 border-t border-slate-200 pt-3 text-sm leading-relaxed text-slate-600">{f.detail}</p>
+                </div>
+                <motion.div
+                  className="bg-gradient-to-br from-[#eef5ff] via-[#f6f8ff] to-[#edf4ff] p-3 sm:p-4"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut", delay: i * 0.18 }}
+                  whileHover={{ y: -8, scale: 1.01 }}
+                >
+                  <img
+                    src={f.image}
+                    alt={f.title}
+                    className="h-44 w-full rounded-2xl object-cover sm:h-52"
+                  />
+                </motion.div>
+              </motion.article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Audience + trust */}
-      <section className="py-12 sm:py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:gap-12 sm:px-6 lg:grid-cols-2 lg:items-center">
-          <motion.div {...fadeUp}>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 text-balance sm:text-4xl">
-              Built for real selling workflows
-            </h2>
-            <p className="mt-4 text-pretty text-sm text-slate-600 sm:text-base">
-              If you already send PDFs, voice notes, or photo collages to confirm orders, CatShare replaces the guesswork with structured catalogue data—without forcing you into a heavy ERP.
-            </p>
-            <ul className="mt-5 space-y-3 sm:mt-6">
-              {audiences.map((a) => (
-                <li key={a} className="flex items-start gap-3 text-sm text-slate-700 sm:text-base">
-                  <MdCheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                  <span className="font-medium leading-snug">{a}</span>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
+      <div aria-hidden className="mx-auto h-px w-full max-w-4xl bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
+
+      <section className="bg-gradient-to-b from-[#f4f3ff] to-[#f2f7ff] py-10 sm:py-12">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
           <motion.div
             {...fadeUp}
-            className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 to-indigo-950 p-6 text-white shadow-xl sm:p-8"
+            className="rounded-3xl border border-blue-100 bg-gradient-to-br from-white via-[#f7fbff] to-[#f4f3ff] p-5 shadow-md shadow-blue-100/40 sm:p-6"
           >
-            <h3 className="text-lg font-bold sm:text-xl">Why teams stick with it</h3>
-            <ul className="mt-5 space-y-3 text-sm leading-relaxed text-slate-300 sm:mt-6 sm:space-y-4">
-              <li className="flex gap-3">
-                <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                <span>Mobile-first: manage the floor from your phone.</span>
-              </li>
-              <li className="flex gap-3">
-                <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                <span>Cloud backup and sync across devices when you sign in.</span>
-              </li>
-              <li className="flex gap-3">
-                <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                <span>Online store link, order links, and social/contact-ready business profile.</span>
-              </li>
-              <li className="flex gap-3">
-                <MdCheckCircle className="h-5 w-5 shrink-0 text-emerald-400" />
-                <span>Pro features available—start with a 14-day trial and upgrade when you need more.</span>
-              </li>
-            </ul>
+            <h3 className="text-lg font-bold text-slate-900 sm:text-xl">Why sellers stick with CatShare</h3>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {[
+                "Reduce order mistakes",
+                "Faster customer replies",
+                "Cleaner catalogue sharing",
+                "Safer growth with always-online data",
+              ].map((item) => (
+                <div key={item} className="flex items-start gap-2 rounded-xl bg-gradient-to-r from-white to-[#edf5ff] px-3 py-2.5 text-sm text-slate-700">
+                  <MdCheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-slate-200 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 py-12 text-center text-white sm:py-16">
+      <section id="start" className="border-t border-blue-100 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 py-12 text-center text-white sm:py-16">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <h2 className="text-2xl font-bold tracking-tight text-balance sm:text-4xl">
-            Try CatShare on your next catalogue update
+            Start in 2 Minutes
           </h2>
           <p className="mt-4 text-base text-blue-100 text-pretty sm:text-lg">
-            Sign up in the app, add a few products, and launch your online store, order link, or first render.
+            Sign up, add products, share your catalogue, and start taking cleaner orders today.
           </p>
           <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
-            <Link
-              to="/register"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-8 py-3.5 text-sm font-bold text-blue-700 shadow-lg transition hover:bg-blue-50 active:scale-[0.99]"
-            >
-              Get started
-            </Link>
-            <Link
-              to="/login"
-              className="inline-flex min-h-12 items-center justify-center rounded-full border-2 border-white/40 px-8 py-3.5 text-sm font-bold text-white transition hover:bg-white/10 active:scale-[0.99]"
-            >
-              I already have an account
-            </Link>
+            <motion.div {...softFloat} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+              <Link
+                to="/register"
+                className="inline-flex min-h-12 items-center justify-center rounded-full bg-white px-8 py-3.5 text-sm font-bold text-blue-700 shadow-lg transition hover:bg-blue-50"
+                onClick={() => logWebsiteCtaClicked("final_signup", "website")}
+              >
+                Get started
+              </Link>
+            </motion.div>
+            <motion.div {...softFloat} transition={{ ...softFloat.transition, delay: 0.4 }} whileHover={{ y: -2, scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+              <Link
+                to="/login"
+                className="inline-flex min-h-12 items-center justify-center rounded-full border-2 border-white/40 px-8 py-3.5 text-sm font-bold text-white transition hover:bg-white/10"
+                onClick={() => logWebsiteCtaClicked("final_login", "website")}
+              >
+                I already have an account
+              </Link>
+            </motion.div>
           </div>
         </div>
       </section>
 
+      {/* Mobile sticky conversion CTA */}
+      <div className="fixed inset-x-0 bottom-0 z-[70] border-t border-blue-100 bg-gradient-to-r from-white/95 via-[#f5f8ff]/95 to-[#edf4ff]/95 px-3 py-3 shadow-[0_-6px_24px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-md gap-2">
+          <Link
+            to="/register"
+            className="flex-1 inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 text-sm font-bold text-white"
+            onClick={() => logWebsiteCtaClicked("sticky_signup", "website")}
+          >
+            Sign up free
+          </Link>
+          <Link
+            to="/login"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 px-3 text-sm font-semibold text-slate-700"
+            onClick={() => logWebsiteCtaClicked("sticky_login", "website")}
+          >
+            Log in
+          </Link>
+        </div>
+      </div>
+
       {/* Footer */}
-      <footer className="bg-slate-950 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-slate-400 sm:py-12">
+      <footer className="bg-slate-900 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-slate-400 sm:py-12">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-8 px-4 sm:flex-row sm:gap-6 sm:px-6">
           <div className="flex items-center gap-2">
             <img src="/CatShare_logo.png" alt="" className="h-8 w-auto opacity-90" />
@@ -530,20 +518,12 @@ export default function Website() {
             className="flex w-full max-w-sm flex-col items-stretch gap-1 text-sm sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-end sm:gap-x-6 sm:gap-y-2"
             aria-label="Footer"
           >
-            <Link to="/login" className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1">
+            <Link to="/login" className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1" onClick={() => logWebsiteCtaClicked("footer_login", "website")}>
               Log in
             </Link>
-            <Link to="/register" className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1">
+            <Link to="/register" className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1" onClick={() => logWebsiteCtaClicked("footer_signup", "website")}>
               Sign up
             </Link>
-            <a
-              href={PLAY_STORE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1"
-            >
-              Google Play
-            </a>
             <Link to="/privacy" className="min-h-11 inline-flex items-center justify-center rounded-lg hover:text-white sm:min-h-0 sm:inline sm:py-1">
               Privacy
             </Link>

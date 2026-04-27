@@ -45,6 +45,7 @@ export const ANALYTICS_EVENTS = {
   PASSWORD_RESET_REQUESTED: "password_reset_requested",
   PASSWORD_RESET_COMPLETED: "password_reset_completed",
   WEBSITE_VISITED: "website_visited",
+  WEBSITE_CTA_CLICKED: "website_cta_clicked",
 } as const;
 
 // Type definitions for event parameters
@@ -317,6 +318,14 @@ export const logPasswordResetCompleted = () => {
 export const logWebsiteVisited = (source?: string) => {
   logAnalyticsEvent(ANALYTICS_EVENTS.WEBSITE_VISITED, {
     timestamp: Date.now(),
+    ...(source && { source }),
+  });
+};
+
+export const logWebsiteCtaClicked = (ctaName: string, source?: string) => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.WEBSITE_CTA_CLICKED, {
+    timestamp: Date.now(),
+    cta_name: ctaName,
     ...(source && { source }),
   });
 };
