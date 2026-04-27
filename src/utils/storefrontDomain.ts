@@ -35,6 +35,17 @@ function getLikelyRootDomain(host: string): string {
   return parts.slice(-2).join('.');
 }
 
+/**
+ * *.vercel.app (and similar) are multi-tenant preview hosts — the left label is the *project*,
+ * not a seller slug. Never infer storefront root from these or `resolveStoreSlugFromHostname`
+ * will treat `catshare.vercel.app` as slug "catshare".
+ */
+function looksLikeHostingPreviewHostname(host: string): boolean {
+  const h = normalizeHost(host);
+  if (!h) return false;
+  return /\.(vercel\.app|netlify\.app|pages\.dev|pages\.github\.io|cloudflarepages\.net)$/i.test(h);
+}
+
 export function getStorefrontRootHost(): string {
   const fromEnv = normalizeHost(String(import.meta.env.VITE_STOREFRONT_ROOT_DOMAIN || ''));
   if (fromEnv) return getLikelyRootDomain(fromEnv);
@@ -47,6 +58,10 @@ export function getStorefrontRootHost(): string {
   }
 
   if (!publicHost || /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(publicHost)) {
+    return DEFAULT_STOREFRONT_ROOT_HOST;
+  }
+
+  if (looksLikeHostingPreviewHostname(publicHost)) {
     return DEFAULT_STOREFRONT_ROOT_HOST;
   }
 
@@ -66,18 +81,16 @@ export function resolveStoreSlugFromHostname(hostname?: string | null): string |
     );
   if (!host) return null;
 
-  const rootCandidates = Array.from(new Set([getStorefrontRootHost(), getLikelyRootDomain(host)]));
-  for (const rootHost of rootCandidates) {
-    if (!rootHost || host === rootHost) continue;
-    const suffix = `.${rootHost}`;
-    if (!host.endsWith(suffix)) continue;
+  // Only match seller subdomains against the configured storefront root — not the browser host's
+  // registrable domain (e.g. *.vercel.app would wrongly use the project name as a store slug).
+  const rootHost = getStorefrontRootHost();
+  if (!rootHost || host === rootHost) return null;
+  const suffix = `.${rootHost}`;
+  if (!host.endsWith(suffix)) return null;
 
-    const subdomain = host.slice(0, -suffix.length);
-    if (!subdomain || subdomain.includes('.')) continue;
-    if (!/^[a-z0-9-]+$/.test(subdomain)) continue;
-    if (RESERVED_STORE_SLUGS.includes(subdomain)) continue;
-    return subdomain;
-  }
-
-  return null;
+  const subdomain = host.slice(0, -suffix.length);
+  if (!subdomain || subdomain.includes('.')) return null;
+  if (!/^[a-z0-9-]+$/.test(subdomain)) return null;
+  if (RESERVED_STORE_SLUGS.includes(subdomain)) return null;
+  return subdomain;
 }
