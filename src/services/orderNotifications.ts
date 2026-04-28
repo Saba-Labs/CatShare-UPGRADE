@@ -136,6 +136,17 @@ function shouldSkipLocalNotificationBecauseFcm(): boolean {
   }
 }
 
+/** Latest ISO created_at among orders (lexicographic compare works for ISO-8601 from Postgres). */
+function maxCreatedAtIso(orders: Pick<Order, 'created_at'>[]): string | null {
+  if (!orders.length) return null;
+  let best = orders[0].created_at;
+  for (let i = 1; i < orders.length; i++) {
+    const t = orders[i].created_at;
+    if (t > best) best = t;
+  }
+  return best;
+}
+
 function emitNewOrderIfEligible(
   order: Order,
   _source: 'realtime' | 'poll',
@@ -162,33 +173,45 @@ function emitNewOrderIfEligible(
 
 /**
  * Poll REST for new orders. Reliable when Realtime/RLS/WebSocket does not deliver postgres_changes.
+ * After one full baseline fetch, polls only rows with created_at newer than the last watermark (less disk I/O).
  */
 export function startPollingForNewSellerOrders(
   sellerUserId: string,
   options?: { onNewOrder?: (order: Order) => void; pollIntervalMs?: number }
 ): () => void {
-  const pollMs = options?.pollIntervalMs ?? 12000;
+  const pollMs = options?.pollIntervalMs ?? 20000;
   let baselineReady = false;
   let knownIds = new Set<string>();
+  /** Upper bound on created_at we've processed; incremental polls use .gt(this). */
+  let createdAtWatermark = '';
 
   const tick = async () => {
     try {
-      const { data, error } = await fetchSellerOrders(sellerUserId);
-      if (error || !data) return;
-
       if (!baselineReady) {
+        const { data, error } = await fetchSellerOrders(sellerUserId);
+        if (error || !data) return;
         knownIds = new Set(data.map((o) => o.id));
+        createdAtWatermark = maxCreatedAtIso(data) ?? '1970-01-01T00:00:00.000Z';
         baselineReady = true;
         return;
       }
 
-      const nextKnown = new Set(data.map((o) => o.id));
+      const { data, error } = await fetchSellerOrders(sellerUserId, {
+        createdAfter: createdAtWatermark,
+      });
+      if (error || !data?.length) return;
+
       for (const o of data) {
         if (!knownIds.has(o.id)) {
           emitNewOrderIfEligible(o, 'poll', options);
         }
+        knownIds.add(o.id);
       }
-      knownIds = nextKnown;
+
+      const newest = maxCreatedAtIso(data);
+      if (newest && newest > createdAtWatermark) {
+        createdAtWatermark = newest;
+      }
     } catch (e) {
       console.warn('[CatShare] order poll failed:', e);
     }

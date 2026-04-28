@@ -104,12 +104,22 @@ export async function createOrderDirectly(
   }
 }
 
+export type FetchSellerOrdersOptions = {
+  status?: 'pending' | 'completed' | 'cancelled';
+  /**
+   * Only rows with created_at strictly greater than this ISO timestamp.
+   * Use for polling new orders — avoids re-reading the full orders table every tick.
+   * Pair with DB index on (seller_user_id, created_at) for best performance.
+   */
+  createdAfter?: string;
+};
+
 /**
- * Fetch all orders for a seller
+ * Fetch orders for a seller (full list or incremental when `createdAfter` is set).
  */
 export async function fetchSellerOrders(
   sellerUserId: string,
-  status?: 'pending' | 'completed' | 'cancelled'
+  options?: FetchSellerOrdersOptions
 ): Promise<{ data: Order[] | null; error: any }> {
   try {
     // Validate seller user ID is provided and not empty
@@ -134,15 +144,20 @@ export async function fetchSellerOrders(
     setSupabaseRlsUserId(trimmed);
 
     const client = getSupabaseClient();
+    const incremental = Boolean(options?.createdAfter?.trim());
 
     let query = client
       .from('orders')
       .select('*')
       .eq('seller_user_id', trimmed)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: incremental });
 
-    if (status) {
-      query = query.eq('status', status);
+    if (options?.createdAfter?.trim()) {
+      query = query.gt('created_at', options.createdAfter.trim());
+    }
+
+    if (options?.status) {
+      query = query.eq('status', options.status);
     }
 
     const { data, error } = await query;
