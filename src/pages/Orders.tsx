@@ -677,6 +677,8 @@ export default function Orders() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const swipeBackEligible = useRef(false);
+  const swipeBackActive = useRef(false);
 
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '') return;
@@ -767,35 +769,55 @@ export default function Orders() {
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    swipeBackEligible.current = e.touches[0].clientX <= 28;
+    swipeBackActive.current = false;
     setSwipeProgress(0);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    if (!swipeBackEligible.current) return;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
     const deltaX = currentX - touchStartX.current;
     const deltaY = currentY - touchStartY.current;
+    const absDeltaY = Math.abs(deltaY);
 
-    // Only trigger swipe if:
-    // 1. Started from left edge (within 50px)
-    // 2. More horizontal movement than vertical
-    if (touchStartX.current < 50 && Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 0) {
-      const progress = Math.min(deltaX / 100, 1);
-      setSwipeProgress(progress);
-      e.preventDefault();
+    // Orders is mostly a vertical-scrolling page, so treat the gesture as back
+    // only after a deliberate edge swipe with strong horizontal dominance.
+    if (!swipeBackActive.current) {
+      if (deltaX <= 12) return;
+      if (absDeltaY > 24 || deltaX <= absDeltaY * 1.6) {
+        swipeBackEligible.current = false;
+        setSwipeProgress(0);
+        return;
+      }
+      swipeBackActive.current = true;
     }
+
+    const progress = Math.min(Math.max(deltaX, 0) / 110, 1);
+    setSwipeProgress(progress);
+    e.preventDefault();
   };
 
   const handleTouchEnd = async (e: React.TouchEvent) => {
+    const currentY = e.changedTouches[0].clientY;
     const currentX = e.changedTouches[0].clientX;
     const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+    const shouldNavigateBack =
+      swipeBackActive.current &&
+      swipeBackEligible.current &&
+      deltaX > 90 &&
+      Math.abs(deltaY) <= 36 &&
+      deltaX > Math.abs(deltaY) * 1.8;
 
-    // Navigate back if swiped more than 80px
-    if (deltaX > 80) {
+    if (shouldNavigateBack) {
       await Haptics.impact({ style: ImpactStyle.Light });
       navigate(-1);
     }
 
+    swipeBackEligible.current = false;
+    swipeBackActive.current = false;
     setSwipeProgress(0);
   };
 
