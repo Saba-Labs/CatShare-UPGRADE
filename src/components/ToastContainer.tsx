@@ -9,14 +9,14 @@ export const ToastContainer: React.FC = () => {
   const getIcon = (type: string) => {
     switch (type) {
       case "success":
-        return <FiCheckCircle className="w-5 h-5 text-green-500" />;
+        return <FiCheckCircle className="w-2.5 h-2.5 text-green-500" />;
       case "error":
-        return <FiAlertCircle className="w-5 h-5 text-red-500" />;
+        return <FiAlertCircle className="w-2.5 h-2.5 text-red-500" />;
       case "warning":
-        return <FiAlertCircle className="w-5 h-5 text-yellow-500" />;
+        return <FiAlertCircle className="w-2.5 h-2.5 text-yellow-500" />;
       case "info":
       default:
-        return <FiInfo className="w-5 h-5 text-blue-500" />;
+        return <FiInfo className="w-2.5 h-2.5 text-blue-500" />;
     }
   };
 
@@ -49,7 +49,7 @@ export const ToastContainer: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[200] space-y-2 max-w-sm">
+    <div className="fixed bottom-2 right-2 z-[200] space-y-1 max-w-[12rem]">
       <AnimatePresence initial={false}>
         {toasts.map((toast) => (
           <motion.div
@@ -59,21 +59,21 @@ export const ToastContainer: React.FC = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 36 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getBgColor(
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border ${getBgColor(
               toast.type
             )} shadow-lg`}
           >
             <div>{getIcon(toast.type)}</div>
-            <div className={`flex-1 ${getTextColor(toast.type)} text-sm`}>
+            <div className={`flex-1 ${getTextColor(toast.type)} text-[10px] leading-tight`}>
               {toast.message}
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className={`p-1 hover:bg-black/10 rounded transition ${getTextColor(
+              className={`p-0.5 hover:bg-black/10 rounded transition ${getTextColor(
                 toast.type
               )}`}
             >
-              <FiX className="w-4 h-4" />
+              <FiX className="w-2 h-2" />
             </button>
           </motion.div>
         ))}

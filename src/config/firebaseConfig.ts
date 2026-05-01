@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getMessaging, onMessage, getToken } from "firebase/messaging";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { getAnalytics, logEvent } from "firebase/analytics";
+import { getAnalytics, logEvent, type Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5BOq_3xjUbbnKdF5KFFeOj6FmvV6nWJ8",
@@ -30,15 +30,27 @@ try {
 }
 export const messaging = messagingInstance;
 
-// Analytics — also wrap in try-catch for safety
-let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
-try {
-  analyticsInstance = getAnalytics(app);
-  logEvent(analyticsInstance, "app_open");
-} catch (e) {
-  console.warn("Firebase Analytics not supported in this environment:", e);
-}
-export const analytics = analyticsInstance;
+// Analytics is intentionally lazy-initialized from App.tsx for private seller routes only.
+let analyticsInstance: Analytics | null = null;
+let analyticsAppOpenLogged = false;
+
+export const initWebAnalyticsIfNeeded = (): Analytics | null => {
+  if (analyticsInstance) return analyticsInstance;
+  if (typeof window === "undefined") return null;
+  try {
+    analyticsInstance = getAnalytics(app);
+    if (!analyticsAppOpenLogged) {
+      logEvent(analyticsInstance, "app_open");
+      analyticsAppOpenLogged = true;
+    }
+    return analyticsInstance;
+  } catch (e) {
+    console.warn("Firebase Analytics not supported in this environment:", e);
+    return null;
+  }
+};
+
+export const getAnalyticsInstance = (): Analytics | null => analyticsInstance;
 
 // Register service worker for FCM on web
 export const registerServiceWorker = async () => {

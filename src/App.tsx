@@ -16,6 +16,7 @@ import { initializeFieldSystem } from "./config/initializeFields";
 import { DEFAULT_FIELDS, getFieldsDefinition, setFieldsDefinition } from "./config/fieldConfig";
 import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import { initializeFirebaseMessaging } from "./services/firebaseService";
+import { initWebAnalyticsIfNeeded } from "./config/firebaseConfig";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
@@ -1818,6 +1819,16 @@ if (user?.uid && !authService.isOfflineGuest()) {
       window.removeEventListener("firebaseNotification", handleFirebaseNotification);
     };
   }, [isPublicStoreOrOrderRoute]);
+
+  // Enable web analytics only for signed-in seller usage (exclude public store/order visitors).
+  useEffect(() => {
+    if (isNative) return;
+    if (isPublicStoreOrOrderRoute) return;
+    if (loading) return;
+    if (!user?.uid || user.isAnonymous) return;
+    if (authService.isOfflineGuest()) return;
+    initWebAnalyticsIfNeeded();
+  }, [isNative, isPublicStoreOrOrderRoute, loading, user?.uid, user?.isAnonymous]);
 
   // New orders: Realtime (if enabled) + REST polling (reliable when Realtime/RLS misses events)
   useEffect(() => {

@@ -1,5 +1,5 @@
-import { getAnalytics, logEvent } from "firebase/analytics";
-import { analytics } from "./firebaseConfig";
+import { logEvent } from "firebase/analytics";
+import { getAnalyticsInstance } from "./firebaseConfig";
 
 // Event name constants - prevents typos and centralizes event naming
 export const ANALYTICS_EVENTS = {
@@ -62,6 +62,7 @@ export const logAnalyticsEvent = (
 ) => {
   try {
     // Log to Firebase Analytics (JS SDK for web)
+    const analytics = getAnalyticsInstance();
     if (analytics) {
       logEvent(analytics, eventName, parameters);
     }
