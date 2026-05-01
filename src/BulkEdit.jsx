@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { useToast } from "./context/ToastContext";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue, normalizeOrderQuantityStep } from "./config/catalogueProductUtils";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
@@ -67,6 +68,7 @@ export default function BulkEdit({
   const [hasConfirmedFill, setHasConfirmedFill] = useState(false); // Track if user confirmed fill dialog once
   const [dataLoaded, setDataLoaded] = useState(false); // Track if data has been loaded
   const { showToast } = useToast();
+  const { guardCloudWrite } = useCloudWriteGate();
 
   // Use initial values or selected values
   const catalogueId = selectedCatalogueId || initialCatalogueId;
@@ -374,6 +376,7 @@ useEffect(() => {
 
    const handleSave = () => {
   try {
+    if (!guardCloudWrite()) return;
     const cleanData = editedData.map((p) => {
   let copy = { ...p };
   // Preserve image field to maintain product-to-image associations

@@ -28,6 +28,7 @@ import { logProductAdded, logBulkImportImages } from "../config/analyticsEvents"
 import { buildBulkImportedProduct, type BulkRenderingType } from "../bulkImport/bulkProductFactory";
 import { dedupeDisplayNamesFromFilenames } from "../bulkImport/fileNameUtils";
 import type { ProductWithCatalogueData } from "../config/catalogueProductUtils";
+import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 
 const MAX_IMAGES_PER_BATCH = 100;
 const UPLOAD_CONCURRENCY = 2;
@@ -122,6 +123,7 @@ export default function CreateBulk() {
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
   const { isPro } = useSubscription();
+  const { guardCloudWrite } = useCloudWriteGate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const authUserId = getPersistedAuthUserId();
@@ -479,6 +481,8 @@ export default function CreateBulk() {
         return;
       }
     }
+
+    if (authUserId && !guardCloudWrite()) return;
 
     setIsImporting(true);
     setStatusLine("Preparing…");

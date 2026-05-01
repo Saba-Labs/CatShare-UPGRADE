@@ -42,6 +42,8 @@ export const ANALYTICS_EVENTS = {
   LOGOUT: "logout",
   SIGN_UP_FAILED: "sign_up_failed",
   LOGIN_FAILED: "login_failed",
+  SIGN_UP_CANCELLED: "sign_up_cancelled",
+  LOGIN_CANCELLED: "login_cancelled",
   PASSWORD_RESET_REQUESTED: "password_reset_requested",
   PASSWORD_RESET_COMPLETED: "password_reset_completed",
   WEBSITE_VISITED: "website_visited",
@@ -292,6 +294,13 @@ export const logSignUpFailed = (
   });
 };
 
+export const logSignUpCancelled = (method: "email" | "google") => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.SIGN_UP_CANCELLED, {
+    timestamp: Date.now(),
+    method,
+  });
+};
+
 export const logLoginFailed = (
   method: "email" | "google",
   reason: string
@@ -300,6 +309,13 @@ export const logLoginFailed = (
     timestamp: Date.now(),
     method,
     reason,
+  });
+};
+
+export const logLoginCancelled = (method: "email" | "google") => {
+  logAnalyticsEvent(ANALYTICS_EVENTS.LOGIN_CANCELLED, {
+    timestamp: Date.now(),
+    method,
   });
 };
 

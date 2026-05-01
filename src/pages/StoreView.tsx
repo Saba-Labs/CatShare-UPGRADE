@@ -16,6 +16,8 @@ import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import './OrderForm.css';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    INLINE STYLES — clean, professional light storefront
@@ -109,18 +111,17 @@ const CSS = `
 
 /* ── 2-col grid ── */
 .sv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 12px 140px; }
+.sv-list { display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 140px; }
 
 /* ── Product card ── */
 .sv-pcard { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column; transition: border-color var(--trans), box-shadow var(--trans); position: relative; box-shadow: var(--shadow-sm); }
 .sv-pcard:hover { border-color: var(--c-border2); box-shadow: var(--shadow-md); }
 .sv-pcard.selected { border-color: var(--c-accent); box-shadow: 0 0 0 1.5px var(--c-accent), var(--shadow-md); }
-
 .sv-pcard-img-wrap { width: 100%; aspect-ratio: 1/1; background: var(--c-surface2); position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
 .sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; transition: transform 0.35s ease; display: block; }
 .sv-pcard-img-wrap:hover img { transform: scale(1.05); }
 .sv-pcard-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .sv-pcard-sel { position: absolute; top: 8px; left: 8px; width: 22px; height: 22px; border-radius: 50%; background: var(--c-accent); display: flex; align-items: center; justify-content: center; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
-
 .sv-pcard-body { padding: 10px 10px 5px; display: flex; flex-direction: column; gap: 2px; }
 .sv-pcard-name { font-family: var(--f-body); font-size: 13px; font-weight: 600; color: var(--c-text); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; }
@@ -135,6 +136,10 @@ const CSS = `
 .sv-pcard-subtotal { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--c-accent-light); border-radius: var(--r-sm); border: 1px solid rgba(26,107,74,0.15); margin: 0 10px 10px; }
 .sv-pcard-subtotal-calc { font-size: 10.5px; color: var(--c-text3); }
 .sv-pcard-subtotal-val { font-size: 13px; font-weight: 700; color: var(--c-accent); font-family: var(--f-body); }
+
+/* List mode uses OrderForm.css (of-item-card). Preserve storefront page background if shared with OrderForm styles. */
+body { background: var(--c-bg); }
+.sv-of-items--store.of-items { padding: 12px 12px 140px; }
 
 /* ── Qty ── */
 .sv-qty { display: inline-flex; align-items: center; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-full); overflow: hidden; }
@@ -327,6 +332,10 @@ const CSS = `
     padding: 8px 0 160px;
   }
 
+  .sv-of-items--store.of-items {
+    padding: 8px 12px 160px;
+  }
+
   .sv-footer {
     margin: 18px 0 10px;
     padding: 16px 18px;
@@ -371,6 +380,34 @@ function fmt(n: number, sym: string) { return `${sym}${n.toLocaleString('en-IN',
 function fmtCalc(qty: number, price: number, u: string | undefined, sym: string, qstep: number = 1): string | null {
   if (qty <= 0 || !Number.isFinite(price)) return null;
   return `${qty} ${unitLabel(u)} × ${fmt(price, sym)}`;
+}
+
+/** Same logic as OrderForm `getOrderUnitLabel` for list-row parity */
+function getOrderFormUnitLabel(priceUnit: string | undefined): string {
+  if (!priceUnit || String(priceUnit).trim() === '' || priceUnit === 'None') {
+    return 'units';
+  }
+  const cleaned = String(priceUnit)
+    .replace(/^\s*\/\s*/i, '')
+    .trim()
+    .toLowerCase();
+  if (!cleaned) return 'units';
+  if (cleaned === 'piece' || cleaned === 'pieces' || cleaned === 'pc') return 'pieces';
+  return cleaned;
+}
+
+/** Same shape as OrderForm `formatLineCalculationDetail` (storefront uses numeric unit price). */
+function formatStorefrontLineCalculationDetail(
+  q: number,
+  unitPrice: number,
+  priceUnit: string | undefined,
+  currencySymbol: string
+): string | null {
+  if (q <= 0) return null;
+  if (!Number.isFinite(unitPrice)) return null;
+  const label = getOrderFormUnitLabel(priceUnit);
+  const priceStr = fmt(unitPrice, currencySymbol);
+  return `${q} ${label} × ${priceStr}`;
 }
 function isPublicUrl(url?: string): boolean {
   if (!url) return false;
@@ -497,6 +534,25 @@ function fieldLU(p: ProductWithCatalogueData, n: number): { label: string; unitS
 const IconBack = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>;
 const IconStore = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ color: '#aaa' }}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" /></svg>;
 const IconImg = ({ size = 28 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>;
+/** OrderForm list placeholder icon */
+function ImgIcon({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+function AlertIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
 const IconCheck = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>;
 const IconLoc = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>;
 const IconPhone = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 010 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92v2z" /></svg>;
@@ -518,6 +574,27 @@ function QtyControl({ value, step, onChange, accent = false }: { value: number; 
       <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>−</button>
       <span className="sv-qty-val">{value}</span>
       <button type="button" className="sv-qty-btn" onClick={() => onChange(s)}>+</button>
+    </div>
+  );
+}
+
+/** Same markup/classes as OrderForm `QtyControl` (list storefront rows). */
+function OrderFormQtyControl({
+  value,
+  step,
+  onChange,
+}: {
+  value: number;
+  step: number;
+  onChange: (delta: number) => void;
+}) {
+  const s = Math.max(1, Math.floor(normalizeOrderQuantityStep(step)) || 1);
+  const inc = s > 1 ? s : 1;
+  return (
+    <div className="of-qty">
+      <button type="button" className="of-qty-btn" onClick={() => onChange(-inc)}>−</button>
+      <span className="of-qty-val">{value}</span>
+      <button type="button" className="of-qty-btn" onClick={() => onChange(inc)}>+</button>
     </div>
   );
 }
@@ -564,6 +641,7 @@ function SkeletonCard() {
 export default function StoreView() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { guardOnline } = useCloudWriteGate();
   const { slug } = useParams<{ slug: string }>();
   const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
   const effectiveSlug = slug || hostSlug || null;
@@ -744,6 +822,7 @@ export default function StoreView() {
       );
       return;
     }
+    if (!guardOnline()) return;
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
@@ -920,6 +999,7 @@ export default function StoreView() {
     store?.whatsapp ||
     socialLinks.length > 0
   );
+  const storefrontViewMode: 'grid' | 'list' = store.viewMode === 'list' ? 'list' : 'grid';
 
   const renderStoreFooter = () => (
     <footer className="sv-footer">
@@ -1071,8 +1151,8 @@ export default function StoreView() {
             )}
           </div>
 
-          {/* ══ 2-COL PRODUCT GRID ══ */}
-          <div className="sv-grid">
+          {/* ══ PRODUCT LISTING (grid / OrderForm-style list) ══ */}
+          <div className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}>
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (
               <div className="sv-empty"><div className="sv-empty-icon">🛍️</div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
@@ -1087,9 +1167,114 @@ export default function StoreView() {
               const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
               const imgUrl = displayStoreProductImage(product);
+              const hasParsedPrice = Number.isFinite(price);
+              const lineAmt = quantity > 0 && hasParsedPrice ? quantity * price : 0;
+              const lineCalcDetail =
+                hasParsedPrice && quantity > 0
+                  ? formatStorefrontLineCalculationDetail(quantity, price, priceUnit, currencySymbol)
+                  : null;
+
+              if (storefrontViewMode === 'list') {
+                return (
+                  <div
+                    key={product.id}
+                    className={`of-item-card${isSelected ? ' is-selected' : ''}`}
+                  >
+                    <div className="of-img-wrap" onClick={() => setDrawerProduct(product)}>
+                      {isDisplayableImageUrl(imgUrl) ? (
+                        <img
+                          key={String(imgUrl)}
+                          src={String(imgUrl)}
+                          alt={product.name}
+                          className="of-img"
+                        />
+                      ) : (
+                        <div className="of-img-ph">
+                          <ImgIcon />
+                        </div>
+                      )}
+                      {isSelected ? <div className="of-selected-badge">✓ Added</div> : null}
+                    </div>
+
+                    <div className="of-item-body">
+                      <div className="of-item-top">
+                        <div className="of-item-text">
+                          <div className="of-item-title-line">
+                            <span className="of-item-name">{product.name}</span>
+                            {product.subtitle ? (
+                              <span className="of-item-subtitle-inline">({product.subtitle})</span>
+                            ) : null}
+                          </div>
+                          <div className="of-item-price-row">
+                            {price > 0 ? (
+                              <div className="of-price-tag">
+                                {fmt(price, currencySymbol)}
+                                {priceUnit ? ` ${priceUnit}` : ''}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="of-item-bottom">
+                        <div className="of-item-qty-cluster">
+                          <div className="of-qty-inline-row">
+                            <OrderFormQtyControl
+                              value={quantity}
+                              step={qstep}
+                              onChange={(d) => changeQty(product.id, d, qstep)}
+                            />
+                            {qstep > 1 ? (
+                              <div className="of-step-hint of-step-hint--next-to-qty">
+                                <AlertIcon />
+                                Pack of {qstep}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="of-view-btn"
+                          onClick={() => setDrawerProduct(product)}
+                        >
+                          Details ›
+                        </button>
+                      </div>
+
+                      {isSelected ? (
+                        <div className="of-line-total-below" aria-live="polite">
+                          <span className="of-subtotal-label">subtotal</span>
+                          <span className="of-line-sep" aria-hidden>
+                            ·
+                          </span>
+                          {lineCalcDetail ? (
+                            <>
+                              <span className="of-line-calc" title={lineCalcDetail}>
+                                {lineCalcDetail}
+                              </span>
+                              <span className="of-line-sep" aria-hidden>
+                                ·
+                              </span>
+                            </>
+                          ) : null}
+                          {hasParsedPrice ? (
+                            <span className="of-line-total-val">{fmt(lineAmt, currencySymbol)}</span>
+                          ) : (
+                            <span className="of-line-total-na">—</span>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              }
+
               const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
               return (
-                <div key={product.id} className={`sv-pcard${isSelected ? ' selected' : ''}`}>
+                <div
+                  key={product.id}
+                  className={`sv-pcard${isSelected ? ' selected' : ''}`}
+                >
                   <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
                     {isDisplayableImageUrl(imgUrl)
                       ? <img key={imgUrl} src={String(imgUrl)} alt={product.name} />
@@ -1109,7 +1294,7 @@ export default function StoreView() {
                   <div className="sv-pcard-footer">
                     <div className="sv-pcard-actions">
                       <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(product.id, d, qstep)} accent={isSelected} />
-                      <button className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
+                      <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
                     {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
                   </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
@@ -23,17 +23,39 @@ import MainAppBottomNav from "./components/MainAppBottomNav";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
 import { useSync } from "./context/SyncContext";
-import { safeGetFromStorage, getStorageKey } from "./utils/safeStorage";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
+import {
+  safeGetFromStorage,
+  getStorageKey,
+  readProductsWithLegacyFallback,
+  readDeletedProductsWithLegacyFallback,
+} from "./utils/safeStorage";
+import { isBrowserOnline } from "./utils/cloudWritePolicy";
+import { fetchSellerCatalogue } from "./services/sellerCatalogueService";
+import { getCatalogueRowsFromDeviceStorage } from "./utils/catalogueCachePersist";
 import {
   tryReadProductSourceAsDataUrl,
   deleteProductSourceImagesBestEffort,
 } from "./utils/productSourceImage";
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
+import { migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import Lottie from "lottie-react";
 import syncAnimationData from "./loading.json";
 
 const PRODUCT_SCROLL_KEY = "productScroll";
+/** Lie-fi / hung Supabase: never block Products tab longer than this (Orders-style UX). */
+const CATALOGUE_FETCH_TIMEOUT_MS = 14_000;
+const SELLER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** List ↔ shelf: cap sync overlay at 1s and skip full cloud refresh; upload continues in background. */
+function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
+  return {
+    skipFullCloudRefresh: true,
+    maxSyncUiMs: 1000,
+    fullListForPosition,
+  };
+}
 
 const fabDialSpring = { type: "spring" as const, stiffness: 460, damping: 26, mass: 0.85 };
 
@@ -113,7 +135,128 @@ function applyVisibleOrderToProducts(products: any[], visibleBefore: any[], visi
 export default function CatalogueApp({ products, setProducts, deletedProducts, setDeletedProducts, darkMode, setDarkMode, isRendering: propIsRendering, setIsRendering: propSetIsRendering, renderProgress: propRenderProgress, setRenderProgress: propSetRenderProgress, renderingTotal: propRenderingTotal, setRenderingTotal: propSetRenderingTotal, renderResult: propRenderResult, setRenderResult: propSetRenderResult, showTutorial, setShowTutorial, startupPhase = 'done', catalogueFirstLoadSettled = true, startupStatusText = 'Fetching your catalogue' }: { products: any[]; setProducts: React.Dispatch<React.SetStateAction<any[]>>; deletedProducts: any[]; setDeletedProducts: React.Dispatch<React.SetStateAction<any[]>>; darkMode: boolean; setDarkMode: React.Dispatch<React.SetStateAction<boolean>>; isRendering?: boolean; setIsRendering?: React.Dispatch<React.SetStateAction<boolean>>; renderProgress?: number; setRenderProgress?: React.Dispatch<React.SetStateAction<number>>; renderingTotal?: number; setRenderingTotal?: React.Dispatch<React.SetStateAction<number>>; renderResult?: any; setRenderResult?: React.Dispatch<React.SetStateAction<any>>; showTutorial?: boolean; setShowTutorial?: React.Dispatch<React.SetStateAction<boolean>>; startupPhase?: 'pending' | 'resolving' | 'done'; /** After first load path finished (incl. strict cloud refresh); empty list may show intro */ catalogueFirstLoadSettled?: boolean; startupStatusText?: string }) {
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  /** Mirrors Orders.tsx `loading`: false as soon as device cache has rows; fetch runs without forcing a spinner. */
+  const [catalogueLoading, setCatalogueLoading] = useState(true);
+
+  // Match Orders.tsx: always hydrate lists from device cache on uid change before paint (no "keep prev" guard).
+  useLayoutEffect(() => {
+    if (!user?.uid || user.uid.trim() === '') {
+      setCatalogueLoading(true);
+      return;
+    }
+    if (user.isAnonymous && localStorage.getItem('isOfflineGuest') !== 'true') {
+      setCatalogueLoading(false);
+      return;
+    }
+
+    migrateUnkeyedDataToUserKeyed(user.uid);
+    const p = readProductsWithLegacyFallback(user.uid);
+    const d = readDeletedProductsWithLegacyFallback(user.uid);
+    setProducts(p);
+    setDeletedProducts(d);
+    setCatalogueLoading(p.length === 0 && d.length === 0);
+  }, [user?.uid, user?.isAnonymous, setProducts, setDeletedProducts]);
+
+  // Match Orders.tsx: after paint, fetch from network (or offline short-circuit in fetchSellerCatalogue).
+  useEffect(() => {
+    if (!user?.uid || user.uid.trim() === '') return;
+    if (user.isAnonymous && localStorage.getItem('isOfflineGuest') !== 'true') return;
+
+    const isGuest = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuest) {
+      const p = readProductsWithLegacyFallback(user.uid);
+      const d = readDeletedProductsWithLegacyFallback(user.uid);
+      setProducts(p);
+      setDeletedProducts(d);
+      setCatalogueLoading(false);
+      return;
+    }
+
+    if (!SELLER_UUID_RE.test(user.uid)) {
+      setCatalogueLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const uid = user.uid;
+    const pCached = readProductsWithLegacyFallback(uid);
+    const dCached = readDeletedProductsWithLegacyFallback(uid);
+
+    void (async () => {
+      if (pCached.length === 0 && dCached.length === 0) {
+        setCatalogueLoading(true);
+      }
+      try {
+        type FetchResult = Awaited<ReturnType<typeof fetchSellerCatalogue>>;
+        const raced = await Promise.race<FetchResult>([
+          fetchSellerCatalogue(uid),
+          new Promise<FetchResult>((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  data: null,
+                  error: new Error('Catalogue fetch timed out'),
+                }),
+              CATALOGUE_FETCH_TIMEOUT_MS
+            )
+          ),
+        ]);
+        if (cancelled) return;
+
+        let { data, error } = raced;
+
+        if (error) {
+          console.warn('Catalogue fetch failed or timed out:', error);
+          const fallback = getCatalogueRowsFromDeviceStorage(uid);
+          if (fallback.products.length > 0 || fallback.deletedProducts.length > 0) {
+            setProducts(fallback.products);
+            setDeletedProducts(fallback.deletedProducts);
+            showToast(
+              isBrowserOnline()
+                ? 'Could not refresh catalogue. Showing saved list.'
+                : 'Showing saved catalogue',
+              'info'
+            );
+          } else if (pCached.length > 0 || dCached.length > 0) {
+            setProducts(pCached);
+            setDeletedProducts(dCached);
+            showToast(
+              isBrowserOnline()
+                ? 'Could not refresh catalogue. Showing saved list.'
+                : 'Showing saved catalogue',
+              'info'
+            );
+          }
+          return;
+        }
+
+        if (data) {
+          let nextP = Array.isArray(data.products) ? data.products : [];
+          let nextD = Array.isArray(data.deletedProducts) ? data.deletedProducts : [];
+          if (
+            nextP.length === 0 &&
+            nextD.length === 0 &&
+            (pCached.length > 0 || dCached.length > 0)
+          ) {
+            nextP = pCached;
+            nextD = dCached;
+          }
+          setProducts(nextP);
+          setDeletedProducts(nextD);
+        }
+      } finally {
+        if (!cancelled) setCatalogueLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, user?.isAnonymous, setProducts, setDeletedProducts, showToast]);
+
   const { syncProductsToCloud, isStrictMode } = useSync();
+  const { guardCloudWrite, blocked: cloudWriteBlockedOffline } = useCloudWriteGate();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -585,6 +728,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     const label = field === "wholesaleStock" ? "Catalogue 1 Stock" : "Catalogue 2 Stock";
     const confirm = window.confirm(`Do you want to update ${label} for this item?`);
     if (!confirm) return;
+    if (!guardCloudWrite()) return;
 
     await Haptics.impact({ style: ImpactStyle.Medium });
 
@@ -604,6 +748,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     const now = Date.now();
 
     if (now < bypassUntil) {
+      if (!guardCloudWrite()) return;
       // Bypassed within 5 minutes
       Haptics.impact({ style: ImpactStyle.Medium });
       const freshProducts = products.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p));
@@ -626,6 +771,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     const now = Date.now();
 
     if (now < bypassUntil) {
+      if (!guardCloudWrite()) return;
       // Bypassed within 5 minutes
       Haptics.impact({ style: ImpactStyle.Medium });
       const freshProducts = products.map((p) => {
@@ -654,6 +800,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const updateProduct = (item) => {
+    if (!guardCloudWrite()) return;
     const freshProducts = products.map((p) => (p.id === item.id ? item : p));
     setProducts(freshProducts);
 
@@ -675,6 +822,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleRenderAllImages = async (forceRerender: boolean = true) => {
     const all = products;
     if (all.length === 0) return;
+    if (!guardCloudWrite()) return;
 
     const cats = getAllCatalogues();
 
@@ -809,6 +957,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleDelete = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
     if (!confirmDelete) return;
+    if (!guardCloudWrite()) return;
     const toDelete = products.find((p) => p.id === id);
     if (toDelete) {
       await Haptics.impact({ style: ImpactStyle.Heavy });
@@ -818,7 +967,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setDeletedProducts(freshDeleted);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+        syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -836,6 +985,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const handlePermanentDelete = async (id) => {
     if (window.confirm("Permanently delete this item?")) {
+      if (!guardCloudWrite()) return;
       const product = deletedProducts.find(p => p.id === id);
   
       await deleteProductSourceImagesBestEffort(product || { id });
@@ -1173,7 +1323,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       <main ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}>
         {tab === "products" &&
           visible.length === 0 &&
-          (startupPhase !== "done" || !catalogueFirstLoadSettled) && (
+          products.length === 0 &&
+          catalogueLoading && (
           <div
             className="flex flex-col items-center justify-center py-16 px-6 text-center"
             role="status"
@@ -1201,11 +1352,20 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         {tab === "products" &&
           visible.length === 0 &&
+          products.length === 0 &&
           startupPhase === "done" &&
-          catalogueFirstLoadSettled && (
+          catalogueFirstLoadSettled &&
+          readProductsWithLegacyFallback(user?.uid || "").length === 0 &&
+          readDeletedProductsWithLegacyFallback(user?.uid || "").length === 0 && (
           <EmptyStateIntro
-            onCreateProduct={() => navigate("/create")}
-            onBulkAddFromGallery={() => navigate("/create-bulk")}
+            onCreateProduct={() => {
+              if (!guardCloudWrite()) return;
+              navigate("/create");
+            }}
+            onBulkAddFromGallery={() => {
+              if (!guardCloudWrite()) return;
+              navigate("/create-bulk");
+            }}
           />
         )}
 
@@ -1214,6 +1374,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             if (!destination) return;
             if (source.droppableId !== destination.droppableId) return;
             if (source.index === destination.index) return;
+            if (!guardCloudWrite()) return;
 
             const newVisible = reorderList(visible, source.index, destination.index);
             const copy = applyVisibleOrderToProducts(products, visible, newVisible);
@@ -1226,7 +1387,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               {(provided) => (
                 <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3 mt-4">
                   {visible.map((p, index) => (
-                    <Draggable key={p.id} draggableId={p.id} index={index}>
+                    <Draggable key={p.id} draggableId={p.id} index={index} isDragDisabled={cloudWriteBlockedOffline}>
                       {(provided) => (
                         <div
                           ref={provided.innerRef}
@@ -1274,6 +1435,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                             <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 onClick={() => {
+                                  if (!guardCloudWrite()) return;
                                   persistProductsListScrollForEdit(scrollRef.current);
                                   navigate(`/create?id=${p.id}`);
                                 }}
@@ -1283,6 +1445,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                               </button>
                               <button
                                 onClick={() => {
+                                  if (!guardCloudWrite()) return;
                                   setShelfTarget(p);
                                   setShowShelfConfirm(true);
                                 }}
@@ -1340,6 +1503,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-800 transition"
                   onClick={async () => {
                     if (shelfTarget) {
+                      if (!guardCloudWrite()) return;
                       console.log('🗑️ Shelf button clicked for product:', shelfTarget.id);
                       await Haptics.impact({ style: ImpactStyle.Heavy });
                       // ✅ CRITICAL: Get the complete product object from the products array, not from stale shelfTarget
@@ -1363,7 +1527,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       // Direct sync like updateProduct for faster response
                       if (isStrictMode() && user?.uid) {
                         console.log('📤 Direct sync for shelved product');
-                        syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                        syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
                           setProducts(cloudData.products);
                           setDeletedProducts(cloudData.deletedProducts);
                         }).catch(err => console.error('Shelf sync failed:', err));
@@ -1399,6 +1563,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                 <button
                   className="px-4 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-800 transition"
                   onClick={async () => {
+                    if (!guardCloudWrite()) return;
                     await Haptics.impact({ style: ImpactStyle.Heavy });
                     // Move all products to shelf
                     const freshDeleted = [...deletedProducts, ...products];
@@ -1410,7 +1575,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     // Direct sync like updateProduct for faster response
                     if (isStrictMode() && user?.uid) {
                       console.log('📤 Direct sync for shelf all');
-                      syncProductsToCloud([], freshDeleted).then(cloudData => {
+                      syncProductsToCloud([], freshDeleted, shelfMoveCloudSyncOptions([])).then(cloudData => {
                         setProducts(cloudData.products);
                         setDeletedProducts(cloudData.deletedProducts);
                       }).catch(err => console.error('Shelf all sync failed:', err));
@@ -1468,6 +1633,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
                   onClick={() => {
                     const { id, field } = confirmToggleStock;
+                    if (!guardCloudWrite()) return;
 
                     if (bypassChecked) {
                       sessionStorage.setItem("bypassStockWarningUntil", (Date.now() + 5 * 60 * 1000).toString());
@@ -1571,6 +1737,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             filteredProducts={previewList}
             onClose={() => setPreviewProduct(null)}
             onEdit={() => {
+              if (!guardCloudWrite()) return;
               persistProductsListScrollForEdit(scrollRef.current);
               navigate(`/create?id=${previewProduct.id}`);
             }}
@@ -1595,6 +1762,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               // Perform shelf action directly since ProductPreviewModal already showed confirmation
               const toShelf = product || previewProduct;
               if (!toShelf) return;
+              if (!guardCloudWrite()) return;
 
               Haptics.impact({ style: ImpactStyle.Heavy });
 
@@ -1614,7 +1782,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               // Direct sync like updateProduct for faster response
               if (isStrictMode() && user?.uid) {
                 console.log('📤 Direct sync for shelved product from preview');
-                syncProductsToCloud(freshProducts, freshDeleted).then(cloudData => {
+                syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
                   setProducts(cloudData.products);
                   setDeletedProducts(cloudData.deletedProducts);
                 }).catch(err => console.error('Preview shelf sync failed:', err));
@@ -1680,6 +1848,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   animate="visible"
                   exit="leave"
                   onClick={async () => {
+                    if (!guardCloudWrite()) return;
                     await Haptics.impact({ style: ImpactStyle.Medium });
                     setProductFabExpanded(false);
                     navigate("/create-bulk");
@@ -1711,6 +1880,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   animate="visible"
                   exit="leave"
                   onClick={async () => {
+                    if (!guardCloudWrite()) return;
                     await Haptics.impact({ style: ImpactStyle.Medium });
                     setProductFabExpanded(false);
                     navigate("/create");

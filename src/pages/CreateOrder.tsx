@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
+import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,6 +11,7 @@ import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityS
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './CreateOrder.css';
 
@@ -184,6 +186,7 @@ export default function CreateOrder() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { guardOnline } = useCloudWriteGate();
 
   const [step, setStep] = useState<Step>('catalogue');
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
@@ -411,6 +414,7 @@ export default function CreateOrder() {
 
   const handleCreateOrder = async () => {
     if (!user?.uid || !selectedCatalogueId) return;
+    if (!guardOnline()) return;
 
     setIsSubmitting(true);
     try {
@@ -462,8 +466,9 @@ export default function CreateOrder() {
   };
 
   const swipeHandlers = useSwipeable({
-    onSwipedRight: async () => {
+    onSwipedRight: async (e) => {
       if (isSwipeProcessingRef.current) return;
+      if (!isDeliberateEdgeSwipeBack(e)) return;
       isSwipeProcessingRef.current = true;
       await Haptics.impact({ style: ImpactStyle.Light });
       window.history.back();

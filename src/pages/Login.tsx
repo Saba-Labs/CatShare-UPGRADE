@@ -15,7 +15,7 @@ import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { safeGetFromStorage } from '../utils/safeStorage';
 import { supabase } from '../supabaseClient';
-import { logLogin, logLoginFailed } from '../config/analyticsEvents';
+import { logLogin, logLoginFailed, logLoginCancelled } from '../config/analyticsEvents';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 export default function Login() {
@@ -36,6 +36,20 @@ export default function Login() {
   const subdomainStoreSlug = resolveStoreSlugFromHostname();
   /** Mobile-only: full-screen landing → tap Log in to show the form (desktop unchanged). */
   const [mobileShowLoginForm, setMobileShowLoginForm] = useState(false);
+
+  const isAuthCancelError = (msg: string): boolean => {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('cancel') ||
+      m.includes('cancelled') ||
+      m.includes('canceled') ||
+      m.includes('popup closed') ||
+      m.includes('popup_closed_by_user') ||
+      m.includes('sign in cancelled') ||
+      m.includes('sign-in cancelled') ||
+      m.includes('sign_in_cancelled')
+    );
+  };
 
   /** Avoid double redirect / double toast (e.g. React Strict Mode, re-renders). */
   const postAuthRedirectDoneRef = useRef(false);
@@ -178,9 +192,14 @@ export default function Login() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google login failed';
-      setError(errorMessage);
-      logLoginFailed('google', errorMessage);
-      showToast(errorMessage, 'error');
+      if (isAuthCancelError(errorMessage)) {
+        logLoginCancelled('google');
+        showToast('Login cancelled', 'info');
+      } else {
+        setError(errorMessage);
+        logLoginFailed('google', errorMessage);
+        showToast(errorMessage, 'error');
+      }
       setAuthLoading(null);
     }
   };

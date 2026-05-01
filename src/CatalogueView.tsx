@@ -20,6 +20,7 @@ import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, getSellerCurrencyForShareLink, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF, pdfFilenamePrefix } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import {
   createShareLink,
   productToShareLinkItem,
@@ -322,6 +323,7 @@ export default React.memo(function CatalogueView({
   onBack,
 }: CatalogueViewProps) {
   const { user, supabaseData } = useAuth();
+  const { guardCloudWrite } = useCloudWriteGate();
   const { isPro } = useSubscription();
   const navigate = useNavigate();
   // Helper function to get catalogue-specific data for a product
@@ -1478,6 +1480,7 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!guardCloudWrite()) return;
                   console.log('🟢 Mark as In Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
@@ -1507,6 +1510,7 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!guardCloudWrite()) return;
                   console.log('🔴 Mark as Out of Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>

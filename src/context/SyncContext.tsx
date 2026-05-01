@@ -1,13 +1,23 @@
 import React, { createContext, useContext, useCallback, useState, useRef, ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from './AuthContext';
-import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import {
+  safeGetFromStorage,
+  safeSetInStorage,
+  getStorageKey,
+  readProductsWithLegacyFallback,
+  readDeletedProductsWithLegacyFallback,
+  safeSetProductsCache,
+  safeSetDeletedProductsCache,
+} from '../utils/safeStorage';
 import { cacheCloudProductImages } from '../utils/productImageLocalCache';
 import { readProductSourceBase64ForCloudUpload } from '../utils/productSourceImage';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { getFieldsDefinition, setFieldsDefinition } from '../config/fieldConfig';
 import { getCataloguesDefinition, setCataloguesDefinition } from '../config/catalogueConfig';
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
+import { cloudWriteWouldBeBlocked, isBrowserOnline } from '../utils/cloudWritePolicy';
+import { getCatalogueRowsFromDeviceStorage } from '../utils/catalogueCachePersist';
 
 /** Max parallel image reads + R2 uploads (avoids OOM from huge Promise.all). */
 const SYNC_UPLOAD_CONCURRENCY = 6;
@@ -30,7 +40,12 @@ export type SyncProductsToCloudOptions = {
   onlyProductIds?: string[];
   background?: boolean;
   skipFullCloudRefresh?: boolean;
-  fullListForPosition?: any[];   // ← add this line
+  fullListForPosition?: any[];
+  /**
+   * Hide the global sync overlay after this many ms while work continues (non-detailed sync only).
+   * Use with shelf / restore so users are not blocked by a long spinner.
+   */
+  maxSyncUiMs?: number;
 };
 
 interface SyncContextType {
@@ -49,9 +64,6 @@ interface SyncContextType {
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
-
-const getProductsKey = (uid: string) => getStorageKey('products', uid);
-const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
 
 /** Map status lines from detailed cloud sync to 0–100 for SyncProgressModal (restore, etc.). */
 export function computeSyncPercentFromDetail(message: string): number {
@@ -177,18 +189,46 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user?.uid) return null;
     const userId = user.uid;
 
+    const fromDevice = () => {
+      opts?.onStatus?.('Loading saved catalogue…');
+      return getCatalogueRowsFromDeviceStorage(userId);
+    };
+
+    if (!isBrowserOnline()) {
+      return fromDevice();
+    }
+
     opts?.onStatus?.('Loading data from cloud…');
 
-    const { fetchAllUserData } = await import('../services/supabaseSync');
-    const result = await fetchAllUserData(userId);
+    let result: { success: boolean; data?: any; error?: string };
+    try {
+      const { fetchAllUserData } = await import('../services/supabaseSync');
+      result = await fetchAllUserData(userId);
+    } catch (e) {
+      console.warn('⚠️ refreshFromCloud: network error, using device cache:', e);
+      return fromDevice();
+    }
+
     if (!result.success || !result.data) {
-      throw new Error(result.error || 'Failed to fetch cloud data');
+      console.warn('⚠️ refreshFromCloud: cloud fetch failed, using device cache:', result.error);
+      return fromDevice();
     }
 
     const snapshot = result.data;
 
-    const nextProducts = Array.isArray(snapshot.products) ? snapshot.products : [];
-    const nextDeleted = Array.isArray(snapshot.deletedProducts) ? snapshot.deletedProducts : [];
+    let nextProducts = Array.isArray(snapshot.products) ? snapshot.products : [];
+    let nextDeleted = Array.isArray(snapshot.deletedProducts) ? snapshot.deletedProducts : [];
+
+    const localP = readProductsWithLegacyFallback(userId);
+    const localD = readDeletedProductsWithLegacyFallback(userId);
+    if (
+      nextProducts.length === 0 &&
+      nextDeleted.length === 0 &&
+      (localP.length > 0 || localD.length > 0)
+    ) {
+      nextProducts = localP;
+      nextDeleted = localD;
+    }
 
     const deletedIds = new Set<string>(
       nextDeleted.map((p: any) => p?.id).filter((id: any) => id != null).map((id: any) => String(id))
@@ -221,8 +261,8 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const persistProducts = (prods: any[], del: any[]) => {
-      safeSetInStorage(getProductsKey(userId), prods);
-      safeSetInStorage(getDeletedProductsKey(userId), del);
+      safeSetProductsCache(userId, prods);
+      safeSetDeletedProductsCache(userId, del);
     };
 
     /**
@@ -311,12 +351,18 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { products, deletedProducts };
     }
 
+    if (cloudWriteWouldBeBlocked(user, isBrowserOnline())) {
+      return { products, deletedProducts };
+    }
+
     if (syncLockRef.current) {
       return { products, deletedProducts };
     }
 
     const detailedStatus = options?.detailedStatus === true;
     const showSyncUi = options?.background !== true;
+
+    let syncUiCapTimer: ReturnType<typeof setTimeout> | null = null;
 
     syncLockRef.current = true;
     if (showSyncUi) {
@@ -328,6 +374,15 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setSyncProgressPercent(computeSyncPercentFromDetail('Preparing sync…'));
       } else {
         setSyncStatusDetail(null);
+      }
+
+      const capMs = options?.maxSyncUiMs;
+      if (typeof capMs === 'number' && capMs > 0 && !detailedStatus) {
+        syncUiCapTimer = setTimeout(() => {
+          setIsSyncing(false);
+          setSyncStatusDetail(null);
+          setSyncProgressPercent(0);
+        }, capMs);
       }
     }
 
@@ -518,6 +573,10 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       throw err;
     } finally {
+      if (syncUiCapTimer != null) {
+        clearTimeout(syncUiCapTimer);
+        syncUiCapTimer = null;
+      }
       syncLockRef.current = false;
       if (showSyncUi) {
         setIsSyncing(false);

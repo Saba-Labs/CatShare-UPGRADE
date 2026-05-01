@@ -164,6 +164,8 @@ export interface Store {
   storeWhatsapp: string | null;
   /** Optional minimum order total required to place orders on storefront. */
   minimumOrderValue: number | null;
+  /** Product listing layout on public storefront. */
+  viewMode: 'grid' | 'list';
 }
 
 export interface StorePublic {
@@ -192,6 +194,8 @@ export interface StorePublic {
   facebook?: string | null;
   website?: string | null;
   minimumOrderValue?: number | null;
+  /** Product listing layout on public storefront. */
+  viewMode?: 'grid' | 'list';
   /** False = seller paused the storefront (from `get_store_by_slug`). */
   isLive?: boolean;
 }
@@ -209,6 +213,8 @@ function mapStoreRow(row: Record<string, unknown>): Store {
   const minimumOrderValue = normalizeOptionalNonNegativeNumber(
     row.minimum_order_value ?? row.minimumOrderValue
   );
+  const rawViewMode = row.view_mode ?? row.viewMode;
+  const viewMode: 'grid' | 'list' = rawViewMode === 'list' ? 'list' : 'grid';
   return {
     id: String(row.id ?? ''),
     sellerUserId: String(row.seller_user_id ?? ''),
@@ -219,6 +225,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     isLive: row.is_live !== false,
     storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
     minimumOrderValue,
+    viewMode,
   };
 }
 
@@ -472,9 +479,15 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     let minimumOrderValue = normalizeOptionalNonNegativeNumber(
       row.minimumOrderValue ?? row.minimum_order_value ?? row.store_minimum_order_value
     );
+    let viewMode: 'grid' | 'list' | null =
+      (row.view_mode === 'list' || row.viewMode === 'list')
+        ? 'list'
+        : (row.view_mode === 'grid' || row.viewMode === 'grid')
+          ? 'grid'
+          : null;
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -489,6 +502,12 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         minimumOrderValue = normalizeOptionalNonNegativeNumber(
           storeRecord?.minimum_order_value ?? storeRecord?.minimumOrderValue
         );
+      }
+      if (viewMode == null) {
+        viewMode =
+          storeRecord?.view_mode === 'list' || storeRecord?.viewMode === 'list'
+            ? 'list'
+            : 'grid';
       }
     }
 
@@ -552,6 +571,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         businessProfile?.website,
       ) ?? null,
       minimumOrderValue: minimumOrderValue ?? null,
+      viewMode: viewMode ?? 'grid',
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
@@ -698,6 +718,42 @@ export async function updateStoreCatalogue(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreCatalogue:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreViewMode(
+  sellerUserId: string,
+  viewMode: 'grid' | 'list'
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        view_mode: viewMode,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store view mode:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreViewMode:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);

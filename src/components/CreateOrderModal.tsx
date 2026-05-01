@@ -6,6 +6,7 @@ import { getAllCatalogues } from '../config/catalogueConfig';
 import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalogueProductUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
 
@@ -73,6 +74,7 @@ export default function CreateOrderModal({
 }: CreateOrderModalProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { guardOnline } = useCloudWriteGate();
 
   const [step, setStep] = useState<Step>('catalogue');
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
@@ -184,6 +186,7 @@ export default function CreateOrderModal({
 
   const handleCreateOrder = async () => {
     if (!user?.uid || !selectedCatalogueId) return;
+    if (!guardOnline()) return;
 
     setIsSubmitting(true);
     try {

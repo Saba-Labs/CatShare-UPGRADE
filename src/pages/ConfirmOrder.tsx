@@ -4,6 +4,7 @@ import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 type QtyMap = Record<string, number>;
 
@@ -136,6 +137,7 @@ export default function ConfirmOrder() {
   const { token } = useParams<{ token: string }>();
   const location = useLocation();
   const state = location.state as ConfirmOrderState | null;
+  const { guardOnline } = useCloudWriteGate();
 
   const [customerName, setCustomerName] = useState(state?.customerName || '');
   const [customerWhatsapp, setCustomerWhatsapp] = useState(state?.customerWhatsapp || '');
@@ -187,6 +189,8 @@ export default function ConfirmOrder() {
       alert('Seller WhatsApp number is not configured.');
       return;
     }
+
+    if (!guardOnline()) return;
 
     // Save order to Supabase
     if (token && sellerUserId) {

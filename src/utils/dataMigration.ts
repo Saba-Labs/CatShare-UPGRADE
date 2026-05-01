@@ -9,7 +9,7 @@ import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } 
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
 import { getPersistedAuthUserId } from "./authUserId";
-import { getStorageKey, getUserImagePath, safeGetFromStorage, safeSetInStorage } from "./safeStorage";
+import { getStorageKey, getUserImagePath, safeGetFromStorage, safeSetProductsCache, safeSetDeletedProductsCache } from "./safeStorage";
 import { getFieldsDefinition, setFieldsDefinition } from "../config/fieldConfig";
 
 /**
@@ -361,11 +361,11 @@ export async function runMigrations(): Promise<void> {
     const del = safeGetFromStorage(dk, []);
     if (Array.isArray(prods) && prods.length > 0) {
       await migrateProductImagePaths(prods, uid);
-      safeSetInStorage(pk, prods);
+      safeSetProductsCache(uid, prods);
     }
     if (Array.isArray(del) && del.length > 0) {
       await migrateProductImagePaths(del, uid);
-      safeSetInStorage(dk, del);
+      safeSetDeletedProductsCache(uid, del);
     }
   }
 

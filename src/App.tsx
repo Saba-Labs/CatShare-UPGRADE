@@ -19,7 +19,15 @@ import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
-import { safeGetFromStorage, safeSetInStorage, getStorageKey } from "./utils/safeStorage";
+import {
+  safeGetFromStorage,
+  safeSetInStorage,
+  getStorageKey,
+  readProductsWithLegacyFallback,
+  readDeletedProductsWithLegacyFallback,
+  safeSetProductsCache,
+  safeSetDeletedProductsCache,
+} from "./utils/safeStorage";
 import { mapWithConcurrencyLimit } from "./utils/concurrencyPool";
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { useAuth } from "./context/AuthContext";
@@ -27,8 +35,9 @@ import { useSync, applyUserSettingsFromCloud, CATALOGUE_LOCAL_IMAGES_READY_EVENT
 import SyncStatusIndicator from "./components/SyncStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 import { supabase } from "./supabaseClient";
+/** Eager import: home shell must not depend on a lazy chunk fetch (breaks offline reload on web). */
+import CatalogueApp from "./CatalogueApp";
 
-const CatalogueApp = lazy(() => import("./CatalogueApp"));
 const CreateProduct = lazy(() => import("./CreateProduct"));
 const CreateBulk = lazy(() => import("./pages/CreateBulk"));
 const Shelf = lazy(() => import("./Shelf"));
@@ -60,7 +69,13 @@ const Tutorial = lazy(() => import("./Tutorial"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
+import { NetworkStatusProvider } from "./context/NetworkStatusContext";
 import { SyncProvider } from "./context/SyncContext";
+import {
+  cloudWriteWouldBeBlocked,
+  isBrowserOnline,
+  OFFLINE_CLOUD_WRITE_TOAST,
+} from "./utils/cloudWritePolicy";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { authService } from "./services/authService";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
@@ -141,7 +156,7 @@ function AppWithBackHandler() {
   const strictBootstrapRanRef = useRef<string | null>(null);
   /** Prevent repeated metadata refetch loops when initial snapshot misses definitions/settings. */
   const metadataHydrationFetchForUserRef = useRef<string | null>(null);
-  /** False until first catalogue hydrate finishes (strict: after refreshFromCloud settles). Avoids EmptyStateIntro while cloud still loading. */
+  /** False until first catalogue hydrate finishes. Strict path sets true once local/snapshot data is applied; cloud refresh may continue in background. */
   const [catalogueFirstLoadSettled, setCatalogueFirstLoadSettled] = useState(false);
   const [startupStatusText, setStartupStatusText] = useState('Fetching your catalogue');
 
@@ -286,13 +301,6 @@ function AppWithBackHandler() {
     void markOfflineMigrationCompletedInCloud(uid);
   }, [user?.uid, markOfflineMigrationCompletedInCloud]);
 
-  // Prefetch CatalogueApp JS while auth + Supabase profile load — same chunk as lazy route, faster time-to-interactive.
-  useEffect(() => {
-    if (loading) return;
-    if (!user?.uid) return;
-    void import("./CatalogueApp");
-  }, [loading, user?.uid]);
-
   // Never re-show the native Capacitor splash (logo-only). Cold start uses a plain white window (Android styles);
   // loading UX is SplashLoadingLayout / auth UI inside the WebView.
   useEffect(() => {
@@ -302,9 +310,6 @@ function AppWithBackHandler() {
     }
     SplashScreen.hide().catch(() => {});
   }, [isNative]);
-
-  const getProductsKey = (uid: string) => getStorageKey('products', uid);
-  const getDeletedProductsKey = (uid: string) => getStorageKey('deletedProducts', uid);
 
   const clearAllOfflineCaches = useCallback(() => {
     const keysToRemove: string[] = [];
@@ -332,26 +337,28 @@ function AppWithBackHandler() {
   useLayoutEffect(() => {
     if (loading) return;
     if (!user?.uid) return;
-    if (startupPhase !== 'pending') return;
 
     const uid = user.uid;
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) {
-      const p = safeGetFromStorage(getProductsKey(uid), []);
-      const d = safeGetFromStorage(getDeletedProductsKey(uid), []);
+      const p = readProductsWithLegacyFallback(uid);
+      const d = readDeletedProductsWithLegacyFallback(uid);
       setProducts((prev) => (prev.length > 0 ? prev : p));
       setDeletedProducts((prev) => (prev.length > 0 ? prev : d));
       return;
     }
 
-    const strictReturning =
-      localStorage.getItem('strictOnlineMode::device') === 'true' &&
-      localStorage.getItem('offlineLegacyResolved::device') === 'true';
-    if (!strictReturning) return;
-
+    // All signed-in (non-guest) users: hydrate from keyed localStorage before paint so web/PWA
+    // works offline even when strict-mode flags are not set yet.
     migrateUnkeyedDataToUserKeyed(uid);
-    const p = safeGetFromStorage(getProductsKey(uid), []);
-    const d = safeGetFromStorage(getDeletedProductsKey(uid), []);
+    const p = readProductsWithLegacyFallback(uid);
+    const d = readDeletedProductsWithLegacyFallback(uid);
+
+    // After startup completes we still must backfill React state when it stayed empty but
+    // device cache has rows (race / strict bootstrap / missed merge). Skip when both are empty
+    // so we don't fight an intentional empty catalogue.
+    if (startupPhase === 'done' && p.length === 0 && d.length === 0) return;
+
     setProducts((prev) => (prev.length > 0 ? prev : p));
     setDeletedProducts((prev) => (prev.length > 0 ? prev : d));
   }, [loading, user?.uid, startupPhase]);
@@ -383,8 +390,8 @@ function AppWithBackHandler() {
       startupRanForUserRef.current = userId;
       setStartupStatusText('Loading your local catalogue');
       // Guest users: load local data, skip everything else.
-      const guestProducts = safeGetFromStorage(getProductsKey(userId), []);
-      const guestDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      const guestProducts = readProductsWithLegacyFallback(userId);
+      const guestDeleted = readDeletedProductsWithLegacyFallback(userId);
       setProducts(guestProducts);
       setDeletedProducts(guestDeleted);
       setCatalogueFirstLoadSettled(true);
@@ -418,33 +425,53 @@ function AppWithBackHandler() {
       void (async () => {
         try {
           setStartupStatusText('Fetching products from cloud');
-          const localProducts = safeGetFromStorage(getProductsKey(userId), []);
-          const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+          const localProducts = readProductsWithLegacyFallback(userId);
+          const localDeleted = readDeletedProductsWithLegacyFallback(userId);
           const hasLocalCache = localProducts.length > 0 || localDeleted.length > 0;
           let sourceSnapshot = (!supabaseDataLoading && supabaseData != null)
             ? supabaseData
             : null;
 
           // First app open after reinstall can hit a race where strict bootstrap runs
-          // before profile rows are ready. If local cache is empty, force one fresh read.
-          if (!sourceSnapshot && !hasLocalCache) {
+          // before profile rows are ready. If local cache is empty, force one fresh read (online only).
+          if (!sourceSnapshot && !hasLocalCache && isBrowserOnline()) {
             try {
               setStartupStatusText('Refreshing account snapshot');
-              sourceSnapshot = await refreshSupabaseData({ skipLoadingIndicator: true });
+              const SNAPSHOT_WAIT_MS = 12000;
+              sourceSnapshot = await Promise.race([
+                refreshSupabaseData({ skipLoadingIndicator: true }),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), SNAPSHOT_WAIT_MS)),
+              ]);
             } catch {
               sourceSnapshot = null;
             }
           }
 
-          // On cold starts, auth/profile can still be settling. Don't lock strict bootstrap
-          // as "done" if neither local cache nor cloud snapshot is available yet.
+          // No snapshot and nothing on device: finish startup (empty catalogue). Never leave the
+          // UI stuck on "Refreshing account snapshot" when the network lies online or hangs.
           if (!sourceSnapshot && !hasLocalCache) {
-            strictBootstrapRanRef.current = null;
+            strictBootstrapRanRef.current = userId;
+            setProducts([]);
+            setDeletedProducts([]);
+            setCatalogueFirstLoadSettled(true);
+            setStartupPhase('done');
+            setStartupStatusText('Done');
             return;
           }
 
           strictBootstrapRanRef.current = userId;
-          const useRemoteSnapshot = sourceSnapshot != null;
+          let useRemoteSnapshot = sourceSnapshot != null;
+          // Auth sets defaultSupabaseData (empty rows) when fetch fails offline. Do not treat that
+          // as authoritative over keyed localStorage — it would wipe the catalogue.
+          if (useRemoteSnapshot && hasLocalCache) {
+            const remoteHasProductData =
+              (Array.isArray(sourceSnapshot!.products) && sourceSnapshot!.products.length > 0) ||
+              (Array.isArray(sourceSnapshot!.deletedProducts) &&
+                sourceSnapshot!.deletedProducts.length > 0);
+            if (!remoteHasProductData) {
+              useRemoteSnapshot = false;
+            }
+          }
 
           let cloudProducts: any[];
           let cloudDeleted: any[];
@@ -472,9 +499,9 @@ function AppWithBackHandler() {
 
           setStartupStatusText('Applying products');
           setProducts(filteredProducts);
-          safeSetInStorage(getProductsKey(userId), filteredProducts);
+          safeSetProductsCache(userId, filteredProducts);
           setDeletedProducts(cloudDeleted);
-          safeSetInStorage(getDeletedProductsKey(userId), cloudDeleted);
+          safeSetDeletedProductsCache(userId, cloudDeleted);
 
           const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
           const categoriesJson = JSON.stringify(normalizedCats);
@@ -530,9 +557,17 @@ function AppWithBackHandler() {
             }
           }
 
+          // Allow catalogue UI immediately from local/snapshot data. Do not wait for
+          // refreshFromCloud — it calls Supabase and can hang indefinitely offline.
+          setCatalogueFirstLoadSettled(true);
+
+          // No artificial splash when offline or when showing device/local data — avoids a spinner
+          // after the catalogue rows are already applied.
+          const splashMs =
+            !isBrowserOnline() || !useRemoteSnapshot ? 0 : STARTUP_SPLASH_MS;
           window.setTimeout(() => {
             setStartupPhase('done');
-          }, STARTUP_SPLASH_MS);
+          }, splashMs);
 
           void refreshFromCloud()
             .then(async (cloudData) => {
@@ -544,7 +579,15 @@ function AppWithBackHandler() {
 
               // Ensure strict first-launch also hydrates metadata/settings,
               // not only products, when initial snapshot arrived late.
-              const latest = await refreshSupabaseData({ skipLoadingIndicator: true });
+              if (!isBrowserOnline()) {
+                setSupabaseSyncStatus('synced');
+                return;
+              }
+              const META_REFRESH_MS = 12000;
+              const latest = await Promise.race([
+                refreshSupabaseData({ skipLoadingIndicator: true }),
+                new Promise<null>((resolve) => setTimeout(() => resolve(null), META_REFRESH_MS)),
+              ]);
               if (latest?.fieldsDefinition) {
                 setStartupStatusText('Refreshing field definitions');
                 setFieldsDefinition(latest.fieldsDefinition, userId);
@@ -584,10 +627,37 @@ function AppWithBackHandler() {
       return;
     }
 
-    // Wait for auth snapshot to finish loading before deciding startup path.
-    // This avoids entering app with empty products/settings and never rehydrating.
-    if (supabaseDataLoading) {
+    const localSnapshotP = readProductsWithLegacyFallback(userId);
+    const localSnapshotD = readDeletedProductsWithLegacyFallback(userId);
+    const hasDeviceCatalogueCache =
+      localSnapshotP.length > 0 || localSnapshotD.length > 0;
+
+    // Stale-while-revalidate (online): show keyed device cache immediately while the profile fetch runs.
+    // Do not set startupRanForUserRef — step 4 still merges the cloud snapshot when it arrives.
+    const showCachedCatalogueWhileCloudLoads = () => {
+      setStartupStatusText('Showing saved catalogue');
+      setProducts(localSnapshotP);
+      setDeletedProducts(localSnapshotD);
+      setCatalogueFirstLoadSettled(true);
+      setStartupPhase('done');
+    };
+
+    // Wait for auth snapshot while online. Offline, proceed with local cache so startup does not stall.
+    if (supabaseDataLoading && isBrowserOnline()) {
       setStartupStatusText('Fetching products, categories and settings');
+      if (hasDeviceCatalogueCache) {
+        showCachedCatalogueWhileCloudLoads();
+      }
+      return;
+    }
+
+    // Race: `loadUserData` runs async after login. If step 4 runs while `supabaseData` is still null,
+    // we skip `safeSetInStorage`, set `startupRanForUserRef`, and finish startup; when data arrives
+    // the ref blocks forever and products never persist offline (Orders still save on each fetch).
+    if (isBrowserOnline() && supabaseData == null) {
+      if (hasDeviceCatalogueCache) {
+        showCachedCatalogueWhileCloudLoads();
+      }
       return;
     }
 
@@ -615,11 +685,11 @@ function AppWithBackHandler() {
 
     // Step 3: Check for legacy offline data (ANY type, not just products).
     const hasLegacyProducts = (() => {
-      const kp = safeGetFromStorage(getProductsKey(userId), []);
+      const kp = readProductsWithLegacyFallback(userId);
       return Array.isArray(kp) && kp.length > 0;
     })();
     const hasLegacyDeleted = (() => {
-      const kd = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      const kd = readDeletedProductsWithLegacyFallback(userId);
       return Array.isArray(kd) && kd.length > 0;
     })();
     const hasLegacyCategories = (() => {
@@ -643,6 +713,7 @@ function AppWithBackHandler() {
     const hasAnyOfflineData = hasLegacyProducts || hasLegacyDeleted || hasLegacyCategories || hasLegacyFields || hasLegacyCatalogues;
 
     const shouldShowOfflineSyncPrompt =
+      isBrowserOnline() &&
       !supabaseDataLoading &&
       !cloudMigrationCompleted &&
       !hasCloudAccountData &&
@@ -655,8 +726,8 @@ function AppWithBackHandler() {
       setShowOfflineSyncModal(true);
 
       // Load local data so user can see what they have while deciding.
-      const localP = safeGetFromStorage(getProductsKey(userId), []);
-      const localD = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      const localP = readProductsWithLegacyFallback(userId);
+      const localD = readDeletedProductsWithLegacyFallback(userId);
       setProducts(localP);
       setDeletedProducts(localD);
       console.log('⏳ [startup] Offline data detected, awaiting user decision');
@@ -666,8 +737,8 @@ function AppWithBackHandler() {
     // Step 4: No offline data (or already resolved but strict not enabled yet).
     // This is a new user or a user whose legacy was already handled.
     // Apply Supabase data normally (merge for non-strict, or just load).
-    const localProducts = safeGetFromStorage(getProductsKey(userId), []);
-    const localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+    const localProducts = readProductsWithLegacyFallback(userId);
+    const localDeleted = readDeletedProductsWithLegacyFallback(userId);
 
     if (supabaseData?.products && supabaseData.products.length > 0) {
       const currentDeletedIds = new Set<string>();
@@ -679,17 +750,19 @@ function AppWithBackHandler() {
       }
       const merged = mergeProductsData(localProducts, supabaseData.products, currentDeletedIds);
         setProducts(merged);
-      safeSetInStorage(getProductsKey(userId), merged);
+      safeSetProductsCache(userId, merged);
     } else {
       setProducts(localProducts);
+      safeSetProductsCache(userId, localProducts);
       }
 
     if (supabaseData?.deletedProducts && supabaseData.deletedProducts.length > 0) {
       const merged = mergeProductsData(localDeleted, supabaseData.deletedProducts);
         setDeletedProducts(merged);
-      safeSetInStorage(getDeletedProductsKey(userId), merged);
+      safeSetDeletedProductsCache(userId, merged);
     } else {
       setDeletedProducts(localDeleted);
+      safeSetDeletedProductsCache(userId, localDeleted);
       }
 
     if (Array.isArray(supabaseData?.categories)) {
@@ -908,8 +981,8 @@ function AppWithBackHandler() {
         }
       };
 
-      let localProducts = safeGetFromStorage(getProductsKey(userId), []);
-      let localDeleted = safeGetFromStorage(getDeletedProductsKey(userId), []);
+      let localProducts = readProductsWithLegacyFallback(userId);
+      let localDeleted = readDeletedProductsWithLegacyFallback(userId);
       const unkeyedProducts = parseStoredJsonArray(localStorage.getItem('products'));
       const unkeyedDeleted = parseStoredJsonArray(localStorage.getItem('deletedProducts'));
       if (unkeyedProducts.length > 0) {
@@ -1030,7 +1103,7 @@ function AppWithBackHandler() {
         'active',
         { percentFrom: 6, percentTo: 26, detailPrefix: 'Uploading product images' }
       );
-      safeSetInStorage(getProductsKey(userId), localProducts);
+      safeSetProductsCache(userId, localProducts);
 
       setSyncPhase(28, 'Uploading shelf images…');
       let localDeletedUpdated = await uploadMissingImages(
@@ -1295,8 +1368,8 @@ function AppWithBackHandler() {
     const onLocalImagesReady = (e: Event) => {
       const uid = (e as CustomEvent<{ userId?: string }>).detail?.userId;
       if (!uid || uid !== user?.uid) return;
-      const freshP = safeGetFromStorage(getProductsKey(uid), []);
-      const freshD = safeGetFromStorage(getDeletedProductsKey(uid), []);
+      const freshP = readProductsWithLegacyFallback(uid);
+      const freshD = readDeletedProductsWithLegacyFallback(uid);
       setProducts(freshP);
       setDeletedProducts(freshD);
     };
@@ -1317,8 +1390,8 @@ function AppWithBackHandler() {
         ?.skipStrictSync;
       if (skipStrictSync) return;
 
-      const freshProducts = safeGetFromStorage(getProductsKey(user.uid), []);
-      const freshDeleted = safeGetFromStorage(getDeletedProductsKey(user.uid), []);
+      const freshProducts = readProductsWithLegacyFallback(user.uid);
+      const freshDeleted = readDeletedProductsWithLegacyFallback(user.uid);
 
       const detail = (e as CustomEvent<{ onlyProductId?: string; onlyProductIds?: string[] }> | undefined)
         ?.detail;
@@ -1397,10 +1470,15 @@ function AppWithBackHandler() {
         return;
       }
 
+      if (cloudWriteWouldBeBlocked(user, isBrowserOnline())) {
+        showToast(OFFLINE_CLOUD_WRITE_TOAST, 'error');
+        return;
+      }
+
       try {
         // Use data from event detail (passed from CatalogueApp) or fall back to localStorage
-        const freshProducts = e.detail?.products ?? safeGetFromStorage(getProductsKey(user.uid), []);
-        const freshDeleted = e.detail?.deletedProducts ?? safeGetFromStorage(getDeletedProductsKey(user.uid), []);
+        const freshProducts = e.detail?.products ?? readProductsWithLegacyFallback(user.uid);
+        const freshDeleted = e.detail?.deletedProducts ?? readDeletedProductsWithLegacyFallback(user.uid);
 
         const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
           background: true,
@@ -1433,8 +1511,14 @@ function AppWithBackHandler() {
       if (!clean.updatedAt) clean.updatedAt = new Date().toISOString();
       return clean;
     });
-    safeSetInStorage(getProductsKey(user.uid), cleanedProducts);
-  }, [products, user?.uid]);
+    // Prevent startup/auth races from overwriting a valid keyed cache with [].
+    // Legit empty saves still happen after startup settles (startupPhase === 'done').
+    if (cleanedProducts.length === 0 && startupPhase !== 'done') {
+      const existing = readProductsWithLegacyFallback(user.uid);
+      if (existing.length > 0) return;
+    }
+    safeSetProductsCache(user.uid, cleanedProducts);
+  }, [products, user?.uid, startupPhase]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1447,8 +1531,12 @@ function AppWithBackHandler() {
       delete clean.renderedImages;
       return clean;
     });
-    safeSetInStorage(getDeletedProductsKey(user.uid), cleanedDeleted);
-  }, [deletedProducts, user?.uid]);
+    if (cleanedDeleted.length === 0 && startupPhase !== 'done') {
+      const existing = readDeletedProductsWithLegacyFallback(user.uid);
+      if (existing.length > 0) return;
+    }
+    safeSetDeletedProductsCache(user.uid, cleanedDeleted);
+  }, [deletedProducts, user?.uid, startupPhase]);
 
   const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
     const merged = new Map<string, any>();
@@ -1982,8 +2070,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
                 try {
                 setProducts([]);
                 setDeletedProducts([]);
-                safeSetInStorage(getProductsKey(user.uid), []);
-                safeSetInStorage(getDeletedProductsKey(user.uid), []);
+                safeSetProductsCache(user.uid, []);
+                safeSetDeletedProductsCache(user.uid, []);
 
                 localStorage.setItem('offlineLegacyResolved::device', 'true');
                 localStorage.setItem('strictOnlineMode::device', 'true');
@@ -2017,8 +2105,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
                   const filteredProducts = cloudProducts.filter((p: any) => !deletedIds.has(p.id));
                   setProducts(filteredProducts);
                   setDeletedProducts(cloudDeleted);
-                  safeSetInStorage(getProductsKey(user.uid), filteredProducts);
-                  safeSetInStorage(getDeletedProductsKey(user.uid), cloudDeleted);
+                  safeSetProductsCache(user.uid, filteredProducts);
+                  safeSetDeletedProductsCache(user.uid, cloudDeleted);
 
                   const rawCats = cloud?.categories || [];
                   const normalizedCats = rawCats.map((c: any) => typeof c === 'string' ? c : c.name).filter(Boolean);
@@ -2190,8 +2278,9 @@ if (user?.uid && !authService.isOfflineGuest()) {
             </ProtectedRoute>
           }
         >
-          <Route index />
-          <Route path="catalogues" />
+          {/* Leaf routes must have an element or RR warns; Catalogue UI lives outside <Outlet />. */}
+          <Route index element={<></>} />
+          <Route path="catalogues" element={<></>} />
         </Route>
         <Route
           path="/create"
@@ -2353,6 +2442,7 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
+            <NetworkStatusProvider>
             <SyncProvider>
             <SubscriptionProvider>
               <GlassThemeProGate />
@@ -2361,6 +2451,7 @@ export default function App() {
               </Router>
             </SubscriptionProvider>
             </SyncProvider>
+            </NetworkStatusProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

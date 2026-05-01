@@ -149,6 +149,9 @@ export async function recoverSupabaseSession(): Promise<Session | null> {
     } catch {
       /* ignore */
     }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return null;
+    }
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (!error && data.session?.user) return data.session;

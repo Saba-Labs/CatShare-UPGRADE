@@ -26,6 +26,8 @@ import MainAppBottomNav from '../components/MainAppBottomNav';
 import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 /** Haptics throws/rejects on desktop web — avoids dozens of console errors in DevTools. */
 async function safeHapticsLight() {
@@ -1178,6 +1180,7 @@ export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, supabaseData } = useAuth();
   const { showToast } = useToast();
+  const { guardOnline } = useCloudWriteGate();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1287,8 +1290,9 @@ useEffect(() => {
   );
 
   const swipeHandlers = useSwipeable({
-    onSwipedRight: async () => {
+    onSwipedRight: async (e) => {
       if (isSwipeProcessingRef.current) return;
+      if (!isDeliberateEdgeSwipeBack(e)) return;
 
       // Capture synchronously before any awaits
       const wasInEditMode = editModeRef.current;
@@ -1344,6 +1348,7 @@ useEffect(() => {
 
   const handleStatusChange = async (status: StatusType) => {
     if (!order) return;
+    if (!guardOnline()) return;
 
     await safeHapticsLight();
 
@@ -1374,6 +1379,7 @@ useEffect(() => {
 
   const handleSaveEdit = async () => {
     if (!order) return;
+    if (!guardOnline()) return;
     setSaveLoading(true);
     try {
       const persistedEditItems = editItems.filter((it) => it.quantity > 0);
@@ -1763,6 +1769,7 @@ useEffect(() => {
 
   const handleDelete = async () => {
     if (!order) return;
+    if (!guardOnline()) return;
     try {
       const { error } = await deleteOrder(order.id);
       if (error) {

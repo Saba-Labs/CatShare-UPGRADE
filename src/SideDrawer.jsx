@@ -35,6 +35,7 @@ import {
   CATSHARE_AUTH_RESTORED_EVENT,
 } from "./supabaseClient";
 import { useSync } from "./context/SyncContext";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 
 export default function SideDrawer({
   open,
@@ -83,6 +84,7 @@ const navigate = useNavigate();
   const { currentTheme } = useTheme();
   const { user } = useAuth();
   const { syncProductsToCloud } = useSync();
+  const { guardCloudWrite } = useCloudWriteGate();
   const { isPro, isPaidPro, isTrialActive, trialEndsAt, loading: subscriptionLoading } =
     useSubscription();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
@@ -744,6 +746,7 @@ const exportProductsToCSV = (products) => {
   const reader = new FileReader();
   reader.onload = async (event) => {
     try {
+      if (!guardCloudWrite()) return;
       const zip = await JSZip.loadAsync(event.target.result);
 
       // Try to find catalogue-data.json at root first
@@ -1308,6 +1311,7 @@ const restoreFromDetectedBackup = async (backupFile) => {
 
     reader.onload = async (event) => {
       try {
+        if (!guardCloudWrite()) return;
         const zip = await JSZip.loadAsync(event.target.result);
 
         // Try to find catalogue-data.json at root first

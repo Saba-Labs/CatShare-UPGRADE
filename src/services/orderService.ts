@@ -1,4 +1,6 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 
 /** Orders RLS (see SUPABASE_ORDERS_SQL.md) uses `x-user-id`. Restore from session before seller mutations when header was cleared (e.g. after StoreView order). */
 async function ensureOrdersRlsHeaderFromSession(): Promise<void> {
@@ -140,6 +142,26 @@ export async function fetchSellerOrders(
     }
 
     const trimmed = sellerUserId.trim();
+
+    if (!isBrowserOnline()) {
+      const cacheKey = getStorageKey('sellerOrders', trimmed);
+      let cached = safeGetFromStorage<Order[]>(cacheKey, []);
+      if (options?.status) {
+        cached = cached.filter((o) => o.status === options.status);
+      }
+      if (options?.createdAfter?.trim()) {
+        const after = options.createdAfter.trim();
+        cached = cached.filter((o) => (o.created_at || '') > after);
+      }
+      const incremental = Boolean(options?.createdAfter?.trim());
+      cached = [...cached].sort((a, b) => {
+        const ta = new Date(a.created_at).getTime();
+        const tb = new Date(b.created_at).getTime();
+        return incremental ? ta - tb : tb - ta;
+      });
+      return { data: cached, error: null };
+    }
+
     // RLS matches seller_user_id to x-user-id; customer flows clear the header after insert — restore for seller reads.
     setSupabaseRlsUserId(trimmed);
 

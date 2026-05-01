@@ -13,7 +13,7 @@ import {
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { logSignUp, logSignUpFailed } from '../config/analyticsEvents';
+import { logSignUp, logSignUpFailed, logSignUpCancelled } from '../config/analyticsEvents';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
 function GoogleIcon() {
@@ -61,6 +61,20 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustSignedUp, setHasJustSignedUp] = useState(false);
+
+  const isAuthCancelError = (msg: string): boolean => {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('cancel') ||
+      m.includes('cancelled') ||
+      m.includes('canceled') ||
+      m.includes('popup closed') ||
+      m.includes('popup_closed_by_user') ||
+      m.includes('sign in cancelled') ||
+      m.includes('sign-in cancelled') ||
+      m.includes('sign_in_cancelled')
+    );
+  };
 
   useEffect(() => {
     if (!subdomainStoreSlug) return;
@@ -133,9 +147,14 @@ export default function Register() {
       setHasJustSignedUp(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google signup failed';
-      setError(errorMessage);
-      logSignUpFailed('google', errorMessage);
-      showToast(errorMessage, 'error');
+      if (isAuthCancelError(errorMessage)) {
+        logSignUpCancelled('google');
+        showToast('Signup cancelled', 'info');
+      } else {
+        setError(errorMessage);
+        logSignUpFailed('google', errorMessage);
+        showToast(errorMessage, 'error');
+      }
     } finally {
       setAuthLoading(null);
     }

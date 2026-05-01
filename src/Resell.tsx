@@ -15,6 +15,7 @@ import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 
 
 export default function ResellTab({
@@ -32,6 +33,7 @@ export default function ResellTab({
   stockField,
   onBack,
 }) {
+  const { guardCloudWrite } = useCloudWriteGate();
   // Helper function to get catalogue-specific data for a product
   const getProductCatalogueData = (product) => {
     if (!catalogueId) return product; // Fallback to product if no catalogueId
@@ -704,6 +706,7 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
               <div className="border-t border-gray-200 my-1" />
               <button
                 onClick={() => {
+                  if (!guardCloudWrite()) return;
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: true } : p
@@ -723,6 +726,7 @@ setSelected((prev) => (prev.includes(id) ? prev : [...prev, id]));
 
               <button
                 onClick={() => {
+                  if (!guardCloudWrite()) return;
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
                     selected.includes(p.id) ? { ...p, [stockField]: false } : p

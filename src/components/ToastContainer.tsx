@@ -1,6 +1,7 @@
 import React from "react";
 import { useToast } from "../context/ToastContext";
 import { FiCheckCircle, FiAlertCircle, FiInfo, FiX } from "react-icons/fi";
+import { AnimatePresence, motion } from "framer-motion";
 
 export const ToastContainer: React.FC = () => {
   const { toasts, removeToast } = useToast();
@@ -49,27 +50,34 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <div className="fixed bottom-4 right-4 z-[200] space-y-2 max-w-sm">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getBgColor(
-            toast.type
-          )} shadow-lg animate-fadeIn`}
-        >
-          <div>{getIcon(toast.type)}</div>
-          <div className={`flex-1 ${getTextColor(toast.type)} text-sm`}>
-            {toast.message}
-          </div>
-          <button
-            onClick={() => removeToast(toast.id)}
-            className={`p-1 hover:bg-black/10 rounded transition ${getTextColor(
+      <AnimatePresence initial={false}>
+        {toasts.map((toast) => (
+          <motion.div
+            key={toast.id}
+            layout
+            initial={{ opacity: 0, x: 36 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 36 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getBgColor(
               toast.type
-            )}`}
+            )} shadow-lg`}
           >
-            <FiX className="w-4 h-4" />
-          </button>
-        </div>
-      ))}
+            <div>{getIcon(toast.type)}</div>
+            <div className={`flex-1 ${getTextColor(toast.type)} text-sm`}>
+              {toast.message}
+            </div>
+            <button
+              onClick={() => removeToast(toast.id)}
+              className={`p-1 hover:bg-black/10 rounded transition ${getTextColor(
+                toast.type
+              )}`}
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 };

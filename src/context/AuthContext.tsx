@@ -10,10 +10,17 @@ import {
   CATSHARE_AUTH_RESTORED_EVENT,
 } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
+import { persistCatalogueSnapshotForUser } from '../utils/catalogueCachePersist';
 import { authService } from '../services/authService';
 import { getDeviceId } from '../services/deviceIdService';
 import { PUSH_REGISTERED_STORAGE_KEY } from '../services/pushTokenService';
 import { logLogout } from '../config/analyticsEvents';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import {
+  getPersistedAuthUserId,
+  tryGetSupabaseUserIdFromAuthToken,
+  tryDiscoverCatalogueOwnerUserIdFromStorage,
+} from '../utils/authUserId';
 
 /** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
@@ -106,6 +113,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSupabaseDataLoading(true);
     }
     try {
+      if (!isBrowserOnline()) {
+        return null;
+      }
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -121,6 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (result.success && result.data) {
         const data = result.data as SupabaseUserData;
         setSupabaseData(data);
+        persistCatalogueSnapshotForUser(uid, data.products, data.deletedProducts);
         return data;
       }
       console.warn('⚠️ refreshSupabaseData failed:', result.error);
@@ -184,13 +195,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         activeProfileLoadsRef.current += 1;
         if (activeProfileLoadsRef.current === 1) setSupabaseDataLoading(true);
         try {
+          if (!isBrowserOnline()) {
+            return;
+          }
           const result = await fetchAllUserData(uid);
           if (cancelled) return;
           const { data: { session: latest } } = await supabase.auth.getSession();
           if (!latest?.user || latest.user.id !== uid) return;
 
           if (result.success && result.data) {
-            setSupabaseData(result.data as SupabaseUserData);
+            const snapshot = result.data as SupabaseUserData;
+            setSupabaseData(snapshot);
+            persistCatalogueSnapshotForUser(
+              uid,
+              snapshot.products,
+              snapshot.deletedProducts
+            );
             console.log('✅ Fetched Supabase data for user:', uid);
           } else {
             console.warn('⚠️ Failed to fetch Supabase data:', result.error);
@@ -241,7 +261,77 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       activeProfileLoadsRef.current = 0;
     };
 
+    /**
+     * Restore a minimal signed-in user when Supabase reports no session but the device still
+     * knows who was logged in. Required for offline reload and for "lie-fi" (navigator.onLine
+     * true while the network/session is dead); the old `!online` guard left user null and wiped UI state.
+     */
+    const applyOfflineCachedIdentity = (): boolean => {
+      let cachedUid = (getPersistedAuthUserId() || '').trim();
+      if (!cachedUid) {
+        const fromSessionBlob = (tryGetSupabaseUserIdFromAuthToken() || '').trim();
+        if (fromSessionBlob) {
+          cachedUid = fromSessionBlob;
+          persistAuthUserIdsForStorage(cachedUid);
+        }
+      }
+      if (!cachedUid && !isBrowserOnline()) {
+        const fromProducts = (tryDiscoverCatalogueOwnerUserIdFromStorage() || '').trim();
+        if (fromProducts) {
+          cachedUid = fromProducts;
+          persistAuthUserIdsForStorage(cachedUid);
+        }
+      }
+      if (!cachedUid) return false;
+
+      setUser((prev) => {
+        if (prev?.uid === cachedUid) return prev;
+        return {
+          uid: cachedUid,
+          email: null,
+          displayName: prev?.displayName ?? 'CatShare User',
+          emailVerified: prev?.emailVerified ?? false,
+        };
+      });
+      setSupabaseRlsUserId(cachedUid);
+      setSupabaseData((prev) => prev ?? defaultSupabaseData);
+      setSupabaseDataLoading(false);
+      persistAuthUserIdsForStorage(cachedUid);
+      return true;
+    };
+
     const initSession = async () => {
+      // Fast path: no network — one session read, then cached identity. Avoids multi-retry delay
+      // and keeps ProtectedRoute from showing the auth splash longer than necessary on reload.
+      if (!isBrowserOnline()) {
+        try {
+          // Android / airplane mode: getSession can hang; fall through to cached uid before logout.
+          const fastSession: any = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<{ data: { session: null } }>((resolve) =>
+              setTimeout(() => resolve({ data: { session: null } }), 5000)
+            ),
+          ]);
+          const session = fastSession?.data?.session ?? null;
+          if (!cancelled && session?.user) {
+            applySignedInSession(session.user);
+            setLoading(false);
+            void loadUserData(session.user.id);
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+        if (cancelled) return;
+        if (applyOfflineCachedIdentity()) {
+          setLoading(false);
+          return;
+        }
+        clearSignedOutState();
+        setLoading(false);
+        return;
+      }
+
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -270,6 +360,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         applySignedInSession(recovered.user);
         setLoading(false);
         void loadUserData(recovered.user.id);
+        return;
+      }
+
+      if (applyOfflineCachedIdentity()) {
+        setLoading(false);
         return;
       }
 
@@ -333,6 +428,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
               void loadUserData(recovered.user.id);
             }
+            return;
+          }
+          if (applyOfflineCachedIdentity()) {
             return;
           }
           clearSignedOutState();

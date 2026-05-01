@@ -39,6 +39,7 @@ import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
+import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -294,6 +295,7 @@ export default function CreateProduct() {
   const { showToast } = useToast();
   const { currentTheme } = useTheme();
   const { isPro } = useSubscription();
+  const { guardCloudWrite } = useCloudWriteGate();
 
   // When logged in, product/offline state should be stored per-user.
   // This prevents localStorage quota errors from the legacy unkeyed "products".
@@ -314,6 +316,7 @@ export default function CreateProduct() {
       showToast("Enter a category name", "warning");
       return;
     }
+    if (authUserId && !guardCloudWrite()) return;
     if (categoryList.some((x) => x.toLowerCase() === c.toLowerCase())) {
       showToast("That category already exists", "warning");
       return;
@@ -332,7 +335,7 @@ export default function CreateProduct() {
         ).catch((err) => console.warn("⚠️ Failed to sync categories:", err));
       });
     }
-  }, [authUserId, categoryList, newCategoryName, showToast]);
+  }, [authUserId, categoryList, newCategoryName, showToast, guardCloudWrite]);
 
   useEffect(() => {
     if (categoryAddOpen) {
@@ -1009,6 +1012,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
     if (isSaving) {
       return;
     }
+
+    if (authUserId && !guardCloudWrite()) return;
 
     if (!imagePreview) {
       showToast("Please upload and crop an image before saving.", "warning");

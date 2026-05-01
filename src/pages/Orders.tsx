@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -8,12 +8,15 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
 import { initPushTokenForLoggedInUser } from '../services/pushTokenService';
-import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
+const sellerOrdersCacheKey = (uid: string) => getStorageKey('sellerOrders', uid);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -663,6 +666,7 @@ export default function Orders() {
   const scrollRef = useRef<HTMLElement | null>(null);
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { guardOnline } = useCloudWriteGate();
   const [tab, setTab] = useState<TabType>('all');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -680,6 +684,14 @@ export default function Orders() {
   const swipeBackEligible = useRef(false);
   const swipeBackActive = useRef(false);
 
+  useLayoutEffect(() => {
+    if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
+    const cached = safeGetFromStorage(sellerOrdersCacheKey(user.uid), [] as Order[]);
+    setOrders(cached);
+    setLoading(cached.length === 0);
+    setError(null);
+  }, [user?.uid, user?.isAnonymous]);
+
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '') return;
     loadOrders();
@@ -689,7 +701,10 @@ export default function Orders() {
     if (!user?.uid || user.isAnonymous) return;
     const handler = () => {
       void fetchSellerOrders(user.uid).then(({ data, error }) => {
-        if (!error && data) setOrders(data);
+        if (!error && data) {
+          setOrders(data);
+          safeSetInStorage(sellerOrdersCacheKey(user.uid), data);
+        }
       });
     };
     window.addEventListener('catshareNewOrder', handler);
@@ -836,15 +851,32 @@ export default function Orders() {
       return;
     }
 
-    setLoading(true);
+    const cacheKey = sellerOrdersCacheKey(user.uid);
+    const cached = safeGetFromStorage(cacheKey, [] as Order[]);
+    if (cached.length === 0) {
+      setLoading(true);
+    }
     setError(null);
     const { data, error } = await fetchSellerOrders(user.uid);
     if (error) {
       console.error('Failed to load orders:', error);
-      setError('Failed to load orders. Please try again.');
-      showToast('Error loading orders', 'error');
+      const fallback =
+        cached.length > 0 ? cached : safeGetFromStorage(cacheKey, [] as Order[]);
+      if (fallback.length > 0) {
+        setOrders(fallback);
+        setError(null);
+        showToast(
+          isBrowserOnline() ? 'Could not refresh orders. Showing saved list.' : 'Showing saved orders',
+          'info'
+        );
+      } else {
+        setError('Failed to load orders. Please try again.');
+        showToast('Error loading orders', 'error');
+      }
     } else {
-      setOrders(data || []);
+      const list = data || [];
+      setOrders(list);
+      safeSetInStorage(cacheKey, list);
     }
     setLoading(false);
   };
@@ -860,17 +892,24 @@ export default function Orders() {
   };
 
   const handleStatusChange = async (id: string, status: StatusType) => {
-    // Update local state immediately
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    if (!guardOnline()) return;
+    const previousStatus = orders.find((o) => o.id === id)?.status as StatusType | undefined;
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
 
-    // Persist to backend
     const { error } = await updateOrderStatus(id, status);
     if (error) {
       showToast('Failed to update order status', 'error');
-      // Revert local state on error
-      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: o.status } : o));
+      if (previousStatus !== undefined) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, status: previousStatus } : o))
+        );
+      }
     } else {
       showToast(`Order marked as ${status}`, 'success');
+      setOrders((prev) => {
+        safeSetInStorage(sellerOrdersCacheKey(user.uid!), prev);
+        return prev;
+      });
     }
   };
 
@@ -926,7 +965,7 @@ export default function Orders() {
   );
 
   const shouldRestoreScroll =
-    location.pathname === '/orders' && !loading && !error;
+    location.pathname === '/orders' && !loading && !(error && orders.length === 0);
   useListScrollRestore(ORDERS_LIST_SCROLL_KEY, scrollRef, {
     active: shouldRestoreScroll,
     contentLength: shouldRestoreScroll ? filteredOrders.length : 0,

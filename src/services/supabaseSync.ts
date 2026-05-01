@@ -611,21 +611,47 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
     if (fieldsError && fieldsError.code !== 'PGRST116') console.warn('⚠️ Error fetching fields definition:', getErrorMessage(fieldsError));
     if (settingsError && settingsError.code !== 'PGRST116') console.warn('⚠️ Error fetching user settings:', getErrorMessage(settingsError));
 
+    /** Prefer `data` JSON; older rows may only have flat columns — without this, cache stays empty. */
+    const mapProductsTableRowToApp = (p: any): any | null => {
+      if (!p) return null;
+      if (p.data != null && typeof p.data === 'object' && !Array.isArray(p.data)) {
+        const row = { ...p.data };
+        if (row.id == null && p.product_id != null) row.id = p.product_id;
+        return row.id != null ? row : null;
+      }
+      if (p.product_id != null) {
+        return {
+          id: p.product_id,
+          name: p.name ?? '',
+          sku: p.sku ?? null,
+          categoryId: p.category_id ?? null,
+        };
+      }
+      return null;
+    };
+
+    const mapDeletedProductsRowToApp = (dp: any): any | null => {
+      if (!dp) return null;
+      if (dp.data != null && typeof dp.data === 'object' && !Array.isArray(dp.data)) {
+        return { ...dp.data, id: dp.product_id ?? dp.data?.id };
+      }
+      if (dp.product_id != null) {
+        return { id: dp.product_id, name: dp.name ?? '', sku: dp.sku ?? null };
+      }
+      return null;
+    };
+
     // deleted_products now stores full product data in the `data` column.
     // No cross-referencing with the products table needed.
     const deletedProductsList = (deletedProducts || [])
-      .map((dp: any) => {
-        if (dp.data) {
-          return { ...dp.data, id: dp.product_id };
-        }
-        return null;
-      })
-      .filter((p: any) => p !== null);
+      .map(mapDeletedProductsRowToApp)
+      .filter((p: any) => p != null && p.id != null);
 
     // Filter active products: exclude any that are in deleted_products
-    const deletedIds = new Set(deletedProductsList.map((p: any) => p.id));
-    const activeProducts = (products?.map((p: any) => p.data) || [])
-      .filter((p: any) => !deletedIds.has(p?.id));
+    const deletedIds = new Set(deletedProductsList.map((p: any) => String(p.id)));
+    const activeProducts = (products?.map(mapProductsTableRowToApp) || []).filter(
+      (p: any) => p != null && p.id != null && !deletedIds.has(String(p.id))
+    );
 
     const userData = {
       products: activeProducts,

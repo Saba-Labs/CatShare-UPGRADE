@@ -10,6 +10,7 @@ import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../config/catalogueProductUtils";
 import { saveProducts } from "../config/productUtils";
 import { productImageDisplayUrl } from "../utils/imageUrl";
+import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 
 interface AddProductsModalProps {
   isOpen: boolean;
@@ -82,6 +83,7 @@ export default function AddProductsModal({
   const [products, setProducts] = useState(allProducts);
   const [search, setSearch] = useState("");
   const wasOpenRef = useRef(false);
+  const { guardCloudWrite } = useCloudWriteGate();
 
   // Only hydrate from parent when the modal opens — not on every parent re-render (avoids jank / search reset).
   useEffect(() => {
@@ -103,6 +105,7 @@ export default function AddProductsModal({
 
   const handleToggleProduct = useCallback(
     (productId: string) => {
+      if (!guardCloudWrite()) return;
       let updated: any[] | undefined;
       setProducts((prev) => {
         updated = prev.map((p) => {
@@ -116,10 +119,11 @@ export default function AddProductsModal({
       });
       if (updated) persistAndNotifyParent(updated);
     },
-    [catalogueId, persistAndNotifyParent]
+    [catalogueId, persistAndNotifyParent, guardCloudWrite]
   );
 
   const handleToggleAllProducts = useCallback(() => {
+    if (!guardCloudWrite()) return;
     let updated: any[] | undefined;
     setProducts((prev) => {
       const filtered = prev.filter(
@@ -138,7 +142,7 @@ export default function AddProductsModal({
       return updated;
     });
     if (updated) persistAndNotifyParent(updated);
-  }, [catalogueId, search, persistAndNotifyParent]);
+  }, [catalogueId, search, persistAndNotifyParent, guardCloudWrite]);
 
   const filteredProducts = products.filter(
     (p) =>

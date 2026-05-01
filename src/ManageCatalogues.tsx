@@ -11,6 +11,7 @@ import { deleteRenderedImagesFromFolder, renameRenderedImagesForCatalogue } from
 import { FiX, FiPlus, FiEdit2, FiTrash2, FiImage, FiCheck, FiLoader } from "react-icons/fi";
 import { logCatalogueCreated, logCatalogueDeleted } from "./config/analyticsEvents";
 import { useAuth } from "./context/AuthContext";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { useSubscription } from "./context/SubscriptionContext";
 import { FREE_MAX_CATALOGUES } from "./config/freeTierLimits";
 import { syncCataloguesDefinition } from "./services/supabaseSync";
@@ -55,6 +56,7 @@ export default React.memo(function ManageCatalogues({
   renamingCatalogueIds = new Set(),
 }: ManageCataloguesProps) {
   const { user } = useAuth();
+  const { guardCloudWrite } = useCloudWriteGate();
   const { isPro } = useSubscription();
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -117,6 +119,8 @@ export default React.memo(function ManageCatalogues({
       );
       return;
     }
+
+    if (!guardCloudWrite()) return;
 
     setIsSaving(true);
     try {
@@ -215,6 +219,8 @@ export default React.memo(function ManageCatalogues({
       return;
     }
 
+    if (!guardCloudWrite()) return;
+
     setIsSaving(true);
     try {
       await Haptics.impact({ style: ImpactStyle.Medium });
@@ -294,6 +300,7 @@ export default React.memo(function ManageCatalogues({
 
   const handleDeleteConfirm = async (catalogue: Catalogue) => {
     if (!catalogue) return;
+    if (!guardCloudWrite()) return;
 
     try {
       await Haptics.impact({ style: ImpactStyle.Heavy });

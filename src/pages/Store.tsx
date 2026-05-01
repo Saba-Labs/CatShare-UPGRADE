@@ -7,6 +7,7 @@ import {
   createStore,
   updateStoreSlug,
   updateStoreCatalogue,
+  updateStoreViewMode,
   updateStoreLiveStatus,
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
@@ -19,7 +20,10 @@ import {
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { buildStorefrontUrl, getStorefrontRootHost } from '../utils/storefrontDomain';
 import { syncUserSettings } from '../services/supabaseSync';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { uploadProductImageToR2 } from '../services/r2Upload';
+import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import {
   type BusinessProfile,
   EMPTY_BUSINESS_PROFILE,
@@ -28,6 +32,8 @@ import {
 import MainAppBottomNav from '../components/MainAppBottomNav';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
+const STORE_FETCH_TIMEOUT_MS = 14_000;
+const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
 
 /* ─── Icons ─────────────────────────────────────────────── */
 const IconCopy = () => (
@@ -989,16 +995,18 @@ export default function StorePage() {
   const navigate = useNavigate();
   const { user, supabaseData, refreshSupabaseData } = useAuth();
   const { showToast } = useToast();
+  const { guardCloudWrite } = useCloudWriteGate();
 
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'whatsapp' | 'minimumOrder' | null>(null);
+  const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'view' | 'whatsapp' | 'minimumOrder' | null>(null);
   const [isLive, setIsLive] = useState(true);
   const [liveTogglePending, setLiveTogglePending] = useState(false);
 
   const [formSlug, setFormSlug] = useState('');
   const [formCatalogue, setFormCatalogue] = useState('');
+  const [formViewMode, setFormViewMode] = useState<'grid' | 'list'>('grid');
   const [slugError, setSlugError] = useState('');
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1007,6 +1015,8 @@ export default function StorePage() {
   const [formMinimumOrder, setFormMinimumOrder] = useState('');
   const [catalogueMenuOpen, setCatalogueMenuOpen] = useState(false);
   const catalogueMenuRef = useRef<HTMLDivElement | null>(null);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const viewMenuRef = useRef<HTMLDivElement | null>(null);
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(EMPTY_BUSINESS_PROFILE);
   const [businessSaving, setBusinessSaving] = useState(false);
   const [businessProfileOpen, setBusinessProfileOpen] = useState(false);
@@ -1015,28 +1025,86 @@ export default function StorePage() {
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
 
+  const applyStoreState = (nextStore: Store) => {
+    setStore(nextStore);
+    setFormWhatsapp(nextStore.storeWhatsapp || '');
+    setFormMinimumOrder(nextStore.minimumOrderValue != null ? String(nextStore.minimumOrderValue) : '');
+    setFormViewMode(nextStore.viewMode === 'list' ? 'list' : 'grid');
+    setShowCreateForm(false);
+    setIsLive(nextStore.isLive);
+  };
+
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
+    const cacheKey = sellerStoreCacheKey(user.uid);
+    if (store) {
+      safeSetInStorage(cacheKey, store);
+    }
+  }, [store, user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
+    if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
+    const cached = safeGetFromStorage<Store | null>(sellerStoreCacheKey(user.uid), null);
+    if (!cached) return;
+    applyStoreState(cached);
+    setLoading(false);
+  }, [user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
+    if (!user?.uid || user.uid.trim() === '') return;
+    if (user.isAnonymous) {
+      setLoading(false);
+      setStore(null);
+      setShowCreateForm(true);
+      return;
+    }
+
+    let cancelled = false;
     const load = async () => {
-      setLoading(true);
-      const result = await getSellerStore(user.uid);
+      const uid = user.uid;
+      const cacheKey = sellerStoreCacheKey(uid);
+      const cached = safeGetFromStorage<Store | null>(cacheKey, null);
+      if (!cached) {
+        setLoading(true);
+      }
+
+      type StoreResult = Awaited<ReturnType<typeof getSellerStore>>;
+      const result = await Promise.race<StoreResult>([
+        getSellerStore(uid),
+        new Promise<StoreResult>((resolve) =>
+          setTimeout(() => resolve({ success: false, error: 'Store fetch timed out' }), STORE_FETCH_TIMEOUT_MS)
+        ),
+      ]);
+
+      if (cancelled) return;
+
       if (result.success && result.data) {
-        setStore(result.data);
-        setFormWhatsapp(result.data.storeWhatsapp || '');
-        setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
-        setShowCreateForm(false);
-        setIsLive(result.data.isLive);
+        applyStoreState(result.data);
+        safeSetInStorage(cacheKey, result.data);
       } else {
-        setStore(null);
-        setShowCreateForm(true);
+        const fallback = cached ?? safeGetFromStorage<Store | null>(cacheKey, null);
+        if (fallback) {
+          applyStoreState(fallback);
+          showToast(
+            isBrowserOnline() ? 'Could not refresh store. Showing saved settings.' : 'Showing saved store settings',
+            'info'
+          );
+        } else {
+          setStore(null);
+          setShowCreateForm(true);
+        }
       }
       setLoading(false);
     };
-    load();
-  }, [user?.uid]);
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, user?.isAnonymous, showToast]);
 
   useEffect(() => {
     if (editingField !== 'catalogue') setCatalogueMenuOpen(false);
+    if (editingField !== 'view') setViewMenuOpen(false);
   }, [editingField]);
 
   useEffect(() => {
@@ -1061,6 +1129,24 @@ export default function StorePage() {
     };
   }, [catalogueMenuOpen]);
 
+  useEffect(() => {
+    if (!viewMenuOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!viewMenuRef.current) return;
+      const target = event.target as Node;
+      if (!viewMenuRef.current.contains(target)) setViewMenuOpen(false);
+    };
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setViewMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onEscape);
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onEscape);
+    };
+  }, [viewMenuOpen]);
+
   const validateAndSetSlug = (slug: string) => {
     setFormSlug(slug);
     const v = validateStoreSlug(slug);
@@ -1071,6 +1157,7 @@ export default function StorePage() {
   const handleCreateStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     const v = validateStoreSlug(formSlug);
     if (!v.valid) { setSlugError(v.error || 'Check the link name and try again'); return; }
     if (!formCatalogue) { showToast('Please choose which products to show in your store', 'error'); return; }
@@ -1094,6 +1181,7 @@ export default function StorePage() {
 
   const handleUpdateSlug = async (newSlug: string) => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     const v = validateStoreSlug(newSlug);
     if (!v.valid) { showToast(v.error || 'Check the link name and try again', 'error'); return; }
     setIsSubmitting(true);
@@ -1112,6 +1200,7 @@ export default function StorePage() {
 
   const handleUpdateCatalogue = async (catId: string) => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     setIsSubmitting(true);
     const result = await updateStoreCatalogue(user.uid, catId);
     if (result.success && result.data) {
@@ -1124,8 +1213,25 @@ export default function StorePage() {
     setIsSubmitting(false);
   };
 
+  const handleUpdateViewMode = async (nextViewMode: 'grid' | 'list') => {
+    if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
+    setIsSubmitting(true);
+    const result = await updateStoreViewMode(user.uid, nextViewMode);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setFormViewMode(result.data.viewMode === 'list' ? 'list' : 'grid');
+      setEditingField(null);
+      showToast(nextViewMode === 'grid' ? 'Store view set to Grid' : 'Store view set to List', 'success');
+    } else {
+      showToast(result.error || 'Failed', 'error');
+    }
+    setIsSubmitting(false);
+  };
+
   const handleSaveWhatsapp = async () => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     const n = normalizeStoreWhatsappInput(formWhatsapp);
     if (n.ok === false) { showToast(n.error, 'error'); return; }
     setIsSubmitting(true);
@@ -1141,6 +1247,7 @@ export default function StorePage() {
 
   const handleSaveMinimumOrder = async () => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     const normalized = normalizeStoreMinimumOrderValueInput(formMinimumOrder);
     if (normalized.ok === false) { showToast(normalized.error, 'error'); return; }
     setIsSubmitting(true);
@@ -1159,12 +1266,14 @@ export default function StorePage() {
     if (!editingField) return;
     if (editingField === 'slug') await handleUpdateSlug(formSlug);
     else if (editingField === 'catalogue') await handleUpdateCatalogue(formCatalogue);
+    else if (editingField === 'view') await handleUpdateViewMode(formViewMode);
     else if (editingField === 'whatsapp') await handleSaveWhatsapp();
     else if (editingField === 'minimumOrder') await handleSaveMinimumOrder();
   };
 
   const handleLiveToggle = async () => {
     if (!user?.uid || liveTogglePending) return;
+    if (!guardCloudWrite()) return;
     const prev = isLive;
     const next = !prev;
     setIsLive(next);
@@ -1189,6 +1298,7 @@ export default function StorePage() {
 
   const handleSaveBusinessProfile = async () => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     setBusinessSaving(true);
     const result = await syncUserSettings(user.uid, {
       data: { businessProfile: { ...businessProfile } },
@@ -1247,7 +1357,7 @@ export default function StorePage() {
 
   /* ── Helper: render a single info row ── */
   const renderInfoRow = (
-    field: 'slug' | 'catalogue' | 'whatsapp' | 'minimumOrder',
+    field: 'slug' | 'catalogue' | 'view' | 'whatsapp' | 'minimumOrder',
     label: string,
     displayValue: React.ReactNode,
     editContent: React.ReactNode,
@@ -1466,6 +1576,51 @@ export default function StorePage() {
                     )}
                   </div>,
                   () => { setEditingField('catalogue'); setFormCatalogue(store.catalogueId); },
+                )}
+
+                {/* View mode */}
+                {renderInfoRow(
+                  'view',
+                  'View',
+                  <div className="field-value">{store.viewMode === 'list' ? 'List' : 'Grid'}</div>,
+                  <div className={`inline-select-wrap${viewMenuOpen ? ' open' : ''}`} ref={viewMenuRef}>
+                    <button
+                      type="button"
+                      className="inline-select"
+                      onClick={() => setViewMenuOpen((v) => !v)}
+                    >
+                      {formViewMode === 'list' ? 'List' : 'Grid'}
+                    </button>
+                    <IconChevron />
+                    {viewMenuOpen && (
+                      <div className="inline-select-menu">
+                        <button
+                          type="button"
+                          className={`inline-select-option${formViewMode === 'grid' ? ' active' : ''}`}
+                          onClick={() => {
+                            setFormViewMode('grid');
+                            setViewMenuOpen(false);
+                          }}
+                        >
+                          Grid
+                        </button>
+                        <button
+                          type="button"
+                          className={`inline-select-option${formViewMode === 'list' ? ' active' : ''}`}
+                          onClick={() => {
+                            setFormViewMode('list');
+                            setViewMenuOpen(false);
+                          }}
+                        >
+                          List
+                        </button>
+                      </div>
+                    )}
+                  </div>,
+                  () => {
+                    setEditingField('view');
+                    setFormViewMode(store.viewMode === 'list' ? 'list' : 'grid');
+                  },
                 )}
 
                 {/* WhatsApp */}
@@ -1721,10 +1876,12 @@ export default function StorePage() {
 
   async function handleDeleteStore() {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     setIsSubmitting(true);
     const result = await deleteStore(user.uid);
     if (result.success) {
       setStore(null); setShowCreateForm(true); setConfirmDelete(false);
+      localStorage.removeItem(sellerStoreCacheKey(user.uid));
       showToast('Store deleted', 'success');
     } else showToast(result.error || 'Failed', 'error');
     setIsSubmitting(false);

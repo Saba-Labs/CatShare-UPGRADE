@@ -14,6 +14,7 @@ import { getAllCatalogues } from "../config/catalogueConfig";
 import { INDUSTRY_PRESETS } from "../config/industryPresets";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
+import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 function parseUnitOptionsString(unitsString) {
@@ -28,6 +29,7 @@ export default function FieldsSettings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
   const { user } = useAuth();
+  const { guardCloudWrite } = useCloudWriteGate();
   const [definition, setDefinition] = useState(null);
   const [savedDefinition, setSavedDefinition] = useState(null);
   const [activePriceFields, setActivePriceFields] = useState([]);
@@ -215,6 +217,10 @@ export default function FieldsSettings() {
   };
 
   const confirmSave = async () => {
+    if (!guardCloudWrite()) {
+      setShowSaveConfirmation(false);
+      return;
+    }
     if (definition) {
       const mergedDefinition = mergeUnitDraftsIntoDefinition(definition);
       setDefinition(mergedDefinition);

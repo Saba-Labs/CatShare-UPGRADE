@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { syncUserSettings } from '../services/supabaseSync';
+import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { uploadProductImageToR2 } from '../services/r2Upload';
 import { parseWhatsAppNumber } from '../data/whatsappCountryCodes';
 import {
@@ -50,6 +51,7 @@ export default function Account() {
   const navigate = useNavigate();
   const { user, logout, supabaseData, refreshSupabaseData } = useAuth();
   const { showToast } = useToast();
+  const { guardCloudWrite } = useCloudWriteGate();
   const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -146,6 +148,7 @@ export default function Account() {
   const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user?.uid) return;
+    if (!guardCloudWrite()) return;
     if (!file.type.startsWith('image/')) {
       showToast('Please choose an image file', 'error');
       return;
@@ -177,6 +180,7 @@ export default function Account() {
 
   const saveBusinessDetails = async () => {
     if (!user?.uid) return;
+    if (!guardCloudWrite()) return;
     setBusinessSaving(true);
     setError('');
     try {

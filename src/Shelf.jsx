@@ -9,6 +9,7 @@ import { deleteRenderedImageForProduct } from "./Save";
 import { tryReadProductSourceAsDataUrl, deleteProductSourceImagesBestEffort } from "./utils/productSourceImage";
 import { deleteAllDeletedProducts, deleteProductFromSupabase } from "./services/supabaseSync";
 import { useSync } from "./context/SyncContext";
+import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
 export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap, user }) {
@@ -54,7 +55,11 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
     if (isStrictMode() && user?.uid) {
       try {
-        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted);
+        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
+          skipFullCloudRefresh: true,
+          maxSyncUiMs: 1000,
+          fullListForPosition: freshProducts,
+        });
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
         console.log(`✅ Product ${product.id} restored and synced to cloud`);
@@ -71,6 +76,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
   const handleDelete = async () => {
     if (!deleteTargetId) return;
+    if (!guardCloudWrite()) return;
 
     const toDelete = deletedProducts.find(p => p.id === deleteTargetId);
     if (!toDelete) {
@@ -115,6 +121,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
   const handleDeleteAll = async () => {
     setShowDeleteAllConfirm(false);
+    if (!guardCloudWrite()) return;
 
     if (!user?.uid) {
       alert("Please login to permanently delete from cloud.");
