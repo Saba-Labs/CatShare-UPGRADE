@@ -30,6 +30,7 @@ import {
   businessProfileFromUserSettings,
 } from '../config/businessProfile';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+import { Capacitor } from '@capacitor/core';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 const STORE_FETCH_TIMEOUT_MS = 14_000;
@@ -86,7 +87,10 @@ const IconExternalLink = () => (
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Scoped reset; :where() keeps specificity 0 so Tailwind on MainAppBottomNav (py-2.5 etc.) still applies. */
+  :where(.store-root) *,
+  :where(.store-root) *::before,
+  :where(.store-root) *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
     --bg:rgb(224, 238, 243);
@@ -116,7 +120,8 @@ const CSS = `
     --mono: 'DM Mono', 'Menlo', monospace;
   }
 
-  body { font-family: var(--font); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  /* Do not set body font-family — it leaked to fixed UI outside .store-root (offline banner). DM Sans stays on .store-root */
+  body { background: var(--bg); -webkit-font-smoothing: antialiased; }
 
   .store-root {
     display: flex;
@@ -129,7 +134,7 @@ const CSS = `
   .status-bar {
     position: fixed;
     inset: 0 0 auto 0;
-    height: 44px;
+    height: 40px;
     background: #0F172A;
     z-index: 60;
   }
@@ -137,7 +142,7 @@ const CSS = `
   /* ── Header ── */
   .header {
     position: sticky;
-    top: 44px;
+    top: 40px;
     z-index: 50;
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(16px);
@@ -197,7 +202,7 @@ const CSS = `
   .main {
     flex: 1;
     padding: 16px 16px 100px;
-    margin-top: 44px;
+    margin-top: 40px;
     max-width: 480px;
     margin-left: auto;
     margin-right: auto;
@@ -1485,7 +1490,19 @@ export default function StorePage() {
                   </button>
                 </div>
                 <div className="url-banner-row">
-                  <a className="url-text" href={storeUrl} target="_blank" rel="noreferrer">
+                  <a
+                    className="url-text"
+                    href={storeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => {
+                      if (!Capacitor.isNativePlatform()) return;
+                      e.preventDefault();
+                      void import('@capacitor/browser').then(({ Browser }) =>
+                        Browser.open({ url: storeUrl, toolbarColor: '#ffffff' })
+                      );
+                    }}
+                  >
                     {storeUrl}
                     <IconExternalLink />
                   </a>

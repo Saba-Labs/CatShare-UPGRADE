@@ -27,6 +27,7 @@ import {
   SHARE_LINK_EXPIRY_PRESETS,
   type ShareLinkExpiryPresetId,
 } from "./services/shareLinks";
+import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from "./utils/offerPriceUtils";
 import { businessProfileFromUserSettings, getBusinessProfileForPdf } from "./config/businessProfile";
 import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
@@ -50,6 +51,7 @@ const ProductCard = React.memo(({
   catalogueId,
   getLighterColor,
   getProductCatalogueData,
+  priceField,
   onCardClick,
   onTouchStart,
   onTouchMove,
@@ -181,7 +183,19 @@ const ProductCard = React.memo(({
 
       {showInfo && (
         <div className="absolute top-1.5 left-1.5 bg-red-800 text-white text-[11px] font-medium px-2 py-0.45 rounded-full shadow-md tracking-wide z-10">
-          {currencySymbol}{catData.price}
+          {(() => {
+            const row = getCatalogueData(p, catalogueId);
+            const r = resolveListOfferEffective(row, priceField, p as Record<string, unknown>);
+            if (r.showStrikeout) {
+              return (
+                <>
+                  {currencySymbol}{r.offerPrice}
+                  <span style={{ ...STRUCK_LIST_PRICE_STYLE, marginLeft: 3 }}>{currencySymbol}{r.listPrice}</span>
+                </>
+              );
+            }
+            return <>{currencySymbol}{r.effectiveUnitPrice || catData.price}</>;
+          })()}
         </div>
       )}
 
@@ -284,7 +298,23 @@ const ProductCard = React.memo(({
           padding: "5px 8px", textAlign: "center",
           fontWeight: "normal", fontSize: 19, margin: 0, lineHeight: 1.2,
         }}>
-          Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{catData.price}{" "}{catData.priceUnit}
+          {(() => {
+            const row = getCatalogueData(p, catalogueId);
+            const r = resolveListOfferEffective(row, priceField, p as Record<string, unknown>);
+            const u = catData.priceUnit && catData.priceUnit !== "None" ? catData.priceUnit : "";
+            if (r.showStrikeout) {
+              return (
+                <>
+                  Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{r.offerPrice}{" "}
+                  <span style={STRUCK_LIST_PRICE_STYLE}>{currencySymbol}{r.listPrice}</span>
+                  {u ? ` ${u}` : ""}
+                </>
+              );
+            }
+            return (
+              <>Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{r.effectiveUnitPrice || catData.price}{u ? ` ${u}` : ""}</>
+            );
+          })()}
         </h2>
       </div>
     </div>
@@ -887,12 +917,15 @@ const handleTouchEnd = useCallback(() => {
             imageData = imageMap[product.id];
           }
 
+          const catRow = getCatalogueData(product, catalogueId);
+          const offerR = resolveListOfferEffective(catRow, priceField, product as Record<string, unknown>);
           return {
             id: product.id,
             name: product.name || "Unnamed Product",
             subtitle: product.subtitle || "",
             image: imageData,
-            price: catalogueData.price,
+            price: offerR.showStrikeout ? offerR.listPrice : catalogueData.price,
+            offerPrice: offerR.showStrikeout ? offerR.offerPrice : undefined,
             priceUnit: catalogueData.priceUnit,
             field1: catalogueData.field1,
             field2: catalogueData.field2,
@@ -1939,6 +1972,7 @@ const handleTouchEnd = useCallback(() => {
     currencySymbol={currencySymbol}
     imageMap={imageMap}
     catalogueId={catalogueId}
+    priceField={priceField}
     getLighterColor={getLighterColor}
     getProductCatalogueData={getProductCatalogueData}
     onCardClick={handleCardClick}

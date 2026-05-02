@@ -4,6 +4,7 @@ import {
   initializeCatalogueData,
   type ProductWithCatalogueData,
 } from "../config/catalogueProductUtils";
+import { offerPriceFieldFor } from "../utils/offerPriceUtils";
 
 export type BulkRenderingType = "glass" | "classic";
 
@@ -59,6 +60,7 @@ export function buildBulkImportedProduct(options: {
     const catData = getCatalogueData(formData, cat.id);
     newItem[cat.priceField] = catData[cat.priceField] || "";
     newItem[cat.priceUnitField] = catData[cat.priceUnitField] || "/ piece";
+    newItem[offerPriceFieldFor(cat.priceField)] = catData[offerPriceFieldFor(cat.priceField)] || "";
     newItem[cat.stockField] = catData[cat.stockField] !== false;
   }
 

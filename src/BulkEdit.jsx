@@ -3,6 +3,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { useToast } from "./context/ToastContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue, normalizeOrderQuantityStep } from "./config/catalogueProductUtils";
+import { offerPriceFieldFor } from "./utils/offerPriceUtils";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
@@ -31,6 +32,7 @@ const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
   // Add price field based on catalogue
   if (priceField) {
     baseFields.push({ key: priceField, label: 'Price' });
+    baseFields.push({ key: offerPriceFieldFor(priceField), label: 'Offer' });
   }
 
   baseFields.push({ key: "stock", label: "Stock Update" });
@@ -75,6 +77,7 @@ export default function BulkEdit({
   const priceField = selectedCatalogueConfig?.priceField || initialPriceField;
   const priceUnitField = selectedCatalogueConfig?.priceUnitField || initialPriceUnitField;
   const stockField = selectedCatalogueConfig?.stockField || initialStockField;
+  const offerField = priceField ? offerPriceFieldFor(priceField) : null;
 
   // Reset filledFromMaster when catalogue changes
   useEffect(() => {
@@ -86,6 +89,13 @@ export default function BulkEdit({
   const totalProducts = products.length;
   const estimatedSeconds = totalProducts * 2; // or whatever estimate you use
   const FIELD_OPTIONS = getFieldOptions(catalogueId, priceField, priceUnitField);
+  /** Edit grid columns follow getFieldOptions order, not checkbox selection order. */
+  const selectedFieldsInDefaultOrder = useMemo(() => {
+    const selected = new Set(selectedFields);
+    return getFieldOptions(catalogueId, priceField, priceUnitField)
+      .map((f) => f.key)
+      .filter((key) => selected.has(key));
+  }, [selectedFields, catalogueId, priceField, priceUnitField]);
   const tableScrollRef = useRef(null);
   const scrollToSet = useMemo(
     () => new Set((scrollToProductIds || []).map((id) => String(id))),
@@ -178,6 +188,8 @@ useEffect(() => {
     if (priceField) {
       normalized[priceField] = catData[priceField] || "";
       normalized[priceUnitField] = catData[priceUnitField] || "/ piece";
+      const of = offerPriceFieldFor(priceField);
+      normalized[of] = catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "";
     }
 
     // Initialize other price fields - show if they exist
@@ -239,6 +251,12 @@ useEffect(() => {
     if (priceUnitField && !(priceUnitField in defaults)) {
       defaults[priceUnitField] = item[priceUnitField] ?? "/ piece";
     }
+    if (priceField) {
+      const of = offerPriceFieldFor(priceField);
+      if (!(of in defaults)) {
+        defaults[of] = item[of] ?? "";
+      }
+    }
     if (stockField && !(stockField in defaults)) {
       defaults[stockField] = item[stockField] ?? "";
     }
@@ -287,6 +305,8 @@ useEffect(() => {
           } else if (fieldKey === priceField) {
             updates[priceField] = "";
             updates[priceUnitField] = "/ piece";
+          } else if (offerField && fieldKey === offerField) {
+            updates[offerField] = "";
           } else if (fieldKey === "wholesale") {
             updates.wholesale = "";
             updates.wholesaleUnit = "/ piece";
@@ -331,6 +351,11 @@ useEffect(() => {
           // Fill current catalogue's price field with master catalogue's price field data
           updates[priceField] = masterData[masterCatalogue.priceField] || "";
           updates[priceUnitField] = masterData[masterCatalogue.priceUnitField] || "/ piece";
+        } else if (offerField && fieldKey === offerField) {
+          const masterOfferKey = offerPriceFieldFor(masterCatalogue.priceField);
+          const raw = masterData[masterOfferKey];
+          updates[offerField] =
+            raw !== undefined && raw !== null ? String(raw) : "";
         } else if (fieldKey === "wholesale") {
           updates.wholesale = item.masterWholesale || "";
           updates.wholesaleUnit = item.masterWholesaleUnit || "/ piece";
@@ -398,6 +423,9 @@ useEffect(() => {
     badge: p.badge,
     [priceField]: priceField ? p[priceField] : undefined,
     [priceUnitField]: priceField ? p[priceUnitField] : undefined,
+    ...(priceField
+      ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
+      : {}),
     [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
     orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
   };
@@ -571,6 +599,18 @@ useEffect(() => {
       );
     }
 
+    if (offerField && field === offerField) {
+      return (
+        <input
+          value={item[offerField] ?? ""}
+          onChange={(e) => handleFieldChange(item.id, offerField, e.target.value)}
+          className={cellInput}
+          placeholder="Offer"
+          inputMode="decimal"
+        />
+      );
+    }
+
     if (field === "wholesale") {
       return (
         <div className="flex gap-2 w-full min-w-0">
@@ -727,6 +767,10 @@ useEffect(() => {
                   if (cat.priceField) {
                     normalized[cat.priceField] = catData[cat.priceField] || p[cat.priceField] || "";
                     normalized[cat.priceUnitField] = catData[cat.priceUnitField] || p[cat.priceUnitField] || "/ piece";
+                    const of = offerPriceFieldFor(cat.priceField);
+                    const raw = catData[of];
+                    normalized[of] =
+                      raw !== undefined && raw !== null ? String(raw) : (p[of] ?? "");
                   }
 
                   normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
@@ -919,7 +963,7 @@ useEffect(() => {
             <div className="flex w-16 shrink-0 items-center justify-center text-center normal-case tracking-normal font-semibold">Image</div>
           </div>
           <div className="flex gap-2 py-2.5 pr-1 pl-2">
-            {selectedFields.map((field) => (
+            {selectedFieldsInDefaultOrder.map((field) => (
               <React.Fragment key={field}>{renderBulkFieldHeader(field)}</React.Fragment>
             ))}
           </div>
@@ -960,7 +1004,7 @@ useEffect(() => {
                 </div>
               </div>
               <div className="flex gap-2 py-2 pl-2 pr-1 items-center">
-                {selectedFields.map((field) => (
+                {selectedFieldsInDefaultOrder.map((field) => (
                   <div key={`${item.id}-${field}`} className={bulkFieldCol}>
                     {renderBulkFieldCell(item, field)}
                   </div>

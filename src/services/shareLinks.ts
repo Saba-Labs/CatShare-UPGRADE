@@ -1,6 +1,7 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields, isFieldVisibleOnSurface } from '../config/fieldConfig';
-import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import { getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { getCurrencyData } from '../utils/currencyUtils';
 import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
 
@@ -94,12 +95,10 @@ export function productToShareLinkItem(
   const priceField = priceFieldMap[catalogueId] || 'price1';
   const priceUnitField = priceUnitFieldMap[catalogueId] || 'price1Unit';
 
-  const price =
-    catData[priceField] ??
-    product[priceField] ??
-    catData['price1'] ??
-    product['price1'] ??
-    undefined;
+  const catRow = getCatalogueData(product as never, catalogueId);
+  const pricing = resolveListOfferEffective(catRow, priceField, product);
+  const effectivePrice =
+    pricing.effectiveUnitPrice > 0 ? pricing.effectiveUnitPrice : undefined;
 
   const priceUnit =
     catData[priceUnitField] ??
@@ -126,7 +125,7 @@ export function productToShareLinkItem(
     ...(typeof product.imageVersion === 'number' && Number.isFinite(product.imageVersion)
       ? { imageVersion: product.imageVersion }
       : {}),
-    price: price !== undefined && price !== '' ? String(price) : undefined,
+    price: effectivePrice !== undefined ? String(effectivePrice) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
     ...(step > 1 ? { quantityStep: step } : {}),
   };

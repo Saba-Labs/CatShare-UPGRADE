@@ -6,6 +6,7 @@
  */
 
 import { getAllCatalogues, type Catalogue } from './catalogueConfig';
+import { offerPriceFieldFor } from '../utils/offerPriceUtils';
 
 /** Clamp order step for catalogue data (1 = no restriction). */
 export function normalizeOrderQuantityStep(raw: unknown): number {
@@ -83,6 +84,8 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
     // Dynamically get price field values based on catalogue configuration
     const priceValue = product?.[cat.priceField] || "";
     const priceUnitValue = product?.[cat.priceUnitField] || "/ piece";
+    const offerField = offerPriceFieldFor(cat.priceField);
+    const offerValue = product?.[offerField];
     const stockValue = product?.[cat.stockField] !== false;
 
     catalogueData[cat.id] = {
@@ -99,6 +102,7 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
       field10: product?.field10 || "",
       [cat.priceField]: priceValue,
       [cat.priceUnitField]: priceUnitValue,
+      [offerField]: offerValue !== undefined && offerValue !== null ? String(offerValue) : "",
       field2Unit: product?.field2Unit || product?.packageUnit || "None",
       field3Unit: product?.field3Unit || product?.ageUnit || "None",
       field4Unit: product?.field4Unit || "None",
@@ -182,6 +186,7 @@ export function getDefaultCatalogueData(catalogueId: string): CatalogueData {
   if (catalogue) {
     defaults[catalogue.priceField] = "";
     defaults[catalogue.priceUnitField] = "/ piece";
+    defaults[offerPriceFieldFor(catalogue.priceField)] = "";
     defaults[catalogue.stockField] = true;
   } else {
     // Fallback for legacy support (in case catalogue is deleted)

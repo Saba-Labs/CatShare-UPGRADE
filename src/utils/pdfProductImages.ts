@@ -12,6 +12,7 @@ export type PdfExportProductRow = {
   subtitle?: string;
   image?: string;
   price?: string | number;
+  offerPrice?: string | number;
   priceUnit?: string;
   field1?: string;
   field2?: string;

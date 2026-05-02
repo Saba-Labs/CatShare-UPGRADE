@@ -13,6 +13,7 @@ import {
 import { authService } from '../services/authService';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../supabaseClient';
 import { logSignUp, logSignUpFailed, logSignUpCancelled } from '../config/analyticsEvents';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 
@@ -61,6 +62,8 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState<string | null>(null);
   const [hasJustSignedUp, setHasJustSignedUp] = useState(false);
+  /** Set after email sign-up when Supabase did not create a session (confirmation email flow). */
+  const [emailConfirmationSentTo, setEmailConfirmationSentTo] = useState<string | null>(null);
 
   const isAuthCancelError = (msg: string): boolean => {
     const m = msg.toLowerCase();
@@ -83,11 +86,10 @@ export default function Register() {
 
   useEffect(() => {
     if (hasJustSignedUp && !supabaseDataLoading) {
-      showToast('Account created successfully!', 'success');
       navigate('/welcome');
       setHasJustSignedUp(false);
     }
-  }, [hasJustSignedUp, supabaseDataLoading, navigate, showToast]);
+  }, [hasJustSignedUp, supabaseDataLoading, navigate]);
 
   const validatePassword = (password: string) => {
     const errors = [];
@@ -126,7 +128,12 @@ export default function Register() {
     try {
       await authService.registerWithEmail(formData.email, formData.password, formData.displayName);
       logSignUp('email');
-      setHasJustSignedUp(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setHasJustSignedUp(true);
+      } else {
+        setEmailConfirmationSentTo(formData.email.trim());
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
       setError(errorMessage);
@@ -164,7 +171,9 @@ export default function Register() {
     'min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50/80 py-2.5 pl-11 pr-4 text-[15px] text-slate-900 placeholder:text-[14px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 sm:py-3 sm:text-[16px] sm:placeholder:text-[15px] lg:text-base';
 
   const showRegisterOverlay =
-    isLoading || (hasJustSignedUp && supabaseDataLoading) || authLoading === 'google';
+    isLoading ||
+    (hasJustSignedUp && supabaseDataLoading) ||
+    authLoading === 'google';
 
   const formColumnClassName = [
     'flex-1 flex flex-col min-h-0',
@@ -203,17 +212,22 @@ export default function Register() {
           <div className="mb-3 -mt-1">
             <Link
               to="/login"
+              state={emailConfirmationSentTo ? { showLoginForm: true } : undefined}
               className="-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg pl-2 pr-3 text-[13px] font-semibold text-sky-50 hover:text-white active:bg-white/10 sm:gap-2 sm:text-sm"
             >
               <FiArrowLeft className="h-[18px] w-[18px] shrink-0 sm:h-5 sm:w-5" aria-hidden />
-              Back
+              {emailConfirmationSentTo ? 'Log in' : 'Back'}
             </Link>
           </div>
 
           <div className="mb-3 text-center lg:mb-4">
-            <h2 className="text-xl font-semibold text-white sm:text-2xl">Create account</h2>
+            <h2 className="text-xl font-semibold text-white sm:text-2xl">
+              {emailConfirmationSentTo ? 'Confirm your email' : 'Create account'}
+            </h2>
             <p className="mt-0.5 text-sm text-blue-100/85 sm:mt-1 sm:text-base">
-              Set up your CatShare workspace
+              {emailConfirmationSentTo
+                ? 'Almost done — check your inbox'
+                : 'Set up your CatShare workspace'}
             </p>
           </div>
 
@@ -221,12 +235,12 @@ export default function Register() {
             className={[
               'rounded-2xl border border-slate-200/70 bg-white p-4 shadow-lg shadow-slate-300/20 sm:p-8 lg:p-8',
               isNativeApp ? 'shadow-slate-300/15' : '',
-              showRegisterOverlay ? 'relative pointer-events-none opacity-60' : '',
+              showRegisterOverlay && !emailConfirmationSentTo ? 'relative pointer-events-none opacity-60' : '',
             ]
               .filter(Boolean)
               .join(' ')}
           >
-            {showRegisterOverlay && (
+            {showRegisterOverlay && !emailConfirmationSentTo && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm">
                 <div className="flex flex-col items-center gap-2.5 sm:gap-3">
                   <div className="h-9 w-9 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 sm:h-10 sm:w-10" />
@@ -240,6 +254,29 @@ export default function Register() {
                 </div>
               </div>
             )}
+            {emailConfirmationSentTo ? (
+              <div className="py-2 text-center sm:py-4">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600 sm:mb-5 sm:h-16 sm:w-16">
+                  <FiMail className="h-7 w-7 sm:h-8 sm:w-8" aria-hidden />
+                </div>
+                <p className="text-[15px] leading-relaxed text-slate-800 sm:text-base">
+                  We sent a confirmation link to{' '}
+                  <span className="font-semibold text-slate-900 break-all">{emailConfirmationSentTo}</span>.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:mt-4">
+                  Open the link in that email to verify your address, then sign in here with your password.
+                </p>
+                <p className="mt-2 text-xs text-slate-500">Check spam if you don&apos;t see it within a few minutes.</p>
+                <Link
+                  to="/login"
+                  state={{ showLoginForm: true }}
+                  className="mt-8 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-blue-600/25 transition hover:from-blue-500 hover:to-indigo-500 sm:text-base"
+                >
+                  Go to log in
+                </Link>
+              </div>
+            ) : (
+              <>
             {error && (
               <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-100 bg-red-50 p-3 sm:mb-6 sm:gap-3 sm:p-3.5">
                 <FiAlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 sm:h-[18px] sm:w-[18px]" />
@@ -406,6 +443,8 @@ export default function Register() {
                 </Link>
               </p>
             </div>
+              </>
+            )}
           </div>
 
           <p className="relative z-10 mt-3 pb-1 text-center text-[11px] text-blue-200/65 sm:mt-4 sm:text-xs">

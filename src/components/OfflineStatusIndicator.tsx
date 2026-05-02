@@ -56,11 +56,21 @@ export const OfflineStatusIndicator: React.FC = () => {
     <>
       {/* Offline Banner */}
       {!isOnline && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-2 text-center text-sm font-medium">
-          <div className="flex items-center justify-center gap-2">
-            <span className="inline-block w-2 h-2 bg-white rounded-full animate-pulse" />
-            You are offline - changes will be synced when reconnected
-          </div>
+        <div
+          className="offline-status-banner fixed top-0 left-0 right-0 z-[80] flex h-10 items-center justify-center gap-2 border-b border-red-950/40 bg-red-900 px-3 text-center font-semibold text-red-50 antialiased"
+          style={{
+            fontSize: 14,
+            lineHeight: 1.25,
+            fontFamily:
+              'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="h-2 w-2 shrink-0 rounded-full bg-red-300/90 animate-pulse" aria-hidden />
+          <span className="truncate" title="Syncs when connection returns">
+            Offline · syncs when online
+          </span>
         </div>
       )}
 

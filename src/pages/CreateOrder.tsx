@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
@@ -316,7 +317,11 @@ export default function CreateOrder() {
       const product = products.find(p => p.id === productId);
       if (product) {
         const catData = getCatalogueData(product, selectedCatalogueId);
-        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+        const unitPrice = resolveListOfferEffective(
+          catData,
+          catalogue.priceField,
+          product as Record<string, unknown>
+        ).effectiveUnitPrice;
         const rowTotal = unitPrice * quantity;
 
         const priceUnit = catData[catalogue.priceUnitField];
@@ -806,7 +811,11 @@ export default function CreateOrder() {
                   const quantity = selectedProducts.get(product.id) || 0;
                   const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
-                  const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+                  const pricing =
+                    catalogue && catData
+                      ? resolveListOfferEffective(catData, catalogue.priceField, product as Record<string, unknown>)
+                      : null;
+                  const price = pricing ? pricing.effectiveUnitPrice : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
                   const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
                   const productImage = imageMap[product.id] || product.image;
@@ -922,7 +931,17 @@ export default function CreateOrder() {
                               fontWeight: 700,
                               color: '#166534',
                             }}>
-                              ₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}
+                              {pricing?.showStrikeout ? (
+                                <>
+                                  ₹{price.toLocaleString('en-IN')}
+                                  <span style={{ ...STRUCK_LIST_PRICE_STYLE, fontWeight: 600 }}>
+                                    ₹{pricing.listPrice.toLocaleString('en-IN')}
+                                  </span>
+                                  {' / '}{getOrderUnitLabel(priceUnit)}
+                                </>
+                              ) : (
+                                <>₹{price.toLocaleString('en-IN')} / {getOrderUnitLabel(priceUnit)}</>
+                              )}
                             </div>
                           )}
                         </div>

@@ -13,6 +13,8 @@ interface ProductWithImage {
   subtitle?: string;
   image?: string; // base64 image data
   price?: string | number;
+  /** Sale price when lower than `price` */
+  offerPrice?: string | number;
   priceUnit?: string;
   bgColor?: string;
   fontColor?: string;
@@ -679,7 +681,7 @@ export async function generateProductPDF(
     if (activeFields.length > 0) {
       totalDetailsHeight += pRows * 6;
     }
-    if (product.price) {
+    if (product.price || product.offerPrice) {
       if (activeFields.length > 0) {
         totalDetailsHeight += 6 + 5;
       } else {
@@ -727,13 +729,17 @@ export async function generateProductPDF(
     }
 
     // --- Price (Floating Glass Label Style) ---
-    if (product.price) {
+    if (product.price || product.offerPrice) {
       const priceY =
         detailsY + (activeFields.length > 0 ? pRows * 6 + 6 : 0);
 
       const pUnit = product.priceUnit || "";
-      const pText =
-        `PRICE : ${currencySymbol}${product.price}${pUnit ? " " + pUnit : ""}`.trim();
+      const listN = parseFloat(String(product.price ?? "").trim()) || 0;
+      const offerN = parseFloat(String(product.offerPrice ?? "").trim()) || 0;
+      const sale = listN > 0 && offerN > 0 && offerN < listN;
+      const pText = sale
+        ? `PRICE : ${currencySymbol}${offerN}  (was ${currencySymbol}${listN})${pUnit ? " " + pUnit : ""}`.trim()
+        : `PRICE : ${currencySymbol}${product.price}${pUnit ? " " + pUnit : ""}`.trim();
 
       // Price background pill
       pdf.setFillColor(accentBlue[0], accentBlue[1], accentBlue[2]);

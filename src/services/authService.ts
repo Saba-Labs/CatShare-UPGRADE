@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { supabase } from '../supabaseClient';
+import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
 
 function mapSupabaseError(error: unknown): Error {
   if (error && typeof error === 'object' && 'message' in error) {
@@ -26,10 +27,12 @@ function mapSupabaseError(error: unknown): Error {
 export const authService = {
   registerWithEmail: async (email: string, password: string, displayName: string) => {
     try {
+      const emailRedirectTo = `${getPublicWebBaseUrl()}/email-confirmed`;
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo,
           data: {
             display_name: displayName.trim(),
             full_name: displayName.trim(),

@@ -16,6 +16,7 @@ import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
+import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import './OrderForm.css';
 
@@ -127,6 +128,13 @@ const CSS = `
 .sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; }
 .sv-pcard-price { font-family: var(--f-body); font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; margin-top: 5px; }
 .sv-pcard-price-unit { font-size: 10px; font-weight: 400; color: var(--c-text3); margin-left: 1px; }
+.sv-price-strike {
+  text-decoration: line-through;
+  font-size: 0.75em;
+  opacity: 0.75;
+  font-weight: 600;
+  margin-left: 6px;
+}
 
 .sv-pcard-footer { padding: 7px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
 .sv-pcard-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
@@ -462,49 +470,68 @@ function displayStoreProductImage(p: ProductWithCatalogueData | Record<string, u
  * Public store visitors may not have the seller's custom catalogue in localStorage.
  * When catalogue config is missing, still read price from product.catalogueData using price1…price10.
  * If merged catalogue row has empty prices but the product still has top-level price fields (legacy), use those.
+ * `price` is always the unit price buyers pay (sale price when offer is set). `listPrice` + `showOffer` drive UI.
  */
 function getStorefrontPriceAndUnit(
   catData: CatalogueData | null | undefined,
   catalogue: Catalogue | null,
   product?: ProductWithCatalogueData | null
-): { price: number; priceUnit?: string } {
-  const fromCat = (): { price: number; priceUnit?: string } => {
-    if (!catData) return { price: 0 };
-    if (catalogue) {
-      const raw = catData[catalogue.priceField as keyof CatalogueData];
-      const price = parseFloat(String(raw ?? '')) || 0;
-      const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
-      return { price, priceUnit };
-    }
-    for (let n = 1; n <= 10; n++) {
-      const pk = `price${n}` as keyof CatalogueData;
-      const price = parseFloat(String(catData[pk] ?? '')) || 0;
-      if (price > 0) {
-        const uk = `price${n}Unit` as keyof CatalogueData;
-        return { price, priceUnit: catData[uk] as string | undefined };
-      }
-    }
-    return { price: 0 };
+): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } {
+  const pr = product as Record<string, unknown> | null | undefined;
+
+  const pack = (
+    res: ReturnType<typeof resolveListOfferEffective>,
+    priceUnit: string | undefined
+  ): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } => {
+    const unit = Number.isFinite(res.effectiveUnitPrice) ? res.effectiveUnitPrice : 0;
+    const pay = unit > 0 ? unit : res.listPrice;
+    return {
+      price: pay,
+      priceUnit,
+      listPrice: res.showStrikeout ? res.listPrice : undefined,
+      showOffer: res.showStrikeout,
+    };
   };
 
-  const r = fromCat();
-  if (r.price > 0 || !product) return r;
+  if (catalogue && catData) {
+    const res = resolveListOfferEffective(catData, catalogue.priceField, pr ?? null);
+    const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
+    if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
+      return pack(res, priceUnit);
+    }
+  }
 
-  const pr = product as Record<string, unknown>;
-  if (catalogue) {
-    const top = pr[catalogue.priceField];
-    const price = parseFloat(String(top ?? '')) || 0;
-    if (price > 0) {
-      return { price, priceUnit: pr[catalogue.priceUnitField] as string | undefined };
+  if (catData && !catalogue) {
+    for (let n = 1; n <= 10; n++) {
+      const pf = `price${n}`;
+      const res = resolveListOfferEffective(catData, pf, pr ?? null);
+      if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
+        const uk = `price${n}Unit` as keyof CatalogueData;
+        return pack(res, catData[uk] as string | undefined);
+      }
     }
   }
-  for (let n = 1; n <= 10; n++) {
-    const price = parseFloat(String(pr[`price${n}`] ?? '')) || 0;
-    if (price > 0) {
-      return { price, priceUnit: pr[`price${n}Unit`] as string | undefined };
+
+  if (catalogue && pr) {
+    const res = resolveListOfferEffective(catData ?? ({} as CatalogueData), catalogue.priceField, pr);
+    const priceUnit =
+      (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined) ??
+      (pr[catalogue.priceUnitField] as string | undefined);
+    if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
+      return pack(res, priceUnit);
     }
   }
-  return r;
+
+  if (pr) {
+    for (let n = 1; n <= 10; n++) {
+      const res = resolveListOfferEffective(catData ?? ({} as CatalogueData), `price${n}`, pr);
+      if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
+        return pack(res, pr[`price${n}Unit`] as string | undefined);
+      }
+    }
+  }
+
+  return { price: 0, priceUnit: undefined, showOffer: false };
 }
 function getCats(p: ProductWithCatalogueData): string[] {
   return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
@@ -1164,7 +1191,7 @@ export default function StoreView() {
               const quantity = selectedProducts.get(product.id) || 0;
               const isSelected = quantity > 0;
               const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-              const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
+              const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, product);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
               const imgUrl = displayStoreProductImage(product);
               const hasParsedPrice = Number.isFinite(price);
@@ -1209,6 +1236,9 @@ export default function StoreView() {
                             {price > 0 ? (
                               <div className="of-price-tag">
                                 {fmt(price, currencySymbol)}
+                                {showOffer && listPrice != null && listPrice > 0 ? (
+                                  <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
+                                ) : null}
                                 {priceUnit ? ` ${priceUnit}` : ''}
                               </div>
                             ) : null}
@@ -1287,6 +1317,9 @@ export default function StoreView() {
                     {price > 0 && (
                       <div className="sv-pcard-price">
                         {fmt(price, currencySymbol)}
+                        {showOffer && listPrice != null && listPrice > 0 ? (
+                          <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
+                        ) : null}
                         {priceUnit && <span className="sv-pcard-price-unit">/{unitLabel(priceUnit)}</span>}
                       </div>
                     )}
@@ -1508,7 +1541,7 @@ export default function StoreView() {
               .filter((n) => Number.isFinite(n))
           );
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
-          const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
+          const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
@@ -1540,6 +1573,9 @@ export default function StoreView() {
                     {price > 0 ? (
                       <>
                         {fmt(price, currencySymbol)}
+                        {showOffer && listPrice != null && listPrice > 0 ? (
+                          <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
+                        ) : null}
                         {priceUnit && <span>/ {unitLabel(priceUnit)}</span>}
                       </>
                     ) : (

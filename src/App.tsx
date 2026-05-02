@@ -55,6 +55,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const EmailConfirmed = lazy(() => import("./pages/EmailConfirmed"));
 const Account = lazy(() => import("./pages/Account"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Store = lazy(() => import("./pages/Store"));
@@ -1328,7 +1329,7 @@ function AppWithBackHandler() {
       hasCompletedOnboarding = true;
     }
 
-    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/privacy', '/terms', '/website', '/o/'];
+    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/email-confirmed', '/privacy', '/terms', '/website', '/o/'];
     const isOnPublicPage = publicPages.some(p => location.pathname.includes(p));
 
     if (!(isNewUser && !hasPersistedFieldDefinition && !hasCompletedOnboarding && !isOnPublicPage)) {
@@ -2243,6 +2244,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/email-confirmed" element={<EmailConfirmed />} />
 
         {/* Public Routes */}
         <Route path="/o/:token" element={<OrderForm />} />

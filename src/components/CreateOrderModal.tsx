@@ -7,6 +7,7 @@ import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalo
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
 
@@ -128,7 +129,11 @@ export default function CreateOrderModal({
       const product = products.find(p => p.id === productId);
       if (product) {
         const catData = getCatalogueData(product, selectedCatalogueId);
-        const unitPrice = parseFloat(catData[catalogue.priceField] || '0') || 0;
+        const unitPrice = resolveListOfferEffective(
+          catData,
+          catalogue.priceField,
+          product as Record<string, unknown>
+        ).effectiveUnitPrice;
         const rowTotal = unitPrice * quantity;
         const priceUnit = catData[catalogue.priceUnitField];
 
@@ -441,7 +446,11 @@ export default function CreateOrderModal({
                     const quantity = selectedProducts.get(product.id) || 0;
                     const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                     const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
-                    const price = catalogue && catData ? parseFloat(catData[catalogue.priceField] || '0') || 0 : 0;
+                    const pricing =
+                      catalogue && catData
+                        ? resolveListOfferEffective(catData, catalogue.priceField, product as Record<string, unknown>)
+                        : null;
+                    const price = pricing ? pricing.effectiveUnitPrice : 0;
                     const hasImage = product.image && /^https?:\/\//i.test(product.image);
 
                     return (
@@ -492,7 +501,16 @@ export default function CreateOrderModal({
                           )}
                           {price > 0 && (
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#166534', marginTop: 4 }}>
-                              ₹{price.toLocaleString('en-IN')}
+                              {pricing?.showStrikeout ? (
+                                <>
+                                  ₹{price.toLocaleString('en-IN')}
+                                  <span style={{ ...STRUCK_LIST_PRICE_STYLE, marginLeft: 6 }}>
+                                    ₹{pricing.listPrice.toLocaleString('en-IN')}
+                                  </span>
+                                </>
+                              ) : (
+                                <>₹{price.toLocaleString('en-IN')}</>
+                              )}
                             </div>
                           )}
                         </div>

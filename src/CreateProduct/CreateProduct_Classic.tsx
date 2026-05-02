@@ -40,6 +40,14 @@ import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
+import {
+  offerPriceFieldFor,
+  resolveListOfferEffective,
+  STRUCK_LIST_PRICE_STYLE,
+  isCataloguePriceOrOfferFieldName,
+  sanitizeDecimalPriceInput,
+  getOfferVersusPriceValidationError,
+} from "../utils/offerPriceUtils";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -735,6 +743,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const updates: Partial<CatalogueData> = {
         [selectedCat.priceField]: "",
         [selectedCat.priceUnitField]: "/ piece",
+        [offerPriceFieldFor(selectedCat.priceField)]: "",
       };
       updateCatalogueData(updates);
       return;
@@ -744,14 +753,19 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     const defaultPriceField = catalogues.find((c) => c.id === 'cat1')?.priceField || 'price1';
     const defaultPriceUnitField = catalogues.find((c) => c.id === 'cat1')?.priceUnitField || 'price1Unit';
+    const defaultOfferField = offerPriceFieldFor(defaultPriceField);
 
     const updates: Partial<CatalogueData> = {
       [selectedCat.priceField]: defaultCatalogueData[defaultPriceField] || "",
       [selectedCat.priceUnitField]: defaultCatalogueData[defaultPriceUnitField] || "/ piece",
+      [offerPriceFieldFor(selectedCat.priceField)]:
+        defaultCatalogueData[defaultOfferField] !== undefined && defaultCatalogueData[defaultOfferField] !== null
+          ? String(defaultCatalogueData[defaultOfferField])
+          : "",
     };
 
     updateCatalogueData(updates);
-    showToast(`Price fetched from default catalogue to ${selectedCat.label}`, "success");
+    showToast(`Price & offer fetched from default catalogue to ${selectedCat.label}`, "success");
   };
 
   const getSelectedCataloguePriceField = () => {
@@ -772,6 +786,13 @@ if (migratedProduct.suggestedColors?.length > 0) {
   const getSelectedCataloguePriceUnit = () => {
     const priceUnitField = getSelectedCataloguePriceUnitField();
     return getCatalogueFormData()[priceUnitField] || "/ piece";
+  };
+
+  const getSelectedCatalogueOfferField = () => offerPriceFieldFor(getSelectedCataloguePriceField());
+
+  const getSelectedCatalogueOffer = () => {
+    const f = getSelectedCatalogueOfferField();
+    return getCatalogueFormData()[f] || "";
   };
 
   const handleSelectImage = async () => {
@@ -1004,8 +1025,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
       setFormData((prev) => ({ ...prev, [name]: value }));
       return;
     }
+    if (isCataloguePriceOrOfferFieldName(name)) {
+      updateCatalogueData({ [name]: sanitizeDecimalPriceInput(value) });
+      return;
+    }
     updateCatalogueData({ [name]: value });
   };
+
+  const offerVersusPriceError = getOfferVersusPriceValidationError(
+    getSelectedCataloguePrice(),
+    getSelectedCatalogueOffer()
+  );
 
   const saveAndNavigate = async () => {
     // Prevent multiple rapid clicks
@@ -1017,6 +1047,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     if (!imagePreview) {
       showToast("Please upload and crop an image before saving.", "warning");
+      return;
+    }
+
+    const offerErr = getOfferVersusPriceValidationError(
+      getSelectedCataloguePrice(),
+      getSelectedCatalogueOffer()
+    );
+    if (offerErr) {
+      showToast(offerErr, "error");
       return;
     }
 
@@ -1124,6 +1163,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const catData = getCatalogueData(formData, cat.id);
       newItem[cat.priceField] = catData[cat.priceField] || "";
       newItem[cat.priceUnitField] = catData[cat.priceUnitField] || "/ piece";
+      newItem[offerPriceFieldFor(cat.priceField)] = catData[offerPriceFieldFor(cat.priceField)] || "";
       newItem[cat.stockField] = catData[cat.stockField] !== false;
     }
 
@@ -1462,7 +1502,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   </div>
 
                   {/* Price Section */}
-                  {getSelectedCataloguePrice() && (
+                  {(getSelectedCataloguePrice() || getSelectedCatalogueOffer()) && (() => {
+                    const pf = getSelectedCataloguePriceField();
+                    const r = resolveListOfferEffective(getCatalogueFormData(), pf, formData as unknown as Record<string, unknown>);
+                    const u = getSelectedCataloguePriceUnit();
+                    const unitDisp = u && u !== "None" ? u : "";
+                    return (
                     <div
                       style={{
                         backgroundColor: overrideColor,
@@ -1473,9 +1518,22 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         fontSize: "16px",
                       }}
                     >
-                      Price: {currencySymbol}{getSelectedCataloguePrice()} {getSelectedCataloguePriceUnit() !== "None" && getSelectedCataloguePriceUnit()}
+                      Price:{" "}
+                      {r.showStrikeout ? (
+                        <>
+                          {currencySymbol}{r.offerPrice}
+                          <span style={{ ...STRUCK_LIST_PRICE_STYLE, marginLeft: 8 }}>{currencySymbol}{r.listPrice}</span>
+                          {unitDisp ? ` ${unitDisp}` : ""}
+                        </>
+                      ) : (
+                        <>
+                          {currencySymbol}{r.effectiveUnitPrice || getSelectedCataloguePrice()}
+                          {unitDisp ? ` ${unitDisp}` : ""}
+                        </>
+                      )}
                     </div>
-                  )}
+                    );
+                  })()}
                 </>
               )}
             </motion.div>
@@ -1942,6 +2000,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         name={getSelectedCataloguePriceField()}
                         value={getSelectedCataloguePrice()}
                         onChange={handleChange}
+                        inputMode="decimal"
+                        autoComplete="off"
                         className="border border-gray-300 dark:border-gray-700 p-2 w-full rounded text-xs bg-white dark:bg-gray-800"
                       />
                     </div>
@@ -1960,6 +2020,33 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         </select>
                       </div>
                     )}
+                  </div>
+
+                  <div className="flex gap-3 items-start">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                      Offer
+                    </label>
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        name={getSelectedCatalogueOfferField()}
+                        value={getSelectedCatalogueOffer()}
+                        onChange={handleChange}
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="Optional — lower than Price"
+                        aria-invalid={offerVersusPriceError ? true : undefined}
+                        className={`border p-2 w-full rounded text-xs bg-white dark:bg-gray-800 placeholder:text-gray-400 ${
+                          offerVersusPriceError
+                            ? "border-red-500 ring-1 ring-red-500/30 dark:border-red-500"
+                            : "border-gray-300 dark:border-gray-700"
+                        }`}
+                      />
+                      {offerVersusPriceError ? (
+                        <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 leading-snug">
+                          {offerVersusPriceError}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex gap-3 items-start">

@@ -290,12 +290,15 @@ export interface ProductData {
   field10?: string;
   field10Unit?: string;
   price?: string | number;
+  /** Sale/unit price when lower than `price` (list/MRP) */
+  offerPrice?: string | number;
   priceUnit?: string;
   badge?: string;
   cropAspectRatio?: number;
 }
 
 import { getFieldConfig, getAllFields } from '../config/fieldConfig';
+import { drawCanvasCataloguePriceLine, hasCanvasRenderablePrice } from './canvasProductPriceDraw';
 import { getThemeById } from '../config/themeConfig';
 
 /**
@@ -593,7 +596,7 @@ export async function renderProductToCanvas(
   currentY += spacingAfterFields * scale;
 
   // ===== PRICE BAR =====
-  if (product.price !== undefined && product.price !== null && product.price !== '' && product.price !== 0) {
+  if (hasCanvasRenderablePrice(product)) {
     // Fill entire remaining canvas with price bar background to avoid gaps
     const remainingHeight = canvasHeight - currentY;
     ctx.fillStyle = options.bgColor;
@@ -603,14 +606,11 @@ export async function renderProductToCanvas(
     const priceFont = `${priceFontSize}px Arial, sans-serif`;
     ctx.font = priceFont;
     ctx.fillStyle = options.fontColor;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle'; // Perfect vertical centering
 
     // Center price text vertically in the remaining space
     const priceTextY = currentY + remainingHeight / 2; // Exact center without offset
     const currencySymbol = options.currencySymbol || '₹';
-    const priceText = product.priceUnit && product.priceUnit !== 'None' ? `Price   :   ${currencySymbol}${product.price} ${product.priceUnit}` : `Price   :   ${currencySymbol}${product.price}`;
-    ctx.fillText(priceText, canvasWidth / 2, priceTextY);
+    drawCanvasCataloguePriceLine(ctx, canvasWidth / 2, priceTextY, product, currencySymbol, options.fontColor, scale);
 
     currentY += remainingHeight;
   }

@@ -19,6 +19,7 @@ import {
 } from "../utils/freeTierWatermark";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
+import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from "../utils/offerPriceUtils";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -632,7 +633,11 @@ export default function ProductPreviewModal_Classic({
 
   // Check if product has a valid price for this catalogue
   const priceValue = catalogueData[priceField] || product[priceField];
-  const hasPriceValue = priceValue !== undefined && priceValue !== null && priceValue !== "" && priceValue !== 0;
+  const offerPricing = resolveListOfferEffective(catalogueData, priceField, product);
+  const hasPriceValue =
+    offerPricing.effectiveUnitPrice > 0 ||
+    offerPricing.listPrice > 0 ||
+    (priceValue !== undefined && priceValue !== null && priceValue !== "" && priceValue !== 0);
 
   // Helper function to check if a field has a valid value
   const hasFieldValue = (value) => value !== undefined && value !== null && value !== "";
@@ -950,12 +955,28 @@ export default function ProductPreviewModal_Classic({
                   flexShrink: 0,
                 }}
               >
-                Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{catalogueData[priceField] || product[priceField]}{(() => {
+                Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{(() => {
                   const unit = (catalogueData[priceUnitField] && catalogueData[priceUnitField] !== "")
                     ? catalogueData[priceUnitField]
                     : (product[priceUnitField] || "/ piece");
-
-                  return unit !== "None" ? ` ${unit}` : "";
+                  const unitDisp = unit !== "None" ? ` ${unit}` : "";
+                  if (offerPricing.showStrikeout) {
+                    return (
+                      <>
+                        {currencySymbol}{offerPricing.offerPrice}
+                        <span style={{ ...STRUCK_LIST_PRICE_STYLE, marginLeft: 8 }}>
+                          {currencySymbol}{offerPricing.listPrice}
+                        </span>
+                        {unitDisp}
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      {currencySymbol}{catalogueData[priceField] || product[priceField]}
+                      {unitDisp}
+                    </>
+                  );
                 })()}
               </div>
             )}

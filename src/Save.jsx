@@ -309,9 +309,19 @@ export async function saveRenderedImage(product, type, units = {}) {
   // Support both legacy and dynamic catalogue parameters
   const priceField = units.priceField || (type === "wholesale" ? "price1" : type);
   const priceUnitField = units.priceUnitField || (type === "wholesale" ? "price1Unit" : `${type}Unit`);
+  const offerField = `${priceField}Offer`;
 
   // Get price from catalogueData using dynamic field
   const price = catalogueData[priceField] !== undefined ? catalogueData[priceField] : catalogueData[priceField.replace(/\d/g, '')] || 0;
+  const rawOffer = catalogueData[offerField];
+  const offerNum = parseFloat(String(rawOffer ?? "").trim());
+  const listNum = parseFloat(String(price ?? "").trim());
+  const saleActive =
+    Number.isFinite(offerNum) &&
+    offerNum > 0 &&
+    Number.isFinite(listNum) &&
+    listNum > 0 &&
+    offerNum < listNum;
   const priceUnit = units[priceUnitField] || catalogueData[priceUnitField] || (units.price1Unit || units.wholesaleUnit);
 
   try {
@@ -344,6 +354,7 @@ export async function saveRenderedImage(product, type, units = {}) {
       subtitle: catalogueData.subtitle,
       image: pickedImage,
       price: price !== "" && price !== 0 ? price : undefined,
+      offerPrice: saleActive ? offerNum : undefined,
       priceUnit: price ? priceUnit : undefined,
       badge: catalogueData.badge,
       cropAspectRatio: cropAspectRatio,

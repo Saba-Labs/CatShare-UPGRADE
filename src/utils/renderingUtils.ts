@@ -8,6 +8,7 @@ import { getPersistedAuthUserId } from "./authUserId";
 import { safeGetFromStorage } from "./safeStorage";
 import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getThemeById } from "../config/themeConfig";
+import { offerPriceFieldFor } from "./offerPriceUtils";
 
 /**
  * Retrieve a rendered image from localStorage or filesystem
@@ -132,7 +133,12 @@ export async function renderProductImageOnTheFly(
     // Get price field
     const priceField = catalogueId === "cat2" ? "price2" : catalogueId === "cat1" ? "price1" : "price1";
     const priceUnitField = catalogueId === "cat2" ? "price2Unit" : catalogueId === "cat1" ? "price1Unit" : "price1Unit";
+    const offerField = offerPriceFieldFor(priceField);
     const price = catalogueData[priceField] || 0;
+    const rawOffer = catalogueData[offerField];
+    const listNum = parseFloat(String(price ?? "").trim()) || 0;
+    const offerNum = parseFloat(String(rawOffer ?? "").trim()) || 0;
+    const saleActive = listNum > 0 && offerNum > 0 && offerNum < listNum;
     const priceUnit = catalogueData[priceUnitField] || "/ piece";
     const isWatermarkEnabled = safeGetFromStorage("showWatermark", true);
     const watermarkText = safeGetFromStorage("watermarkText", "Created using CatShare");
@@ -144,6 +150,7 @@ export async function renderProductImageOnTheFly(
       subtitle: catalogueData.subtitle,
       image,
       price: price !== "" && price !== 0 ? price : undefined,
+      offerPrice: saleActive ? offerNum : undefined,
       priceUnit: price ? priceUnit : undefined,
       badge: catalogueData.badge,
       cropAspectRatio: cropAspectRatio,

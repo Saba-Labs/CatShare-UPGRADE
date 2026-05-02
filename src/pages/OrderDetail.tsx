@@ -28,6 +28,7 @@ import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 
 /** Haptics throws/rejects on desktop web — avoids dozens of console errors in DevTools. */
 async function safeHapticsLight() {
@@ -263,7 +264,11 @@ function resolveOrderCatalogueId(
       const p = productById.get(String(it.productId));
       if (!p) continue;
       const catData = getCatalogueData(p, catId);
-      const expected = parseFloat(String(catData[cat.priceField] ?? '0')) || 0;
+      const expected = resolveListOfferEffective(
+        catData,
+        cat.priceField,
+        p as Record<string, unknown>
+      ).effectiveUnitPrice;
       score += Math.abs(expected - (it.unitPrice || 0));
     }
     if (score < bestScore) {
@@ -276,7 +281,11 @@ function resolveOrderCatalogueId(
 
 function buildOrderItemFromProduct(product: ProductWithCatalogueData, catalogue: Catalogue): OrderItem {
   const catData = getCatalogueData(product, catalogue.id);
-  const unitPrice = parseFloat(String(catData[catalogue.priceField] ?? '0')) || 0;
+  const unitPrice = resolveListOfferEffective(
+    catData,
+    catalogue.priceField,
+    product as Record<string, unknown>
+  ).effectiveUnitPrice;
   const priceUnit = catData[catalogue.priceUnitField];
   const quantityStep = normalizeOrderQuantityStep(
     (catData as { orderQuantityStep?: unknown }).orderQuantityStep
@@ -2099,8 +2108,11 @@ useEffect(() => {
                           ) : (
                             addableCatalogueProducts.map((p) => {
                               const catData = getCatalogueData(p, orderCatalogueId);
-                              const unit =
-                                parseFloat(String(catData[orderCatalogueConfig.priceField] ?? '0')) || 0;
+                              const unit = resolveListOfferEffective(
+                                catData,
+                                orderCatalogueConfig.priceField,
+                                p as Record<string, unknown>
+                              ).effectiveUnitPrice;
                               const thumbUrl =
                                 (typeof p.imageUrl === 'string' && p.imageUrl.trim()) ||
                                 (typeof (p as { image?: string }).image === 'string'

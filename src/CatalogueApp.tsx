@@ -1677,21 +1677,23 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           </div>
         )}
 
-        {tab === "catalogues" && selectedCatalogueInCataloguesTab === null && (
-          <div className="relative -mx-4">
-            <CataloguesList
-              catalogues={catalogues}
-              onSelectCatalogue={(catalogueId) => {
-                setSelectedCatalogueInCataloguesTab(catalogueId);
-                navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueId)}`);
-              }}
-              imageMap={imageMap}
-              products={products}
-              onManageCatalogues={() => setShowManageCatalogues(true)}
-              renamingCatalogueIds={renamingCatalogueIds}
-            />
-          </div>
-        )}
+        {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
+        <div
+          className="relative -mx-4"
+          hidden={tab !== "catalogues" || selectedCatalogueInCataloguesTab != null}
+        >
+          <CataloguesList
+            catalogues={catalogues}
+            onSelectCatalogue={(catalogueId) => {
+              setSelectedCatalogueInCataloguesTab(catalogueId);
+              navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueId)}`);
+            }}
+            imageMap={imageMap}
+            products={products}
+            onManageCatalogues={() => setShowManageCatalogues(true)}
+            renamingCatalogueIds={renamingCatalogueIds}
+          />
+        </div>
 
         {tab === "catalogues" && selectedCatalogueInCataloguesTab && (
           <div className="relative -mx-4">

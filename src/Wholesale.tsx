@@ -16,6 +16,7 @@ import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "./utils/currencyUtils";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
+import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from "./utils/offerPriceUtils";
 
 
 export default function WholesaleTab({
@@ -944,7 +945,19 @@ onMouseLeave={handleTouchEnd}
 <div
   className="absolute top-1.5 left-1.5 bg-red-800 text-white text-[11px] font-medium px-2 py-0.45 rounded-full shadow-md tracking-wide z-10"
 >
-  {currencySymbol}{getProductCatalogueData(p).price}
+  {(() => {
+    const row = getCatalogueData(p, catalogueId);
+    const r = resolveListOfferEffective(row, priceField, p);
+    if (r.showStrikeout) {
+      return (
+        <>
+          {currencySymbol}{r.offerPrice}
+          <span style={{ ...STRUCK_LIST_PRICE_STYLE, marginLeft: 3 }}>{currencySymbol}{r.listPrice}</span>
+        </>
+      );
+    }
+    return <>{currencySymbol}{r.effectiveUnitPrice || getProductCatalogueData(p).price}</>;
+  })()}
 </div>
 )}
 
@@ -1111,8 +1124,27 @@ onMouseLeave={handleTouchEnd}
                     lineHeight: 1.2,
                   }}
                 >
-                  Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{getProductCatalogueData(p).price}{" "}
-                  {getProductCatalogueData(p).priceUnit}
+                  {(() => {
+                    const row = getCatalogueData(p, catalogueId);
+                    const r = resolveListOfferEffective(row, priceField, p);
+                    const u = getProductCatalogueData(p).priceUnit;
+                    const udisp = u && u !== "None" ? u : "";
+                    if (r.showStrikeout) {
+                      return (
+                        <>
+                          Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{r.offerPrice}{" "}
+                          <span style={STRUCK_LIST_PRICE_STYLE}>{currencySymbol}{r.listPrice}</span>
+                          {udisp ? ` ${udisp}` : ""}
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        Price&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;{currencySymbol}{getProductCatalogueData(p).price}{" "}
+                        {udisp}
+                      </>
+                    );
+                  })()}
                 </h2>
               </div>
             </div>

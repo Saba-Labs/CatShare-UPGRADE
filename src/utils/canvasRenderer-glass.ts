@@ -6,6 +6,7 @@
 
 import { loadImage } from './canvasRenderer';
 import { isLightColor, lightenColor } from './canvasRenderer';
+import { drawCanvasCataloguePriceLine, hasCanvasRenderablePrice } from './canvasProductPriceDraw';
 import { getAllFields } from '../config/fieldConfig';
 
 export interface ProductData {
@@ -13,6 +14,7 @@ export interface ProductData {
   subtitle?: string;
   image?: string;
   price?: string | number;
+  offerPrice?: string | number;
   priceUnit?: string;
   badge?: string;
   cropAspectRatio?: number;
@@ -450,7 +452,7 @@ export async function renderProductToCanvasGlass(
   currentY += spacingAfterFields * scale;
 
   // ===== PRICE BUTTON =====
-  if (product.price !== undefined && product.price !== null && product.price !== '' && product.price !== 0) {
+  if (hasCanvasRenderablePrice(product)) {
     const priceBgColor = options.bgColor;
     const priceBarHeight = priceBarHeightBase * scale;
     const priceBarY = currentY + 8 * scale;
@@ -475,11 +477,16 @@ export async function renderProductToCanvasGlass(
     ctx.textBaseline = 'middle';
 
     const currencySymbol = options.currencySymbol || '₹';
-    const priceText = product.priceUnit && product.priceUnit !== 'None'
-      ? `${currencySymbol}${product.price} ${product.priceUnit}`
-      : `${currencySymbol}${product.price}`;
-
-    ctx.fillText(priceText, priceButtonX + priceButtonWidth / 2, priceBarY + priceBarHeight / 2);
+    const fontCol = options.fontColor === 'white' ? '#fff' : '#000';
+    drawCanvasCataloguePriceLine(
+      ctx,
+      priceButtonX + priceButtonWidth / 2,
+      priceBarY + priceBarHeight / 2,
+      product,
+      currencySymbol,
+      fontCol,
+      scale
+    );
 
     currentY += priceBarHeight + 8 * scale;
   }
