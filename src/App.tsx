@@ -227,6 +227,39 @@ function AppWithBackHandler() {
     return JSON.stringify(normalize(aList)) === JSON.stringify(normalize(bList));
   }, [toCatalogueSignature]);
 
+  /** Avoid stale Supabase rows (missing legacy cat2, etc.) overwriting a correct local definition. */
+  const shouldApplyRemoteCataloguesOverLocal = useCallback(
+    (localDef: any, remoteDef: any, hasPersistedLocal: boolean): boolean => {
+      if (!remoteDef?.catalogues || !Array.isArray(remoteDef.catalogues)) return false;
+      if (!hasPersistedLocal) return true;
+      if (areCataloguesEquivalent(localDef, remoteDef)) return false;
+
+      const localLu = localDef?.lastUpdated
+        ? new Date(localDef.lastUpdated).getTime()
+        : 0;
+      const remoteLu = remoteDef?.lastUpdated
+        ? new Date(remoteDef.lastUpdated).getTime()
+        : 0;
+      const localN = Array.isArray(localDef?.catalogues) ? localDef.catalogues.length : 0;
+      const remoteN = remoteDef.catalogues.length;
+
+      if (remoteLu > localLu) return true;
+
+      if (remoteN < localN && remoteLu <= localLu) return false;
+
+      if (
+        remoteN > localN &&
+        !isMeaningfulCataloguesDefinition(localDef) &&
+        isMeaningfulCataloguesDefinition(remoteDef)
+      ) {
+        return true;
+      }
+
+      return false;
+    },
+    [areCataloguesEquivalent, isMeaningfulCataloguesDefinition]
+  );
+
   const toFieldSignature = useCallback((field: any) => {
     if (!field || typeof field !== "object") return null;
     return {
@@ -521,10 +554,22 @@ function AppWithBackHandler() {
             }
             if (sourceSnapshot?.cataloguesDefinition) {
               setStartupStatusText('Fetching catalogue definitions');
-              setCataloguesDefinition(sourceSnapshot.cataloguesDefinition, userId);
-              window.dispatchEvent(new CustomEvent('catalogues-changed', {
-                detail: { action: 'update', catalogues: sourceSnapshot.cataloguesDefinition.catalogues }
-              }));
+              const localCatDef = getCataloguesDefinition(userId);
+              const hasCatPersisted = Boolean(
+                localStorage.getItem(getStorageKey('cataloguesDefinition', userId))
+              );
+              if (
+                shouldApplyRemoteCataloguesOverLocal(
+                  localCatDef,
+                  sourceSnapshot.cataloguesDefinition,
+                  hasCatPersisted
+                )
+              ) {
+                setCataloguesDefinition(sourceSnapshot.cataloguesDefinition, userId);
+                window.dispatchEvent(new CustomEvent('catalogues-changed', {
+                  detail: { action: 'update', catalogues: sourceSnapshot.cataloguesDefinition.catalogues }
+                }));
+              }
             }
             setStartupStatusText('Fetching user settings');
             applyUserSettingsFromCloud(sourceSnapshot?.userSettings);
@@ -602,11 +647,23 @@ function AppWithBackHandler() {
                 }));
               }
               if (latest?.cataloguesDefinition?.catalogues?.length) {
-                setStartupStatusText('Refreshing catalogue definitions');
-                setCataloguesDefinition(latest.cataloguesDefinition, userId);
-                window.dispatchEvent(new CustomEvent('catalogues-changed', {
-                  detail: { action: 'update', catalogues: latest.cataloguesDefinition.catalogues },
-                }));
+                const localCatDef = getCataloguesDefinition(userId);
+                const hasCatPersisted = Boolean(
+                  localStorage.getItem(getStorageKey('cataloguesDefinition', userId))
+                );
+                if (
+                  shouldApplyRemoteCataloguesOverLocal(
+                    localCatDef,
+                    latest.cataloguesDefinition,
+                    hasCatPersisted
+                  )
+                ) {
+                  setStartupStatusText('Refreshing catalogue definitions');
+                  setCataloguesDefinition(latest.cataloguesDefinition, userId);
+                  window.dispatchEvent(new CustomEvent('catalogues-changed', {
+                    detail: { action: 'update', catalogues: latest.cataloguesDefinition.catalogues },
+                  }));
+                }
               }
               setStartupStatusText('Refreshing user settings');
               applyUserSettingsFromCloud(latest?.userSettings);
@@ -796,10 +853,13 @@ function AppWithBackHandler() {
         const localCataloguesDef = getCataloguesDefinition(userId);
         const remoteCataloguesDef = supabaseData.cataloguesDefinition;
         const hasPersistedLocalCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
-        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
-        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
-        const sameCatalogues = areCataloguesEquivalent(localCataloguesDef, remoteCataloguesDef);
-        if (!hasPersistedLocalCatalogues || !sameCatalogues || remoteLastUpdated >= localLastUpdated) {
+        if (
+          shouldApplyRemoteCataloguesOverLocal(
+            localCataloguesDef,
+            remoteCataloguesDef,
+            hasPersistedLocalCatalogues
+          )
+        ) {
           setCataloguesDefinition(remoteCataloguesDef, userId);
           window.dispatchEvent(new CustomEvent('catalogues-changed', {
           detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
@@ -829,6 +889,7 @@ function AppWithBackHandler() {
     isMeaningfulFieldsDefinition,
     isMeaningfulCataloguesDefinition,
     areCataloguesEquivalent,
+    shouldApplyRemoteCataloguesOverLocal,
     markOfflineMigrationCompletedInCloud,
   ]);
 
@@ -877,10 +938,13 @@ function AppWithBackHandler() {
         const localCataloguesDef = getCataloguesDefinition(userId);
         const remoteCataloguesDef = snapshot.cataloguesDefinition;
         const hasPersistedLocalCatalogues = Boolean(localStorage.getItem(getStorageKey('cataloguesDefinition', userId)));
-        const localLastUpdated = localCataloguesDef?.lastUpdated ? new Date(localCataloguesDef.lastUpdated).getTime() : 0;
-        const remoteLastUpdated = remoteCataloguesDef?.lastUpdated ? new Date(remoteCataloguesDef.lastUpdated).getTime() : 0;
-        const sameCatalogues = areCataloguesEquivalent(localCataloguesDef, remoteCataloguesDef);
-        if (!hasPersistedLocalCatalogues || !sameCatalogues || remoteLastUpdated >= localLastUpdated) {
+        if (
+          shouldApplyRemoteCataloguesOverLocal(
+            localCataloguesDef,
+            remoteCataloguesDef,
+            hasPersistedLocalCatalogues
+          )
+        ) {
           setCataloguesDefinition(remoteCataloguesDef, userId);
           window.dispatchEvent(new CustomEvent('catalogues-changed', {
             detail: { action: 'update', catalogues: remoteCataloguesDef.catalogues }
@@ -929,6 +993,7 @@ function AppWithBackHandler() {
     user?.uid,
     isGuestUser,
     areCataloguesEquivalent,
+    shouldApplyRemoteCataloguesOverLocal,
     refreshSupabaseData,
   ]);
 

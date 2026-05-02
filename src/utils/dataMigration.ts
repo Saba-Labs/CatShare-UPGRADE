@@ -6,6 +6,7 @@
  */
 
 import { getCataloguesDefinition, setCataloguesDefinition, DEFAULT_CATALOGUES } from "../config/catalogueConfig";
+import { getAllProducts } from "../config/productUtils";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Capacitor } from "@capacitor/core";
 import { getPersistedAuthUserId } from "./authUserId";
@@ -256,7 +257,10 @@ export function validateCatalogueConfig(): boolean {
 export function migrateFromTwoCataloguesToOne(): void {
   try {
     const definition = getCataloguesDefinition();
-    const products = JSON.parse(localStorage.getItem("products") || "[]");
+    const uid = getPersistedAuthUserId();
+    const products = uid
+      ? getAllProducts(uid)
+      : JSON.parse(localStorage.getItem("products") || "[]");
 
     // Check if cat2 (Resell) exists
     const cat2Index = definition.catalogues.findIndex((c) => c.id === "cat2");

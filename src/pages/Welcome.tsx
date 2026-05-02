@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { INDUSTRY_PRESETS } from '../config/industryPresets';
-import { DEFAULT_FIELDS, FieldConfig } from '../config/fieldConfig';
+import { DEFAULT_FIELDS, type FieldsDefinition } from '../config/fieldConfig';
 import { safeSetInStorage, getStorageKey } from '../utils/safeStorage';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -92,6 +92,65 @@ export default function Welcome() {
     }));
   };
 
+  const persistOnboardingDefinition = async (fieldsDefinition: FieldsDefinition) => {
+    if (user?.uid) {
+      safeSetInStorage(getStorageKey('fieldsDefinition', user.uid), fieldsDefinition);
+      safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
+    } else {
+      safeSetInStorage('fieldsDefinition', fieldsDefinition);
+      safeSetInStorage('hasCompletedOnboarding', true);
+    }
+    safeSetInStorage('showTutorialOnInit', true);
+
+    if (user && user.uid) {
+      try {
+        const { syncFieldsDefinition } = await import('../services/supabaseSync');
+        const syncResult = await syncFieldsDefinition(user.uid, fieldsDefinition);
+
+        if (!syncResult.success) {
+          console.warn('⚠️ Failed to sync fields to cloud:', syncResult.error);
+          showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
+        } else {
+          console.log('✅ Fields definition synced to Supabase');
+        }
+      } catch (syncError) {
+        console.error('❌ Error syncing fields:', syncError);
+        showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
+      }
+    }
+
+    setStep('complete');
+  };
+
+  /** Skip industry/fields tuning: starter template (first 3 fields on), finish onboarding. */
+  const handleSkipSetup = async (from: 'industry' | 'fields') => {
+    setIsLoading(true);
+    try {
+      const industryLabel =
+        from === 'fields' && selectedIndustry ? selectedIndustry : 'Skipped';
+      setSelectedIndustry(industryLabel);
+
+      const configuredFields = DEFAULT_FIELDS.map((field, index) => ({
+        ...field,
+        enabled: index < 3,
+      }));
+
+      const fieldsDefinition: FieldsDefinition = {
+        version: 1,
+        fields: configuredFields,
+        industry: industryLabel,
+        lastUpdated: Date.now(),
+      };
+
+      await persistOnboardingDefinition(fieldsDefinition);
+    } catch (error) {
+      console.error('Error skipping onboarding:', error);
+      alert('Could not save. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleComplete = async () => {
     setIsLoading(true);
 
@@ -133,46 +192,18 @@ export default function Welcome() {
         });
       }
 
-      const fieldsDefinition = {
+      const fieldsDefinition: FieldsDefinition = {
         version: 1,
         fields: configuredFields,
         industry: selectedIndustry,
         lastUpdated: Date.now(),
       };
 
-      // Save to localStorage (keyed per account so new signups are not treated as onboarded)
-      if (user?.uid) {
-        safeSetInStorage(getStorageKey('fieldsDefinition', user.uid), fieldsDefinition);
-        safeSetInStorage(getStorageKey('hasCompletedOnboarding', user.uid), true);
-      } else {
-        safeSetInStorage('fieldsDefinition', fieldsDefinition);
-        safeSetInStorage('hasCompletedOnboarding', true);
-      }
-      safeSetInStorage('showTutorialOnInit', true);
-
-      // Sync to Supabase if user is logged in
-      if (user && user.uid) {
-        try {
-          const { syncFieldsDefinition } = await import('../services/supabaseSync');
-          const syncResult = await syncFieldsDefinition(user.uid, fieldsDefinition);
-
-          if (!syncResult.success) {
-            console.warn('⚠️ Failed to sync fields to cloud:', syncResult.error);
-            showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
-          } else {
-            console.log('✅ Fields definition synced to Supabase');
-          }
-        } catch (syncError) {
-          console.error('❌ Error syncing fields:', syncError);
-          showToast('Note: Changes saved locally but not yet synced to cloud', 'warning');
-        }
-      }
-
-      setStep('complete');
-      setIsLoading(false);
+      await persistOnboardingDefinition(fieldsDefinition);
     } catch (error) {
       console.error('Error completing onboarding:', error);
       alert('Error setting up. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -338,23 +369,36 @@ export default function Welcome() {
                 </motion.div>
               </div>
 
-              <div className="flex gap-2 sm:gap-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2 sm:gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setStep('welcome')}
+                    disabled={isLoading}
+                    className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base hover:border-slate-400 hover:bg-slate-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Back
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setStep('fields')}
+                    disabled={!selectedIndustry || isLoading}
+                    className="flex-1 bg-blue-600 text-white font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-all"
+                  >
+                    Next
+                  </motion.button>
+                </div>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setStep('welcome')}
-                  className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base hover:border-slate-400 hover:bg-slate-100 transition-all"
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => void handleSkipSetup('industry')}
+                  disabled={isLoading}
+                  className="w-full py-2 text-sm text-slate-500 font-medium hover:text-slate-700 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Back
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setStep('fields')}
-                  disabled={!selectedIndustry}
-                  className="flex-1 bg-blue-600 text-white font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-all"
-                >
-                  Next
+                  Skip for now
                 </motion.button>
               </div>
             </div>
@@ -441,23 +485,36 @@ export default function Welcome() {
                 </>
               )}
 
-              <div className="flex gap-2 sm:gap-3">
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2 sm:gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setStep('industry')}
+                    disabled={isLoading}
+                    className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base hover:border-slate-400 hover:bg-slate-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Back
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleComplete}
+                    disabled={isLoading}
+                    className="flex-1 bg-blue-600 text-white font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-all"
+                  >
+                    {isLoading ? '⏳ Setting up...' : '✨ Complete Setup'}
+                  </motion.button>
+                </div>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setStep('industry')}
-                  className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base hover:border-slate-400 hover:bg-slate-100 transition-all"
-                >
-                  Back
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleComplete}
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => void handleSkipSetup('fields')}
                   disabled={isLoading}
-                  className="flex-1 bg-blue-600 text-white font-semibold py-2 px-2 sm:py-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-all"
+                  className="w-full py-2 text-sm text-slate-500 font-medium hover:text-slate-700 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? '⏳ Setting up...' : '✨ Complete Setup'}
+                  Skip for now
                 </motion.button>
               </div>
             </div>
@@ -508,7 +565,11 @@ export default function Welcome() {
                   All Set! 🎉
                 </h2>
                 <p className="text-slate-600 text-xs sm:text-sm md:text-lg mb-2">
-                  Your {selectedIndustry === 'Others' ? 'custom' : selectedIndustry} catalog is ready to go
+                  {selectedIndustry === 'Skipped'
+                    ? 'Your starter catalog is ready to go'
+                    : selectedIndustry === 'Others'
+                      ? 'Your custom catalog is ready to go'
+                      : `Your ${selectedIndustry} catalog is ready to go`}
                 </p>
                 <p className="text-slate-500 text-xs sm:text-sm md:text-base">
                   Redirecting to your workspace...

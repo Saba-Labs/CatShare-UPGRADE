@@ -295,23 +295,23 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     };
   }, []);
 
-  // Initialize catalogues on component mount
+  // Initialize / refresh when auth uid resolves so keyed storage is used (same as other catalogues)
   useEffect(() => {
-    const cats = getAllCatalogues();
+    const cats = getAllCatalogues(user?.uid);
     setCatalogues(cats);
-  }, []);
+  }, [user?.uid]);
 
   // Listen for catalogue changes (e.g., after restore or when ManageCatalogues updates)
   useEffect(() => {
     const handleCataloguesChanged = () => {
-      const cats = getAllCatalogues();
+      const cats = getAllCatalogues(user?.uid);
       setCatalogues(cats);
       console.log("✅ Catalogues refreshed from event");
     };
 
     window.addEventListener("catalogues-changed", handleCataloguesChanged);
     return () => window.removeEventListener("catalogues-changed", handleCataloguesChanged);
-  }, []);
+  }, [user?.uid]);
 
   // Legacy ?tab=catalogues&catalogue= → /catalogues?catalogue=
   useEffect(() => {
