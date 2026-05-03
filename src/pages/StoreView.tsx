@@ -731,7 +731,7 @@ export default function StoreView() {
     });
   }, [store?.sellerUserId, store?.isLive]);
 
-  const catalogues = useMemo(() => getAllCatalogues(null), []);
+  const catalogues = useMemo(() => getAllCatalogues(store?.sellerUserId ?? null), [store?.sellerUserId]);
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
 
