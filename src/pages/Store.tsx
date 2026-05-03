@@ -1176,6 +1176,12 @@ export default function StorePage() {
       setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
       showToast('Store created!', 'success');
+      // Save catalogues so public storefront can read correct price fields
+      try {
+        await syncUserSettings(user.uid, {
+          data: { cataloguesDefinition: getAllCatalogues(user.uid) },
+        });
+      } catch { /* non-critical */ }
     } else {
       if (result.suggestedSlugs?.length) { setSlugError(result.error || 'That name is already taken'); setSlugSuggestions(result.suggestedSlugs); }
       else setSlugError(result.error || 'Failed to create store');
@@ -1214,6 +1220,12 @@ export default function StorePage() {
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setEditingField(null);
       showToast('Products list updated', 'success');
+      // Save catalogues so public storefront can read correct price fields
+      try {
+        await syncUserSettings(user.uid, {
+          data: { cataloguesDefinition: getAllCatalogues(user.uid) },
+        });
+      } catch { /* non-critical */ }
     } else showToast(result.error || 'Failed', 'error');
     setIsSubmitting(false);
   };

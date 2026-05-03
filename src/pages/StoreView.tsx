@@ -9,7 +9,7 @@ import {
   type CatalogueData,
   type ProductWithCatalogueData,
 } from '../config/catalogueProductUtils';
-import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
+import { type Catalogue } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
@@ -731,7 +731,10 @@ export default function StoreView() {
     });
   }, [store?.sellerUserId, store?.isLive]);
 
-  const catalogues = useMemo(() => getAllCatalogues(store?.sellerUserId ?? null), [store?.sellerUserId]);
+  const catalogues = useMemo(
+    () => store?.cataloguesDefinition ?? [],
+    [store?.cataloguesDefinition]
+  );
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
 

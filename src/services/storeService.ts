@@ -198,6 +198,7 @@ export interface StorePublic {
   viewMode?: 'grid' | 'list';
   /** False = seller paused the storefront (from `get_store_by_slug`). */
   isLive?: boolean;
+  cataloguesDefinition?: Array<{ id: string; label: string; priceField: string; priceUnitField: string; stockField: string; folder: string; order: number; createdAt: number; isDefault?: boolean }>;
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -575,6 +576,21 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
+    }
+
+    // Fetch seller's catalogue definition from user_settings
+    try {
+      const { data: catSettingsRow } = await client
+        .from('user_settings')
+        .select('data')
+        .eq('user_id', sellerUserId)
+        .maybeSingle();
+      const settingsData = asRecord((catSettingsRow as Record<string, unknown> | null)?.data);
+      if (Array.isArray(settingsData?.cataloguesDefinition) && (settingsData.cataloguesDefinition as unknown[]).length > 0) {
+        normalized.cataloguesDefinition = settingsData.cataloguesDefinition as StorePublic['cataloguesDefinition'];
+      }
+    } catch {
+      /* non-critical — storefront will show no price if missing */
     }
 
     return { success: true, data: normalized };
