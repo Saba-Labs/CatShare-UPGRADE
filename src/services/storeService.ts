@@ -57,6 +57,21 @@ const debugStorefrontCatalogue =
   import.meta.env.DEV === true || String(import.meta.env.VITE_DEBUG_STOREFRONT || '') === 'true';
 
 /**
+ * `get_store_by_slug` (security definer) can embed catalogue JSON so anon clients do not rely on RLS `user_settings` / `catalogues_definition` reads.
+ */
+function extractCataloguesListFromStoreRpcPayload(row: Record<string, unknown>): Catalogue[] | null {
+  const fromSettings = tryExtractCataloguesArray(
+    row.cataloguesDefinitionUserSettings ?? row.catalogues_definition_user_settings
+  );
+  if (fromSettings && fromSettings.length > 0) return fromSettings;
+  const fromManaged = tryExtractCataloguesArray(
+    row.cataloguesDefinitionManaged ?? row.catalogues_definition_managed
+  );
+  if (fromManaged && fromManaged.length > 0) return fromManaged;
+  return null;
+}
+
+/**
  * RPC may return jsonb as object or string; unwrap common shapes.
  */
 function parseStoreProductsRpcPayload(raw: unknown): unknown[] {
@@ -611,59 +626,61 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       normalized.whatsapp = whatsapp;
     }
 
-    // Catalogue definitions: Store tab syncs an array into user_settings; Manage Catalogues syncs full object to catalogues_definition.
-    // Public StoreView needs priceField/stockField for store.catalogueId — merge both sources so the store matches the seller app.
-    try {
-      const { data: catSettingsRow } = await client
-        .from('user_settings')
-        .select('data')
-        .eq('user_id', sellerUserId)
-        .maybeSingle();
-      const rawUserData = (catSettingsRow as Record<string, unknown> | null)?.data;
-      const settingsData = parseUserSettingsDataColumn(rawUserData);
+    const storeCatId = String(
+      normalized.catalogueId ??
+        (row as Record<string, unknown>).catalogue_id ??
+        (row as Record<string, unknown>).catalogueId ??
+        ''
+    ).trim();
 
-      if (debugStorefrontCatalogue) {
-        console.warn('[getStoreBySlug] raw catSettingsRow:', catSettingsRow);
-        console.warn('[getStoreBySlug] settingsData (parsed):', settingsData);
-        console.warn('[getStoreBySlug] cataloguesDefinition raw:', settingsData?.cataloguesDefinition);
-      }
+    // Catalogue definitions: prefer RPC payload (`get_store_by_slug` security definer); anon RLS blocks direct `user_settings` / `catalogues_definition`.
+    let list: Catalogue[] | null = extractCataloguesListFromStoreRpcPayload(row);
+    if (debugStorefrontCatalogue) {
+      console.warn('[getStoreBySlug] catalogues from RPC:', list?.length ?? 0, 'sellerUserId:', sellerUserId);
+    }
 
-      const fromSettings = tryExtractCataloguesArray(settingsData?.cataloguesDefinition);
-
-      let list = fromSettings;
-      if (!list || list.length === 0) {
-        const { data: catDefRow, error: catDefErr } = await client
-          .from('catalogues_definition')
+    if (!list || list.length === 0) {
+      try {
+        const { data: catSettingsRow } = await client
+          .from('user_settings')
           .select('data')
           .eq('user_id', sellerUserId)
           .maybeSingle();
-        if (!catDefErr && catDefRow && catDefRow.data != null) {
-          list = tryExtractCataloguesArray(parseJsonbValue(catDefRow.data)) ?? null;
-          if (debugStorefrontCatalogue) {
-            console.warn('[getStoreBySlug] catalogues_definition fallback:', catDefRow, 'extracted:', list?.length);
+        const rawUserData = (catSettingsRow as Record<string, unknown> | null)?.data;
+        const settingsData = parseUserSettingsDataColumn(rawUserData);
+
+        if (debugStorefrontCatalogue) {
+          console.warn('[getStoreBySlug] raw catSettingsRow:', catSettingsRow);
+          console.warn('[getStoreBySlug] settingsData (parsed):', settingsData);
+          console.warn('[getStoreBySlug] cataloguesDefinition raw:', settingsData?.cataloguesDefinition);
+        }
+
+        list = tryExtractCataloguesArray(settingsData?.cataloguesDefinition);
+        if (!list || list.length === 0) {
+          const { data: catDefRow, error: catDefErr } = await client
+            .from('catalogues_definition')
+            .select('data')
+            .eq('user_id', sellerUserId)
+            .maybeSingle();
+          if (!catDefErr && catDefRow && catDefRow.data != null) {
+            list = tryExtractCataloguesArray(parseJsonbValue(catDefRow.data)) ?? null;
+            if (debugStorefrontCatalogue) {
+              console.warn('[getStoreBySlug] catalogues_definition fallback:', catDefRow, 'extracted:', list?.length);
+            }
           }
         }
+      } catch {
+        list = null;
       }
+    }
 
-      const storeCatId = String(
-        normalized.catalogueId ??
-          (row as Record<string, unknown>).catalogue_id ??
-          (row as Record<string, unknown>).catalogueId ??
-          ''
-      ).trim();
+    try {
       normalized.cataloguesDefinition = ensureCataloguesForStorefront(
         list ?? undefined,
         storeCatId || undefined
       );
     } catch {
-      /* non-critical — still attach minimal definition for linked catalogue id */
       try {
-        const storeCatId = String(
-          normalized.catalogueId ??
-            (row as Record<string, unknown>).catalogue_id ??
-            (row as Record<string, unknown>).catalogueId ??
-            ''
-        ).trim();
         normalized.cataloguesDefinition = ensureCataloguesForStorefront(undefined, storeCatId || undefined);
       } catch {
         /* ignore */

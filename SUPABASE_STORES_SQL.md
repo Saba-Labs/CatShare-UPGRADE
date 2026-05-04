@@ -100,7 +100,9 @@ using (true);
 
 This RPC is called by unauthenticated users to view a store. It merges live seller data from `user_settings` (currency, logo, and business profile fields for the public store header).
 
-If you already deployed an older version, run the `create or replace function` block below again so the response includes `sellerBusinessName`, `sellerAbout`, contact fields, etc.
+It also returns **`cataloguesDefinitionUserSettings`** and **`cataloguesDefinitionManaged`** (raw JSON from `user_settings.data.cataloguesDefinition` and `catalogues_definition.data`). The app merges them the same way as authenticated reads. **Anonymous buyers cannot `select` those tables under RLS**, so this RPC (already `security definer`) is the correct place to expose catalogue metadata for the public storefront.
+
+If you already deployed an older version, run the `create or replace function` block below again so the response includes `sellerBusinessName`, `sellerAbout`, contact fields, catalogue payloads, etc.
 
 ```sql
 create or replace function public.get_store_by_slug(p_slug text)
@@ -171,7 +173,14 @@ begin
     'sellerDescription', nullif(trim(bp ->> 'description'), ''),
     'createdAt', rec.created_at,
     'isLive', coalesce(rec.is_live, true),
-    'whatsapp', nullif(trim(rec.store_whatsapp), '')
+    'whatsapp', nullif(trim(rec.store_whatsapp), ''),
+    'cataloguesDefinitionUserSettings', us_data -> 'cataloguesDefinition',
+    'cataloguesDefinitionManaged', (
+      select cd.data
+      from public.catalogues_definition cd
+      where cd.user_id = rec.seller_user_id::uuid
+      limit 1
+    )
   );
 end;
 $$;
@@ -254,9 +263,9 @@ Then in your app logic, set either `share_link_token` OR `store_id` (not both) w
 - In the app, check for existing store before insert; offer "update" instead
 
 ### Public RPC vs. Table Read
-- Public users **cannot** directly select from `stores` table (RLS prevents it)
-- They **must** call `get_store_by_slug()` to fetch a store
-- The RPC merges live seller settings (currency, logo) so stores always show current brand info
+- Public users may or may not have direct `select` on `stores` depending on your policies; the storefront still uses `get_store_by_slug()` for a single payload.
+- They **must** call `get_store_by_slug()` for a consistent JSON shape (and catalogue definitions for guests).
+- The RPC merges live seller settings (currency, logo, **catalogue definitions**) so stores always show current brand and **correct `priceField` / `stockField` per catalogue** without opening `user_settings` to anonymous clients.
 
 ### Store vs. Share Link Orders
 - **Share Link**: Token snapshot of products + pricing at time of sharing (expires in 24h)

@@ -543,24 +543,50 @@ function srchText(p: ProductWithCatalogueData): string {
   const ex = Array.from({ length: 10 }, (_, i) => { const n = i + 1; const r = p as unknown as Record<string, string | undefined>; return [r[`field${n}`], r[`field${n}Label`], r[`field${n}Unit`]].filter(Boolean).join(' '); });
   return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
-function fieldLU(
-  p: ProductWithCatalogueData,
-  n: number,
-  /** When set (e.g. store linked to Cat2), read units from the same catalogue row as field values. */
-  catalogueRow?: CatalogueData | null
-): { label: string; unitSuffix: string } {
-  const r = (catalogueRow ?? p) as unknown as Record<string, string | undefined>;
-  const eu = r[`field${n}Unit`];
+/**
+ * Public store: detail text may live on `catalogueData[storeCatalogueId]`, top-level (Master), or another slice.
+ * Anonymous / partial RPC payloads sometimes omit the linked slice — scan so deploy matches seller localhost.
+ */
+function pickStorefrontDetailField(
+  product: ProductWithCatalogueData,
+  preferredCatalogueId: string | undefined,
+  n: number
+): { text: string; unitSuffix: string } | null {
+  const key = `field${n}`;
+  const unitKey = `field${n}Unit`;
+  const tryRow = (row: Record<string, unknown> | null | undefined): { text: string; unitSuffix: string } | null => {
+    if (!row || typeof row !== 'object') return null;
+    const v = row[key];
+    if (v == null || String(v).trim() === '') return null;
+    const u = row[unitKey];
+    const unitSuffix =
+      u != null && String(u).trim() !== '' && String(u).trim() !== 'None' ? String(u).trim() : '';
+    return { text: String(v).trim(), unitSuffix };
+  };
 
-  // Get field label from fieldsDefinition
-  const fieldDefinition = getFieldsDefinition();
-  const fieldConfig = fieldDefinition.fields.find(f => f.key === `field${n}`);
-  const label = fieldConfig?.label || `Field ${n}`;
-
-  // Get unit suffix - exclude "None" and empty strings
-  const unitSuffix = eu && String(eu).trim() !== '' && String(eu).trim() !== 'None' ? String(eu).trim() : '';
-
-  return { label, unitSuffix };
+  const cid = String(preferredCatalogueId ?? '').trim();
+  if (cid) {
+    const primary = getCatalogueData(product, cid) as unknown as Record<string, unknown>;
+    const a = tryRow(primary);
+    if (a) return a;
+  }
+  const top = tryRow(product as unknown as Record<string, unknown>);
+  if (top) return top;
+  const map = product.catalogueData;
+  if (map && typeof map === 'object') {
+    const ids = Object.keys(map).sort((x, y) => {
+      if (x === 'cat1') return -1;
+      if (y === 'cat1') return 1;
+      return x.localeCompare(y);
+    });
+    for (const id of ids) {
+      const sub = map[id];
+      if (!sub || typeof sub !== 'object') continue;
+      const b = tryRow(sub as Record<string, unknown>);
+      if (b) return b;
+    }
+  }
+  return null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1610,24 +1636,32 @@ export default function StoreView() {
         {/* ══ PRODUCT DETAIL DRAWER ══ */}
         {drawerProduct && (() => {
           const fieldDefinition = getFieldsDefinition();
+          const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
+          /** Default `fieldConfig` has field1–10 `enabled: false`; guests have no seller localStorage. When the seller is logged in on the same device, `fieldsDefinition` may set `visibility.onlineStore: false` — still show any slot that has catalogue/product text so the public store matches what buyers see when logged out. */
           const visibleStoreFieldNumbers = new Set(
             fieldDefinition.fields
-              .filter((f) => f.enabled && f.key.startsWith('field') && isFieldVisibleOnSurface(f, 'onlineStore'))
+              .filter((f) => {
+                if (!f.key.startsWith('field')) return false;
+                const n = Number(String(f.key).replace('field', ''));
+                if (!Number.isFinite(n) || n < 1 || n > 10) return false;
+                const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
+                if (picked) return true;
+                return f.enabled === true && isFieldVisibleOnSurface(f, 'onlineStore');
+              })
               .map((f) => Number(String(f.key).replace('field', '')))
               .filter((n) => Number.isFinite(n))
           );
-          const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
           const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
-          const fieldRow = catData ?? (drawerProduct as unknown as CatalogueData);
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             if (!visibleStoreFieldNumbers.has(n)) return null;
-            const raw = (fieldRow as Record<string, unknown>)[`field${n}`] ?? (drawerProduct as Record<string, unknown>)[`field${n}`];
-            if (raw == null || String(raw).trim() === '') return null;
-            const { label, unitSuffix } = fieldLU(drawerProduct, n, catData);
-            return { label, value: unitSuffix ? `${String(raw).trim()} ${unitSuffix}` : String(raw).trim() };
+            const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
+            if (!picked) return null;
+            const label = fieldDefinition.fields.find((f) => f.key === `field${n}`)?.label || `Field ${n}`;
+            const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
+            return { label, value };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
           const imgUrl = displayStoreProductImage(drawerProduct);
           return (
