@@ -488,6 +488,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearAuthUserIdsFromStorage();
       setSupabaseRlsUserId(null);
 
+      try {
+        const { clearSellerCatalogueSessionHydration } = await import('../utils/catalogueSessionHydration');
+        clearSellerCatalogueSessionHydration();
+      } catch {
+        /* ignore */
+      }
+
       localStorage.removeItem('products');
       localStorage.removeItem('deletedProducts');
       localStorage.removeItem('retailProducts');

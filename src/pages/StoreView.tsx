@@ -19,7 +19,7 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
-import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
+import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import './OrderForm.css';
@@ -731,6 +731,7 @@ export default function StoreView() {
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  const pathFallbackSentRef = useRef(false);
   /** Latest slug for tab-visibility refetch (avoid stale closure). */
   const effectiveSlugRef = useRef(effectiveSlug);
   effectiveSlugRef.current = effectiveSlug;
@@ -747,6 +748,23 @@ export default function StoreView() {
     setStoreLoading(true);
     getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
   }, [effectiveSlug]);
+
+  /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
+  useEffect(() => {
+    if (storeLoading || !storeError || !hostSlug || slug) return;
+    if (pathFallbackSentRef.current) return;
+    const base = getStorePathFallbackBaseUrl();
+    const normalizeHost = (h: string) => h.trim().toLowerCase().replace(/\.+$/, '');
+    let targetHost = '';
+    try {
+      targetHost = normalizeHost(new URL(base).hostname);
+    } catch {
+      return;
+    }
+    if (!targetHost || targetHost === normalizeHost(window.location.hostname)) return;
+    pathFallbackSentRef.current = true;
+    window.location.replace(`${base}/store/${encodeURIComponent(hostSlug)}${window.location.search || ''}`);
+  }, [storeLoading, storeError, hostSlug, slug]);
 
   useEffect(() => {
     setLogoFailed(false);

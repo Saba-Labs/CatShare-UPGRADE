@@ -74,6 +74,19 @@ export function buildStorefrontUrl(slug: string): string {
   return `https://${normalizedSlug}.${rootHost}`;
 }
 
+/**
+ * Base URL for path-based store links when leaving a seller subdomain (e.g. client fallback after a failed fetch).
+ * Prefer `VITE_PUBLIC_WEB_BASE_URL` / `VITE_APP_URL`; otherwise `https://my.<storefront root>`.
+ * Avoids using `window.location.origin` on `*.catshare.app` seller hosts, which would not escape the subdomain.
+ */
+export function getStorePathFallbackBaseUrl(): string {
+  const env = String(import.meta.env.VITE_PUBLIC_WEB_BASE_URL || import.meta.env.VITE_APP_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (env) return env;
+  return `https://my.${getStorefrontRootHost()}`;
+}
+
 export function resolveStoreSlugFromHostname(hostname?: string | null): string | null {
   const host =
     normalizeHost(

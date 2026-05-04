@@ -40,6 +40,10 @@ import {
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
 import { migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
+import {
+  hasSellerCatalogueCloudHydrated,
+  markSellerCatalogueCloudHydrated,
+} from "./utils/catalogueSessionHydration";
 import Lottie from "lottie-react";
 import syncAnimationData from "./loading.json";
 
@@ -178,8 +182,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       return;
     }
 
-    let cancelled = false;
     const uid = user.uid;
+    /** Avoid full `fetchAllUserData` on every remount when returning from /orders, /store, etc. */
+    if (hasSellerCatalogueCloudHydrated(uid)) {
+      setCatalogueLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     const pCached = readProductsWithLegacyFallback(uid);
     const dCached = readDeletedProductsWithLegacyFallback(uid);
 
@@ -244,6 +254,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           }
           setProducts(nextP);
           setDeletedProducts(nextD);
+          if (!cancelled) {
+            markSellerCatalogueCloudHydrated(uid);
+          }
         }
       } finally {
         if (!cancelled) setCatalogueLoading(false);

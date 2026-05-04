@@ -30,6 +30,11 @@ import {
   businessProfileFromUserSettings,
 } from '../config/businessProfile';
 import MainAppBottomNav from '../components/MainAppBottomNav';
+import {
+  hasSellerStoreRowFetched,
+  invalidateSellerStoreSessionFetch,
+  markSellerStoreRowFetched,
+} from '../utils/catalogueSessionHydration';
 import { Capacitor } from '@capacitor/core';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
@@ -1065,9 +1070,18 @@ export default function StorePage() {
     }
 
     let cancelled = false;
+    const uid = user.uid;
     const load = async () => {
-      const uid = user.uid;
       const cacheKey = sellerStoreCacheKey(uid);
+      if (hasSellerStoreRowFetched(uid)) {
+        const cachedSkip = safeGetFromStorage<Store | null>(cacheKey, null);
+        if (cachedSkip) {
+          applyStoreState(cachedSkip);
+          setLoading(false);
+          return;
+        }
+      }
+
       const cached = safeGetFromStorage<Store | null>(cacheKey, null);
       if (!cached) {
         setLoading(true);
@@ -1086,10 +1100,12 @@ export default function StorePage() {
       if (result.success && result.data) {
         applyStoreState(result.data);
         safeSetInStorage(cacheKey, result.data);
+        markSellerStoreRowFetched(uid);
       } else {
         const fallback = cached ?? safeGetFromStorage<Store | null>(cacheKey, null);
         if (fallback) {
           applyStoreState(fallback);
+          markSellerStoreRowFetched(uid);
           showToast(
             isBrowserOnline() ? 'Could not refresh store. Showing saved settings.' : 'Showing saved store settings',
             'info'
@@ -1175,6 +1191,12 @@ export default function StorePage() {
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
+      try {
+        safeSetInStorage(sellerStoreCacheKey(user.uid), result.data);
+      } catch {
+        /* ignore */
+      }
+      markSellerStoreRowFetched(user.uid);
       showToast('Store created!', 'success');
       // Save catalogues so public storefront can read correct price fields
       try {
@@ -1911,6 +1933,7 @@ export default function StorePage() {
     if (result.success) {
       setStore(null); setShowCreateForm(true); setConfirmDelete(false);
       localStorage.removeItem(sellerStoreCacheKey(user.uid));
+      invalidateSellerStoreSessionFetch(user.uid);
       showToast('Store deleted', 'success');
     } else showToast(result.error || 'Failed', 'error');
     setIsSubmitting(false);
