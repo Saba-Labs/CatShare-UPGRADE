@@ -493,12 +493,11 @@ function getStorefrontPriceAndUnit(
     };
   };
 
+  // Linked catalogue row is the source of truth for the store: empty price → 0 (do not fall through to legacy top-level prices).
   if (catalogue && catData) {
     const res = resolveListOfferEffective(catData, catalogue.priceField, pr ?? null);
     const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
-    if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
-      return pack(res, priceUnit);
-    }
+    return pack(res, priceUnit);
   }
 
   if (catData && !catalogue) {
@@ -540,8 +539,13 @@ function srchText(p: ProductWithCatalogueData): string {
   const ex = Array.from({ length: 10 }, (_, i) => { const n = i + 1; const r = p as unknown as Record<string, string | undefined>; return [r[`field${n}`], r[`field${n}Label`], r[`field${n}Unit`]].filter(Boolean).join(' '); });
   return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
-function fieldLU(p: ProductWithCatalogueData, n: number): { label: string; unitSuffix: string } {
-  const r = p as unknown as Record<string, string | undefined>;
+function fieldLU(
+  p: ProductWithCatalogueData,
+  n: number,
+  /** When set (e.g. store linked to Cat2), read units from the same catalogue row as field values. */
+  catalogueRow?: CatalogueData | null
+): { label: string; unitSuffix: string } {
+  const r = (catalogueRow ?? p) as unknown as Record<string, string | undefined>;
   const eu = r[`field${n}Unit`];
 
   // Get field label from fieldsDefinition
@@ -1236,7 +1240,7 @@ export default function StoreView() {
                             ) : null}
                           </div>
                           <div className="of-item-price-row">
-                            {price > 0 ? (
+                            {Number.isFinite(price) ? (
                               <div className="of-price-tag">
                                 {fmt(price, currencySymbol)}
                                 {showOffer && listPrice != null && listPrice > 0 ? (
@@ -1317,7 +1321,7 @@ export default function StoreView() {
                   <div className="sv-pcard-body">
                     <div className="sv-pcard-name">{product.name}</div>
                     {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
-                    {price > 0 && (
+                    {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
                         {fmt(price, currencySymbol)}
                         {showOffer && listPrice != null && listPrice > 0 ? (
@@ -1548,12 +1552,13 @@ export default function StoreView() {
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
+          const fieldRow = catData ?? (drawerProduct as unknown as CatalogueData);
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             if (!visibleStoreFieldNumbers.has(n)) return null;
-            const value = (drawerProduct as Record<string, unknown>)[`field${n}`];
-            if (value == null || String(value).trim() === '') return null;
-            const { label, unitSuffix } = fieldLU(drawerProduct, n);
-            return { label, value: unitSuffix ? `${String(value)} ${unitSuffix}` : String(value) };
+            const raw = (fieldRow as Record<string, unknown>)[`field${n}`] ?? (drawerProduct as Record<string, unknown>)[`field${n}`];
+            if (raw == null || String(raw).trim() === '') return null;
+            const { label, unitSuffix } = fieldLU(drawerProduct, n, catData);
+            return { label, value: unitSuffix ? `${String(raw).trim()} ${unitSuffix}` : String(raw).trim() };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
           const imgUrl = displayStoreProductImage(drawerProduct);
           return (
@@ -1573,7 +1578,7 @@ export default function StoreView() {
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
                   <div className="sv-drawer-price">
-                    {price > 0 ? (
+                    {Number.isFinite(price) ? (
                       <>
                         {fmt(price, currencySymbol)}
                         {showOffer && listPrice != null && listPrice > 0 ? (

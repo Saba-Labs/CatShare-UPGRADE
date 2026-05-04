@@ -48,7 +48,7 @@ const PRODUCT_SCROLL_KEY = "productScroll";
 const CATALOGUE_FETCH_TIMEOUT_MS = 14_000;
 const SELLER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** List ↔ shelf: cap sync overlay at 1s and skip full cloud refresh; upload continues in background. */
+/** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */
 function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
   return {
     skipFullCloudRefresh: true,
@@ -736,7 +736,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     setProducts(freshProducts);
 
     if (isStrictMode() && user?.uid) {
-      syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
+      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
       }).catch(err => console.error('Strict sync failed:', err));
@@ -755,7 +755,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
+        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -788,7 +788,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
+        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -812,7 +812,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     });
 
     if (isStrictMode() && user?.uid) {
-      syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
+      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
       }).catch(err => console.error('Strict sync failed:', err));
@@ -1020,7 +1020,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setDeletedProducts(freshDeleted);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(products, freshDeleted).then(cloudData => {
+        syncProductsToCloud(products, freshDeleted, shelfMoveCloudSyncOptions(products)).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -1660,7 +1660,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     setProducts(freshProducts);
 
                     if (isStrictMode() && user?.uid) {
-                      syncProductsToCloud(freshProducts, deletedProducts).then(cloudData => {
+                      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
                         setProducts(cloudData.products);
                         setDeletedProducts(cloudData.deletedProducts);
                       }).catch(err => console.error('Strict sync failed:', err));
@@ -1719,6 +1719,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     priceField={selectedCat.priceField}
                     priceUnitField={selectedCat.priceUnitField}
                     stockField={selectedCat.stockField}
+                    deletedProducts={deletedProducts}
                     onBack={() => {
                       setSelected([]);
                       setSelectedCatalogueInCataloguesTab(null);

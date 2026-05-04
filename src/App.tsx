@@ -1548,9 +1548,9 @@ function AppWithBackHandler() {
         const freshDeleted = e.detail?.deletedProducts ?? readDeletedProductsWithLegacyFallback(user.uid);
 
         const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
-          background: true,
           skipFullCloudRefresh: true,
           fullListForPosition: freshProducts,
+          maxSyncUiMs: 1000,
         });
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);

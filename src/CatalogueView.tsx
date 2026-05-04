@@ -335,6 +335,8 @@ interface CatalogueViewProps {
   priceUnitField: string;
   stockField: string;
   onBack: () => void;
+  /** Shelf / deleted rows — passed through to cloud sync events so bulk stock sync matches strict mode. */
+  deletedProducts?: any[];
 }
 
 export default React.memo(function CatalogueView({
@@ -351,6 +353,7 @@ export default React.memo(function CatalogueView({
   priceUnitField,
   stockField,
   onBack,
+  deletedProducts = [],
 }: CatalogueViewProps) {
   const { user, supabaseData } = useAuth();
   const { guardCloudWrite } = useCloudWriteGate();
@@ -1525,10 +1528,14 @@ const handleTouchEnd = useCallback(() => {
                   // Use user-scoped key if logged in, otherwise use default key
                   const storageKey = user?.uid ? `products::${user.uid}` : 'products';
                   localStorage.setItem(storageKey, JSON.stringify(updated));
-                  // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
-                  window.dispatchEvent(new CustomEvent("product-added"));
-                  window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-                  console.log('✅ Product-added and sync-to-supabase events dispatched');
+                  // Cloud sync: use only sync-to-supabase (1s overlay via App). Do not also fire product-added
+                  // strict sync — that path runs syncProductsToCloud without maxSyncUiMs and blocks the UI longer.
+                  window.dispatchEvent(
+                    new CustomEvent("sync-to-supabase", {
+                      detail: { products: updated, deletedProducts },
+                    })
+                  );
+                  console.log('✅ sync-to-supabase dispatched (bulk in stock)');
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -1555,10 +1562,12 @@ const handleTouchEnd = useCallback(() => {
                   // Use user-scoped key if logged in, otherwise use default key
                   const storageKey = user?.uid ? `products::${user.uid}` : 'products';
                   localStorage.setItem(storageKey, JSON.stringify(updated));
-                  // Trigger both product-added (for general handlers) and sync-to-supabase (explicit cloud sync)
-                  window.dispatchEvent(new CustomEvent("product-added"));
-                  window.dispatchEvent(new CustomEvent("sync-to-supabase"));
-                  console.log('✅ Product-added and sync-to-supabase events dispatched');
+                  window.dispatchEvent(
+                    new CustomEvent("sync-to-supabase", {
+                      detail: { products: updated, deletedProducts },
+                    })
+                  );
+                  console.log('✅ sync-to-supabase dispatched (bulk out of stock)');
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

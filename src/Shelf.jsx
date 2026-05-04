@@ -12,8 +12,12 @@ import { useSync } from "./context/SyncContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 
+/** Full-screen delete spinner: show max this long; Supabase/R2/local cleanup may continue after. */
+const SHELF_DELETE_OVERLAY_MS = 2000;
+
 export default function Shelf({ deletedProducts, setDeletedProducts, setProducts, products, imageMap: globalImageMap, user }) {
   const { syncProductsToCloud, isStrictMode } = useSync();
+  const { guardCloudWrite } = useCloudWriteGate();
   const [shelfPermanentDeleteBusy, setShelfPermanentDeleteBusy] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -93,6 +97,9 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
     setShowDeleteConfirm(false);
     setDeleteTargetId(null);
     setShelfPermanentDeleteBusy(true);
+    const overlayCapTimer = window.setTimeout(() => {
+      setShelfPermanentDeleteBusy(false);
+    }, SHELF_DELETE_OVERLAY_MS);
 
     try {
       // 1) Delete from Supabase + R2 FIRST
@@ -107,7 +114,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       // 2) After cloud success, remove from local state (no product-added event)
       setDeletedProducts((prev) => prev.filter((p) => p.id !== toDelete.id));
 
-      // 3) Local file cleanup (best-effort)
+      // 3) Local file cleanup (best-effort; may finish after overlay hides)
       try {
         await deleteRenderedImageForProduct(toDelete.id);
         await deleteProductSourceImagesBestEffort(toDelete);
@@ -115,6 +122,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
         console.warn(`⚠️ Failed to clean up files for product ${toDelete.id}:`, err);
       }
     } finally {
+      window.clearTimeout(overlayCapTimer);
       setShelfPermanentDeleteBusy(false);
     }
   };
@@ -130,6 +138,9 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
 
     const snapshot = [...deletedProducts];
     setShelfPermanentDeleteBusy(true);
+    const overlayCapTimerAll = window.setTimeout(() => {
+      setShelfPermanentDeleteBusy(false);
+    }, SHELF_DELETE_OVERLAY_MS);
 
     try {
       const result = await deleteAllDeletedProducts(user.uid);
@@ -142,7 +153,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       console.log('✅ All shelf items permanently deleted from Supabase');
       setDeletedProducts([]);
 
-      // Local file cleanup (best-effort)
+      // Local file cleanup (best-effort; may finish after overlay hides)
       for (const product of snapshot) {
         try {
           await deleteRenderedImageForProduct(product.id);
@@ -155,6 +166,7 @@ export default function Shelf({ deletedProducts, setDeletedProducts, setProducts
       console.error('❌ Error deleting shelf:', err);
       alert("Failed to delete shelf items from cloud. Please try again.");
     } finally {
+      window.clearTimeout(overlayCapTimerAll);
       setShelfPermanentDeleteBusy(false);
     }
   };
