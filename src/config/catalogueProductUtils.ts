@@ -8,6 +8,74 @@
 import { getAllCatalogues, type Catalogue } from './catalogueConfig';
 import { offerPriceFieldFor } from '../utils/offerPriceUtils';
 
+/**
+ * Keep `product.catalogueData[catId]` in sync with top-level columns (`price1`, `wholesaleStock`, …).
+ * Seller grid and legacy edits often update top-level fields only; storefront reads nested rows via
+ * {@link getCatalogueData}. Call before persist / Supabase upsert and when hydrating from cloud.
+ */
+export function syncTopLevelFieldsIntoCatalogueData(
+  product: ProductWithCatalogueData,
+  catalogues: Catalogue[]
+): ProductWithCatalogueData {
+  if (!product || !Array.isArray(catalogues) || catalogues.length === 0) {
+    return product;
+  }
+
+  const nextCd: Record<string, CatalogueData> = product.catalogueData
+    ? { ...product.catalogueData }
+    : {};
+
+  for (const cat of catalogues) {
+    const prev: Partial<CatalogueData> =
+      nextCd[cat.id] && typeof nextCd[cat.id] === 'object' ? { ...nextCd[cat.id] } : {};
+
+    const offerField = offerPriceFieldFor(cat.priceField);
+    const priceValue = product?.[cat.priceField] || '';
+    const priceUnitValue = product?.[cat.priceUnitField] || '/ piece';
+    const offerValue = product?.[offerField];
+    const stockValue = product?.[cat.stockField] !== false;
+
+    nextCd[cat.id] = {
+      ...getDefaultCatalogueData(cat.id),
+      ...prev,
+      enabled: prev.enabled !== undefined ? prev.enabled : cat.id === 'cat1',
+      field1: product?.field1 || '',
+      field2: product?.field2 || '',
+      field3: product?.field3 || '',
+      field4: product?.field4 || '',
+      field5: product?.field5 || '',
+      field6: product?.field6 || '',
+      field7: product?.field7 || '',
+      field8: product?.field8 || '',
+      field9: product?.field9 || '',
+      field10: product?.field10 || '',
+      [cat.priceField]: priceValue,
+      [cat.priceUnitField]: priceUnitValue,
+      [offerField]:
+        offerValue !== undefined && offerValue !== null ? String(offerValue) : '',
+      field2Unit: product?.field2Unit || product?.packageUnit || 'None',
+      field3Unit: product?.field3Unit || product?.ageUnit || 'None',
+      field4Unit: product?.field4Unit || 'None',
+      field5Unit: product?.field5Unit || 'None',
+      field6Unit: product?.field6Unit || 'None',
+      field7Unit: product?.field7Unit || 'None',
+      field8Unit: product?.field8Unit || 'None',
+      field9Unit: product?.field9Unit || 'None',
+      field10Unit: product?.field10Unit || 'None',
+      badge: product?.badge || '',
+      orderQuantityStep: normalizeOrderQuantityStep(
+        product?.orderQuantityStep ?? prev.orderQuantityStep
+      ),
+      stock: product?.stock !== false,
+      wholesaleStock: product?.wholesaleStock !== false,
+      resellStock: product?.resellStock !== false,
+      [cat.stockField]: stockValue,
+    };
+  }
+
+  return { ...product, catalogueData: nextCd };
+}
+
 /** Clamp order step for catalogue data (1 = no restriction). */
 export function normalizeOrderQuantityStep(raw: unknown): number {
   const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? '').replace(/\D/g, ''), 10);

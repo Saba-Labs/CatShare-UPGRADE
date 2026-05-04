@@ -8,8 +8,16 @@
  */
 
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
-import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
-import { tryExtractCataloguesArray } from '../config/catalogueConfig';
+import {
+  syncTopLevelFieldsIntoCatalogueData,
+  type ProductWithCatalogueData,
+} from '../config/catalogueProductUtils';
+import {
+  tryExtractCataloguesArray,
+  DEFAULT_CATALOGUES,
+  ensureCataloguesForStorefront,
+  type Catalogue,
+} from '../config/catalogueConfig';
 import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
@@ -23,6 +31,30 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   return value as Record<string, unknown>;
 }
+
+/** JSONB may be a string, object, or (rare) other — parse string; return value for further checks. */
+function parseJsonbValue(raw: unknown): unknown {
+  if (raw == null) return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  return raw;
+}
+
+/** `user_settings.data` is always a JSON object in correct shape; stringified JSONB is handled here. */
+function parseUserSettingsDataColumn(raw: unknown): Record<string, unknown> | undefined {
+  const v = parseJsonbValue(raw);
+  if (v == null) return undefined;
+  if (typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+  return undefined;
+}
+
+const debugStorefrontCatalogue =
+  import.meta.env.DEV === true || String(import.meta.env.VITE_DEBUG_STOREFRONT || '') === 'true';
 
 /**
  * RPC may return jsonb as object or string; unwrap common shapes.
@@ -587,7 +619,15 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         .select('data')
         .eq('user_id', sellerUserId)
         .maybeSingle();
-      const settingsData = asRecord((catSettingsRow as Record<string, unknown> | null)?.data);
+      const rawUserData = (catSettingsRow as Record<string, unknown> | null)?.data;
+      const settingsData = parseUserSettingsDataColumn(rawUserData);
+
+      if (debugStorefrontCatalogue) {
+        console.warn('[getStoreBySlug] raw catSettingsRow:', catSettingsRow);
+        console.warn('[getStoreBySlug] settingsData (parsed):', settingsData);
+        console.warn('[getStoreBySlug] cataloguesDefinition raw:', settingsData?.cataloguesDefinition);
+      }
+
       const fromSettings = tryExtractCataloguesArray(settingsData?.cataloguesDefinition);
 
       let list = fromSettings;
@@ -598,15 +638,36 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
           .eq('user_id', sellerUserId)
           .maybeSingle();
         if (!catDefErr && catDefRow && catDefRow.data != null) {
-          list = tryExtractCataloguesArray(catDefRow.data) ?? null;
+          list = tryExtractCataloguesArray(parseJsonbValue(catDefRow.data)) ?? null;
+          if (debugStorefrontCatalogue) {
+            console.warn('[getStoreBySlug] catalogues_definition fallback:', catDefRow, 'extracted:', list?.length);
+          }
         }
       }
 
-      if (list && list.length > 0) {
-        normalized.cataloguesDefinition = list;
-      }
+      const storeCatId = String(
+        normalized.catalogueId ??
+          (row as Record<string, unknown>).catalogue_id ??
+          (row as Record<string, unknown>).catalogueId ??
+          ''
+      ).trim();
+      normalized.cataloguesDefinition = ensureCataloguesForStorefront(
+        list ?? undefined,
+        storeCatId || undefined
+      );
     } catch {
-      /* non-critical — storefront falls back to legacy price scan if missing */
+      /* non-critical — still attach minimal definition for linked catalogue id */
+      try {
+        const storeCatId = String(
+          normalized.catalogueId ??
+            (row as Record<string, unknown>).catalogue_id ??
+            (row as Record<string, unknown>).catalogueId ??
+            ''
+        ).trim();
+        normalized.cataloguesDefinition = ensureCataloguesForStorefront(undefined, storeCatId || undefined);
+      } catch {
+        /* ignore */
+      }
     }
 
     return { success: true, data: normalized };
@@ -940,9 +1001,11 @@ export async function deleteStore(sellerUserId: string): Promise<{ success: bool
  * Get products for a store (public, no auth required)
  * Called by guests to view products from a specific store
  * Requires the RPC function get_store_products() in Supabase
+ * @param cataloguesForReconcile — seller's catalogues (from `getStoreBySlug`); merges top-level price fields into `catalogueData` for correct guest pricing
  */
 export async function getStoreProducts(
-  sellerUserId: string
+  sellerUserId: string,
+  cataloguesForReconcile?: Catalogue[]
 ): Promise<{ success: boolean; products?: any[]; error?: string }> {
   try {
     const client = getSupabaseClient();
@@ -962,10 +1025,16 @@ export async function getStoreProducts(
     }
 
     const list = parseStoreProductsRpcPayload(data);
+    const catList =
+      Array.isArray(cataloguesForReconcile) && cataloguesForReconcile.length > 0
+        ? cataloguesForReconcile
+        : DEFAULT_CATALOGUES;
     const products = sortProductsBySupabaseRowOrder(
       list
         .filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x))
-        .map((row) => normalizePublicStoreProduct(row))
+        .map((row) =>
+          syncTopLevelFieldsIntoCatalogueData(normalizePublicStoreProduct(row), catList)
+        )
     );
 
     return { success: true, products };

@@ -17,6 +17,11 @@ import {
 import { getFieldsDefinition, getFieldConfig, FieldConfig } from './fieldConfig';
 import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
+import {
+  syncTopLevelFieldsIntoCatalogueData,
+  type ProductWithCatalogueData,
+} from './catalogueProductUtils';
+import { getAllCatalogues } from './catalogueConfig';
 
 /**
  * Product interface that works with both old and new field names
@@ -222,6 +227,20 @@ export function normalizeProduct(product: Product): Product {
   return synced as Product;
 }
 
+/** After field migration, only when persisting — avoids running on every read/bootstrap. */
+function withCatalogueTopLevelSync(product: Product): Product {
+  const base = normalizeProduct(product);
+  try {
+    return syncTopLevelFieldsIntoCatalogueData(
+      base as ProductWithCatalogueData,
+      getAllCatalogues()
+    ) as Product;
+  } catch (e) {
+    console.warn('[CatShare] catalogue top-level sync skipped:', e);
+    return base;
+  }
+}
+
 /**
  * Get a product with all fields accessible via both old and new names
  * Use this when loading a product from localStorage
@@ -266,7 +285,7 @@ export function getAllProducts(userId?: string): Product[] {
  */
 export function saveProduct(product: Product, userId?: string): void {
   const all = getAllProducts(userId);
-  const normalized = normalizeProduct(product);
+  const normalized = withCatalogueTopLevelSync(product);
   const updated = product.id
     ? all.map(p => (p.id === product.id ? normalized : p))
     : [...all, normalized];
@@ -289,7 +308,7 @@ export function saveProduct(product: Product, userId?: string): void {
  */
 export function saveProducts(products: Product[], userId?: string): void {
   try {
-    const normalized = products.map(normalizeProduct);
+    const normalized = products.map((p) => withCatalogueTopLevelSync(p));
     const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(normalized));

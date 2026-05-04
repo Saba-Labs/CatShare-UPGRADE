@@ -9,7 +9,7 @@ import {
   type CatalogueData,
   type ProductWithCatalogueData,
 } from '../config/catalogueProductUtils';
-import { type Catalogue } from '../config/catalogueConfig';
+import { ensureCataloguesForStorefront, type Catalogue } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
@@ -730,13 +730,23 @@ export default function StoreView() {
       return;
     }
     setProductsLoading(true);
-    getStoreProducts(store.sellerUserId).then((result) => {
+    const cats = ensureCataloguesForStorefront(store.cataloguesDefinition, store.catalogueId);
+    getStoreProducts(store.sellerUserId, cats).then((result) => {
       if (result.success && result.products) {
         setAllProducts(result.products);
       }
       setProductsLoading(false);
     });
-  }, [store?.sellerUserId, store?.isLive]);
+  }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
+
+  /** Temporary diagnostics: set `VITE_DEBUG_STOREFRONT=true` (or run dev) and check console for catalogue merge issues. Remove when done. */
+  useEffect(() => {
+    const on =
+      import.meta.env.DEV === true || String(import.meta.env.VITE_DEBUG_STOREFRONT || '') === 'true';
+    if (!on || !store) return;
+    console.warn('[StoreView] catalogueId:', store.catalogueId);
+    console.warn('[StoreView] cataloguesDefinition length:', store.cataloguesDefinition?.length ?? 0, store.cataloguesDefinition);
+  }, [store]);
 
   /** Re-hit Supabase when user returns to the tab or restores from bfcache — no local product/store cache in StoreView. */
   useEffect(() => {
@@ -750,7 +760,8 @@ export default function StoreView() {
         setStore(r.data);
         if (r.data.sellerUserId && r.data.isLive !== false) {
           setProductsLoading(true);
-          void getStoreProducts(r.data.sellerUserId).then((result) => {
+          const cats = ensureCataloguesForStorefront(r.data.cataloguesDefinition, r.data.catalogueId);
+          void getStoreProducts(r.data.sellerUserId, cats).then((result) => {
             if (result.success && result.products) {
               setAllProducts(result.products);
             }
@@ -777,8 +788,8 @@ export default function StoreView() {
   }, []);
 
   const catalogues = useMemo(
-    () => store?.cataloguesDefinition ?? [],
-    [store?.cataloguesDefinition]
+    () => ensureCataloguesForStorefront(store?.cataloguesDefinition, store?.catalogueId),
+    [store?.cataloguesDefinition, store?.catalogueId]
   );
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
   const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);

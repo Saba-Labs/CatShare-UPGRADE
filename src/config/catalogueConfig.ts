@@ -51,6 +51,60 @@ export const DEFAULT_CATALOGUES: Catalogue[] = [
   },
 ];
 
+/** Legacy second catalogue (Wholesale / Resell split). Used when storefront `catalogueId` is cat2 but cloud definition is missing. */
+export const LEGACY_RESELL_CATALOGUE: Catalogue = {
+  id: "cat2",
+  label: "Resell",
+  priceField: "price2",
+  priceUnitField: "price2Unit",
+  stockField: "resellStock",
+  folder: "Resell",
+  order: 2,
+  createdAt: Date.now(),
+  isDefault: false,
+  heroImage: "",
+  description: "",
+};
+
+/**
+ * Public storefront: ensure we have a {@link Catalogue} row for `store.catalogueId` so `priceField` / stock / sync match the linked catalogue.
+ * When cloud `cataloguesDefinition` is empty or RLS-blocked, guests only had DEFAULT (cat1) — Resell/cat2 stores showed wrong prices and fields.
+ */
+export function ensureCataloguesForStorefront(
+  catalogues: Catalogue[] | null | undefined,
+  storeCatalogueId: string | undefined | null
+): Catalogue[] {
+  const cid = String(storeCatalogueId ?? "").trim();
+  let list =
+    Array.isArray(catalogues) && catalogues.length > 0 ? [...catalogues] : [...DEFAULT_CATALOGUES];
+  if (!cid || list.some((c) => c.id === cid)) return list;
+  if (cid === "cat2") {
+    list.push({ ...LEGACY_RESELL_CATALOGUE, createdAt: Date.now() });
+    return list;
+  }
+  const m = /^cat(\d+)$/i.exec(cid);
+  if (m) {
+    const idx = parseInt(m[1], 10);
+    if (Number.isFinite(idx) && idx >= 3) {
+      const priceField = `price${idx}`;
+      list.push({
+        id: cid,
+        label: `Catalogue ${idx}`,
+        priceField,
+        priceUnitField: `price${idx}Unit`,
+        stockField: `${priceField}Stock`,
+        folder: `Cat${idx}`,
+        order: idx,
+        createdAt: Date.now(),
+        isDefault: false,
+        heroImage: "",
+        description: "",
+      });
+    }
+  }
+  return list;
+}
+
 /**
  * Repair shapes that omit `catalogues` (e.g. { "0": cat, "1": cat, lastUpdated }) from bad sync/serialization.
  */
@@ -424,22 +478,7 @@ export function createLegacyResellCatalogueIfNeeded(products: any[]): void {
     return; // No resell data, no need to create
   }
 
-  // Create the legacy Resell catalogue
-  const resellCatalogue: Catalogue = {
-    id: "cat2",
-    label: "Resell",
-    priceField: "price2",
-    priceUnitField: "price2Unit",
-    stockField: "resellStock",
-    folder: "Resell",
-    order: 2,
-    createdAt: Date.now(),
-    isDefault: false, // Not a default catalogue, only for backward compatibility
-    heroImage: "",
-    description: "",
-  };
-
-  definition.catalogues.push(resellCatalogue);
+  definition.catalogues.push({ ...LEGACY_RESELL_CATALOGUE, createdAt: Date.now() });
   setCataloguesDefinition(definition);
 
   console.log(

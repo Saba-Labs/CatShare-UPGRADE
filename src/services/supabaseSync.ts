@@ -7,6 +7,8 @@ import { getSupabaseClient } from '../supabaseClient';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
 import { deleteImageFromR2 } from './cloudflareService';
+import { syncTopLevelFieldsIntoCatalogueData, type ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { getAllCatalogues, DEFAULT_CATALOGUES, type Catalogue } from '../config/catalogueConfig';
 
 interface SyncResult {
   success: boolean;
@@ -44,8 +46,13 @@ export async function syncProducts(
       return { success: false, error: 'Invalid input: userId or products array missing' };
     }
 
+    const catalogues = getAllCatalogues();
     const cleanedProducts = products.map(p => {
-      const clean = { ...p };
+      const reconciled = syncTopLevelFieldsIntoCatalogueData(
+        p as ProductWithCatalogueData,
+        catalogues
+      );
+      const clean = { ...reconciled };
       // Remove large binary data fields but PRESERVE imageUrl (cloud URL)
       delete clean.image;
       delete clean.imageBase64;
@@ -190,12 +197,19 @@ export async function syncDeletedProducts(
       return { success: false, error: 'Invalid input: userId or deletedProducts array missing' };
     }
 
-    const upsertData = deletedProducts.map(product => ({
-      user_id: userId,
-      product_id: product.id,
-      data: product,
-      deleted_at: product.deletedAt || new Date().toISOString(),
-    }));
+    const delCat = getAllCatalogues();
+    const upsertData = deletedProducts.map(product => {
+      const reconciled = syncTopLevelFieldsIntoCatalogueData(
+        product as ProductWithCatalogueData,
+        delCat
+      );
+      return {
+        user_id: userId,
+        product_id: product.id,
+        data: reconciled,
+        deleted_at: product.deletedAt || new Date().toISOString(),
+      };
+    });
 
     if (upsertData.length === 0) {
       return { success: true, data: [] };
@@ -641,17 +655,33 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       return null;
     };
 
+    const rawCatDef = cataloguesDef?.[0]?.data as { catalogues?: Catalogue[] } | null | undefined;
+    let reconcileCatalogues: Catalogue[] = DEFAULT_CATALOGUES;
+    if (
+      rawCatDef &&
+      typeof rawCatDef === 'object' &&
+      Array.isArray(rawCatDef.catalogues) &&
+      rawCatDef.catalogues.length > 0
+    ) {
+      reconcileCatalogues = rawCatDef.catalogues;
+    }
+
     // deleted_products now stores full product data in the `data` column.
     // No cross-referencing with the products table needed.
     const deletedProductsList = (deletedProducts || [])
       .map(mapDeletedProductsRowToApp)
-      .filter((p: any) => p != null && p.id != null);
+      .filter((p: any) => p != null && p.id != null)
+      .map((p: any) =>
+        syncTopLevelFieldsIntoCatalogueData(p as ProductWithCatalogueData, reconcileCatalogues)
+      );
 
     // Filter active products: exclude any that are in deleted_products
     const deletedIds = new Set(deletedProductsList.map((p: any) => String(p.id)));
-    const activeProducts = (products?.map(mapProductsTableRowToApp) || []).filter(
-      (p: any) => p != null && p.id != null && !deletedIds.has(String(p.id))
-    );
+    const activeProducts = (products?.map(mapProductsTableRowToApp) || [])
+      .filter((p: any) => p != null && p.id != null && !deletedIds.has(String(p.id)))
+      .map((p: any) =>
+        syncTopLevelFieldsIntoCatalogueData(p as ProductWithCatalogueData, reconcileCatalogues)
+      );
 
     const userData = {
       products: activeProducts,
