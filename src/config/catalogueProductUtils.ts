@@ -9,9 +9,10 @@ import { getAllCatalogues, type Catalogue } from './catalogueConfig';
 import { offerPriceFieldFor } from '../utils/offerPriceUtils';
 
 /**
- * Keep `product.catalogueData[catId]` in sync with top-level columns (`price1`, `wholesaleStock`, …).
- * Seller grid and legacy edits often update top-level fields only; storefront reads nested rows via
- * {@link getCatalogueData}. Call before persist / Supabase upsert and when hydrating from cloud.
+ * Keep `product.catalogueData[catId]` in sync with top-level **price/stock** columns (`price1`, `wholesaleStock`, …).
+ * Master (`cat1`) also mirrors shared grid fields from the product top-level (`field1`…, units, badge) — legacy seller UX.
+ * Other catalogues keep **per-row** `field1`…`field10` from `catalogueData[catId]` so the public store can show
+ * catalogue-specific copy when the store is linked to Resell / custom ids.
  */
 export function syncTopLevelFieldsIntoCatalogueData(
   product: ProductWithCatalogueData,
@@ -35,42 +36,55 @@ export function syncTopLevelFieldsIntoCatalogueData(
     const offerValue = product?.[offerField];
     const stockValue = product?.[cat.stockField] !== false;
 
-    nextCd[cat.id] = {
+    const isMaster = cat.id === 'cat1';
+
+    const base: CatalogueData = {
       ...getDefaultCatalogueData(cat.id),
       ...prev,
       enabled: prev.enabled !== undefined ? prev.enabled : cat.id === 'cat1',
-      field1: product?.field1 || '',
-      field2: product?.field2 || '',
-      field3: product?.field3 || '',
-      field4: product?.field4 || '',
-      field5: product?.field5 || '',
-      field6: product?.field6 || '',
-      field7: product?.field7 || '',
-      field8: product?.field8 || '',
-      field9: product?.field9 || '',
-      field10: product?.field10 || '',
       [cat.priceField]: priceValue,
       [cat.priceUnitField]: priceUnitValue,
       [offerField]:
         offerValue !== undefined && offerValue !== null ? String(offerValue) : '',
-      field2Unit: product?.field2Unit || product?.packageUnit || 'None',
-      field3Unit: product?.field3Unit || product?.ageUnit || 'None',
-      field4Unit: product?.field4Unit || 'None',
-      field5Unit: product?.field5Unit || 'None',
-      field6Unit: product?.field6Unit || 'None',
-      field7Unit: product?.field7Unit || 'None',
-      field8Unit: product?.field8Unit || 'None',
-      field9Unit: product?.field9Unit || 'None',
-      field10Unit: product?.field10Unit || 'None',
-      badge: product?.badge || '',
-      orderQuantityStep: normalizeOrderQuantityStep(
-        product?.orderQuantityStep ?? prev.orderQuantityStep
-      ),
-      stock: product?.stock !== false,
-      wholesaleStock: product?.wholesaleStock !== false,
-      resellStock: product?.resellStock !== false,
       [cat.stockField]: stockValue,
     };
+
+    if (isMaster) {
+      nextCd[cat.id] = {
+        ...base,
+        field1: product?.field1 || '',
+        field2: product?.field2 || '',
+        field3: product?.field3 || '',
+        field4: product?.field4 || '',
+        field5: product?.field5 || '',
+        field6: product?.field6 || '',
+        field7: product?.field7 || '',
+        field8: product?.field8 || '',
+        field9: product?.field9 || '',
+        field10: product?.field10 || '',
+        field2Unit: product?.field2Unit || product?.packageUnit || 'None',
+        field3Unit: product?.field3Unit || product?.ageUnit || 'None',
+        field4Unit: product?.field4Unit || 'None',
+        field5Unit: product?.field5Unit || 'None',
+        field6Unit: product?.field6Unit || 'None',
+        field7Unit: product?.field7Unit || 'None',
+        field8Unit: product?.field8Unit || 'None',
+        field9Unit: product?.field9Unit || 'None',
+        field10Unit: product?.field10Unit || 'None',
+        badge: product?.badge || '',
+        orderQuantityStep: normalizeOrderQuantityStep(
+          product?.orderQuantityStep ?? prev.orderQuantityStep
+        ),
+        stock: product?.stock !== false,
+        wholesaleStock: product?.wholesaleStock !== false,
+        resellStock: product?.resellStock !== false,
+      };
+    } else {
+      nextCd[cat.id] = {
+        ...base,
+        orderQuantityStep: normalizeOrderQuantityStep(prev.orderQuantityStep),
+      };
+    }
   }
 
   return { ...product, catalogueData: nextCd };
@@ -156,37 +170,53 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
     const offerValue = product?.[offerField];
     const stockValue = product?.[cat.stockField] !== false;
 
-    catalogueData[cat.id] = {
-      enabled: cat.id === 'cat1' ? true : false, // Enable cat1 by default
-      field1: product?.field1 || "",
-      field2: product?.field2 || "",
-      field3: product?.field3 || "",
-      field4: product?.field4 || "",
-      field5: product?.field5 || "",
-      field6: product?.field6 || "",
-      field7: product?.field7 || "",
-      field8: product?.field8 || "",
-      field9: product?.field9 || "",
-      field10: product?.field10 || "",
+    const isMaster = cat.id === "cat1";
+    const common: CatalogueData = {
+      enabled: cat.id === "cat1" ? true : false,
       [cat.priceField]: priceValue,
       [cat.priceUnitField]: priceUnitValue,
       [offerField]: offerValue !== undefined && offerValue !== null ? String(offerValue) : "",
-      field2Unit: product?.field2Unit || product?.packageUnit || "None",
-      field3Unit: product?.field3Unit || product?.ageUnit || "None",
-      field4Unit: product?.field4Unit || "None",
-      field5Unit: product?.field5Unit || "None",
-      field6Unit: product?.field6Unit || "None",
-      field7Unit: product?.field7Unit || "None",
-      field8Unit: product?.field8Unit || "None",
-      field9Unit: product?.field9Unit || "None",
-      field10Unit: product?.field10Unit || "None",
-      badge: product?.badge || "",
-      orderQuantityStep: 1,
-      stock: product?.stock !== false,
-      wholesaleStock: product?.wholesaleStock !== false,
-      resellStock: product?.resellStock !== false,
       [cat.stockField]: stockValue,
     };
+
+    if (isMaster) {
+      catalogueData[cat.id] = {
+        ...common,
+        field1: product?.field1 || "",
+        field2: product?.field2 || "",
+        field3: product?.field3 || "",
+        field4: product?.field4 || "",
+        field5: product?.field5 || "",
+        field6: product?.field6 || "",
+        field7: product?.field7 || "",
+        field8: product?.field8 || "",
+        field9: product?.field9 || "",
+        field10: product?.field10 || "",
+        field2Unit: product?.field2Unit || product?.packageUnit || "None",
+        field3Unit: product?.field3Unit || product?.ageUnit || "None",
+        field4Unit: product?.field4Unit || "None",
+        field5Unit: product?.field5Unit || "None",
+        field6Unit: product?.field6Unit || "None",
+        field7Unit: product?.field7Unit || "None",
+        field8Unit: product?.field8Unit || "None",
+        field9Unit: product?.field9Unit || "None",
+        field10Unit: product?.field10Unit || "None",
+        badge: product?.badge || "",
+        orderQuantityStep: 1,
+        stock: product?.stock !== false,
+        wholesaleStock: product?.wholesaleStock !== false,
+        resellStock: product?.resellStock !== false,
+      };
+    } else {
+      catalogueData[cat.id] = {
+        ...getDefaultCatalogueData(cat.id),
+        ...common,
+        orderQuantityStep: 1,
+        stock: product?.stock !== false,
+        wholesaleStock: product?.wholesaleStock !== false,
+        resellStock: product?.resellStock !== false,
+      };
+    }
   });
 
   return catalogueData;
