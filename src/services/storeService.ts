@@ -9,6 +9,7 @@
 
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { tryExtractCataloguesArray } from '../config/catalogueConfig';
 import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
@@ -578,7 +579,8 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       normalized.whatsapp = whatsapp;
     }
 
-    // Fetch seller's catalogue definition from user_settings
+    // Catalogue definitions: Store tab syncs an array into user_settings; Manage Catalogues syncs full object to catalogues_definition.
+    // Public StoreView needs priceField/stockField for store.catalogueId — merge both sources so the store matches the seller app.
     try {
       const { data: catSettingsRow } = await client
         .from('user_settings')
@@ -586,11 +588,25 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         .eq('user_id', sellerUserId)
         .maybeSingle();
       const settingsData = asRecord((catSettingsRow as Record<string, unknown> | null)?.data);
-      if (Array.isArray(settingsData?.cataloguesDefinition) && (settingsData.cataloguesDefinition as unknown[]).length > 0) {
-        normalized.cataloguesDefinition = settingsData.cataloguesDefinition as StorePublic['cataloguesDefinition'];
+      const fromSettings = tryExtractCataloguesArray(settingsData?.cataloguesDefinition);
+
+      let list = fromSettings;
+      if (!list || list.length === 0) {
+        const { data: catDefRow, error: catDefErr } = await client
+          .from('catalogues_definition')
+          .select('data')
+          .eq('user_id', sellerUserId)
+          .maybeSingle();
+        if (!catDefErr && catDefRow && catDefRow.data != null) {
+          list = tryExtractCataloguesArray(catDefRow.data) ?? null;
+        }
+      }
+
+      if (list && list.length > 0) {
+        normalized.cataloguesDefinition = list;
       }
     } catch {
-      /* non-critical — storefront will show no price if missing */
+      /* non-critical — storefront falls back to legacy price scan if missing */
     }
 
     return { success: true, data: normalized };

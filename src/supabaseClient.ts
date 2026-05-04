@@ -35,7 +35,8 @@ const supabaseFetch: typeof fetch = (input, init) => {
   }
   // Spread init but exclude headers, then add our merged headers
   const { headers: _, ...restInit } = init || {};
-  return fetch(input, { ...restInit, headers });
+  /** Avoid stale browser HTTP cache on PostgREST/RPC (important for public storefront). */
+  return fetch(input, { ...restInit, headers, cache: 'no-store' });
 };
 
 export const supabase: SupabaseClient = createClient(

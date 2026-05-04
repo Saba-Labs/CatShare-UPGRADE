@@ -701,6 +701,9 @@ export default function StoreView() {
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
+  /** Latest slug for tab-visibility refetch (avoid stale closure). */
+  const effectiveSlugRef = useRef(effectiveSlug);
+  effectiveSlugRef.current = effectiveSlug;
 
   // Scroll drawer to top when product is selected
   useEffect(() => {
@@ -734,6 +737,44 @@ export default function StoreView() {
       setProductsLoading(false);
     });
   }, [store?.sellerUserId, store?.isLive]);
+
+  /** Re-hit Supabase when user returns to the tab or restores from bfcache — no local product/store cache in StoreView. */
+  useEffect(() => {
+    const reloadFromCloud = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const slug = effectiveSlugRef.current;
+      if (!slug) return;
+      void getStoreBySlug(slug).then((r) => {
+        if (!r.success || !r.data) return;
+        setStoreError(null);
+        setStore(r.data);
+        if (r.data.sellerUserId && r.data.isLive !== false) {
+          setProductsLoading(true);
+          void getStoreProducts(r.data.sellerUserId).then((result) => {
+            if (result.success && result.products) {
+              setAllProducts(result.products);
+            }
+            setProductsLoading(false);
+          });
+        } else {
+          setAllProducts([]);
+          setProductsLoading(false);
+        }
+      });
+    };
+
+    const onVisibility = () => reloadFromCloud();
+    const onPageShow = (e: Event) => {
+      if ((e as PageTransitionEvent).persisted) reloadFromCloud();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, []);
 
   const catalogues = useMemo(
     () => store?.cataloguesDefinition ?? [],

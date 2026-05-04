@@ -89,6 +89,32 @@ function normalizeCataloguesDefinition(raw: unknown): CataloguesDefinition {
 }
 
 /**
+ * Extract a usable catalogue list from cloud JSON (`user_settings` or `catalogues_definition.data`).
+ * Returns null if nothing usable — do not substitute defaults (public storefront must not invent cat1-only).
+ */
+export function tryExtractCataloguesArray(raw: unknown): Catalogue[] | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) {
+    return raw.length > 0 ? (raw as Catalogue[]) : null;
+  }
+  if (typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (Array.isArray(o.catalogues) && o.catalogues.length > 0) {
+    return o.catalogues as Catalogue[];
+  }
+  const numericKeys = Object.keys(o)
+    .filter((k) => /^\d+$/.test(k))
+    .sort((a, b) => Number(a) - Number(b));
+  const fromNumeric = numericKeys
+    .map((k) => o[k])
+    .filter((x) => x != null && typeof x === 'object');
+  if (fromNumeric.length > 0) {
+    return fromNumeric as Catalogue[];
+  }
+  return null;
+}
+
+/**
  * Get current catalogues definition from localStorage
  * Falls back to defaults if not found (first time setup)
  * @param userId - Optional user ID for keyed storage
