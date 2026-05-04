@@ -9,7 +9,11 @@ import {
   type CatalogueData,
   type ProductWithCatalogueData,
 } from '../config/catalogueProductUtils';
-import { ensureCataloguesForStorefront, type Catalogue } from '../config/catalogueConfig';
+import {
+  ensureCataloguesForStorefront,
+  inferCatalogueStubFromRowData,
+  type Catalogue,
+} from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
@@ -792,13 +796,26 @@ export default function StoreView() {
     [store?.cataloguesDefinition, store?.catalogueId]
   );
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
-  const catalogue = useMemo(() => catalogues.find((c) => c.id === store?.catalogueId) || null, [catalogues, store?.catalogueId]);
 
   /** Same order as `public.products.position` (int8), even if RPC returns rows out of order. */
   const productsInTableOrder = useMemo(
     () => sortProductsBySupabaseRowOrder(allProducts),
     [allProducts]
   );
+
+  /** Prefer cloud definition; if custom `cat…` id is missing there, infer `priceField` from `catalogueData[id]` on a real product row (matches Supabase JSON). */
+  const catalogue = useMemo((): Catalogue | null => {
+    const id = store?.catalogueId;
+    if (!id) return null;
+    const fromDef = catalogues.find((c) => c.id === id);
+    if (fromDef) return fromDef;
+    const sample = productsInTableOrder.find((p) => {
+      const cd = p.catalogueData?.[id];
+      return cd != null && typeof cd === 'object';
+    });
+    const raw = sample?.catalogueData?.[id] as Record<string, unknown> | undefined;
+    return inferCatalogueStubFromRowData(id, raw);
+  }, [catalogues, store?.catalogueId, productsInTableOrder]);
 
   const storeProducts = useMemo(() => {
     if (!store?.catalogueId) return [];

@@ -82,27 +82,69 @@ export function ensureCataloguesForStorefront(
     list.push({ ...LEGACY_RESELL_CATALOGUE, createdAt: Date.now() });
     return list;
   }
-  const m = /^cat(\d+)$/i.exec(cid);
-  if (m) {
-    const idx = parseInt(m[1], 10);
-    if (Number.isFinite(idx) && idx >= 3) {
-      const priceField = `price${idx}`;
-      list.push({
-        id: cid,
-        label: `Catalogue ${idx}`,
-        priceField,
-        priceUnitField: `price${idx}Unit`,
-        stockField: `${priceField}Stock`,
-        folder: `Cat${idx}`,
-        order: idx,
-        createdAt: Date.now(),
-        isDefault: false,
-        heroImage: "",
-        description: "",
-      });
+  /** Never infer `price${n}` from ids like `cat1769532482549` — that produced bogus `price176953…` columns. */
+  return list;
+}
+
+/**
+ * When `cataloguesDefinition` has no row for a custom catalogue id, infer `priceField` / `stockField` from
+ * `product.catalogueData[catalogueId]` (e.g. `price3`, `price3Stock`) so the storefront matches Supabase JSON.
+ */
+export function inferCatalogueStubFromRowData(
+  catalogueId: string,
+  row: Record<string, unknown> | null | undefined
+): Catalogue | null {
+  const cid = String(catalogueId ?? "").trim();
+  if (!cid || !row || typeof row !== "object") return null;
+
+  const priceIndices: number[] = [];
+  for (const k of Object.keys(row)) {
+    const m = /^price(\d+)$/.exec(k);
+    if (m) priceIndices.push(parseInt(m[1], 10));
+  }
+  const unique = [...new Set(priceIndices)]
+    .filter((n) => Number.isFinite(n) && n >= 1 && n <= 99)
+    .sort((a, b) => a - b);
+  if (unique.length === 0) return null;
+
+  let chosen = unique[0];
+  for (const n of unique) {
+    const raw = row[`price${n}`];
+    const num = parseFloat(String(raw ?? "").trim());
+    if (Number.isFinite(num) && num > 0) {
+      chosen = n;
+      break;
     }
   }
-  return list;
+  if (parseFloat(String(row[`price${chosen}`] ?? "").trim()) <= 0) {
+    for (let i = unique.length - 1; i >= 0; i--) {
+      const n = unique[i];
+      const raw = row[`price${n}`];
+      if (raw != null && String(raw).trim() !== "") {
+        chosen = n;
+        break;
+      }
+    }
+  }
+
+  const stockKey = `price${chosen}Stock`;
+  const stockField = Object.prototype.hasOwnProperty.call(row, stockKey)
+    ? stockKey
+    : "wholesaleStock";
+
+  return {
+    id: cid,
+    label: "Catalogue",
+    priceField: `price${chosen}`,
+    priceUnitField: `price${chosen}Unit`,
+    stockField,
+    folder: cid,
+    order: chosen,
+    createdAt: Date.now(),
+    isDefault: false,
+    heroImage: "",
+    description: "",
+  };
 }
 
 /**
