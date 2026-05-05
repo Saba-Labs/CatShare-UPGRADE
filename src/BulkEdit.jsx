@@ -440,7 +440,7 @@ useEffect(() => {
   copy = setCatalogueData(copy, catalogueId, catUpdates);
 
   // If editing master catalogue, also update top-level fields
-  if (catalogueId === catalogues[0]?.id) {
+  if (catalogueId === "cat1") {
     for (let i = 1; i <= 10; i++) {
       copy[`field${i}`] = p[`field${i}`];
       copy[`field${i}Unit`] = p[`field${i}Unit`];
