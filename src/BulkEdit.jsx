@@ -434,28 +434,10 @@ useEffect(() => {
     }
   }
 
-  // Save catalogue-specific data
-  const catUpdates = {
-    badge: p.badge,
-    [priceField]: priceField ? p[priceField] : undefined,
-    [priceUnitField]: priceField ? p[priceUnitField] : undefined,
-    ...(priceField
-      ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
-      : {}),
-    [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
-    orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
-  };
-
-  // Save all fieldX slots
-  for (let i = 1; i <= 10; i++) {
-    catUpdates[`field${i}`] = p[`field${i}`];
-    catUpdates[`field${i}Unit`] = p[`field${i}Unit`];
-  }
-
-  copy = setCatalogueData(copy, catalogueId, catUpdates);
-
-  // If editing master catalogue, also update top-level fields
+  // For master catalogue, save only to top-level fields (not to catalogueData)
+  // For other catalogues, save to catalogueData[catalogueId]
   if (catalogueId === "cat1") {
+    // Master catalogue: update top-level fields only
     for (let i = 1; i <= 10; i++) {
       copy[`field${i}`] = p[`field${i}`];
       copy[`field${i}Unit`] = p[`field${i}Unit`];
@@ -466,6 +448,26 @@ useEffect(() => {
       copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
     }
     copy.badge = p.badge;
+  } else {
+    // Other catalogues: save to catalogueData[catalogueId]
+    const catUpdates = {
+      badge: p.badge,
+      [priceField]: priceField ? p[priceField] : undefined,
+      [priceUnitField]: priceField ? p[priceUnitField] : undefined,
+      ...(priceField
+        ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
+        : {}),
+      [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
+      orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
+    };
+
+    // Save all fieldX slots
+    for (let i = 1; i <= 10; i++) {
+      catUpdates[`field${i}`] = p[`field${i}`];
+      catUpdates[`field${i}Unit`] = p[`field${i}Unit`];
+    }
+
+    copy = setCatalogueData(copy, catalogueId, catUpdates);
   }
 
   return copy;
