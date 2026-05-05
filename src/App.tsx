@@ -113,7 +113,7 @@ function AppWithBackHandler() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
-  const { user, loading, supabaseData, supabaseDataLoading, refreshSupabaseData } = useAuth();
+  const { user, loading, supabaseData, supabaseDataLoading, refreshSupabaseData, logout } = useAuth();
   const {
     isSyncing: isSyncContextSyncing,
     syncStatusDetail,
@@ -141,6 +141,7 @@ function AppWithBackHandler() {
   const [offlineDeleteLoading, setOfflineDeleteLoading] = useState(false);
   const [syncProgress, setSyncProgress] = useState('');
   const [syncProgressPercent, setSyncProgressPercent] = useState(0);
+  const [sessionLogoutLoading, setSessionLogoutLoading] = useState(false);
   const cloudMigrationMarkingRef = useRef<Set<string>>(new Set());
   const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
 
@@ -163,6 +164,9 @@ function AppWithBackHandler() {
   const [startupStatusText, setStartupStatusText] = useState('Fetching your catalogue');
 
   const isHomeRoute = location.pathname === '/' || location.pathname === '';
+  const isEditFlowRoute = location.pathname === '/create' || location.pathname === '/create-bulk';
+  const shouldDeferCloudSyncNow = () =>
+    isEditFlowRoute || (typeof document !== 'undefined' && document.visibilityState !== 'visible');
   const isStoreSubdomainHost = Boolean(resolveStoreSlugFromHostname());
   const isStorefrontRootRoute = isStoreSubdomainHost && location.pathname === '/';
   const isPublicStoreOrOrderRoute =
@@ -1468,6 +1472,13 @@ function AppWithBackHandler() {
       const partialSyncOpts =
         partialIds && partialIds.length > 0 ? { onlyProductIds: partialIds } : undefined;
 
+      if (shouldDeferCloudSyncNow()) {
+        // Keep edit flows responsive; sync can resume from non-edit views.
+        setProducts(freshProducts);
+        setDeletedProducts(freshDeleted);
+        return;
+      }
+
       if (isStrictMode()) {
         try {
           const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, partialSyncOpts);
@@ -1496,7 +1507,7 @@ function AppWithBackHandler() {
     };
     window.addEventListener("product-added", handleNewProduct);
     return () => window.removeEventListener("product-added", handleNewProduct);
-  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode]);
+  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode, isEditFlowRoute]);
 
   // ──────────────────────────────────────────────────────
   // STRICT REFRESH EVENT: child components dispatch this after
@@ -1506,6 +1517,7 @@ function AppWithBackHandler() {
     const handleStrictRefresh = async () => {
       if (!isStrictMode()) return;
       if (!user?.uid) return;
+      if (shouldDeferCloudSyncNow()) return;
       try {
         const cloudData = await refreshFromCloud();
         if (cloudData) {
@@ -1518,7 +1530,7 @@ function AppWithBackHandler() {
     };
     window.addEventListener('strict-refresh-from-cloud', handleStrictRefresh as any);
     return () => window.removeEventListener('strict-refresh-from-cloud', handleStrictRefresh as any);
-  }, [refreshFromCloud, isStrictMode, user?.uid]);
+  }, [refreshFromCloud, isStrictMode, user?.uid, isEditFlowRoute]);
 
   // ──────────────────────────────────────────────────────
   // SYNC TO SUPABASE EVENT: triggered when products are moved to shelf,
@@ -1534,6 +1546,14 @@ function AppWithBackHandler() {
 
       if (!user?.uid) {
         console.warn('⚠️ sync-to-supabase: no user ID');
+        return;
+      }
+
+      if (shouldDeferCloudSyncNow()) {
+        const freshProducts = e.detail?.products ?? readProductsWithLegacyFallback(user.uid);
+        const freshDeleted = e.detail?.deletedProducts ?? readDeletedProductsWithLegacyFallback(user.uid);
+        setProducts(freshProducts);
+        setDeletedProducts(freshDeleted);
         return;
       }
 
@@ -1560,7 +1580,7 @@ function AppWithBackHandler() {
     };
     window.addEventListener('sync-to-supabase', handleSyncToSupabase as any);
     return () => window.removeEventListener('sync-to-supabase', handleSyncToSupabase as any);
-  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode]);
+  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode, isEditFlowRoute]);
 
   // ──────────────────────────────────────────────────────
   // PERSIST products/deletedProducts to localStorage on change
@@ -2253,6 +2273,43 @@ if (user?.uid && !authService.isOfflineGuest()) {
           title="Syncing to cloud"
           subtitle="Please wait…"
         />
+      )}
+
+      {/* Session expired guard: block edits until user re-authenticates */}
+      {user?.sessionExpired === true && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center px-4 py-6" role="dialog" aria-label="Session expired">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 sm:p-7">
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <FiAlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Session expired</h2>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              We could not reconnect your account session. Please log in again to continue syncing safely.
+            </p>
+            <button
+              type="button"
+              disabled={sessionLogoutLoading}
+              onClick={async () => {
+                setSessionLogoutLoading(true);
+                try {
+                  await logout();
+                  showToast('Please log in again to continue', 'success');
+                  navigate('/login', { replace: true });
+                } catch {
+                  showToast('Unable to log out. Please try again.', 'error');
+                } finally {
+                  setSessionLogoutLoading(false);
+                }
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-semibold text-sm transition-colors"
+            >
+              {sessionLogoutLoading ? 'Logging out…' : 'Log out and re-login'}
+            </button>
+          </div>
+        </div>
       )}
 
       <RenderingOverlay

@@ -31,6 +31,10 @@ export type AppAuthUser = {
   isAnonymous?: boolean;
   /** Supabase: derived from user.email_confirmed_at */
   emailVerified?: boolean;
+  /** True when we only restored cached UID and session may not be valid yet. */
+  isSessionFallback?: boolean;
+  /** True when fallback recovery timed out while online; user should re-login. */
+  sessionExpired?: boolean;
 };
 
 function mapSupabaseUserToApp(u: SupabaseUser): AppAuthUser {
@@ -47,6 +51,8 @@ function mapSupabaseUserToApp(u: SupabaseUser): AppAuthUser {
     displayName,
     photoURL: (meta.avatar_url as string) || (meta.picture as string) || null,
     emailVerified: !!u.email_confirmed_at,
+    isSessionFallback: false,
+    sessionExpired: false,
   };
 }
 
@@ -81,6 +87,7 @@ const defaultSupabaseData: SupabaseUserData = {
   fieldsDefinition: null,
   userSettings: null,
 };
+const sessionExpiredStorageKey = (uid: string) => `sessionExpired::${uid}`;
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppAuthUser | null>(null);
@@ -92,6 +99,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const intentionalLogoutRef = useRef(false);
   const intentionalLogoutResetTimerRef = useRef<number | null>(null);
   const authNullRecoveryTimerRef = useRef<number | null>(null);
+  const fallbackRecoveryTimerRef = useRef<number | null>(null);
+  const fallbackRecoveryIntervalRef = useRef<number | null>(null);
   const clearIntentionalLogoutResetTimer = useCallback(() => {
     if (intentionalLogoutResetTimerRef.current !== null) {
       window.clearTimeout(intentionalLogoutResetTimerRef.current);
@@ -102,6 +111,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (authNullRecoveryTimerRef.current !== null) {
       window.clearTimeout(authNullRecoveryTimerRef.current);
       authNullRecoveryTimerRef.current = null;
+    }
+  }, []);
+  const clearFallbackRecoveryTimers = useCallback(() => {
+    if (fallbackRecoveryTimerRef.current !== null) {
+      window.clearTimeout(fallbackRecoveryTimerRef.current);
+      fallbackRecoveryTimerRef.current = null;
+    }
+    if (fallbackRecoveryIntervalRef.current !== null) {
+      window.clearInterval(fallbackRecoveryIntervalRef.current);
+      fallbackRecoveryIntervalRef.current = null;
+    }
+  }, []);
+  const markSessionExpired = useCallback((uid: string) => {
+    try {
+      localStorage.setItem(sessionExpiredStorageKey(uid), 'true');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const clearSessionExpiredMark = useCallback((uid: string) => {
+    try {
+      localStorage.removeItem(sessionExpiredStorageKey(uid));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const hasSessionExpiredMark = useCallback((uid: string): boolean => {
+    try {
+      return localStorage.getItem(sessionExpiredStorageKey(uid)) === 'true';
+    } catch {
+      return false;
     }
   }, []);
 
@@ -163,6 +203,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           displayName: 'Guest User',
           isAnonymous: true,
           emailVerified: false,
+          isSessionFallback: false,
+          sessionExpired: false,
         };
 
         setUser(guestUser);
@@ -245,6 +287,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const applySignedInSession = (sessionUser: SupabaseUser) => {
+      clearFallbackRecoveryTimers();
+      clearSessionExpiredMark(sessionUser.id);
       const appUser = mapSupabaseUserToApp(sessionUser);
       setUser(appUser);
       persistAuthUserIdsForStorage(sessionUser.id);
@@ -259,6 +303,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setSupabaseDataLoading(false);
       inFlightProfileByUid.current.clear();
       activeProfileLoadsRef.current = 0;
+      clearFallbackRecoveryTimers();
+    };
+
+    const startFallbackRecoveryMonitor = (cachedUid: string) => {
+      clearFallbackRecoveryTimers();
+      if (!isBrowserOnline()) return;
+
+      fallbackRecoveryTimerRef.current = window.setTimeout(() => {
+        fallbackRecoveryTimerRef.current = null;
+        if (cancelled) return;
+        markSessionExpired(cachedUid);
+        setUser((prev) => {
+          if (!prev || prev.uid !== cachedUid) return prev;
+          return { ...prev, sessionExpired: true };
+        });
+      }, 20000);
+
+      fallbackRecoveryIntervalRef.current = window.setInterval(async () => {
+        if (cancelled) return;
+        if (!isBrowserOnline()) return;
+        const recovered = await recoverSupabaseSession();
+        if (!recovered?.user) return;
+        if (recovered.user.id !== cachedUid) return;
+        applySignedInSession(recovered.user);
+        void loadUserData(recovered.user.id);
+      }, 4000);
     };
 
     /**
@@ -285,18 +355,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!cachedUid) return false;
 
       setUser((prev) => {
-        if (prev?.uid === cachedUid) return prev;
+        const fallbackName = `User ${cachedUid.slice(0, 8)}`;
+        const alreadyExpired = hasSessionExpiredMark(cachedUid);
+        if (prev?.uid === cachedUid) {
+          return {
+            ...prev,
+            displayName: prev.displayName || fallbackName,
+            isSessionFallback: true,
+            sessionExpired: alreadyExpired,
+          };
+        }
         return {
           uid: cachedUid,
           email: null,
-          displayName: prev?.displayName ?? 'CatShare User',
+          displayName: prev?.displayName || fallbackName,
+          photoURL: prev?.photoURL ?? null,
           emailVerified: prev?.emailVerified ?? false,
+          isSessionFallback: true,
+          sessionExpired: alreadyExpired,
         };
       });
       setSupabaseRlsUserId(cachedUid);
       setSupabaseData((prev) => prev ?? defaultSupabaseData);
       setSupabaseDataLoading(false);
       persistAuthUserIdsForStorage(cachedUid);
+      if (!hasSessionExpiredMark(cachedUid)) {
+        startFallbackRecoveryMonitor(cachedUid);
+      }
       return true;
     };
 
@@ -442,11 +527,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       cancelled = true;
       clearAuthNullRecoveryTimer();
       clearIntentionalLogoutResetTimer();
+      clearFallbackRecoveryTimers();
       sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
       window.removeEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
     };
-  }, [clearAuthNullRecoveryTimer, clearIntentionalLogoutResetTimer]);
+  }, [clearAuthNullRecoveryTimer, clearIntentionalLogoutResetTimer, clearFallbackRecoveryTimers, clearSessionExpiredMark, hasSessionExpiredMark, markSessionExpired]);
 
   const logout = async () => {
     try {
@@ -485,6 +571,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUser(null);
       setSupabaseData(null);
+      if (user?.uid) clearSessionExpiredMark(user.uid);
       clearAuthUserIdsFromStorage();
       setSupabaseRlsUserId(null);
 

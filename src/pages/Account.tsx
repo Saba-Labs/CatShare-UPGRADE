@@ -227,6 +227,10 @@ export default function Account() {
   };
 
   const busy = isLoading || businessSaving || logoUploading;
+  const isSessionFallback = user?.isSessionFallback === true;
+  const isSessionExpired = user?.sessionExpired === true;
+  const accountDisplayName = user?.displayName || (user?.uid ? `User ${user.uid.slice(0, 8)}` : 'Signed in');
+  const accountAvatarName = accountDisplayName || user?.email || 'User';
   const businessInputClass =
     'w-full h-11 border-0 border-b border-slate-200 bg-transparent px-0 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none transition-colors focus:border-blue-500 focus:ring-0';
   const businessTextareaClass =
@@ -271,21 +275,26 @@ export default function Account() {
                 <img
                   src={
                     user?.photoURL ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}&background=e5e7eb&color=374151`
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(accountAvatarName)}&background=e5e7eb&color=374151`
                   }
                   alt=""
                   className="w-14 h-14 rounded-2xl object-cover border border-gray-100 shrink-0"
                 />
                 <div className="min-w-0 flex-1">
-                  {user?.displayName ? (
-                    <p className="font-semibold text-gray-900 truncate">{user.displayName}</p>
-                  ) : (
-                    <p className="font-semibold text-gray-900 truncate">Signed in</p>
-                  )}
+                  <p className="font-semibold text-gray-900 truncate">{accountDisplayName}</p>
                   {user?.email ? (
                     <p className="text-sm text-gray-600 truncate mt-0.5 flex items-center gap-1.5">
                       <FiMail className="shrink-0 text-gray-400 w-3.5 h-3.5" />
                       {user.email}
+                    </p>
+                  ) : null}
+                  {isSessionFallback ? (
+                    <p
+                      className={`text-xs mt-1 ${isSessionExpired ? 'text-red-700 font-medium' : 'text-amber-700'}`}
+                    >
+                      {isSessionExpired
+                        ? 'Session expired. Please log out and log in again to sync changes.'
+                        : 'Restoring cloud session... avoid editing until this completes.'}
                     </p>
                   ) : null}
                   <div className="mt-2 flex items-center gap-2">
@@ -303,7 +312,26 @@ export default function Account() {
                       />
                       {user?.emailVerified ? 'Email verified' : 'Email not verified'}
                     </span>
+                    {isSessionFallback ? (
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
+                          isSessionExpired ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800'
+                        }`}
+                      >
+                        {isSessionExpired ? 'Re-login required' : 'Reconnecting'}
+                      </span>
+                    ) : null}
                   </div>
+                  {isSessionExpired ? (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isLoading}
+                      className="mt-2 text-xs font-semibold text-red-700 hover:text-red-800 underline underline-offset-2"
+                    >
+                      Log out and sign in again
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

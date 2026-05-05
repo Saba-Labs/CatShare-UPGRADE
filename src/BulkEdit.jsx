@@ -145,6 +145,7 @@ export default function BulkEdit({
 
 
 useEffect(() => {
+  if (dataLoaded) return;
   const storedCategories = JSON.parse(localStorage.getItem("categories") || "[]");
   setCategories(storedCategories);
 

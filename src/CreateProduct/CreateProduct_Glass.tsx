@@ -800,6 +800,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         [selectedCat.priceField]: "",
         [selectedCat.priceUnitField]: "/ piece",
         [offerPriceFieldFor(selectedCat.priceField)]: "",
+        orderQuantityStep: 1,
       };
       updateCatalogueData(updates);
       return;
@@ -818,6 +819,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         defaultCatalogueData[defaultOfferField] !== undefined && defaultCatalogueData[defaultOfferField] !== null
           ? String(defaultCatalogueData[defaultOfferField])
           : "",
+        orderQuantityStep: defaultCatalogueData.orderQuantityStep ?? 1,
     };
 
     updateCatalogueData(updates);

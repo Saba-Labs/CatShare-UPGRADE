@@ -2,6 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNetworkStatus } from '../context/NetworkStatusContext';
 import { useToast } from '../context/ToastContext';
 import {
+  cloudWriteBlockedMessage,
   cloudWriteWouldBeBlocked,
   OFFLINE_CLOUD_WRITE_TOAST,
 } from '../utils/cloudWritePolicy';
@@ -19,7 +20,7 @@ export function useCloudWriteGate() {
 
   const guardCloudWrite = (): boolean => {
     if (!blocked) return true;
-    showToast(OFFLINE_CLOUD_WRITE_TOAST, 'error');
+    showToast(cloudWriteBlockedMessage(user, isOnline), 'error');
     return false;
   };
 
