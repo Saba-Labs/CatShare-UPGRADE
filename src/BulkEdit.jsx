@@ -153,6 +153,9 @@ useEffect(() => {
     // Get catalogue-specific data
     const catData = catalogueId ? getCatalogueData(p, catalogueId) : {};
 
+    // Determine if this is master catalogue for consistent field reading
+    const isMasterCatalogue = catalogueId === "cat1";
+
     // Show field if it has data, otherwise leave empty
     const normalized = {
       ...p,
@@ -160,7 +163,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: catData.badge || p.badge || "",
+      badge: isMasterCatalogue ? (p.badge || catData.badge || "") : (catData.badge || p.badge || ""),
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
@@ -172,7 +175,6 @@ useEffect(() => {
 
     // Dynamically copy all fieldX data
     // For master catalogue (cat1), read from top-level first; for others, read from catData first
-    const isMasterCatalogue = catalogueId === "cat1";
     for (let i = 1; i <= 10; i++) {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
@@ -212,7 +214,10 @@ useEffect(() => {
     normalized.wholesale = p.wholesale || "";
     normalized.wholesaleUnit = p.wholesaleUnit || "/ piece";
     normalized.stock = p.stock || "";
-    normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
+    // For master catalogue, read orderQuantityStep from top-level first
+    normalized.orderQuantityStep = isMasterCatalogue
+      ? normalizeOrderQuantityStep(p.orderQuantityStep ?? catData.orderQuantityStep)
+      : normalizeOrderQuantityStep(catData.orderQuantityStep);
 
     // Store master values for fallback/fill from master
     normalized.masterName = p.name || "";
@@ -448,6 +453,7 @@ useEffect(() => {
       copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
     }
     copy.badge = p.badge;
+    copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
   } else {
     // Other catalogues: save to catalogueData[catalogueId]
     const catUpdates = {
