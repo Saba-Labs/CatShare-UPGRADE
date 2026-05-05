@@ -59,7 +59,7 @@ const CSS = `
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
 }
 
-.sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; }
+.sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; position: relative; }
 .sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
 
 /* ── Hero ── */
@@ -81,7 +81,7 @@ const CSS = `
 .sv-socials { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
 .sv-social-btn { width: 34px; height: 34px; border-radius: var(--r-sm); background: var(--c-surface2); border: 1px solid var(--c-border); display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--c-text2); transition: all var(--trans); cursor: pointer; font-size: 11px; font-weight: 700; font-style: normal; font-family: var(--f-body); }
 .sv-social-btn:hover { background: var(--c-surface3); border-color: var(--c-border2); color: var(--c-text); }
-.sv-footer { margin: 14px 12px 26px; padding: 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.sv-footer { margin: 14px 12px 80px; padding: 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
 .sv-footer-title { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--c-text3); margin-bottom: 10px; }
 .sv-footer .sv-biz-chips { margin-top: 0; }
 .sv-footer .sv-socials { margin-top: 10px; }
@@ -185,8 +185,8 @@ body { background: var(--c-bg); }
 .sv-fab-wa--above-cart { bottom: calc(108px + env(safe-area-inset-bottom)); }
 
 /* ── Morphing panel ── */
-.sv-panel { position: fixed; inset: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--c-bg); z-index: 120; display: flex; flex-direction: column; animation: sv-panel-in 0.3s cubic-bezier(0.32,0.72,0,1); overflow-y: auto; }
-@keyframes sv-panel-in { from{transform:translateX(-50%) translateY(100%)} to{transform:translateX(-50%) translateY(0)} }
+.sv-panel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; background: var(--c-bg); z-index: 120; display: flex; flex-direction: column; animation: sv-panel-in 0.3s cubic-bezier(0.32,0.72,0,1); overflow-y: auto; }
+@keyframes sv-panel-in { from{opacity: 0} to{opacity: 1} }
 
 .sv-panel-header { position: sticky; top: 0; z-index: 10; background: rgba(247,247,245,0.96); backdrop-filter: blur(12px); border-bottom: 1px solid var(--c-border); padding: 13px 16px; display: flex; align-items: center; gap: 13px; }
 .sv-panel-back { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--c-border2); background: var(--c-surface); color: var(--c-text2); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all var(--trans); box-shadow: var(--shadow-sm); }
@@ -218,6 +218,14 @@ body { background: var(--c-bg); }
 .sv-field input { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
 .sv-field input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
 .sv-field input::placeholder { color: var(--c-text3); }
+.sv-phone-group { display: flex; gap: 10px; align-items: flex-end; }
+.sv-phone-group-country { flex: 0 0 110px; }
+.sv-phone-group-country select { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 14px; font-family: var(--f-body); padding: 0 12px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); cursor: pointer; }
+.sv-phone-group-country select:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
+.sv-phone-group-number { flex: 1; }
+.sv-phone-group-number input { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
+.sv-phone-group-number input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
+.sv-phone-group-number input::placeholder { color: var(--c-text3); }
 .sv-order-pill { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-sm); }
 .sv-order-pill-label { font-size: 11.5px; color: var(--c-text3); margin-bottom: 2px; font-weight: 500; }
 .sv-order-pill-detail { font-size: 13px; color: var(--c-text2); font-weight: 500; }
@@ -723,7 +731,8 @@ export default function StoreView() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
   const [customerName, setCustomerName] = useState('');
-  const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [customerWhatsappCountry, setCustomerWhatsappCountry] = useState('+91');
+  const [customerWhatsappNumber, setCustomerWhatsappNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -992,14 +1001,16 @@ export default function StoreView() {
         });
       });
       setSupabaseRlsUserId(store.sellerUserId);
-      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
+      const fullWhatsappNumber = customerWhatsappNumber.trim() ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}` : undefined;
+      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', fullWhatsappNumber, 'store');
       if (error) alert('Failed to place order. Please try again.');
       else {
         alert('Order placed! The seller will contact you soon.');
         setStep('products');
         setSelectedProducts(new Map());
         setCustomerName('');
-        setCustomerWhatsapp('');
+        setCustomerWhatsappCountry('+91');
+        setCustomerWhatsappNumber('');
         setDrawerProduct(null);
         setSearchQuery('');
         setSelectedCategory('all');
@@ -1027,7 +1038,7 @@ export default function StoreView() {
     }
     if (step === 'customer') {
       if (!customerName.trim()) { alert('Please enter your name'); return; }
-      if (!customerWhatsapp.trim()) { alert('Please enter your WhatsApp number'); return; }
+      if (!customerWhatsappNumber.trim()) { alert('Please enter your WhatsApp number'); return; }
       setStep('review');
     }
     else void handlePlaceOrder();
@@ -1507,7 +1518,7 @@ export default function StoreView() {
                 onClick={handlePanelAction}
                 disabled={
                   step === 'customer'
-                    ? !customerName.trim() || !customerWhatsapp.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
+                    ? !customerName.trim() || !customerWhatsappNumber.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
                     : isSubmitting || (minimumOrderValue > 0 && !minimumOrderMet)
                 }
               >
@@ -1521,7 +1532,7 @@ export default function StoreView() {
 
             {step === 'customer' && (
               <div className="sv-form-body">
-                {(!customerName.trim() || !customerWhatsapp.trim()) && (
+                {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
                   <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
                     ⚠️ Name and WhatsApp should be filled to continue
                   </div>
@@ -1537,7 +1548,25 @@ export default function StoreView() {
                 </div>
                 <div className="sv-field">
                   <label>WhatsApp Number *</label>
-                  <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
+                  <div className="sv-phone-group">
+                    <div className="sv-phone-group-country">
+  <input
+    type="text"
+    value={customerWhatsappCountry}
+    onChange={(e) => {
+      const val = e.target.value.replace(/[^\d+]/g, '');
+      setCustomerWhatsappCountry(val.startsWith('+') ? val : '+' + val.replace(/\+/g, ''));
+    }}
+    placeholder="+91"
+    maxLength={5}
+    inputMode="tel"
+    style={{ textAlign: 'center' }}
+  />
+</div>
+                    <div className="sv-phone-group-number">
+                      <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Order Items with Quantity Controls */}
@@ -1599,8 +1628,8 @@ export default function StoreView() {
             )}
 
             {step === 'review' && (
-              <>
-                <div className="sv-review-list">
+              <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
                   {reviewSummary.items.map((item: any) => {
                     const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
                     return (
@@ -1624,7 +1653,7 @@ export default function StoreView() {
                 <div className="sv-review-customer">
                   <div className="sv-review-customer-label">Ordering as</div>
                   <div className="sv-review-customer-name">{customerName}</div>
-                  {customerWhatsapp && <div className="sv-review-customer-phone">{customerWhatsapp}</div>}
+                  {customerWhatsappNumber && <div className="sv-review-customer-phone">{customerWhatsappCountry} {customerWhatsappNumber}</div>}
                 </div>
                 <div className="sv-review-total-bar">
                   <div>
@@ -1633,7 +1662,7 @@ export default function StoreView() {
                   </div>
                   <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>Edit items</button>
                 </div>
-              </>
+              </div>
             )}
             {hasFooterDetails && renderStoreFooter()}
           </div>
