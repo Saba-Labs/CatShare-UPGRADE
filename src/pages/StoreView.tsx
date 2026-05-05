@@ -218,6 +218,14 @@ body { background: var(--c-bg); }
 .sv-field input { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
 .sv-field input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
 .sv-field input::placeholder { color: var(--c-text3); }
+.sv-phone-group { display: flex; gap: 10px; align-items: flex-end; }
+.sv-phone-group-country { flex: 0 0 110px; }
+.sv-phone-group-country select { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 14px; font-family: var(--f-body); padding: 0 12px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); cursor: pointer; }
+.sv-phone-group-country select:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
+.sv-phone-group-number { flex: 1; }
+.sv-phone-group-number input { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
+.sv-phone-group-number input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
+.sv-phone-group-number input::placeholder { color: var(--c-text3); }
 .sv-order-pill { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-shadow: var(--shadow-sm); }
 .sv-order-pill-label { font-size: 11.5px; color: var(--c-text3); margin-bottom: 2px; font-weight: 500; }
 .sv-order-pill-detail { font-size: 13px; color: var(--c-text2); font-weight: 500; }
@@ -723,7 +731,8 @@ export default function StoreView() {
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
   const [customerName, setCustomerName] = useState('');
-  const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [customerWhatsappCountry, setCustomerWhatsappCountry] = useState('+91');
+  const [customerWhatsappNumber, setCustomerWhatsappNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -992,14 +1001,16 @@ export default function StoreView() {
         });
       });
       setSupabaseRlsUserId(store.sellerUserId);
-      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', customerWhatsapp.trim() || undefined, 'store');
+      const fullWhatsappNumber = customerWhatsappNumber.trim() ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}` : undefined;
+      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', fullWhatsappNumber, 'store');
       if (error) alert('Failed to place order. Please try again.');
       else {
         alert('Order placed! The seller will contact you soon.');
         setStep('products');
         setSelectedProducts(new Map());
         setCustomerName('');
-        setCustomerWhatsapp('');
+        setCustomerWhatsappCountry('+91');
+        setCustomerWhatsappNumber('');
         setDrawerProduct(null);
         setSearchQuery('');
         setSelectedCategory('all');
@@ -1027,7 +1038,7 @@ export default function StoreView() {
     }
     if (step === 'customer') {
       if (!customerName.trim()) { alert('Please enter your name'); return; }
-      if (!customerWhatsapp.trim()) { alert('Please enter your WhatsApp number'); return; }
+      if (!customerWhatsappNumber.trim()) { alert('Please enter your WhatsApp number'); return; }
       setStep('review');
     }
     else void handlePlaceOrder();
@@ -1507,7 +1518,7 @@ export default function StoreView() {
                 onClick={handlePanelAction}
                 disabled={
                   step === 'customer'
-                    ? !customerName.trim() || !customerWhatsapp.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
+                    ? !customerName.trim() || !customerWhatsappNumber.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
                     : isSubmitting || (minimumOrderValue > 0 && !minimumOrderMet)
                 }
               >
@@ -1521,7 +1532,7 @@ export default function StoreView() {
 
             {step === 'customer' && (
               <div className="sv-form-body">
-                {(!customerName.trim() || !customerWhatsapp.trim()) && (
+                {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
                   <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
                     ⚠️ Name and WhatsApp should be filled to continue
                   </div>
@@ -1537,7 +1548,39 @@ export default function StoreView() {
                 </div>
                 <div className="sv-field">
                   <label>WhatsApp Number *</label>
-                  <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="+91 98xxxxxxxx" />
+                  <div className="sv-phone-group">
+                    <div className="sv-phone-group-country">
+                      <select value={customerWhatsappCountry} onChange={(e) => setCustomerWhatsappCountry(e.target.value)}>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+91">🇮🇳 +91</option>
+                        <option value="+86">🇨🇳 +86</option>
+                        <option value="+81">🇯🇵 +81</option>
+                        <option value="+82">🇰🇷 +82</option>
+                        <option value="+33">🇫🇷 +33</option>
+                        <option value="+49">🇩🇪 +49</option>
+                        <option value="+39">🇮🇹 +39</option>
+                        <option value="+34">🇪🇸 +34</option>
+                        <option value="+61">🇦🇺 +61</option>
+                        <option value="+64">🇳🇿 +64</option>
+                        <option value="+27">🇿🇦 +27</option>
+                        <option value="+55">🇧🇷 +55</option>
+                        <option value="+52">🇲🇽 +52</option>
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+254">🇰🇪 +254</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+65">🇸🇬 +65</option>
+                        <option value="+60">🇲🇾 +60</option>
+                        <option value="+66">🇹🇭 +66</option>
+                        <option value="+62">🇮🇩 +62</option>
+                        <option value="+63">🇵🇭 +63</option>
+                        <option value="+84">🇻🇳 +84</option>
+                      </select>
+                    </div>
+                    <div className="sv-phone-group-number">
+                      <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Order Items with Quantity Controls */}
@@ -1624,7 +1667,7 @@ export default function StoreView() {
                 <div className="sv-review-customer">
                   <div className="sv-review-customer-label">Ordering as</div>
                   <div className="sv-review-customer-name">{customerName}</div>
-                  {customerWhatsapp && <div className="sv-review-customer-phone">{customerWhatsapp}</div>}
+                  {customerWhatsappNumber && <div className="sv-review-customer-phone">{customerWhatsappCountry} {customerWhatsappNumber}</div>}
                 </div>
                 <div className="sv-review-total-bar">
                   <div>
