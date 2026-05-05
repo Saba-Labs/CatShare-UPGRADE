@@ -153,9 +153,6 @@ useEffect(() => {
     // Get catalogue-specific data
     const catData = catalogueId ? getCatalogueData(p, catalogueId) : {};
 
-    // Determine if this is master catalogue for consistent field reading
-    const isMasterCatalogue = catalogueId === "cat1";
-
     // Show field if it has data, otherwise leave empty
     const normalized = {
       ...p,
@@ -163,7 +160,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: isMasterCatalogue ? (p.badge !== undefined ? p.badge : (catData.badge ?? "")) : (catData.badge ?? (p.badge ?? "")),
+      badge: catData.badge ?? (p.badge ?? ""),
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
@@ -173,18 +170,12 @@ useEffect(() => {
           : p.wholesaleStock || "",
     };
 
-    // Dynamically copy all fieldX data
-    // For master catalogue (cat1), read from top-level first; for others, read from catData first
+    // Dynamically copy all fieldX data from catalogue data
     for (let i = 1; i <= 10; i++) {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
-      if (isMasterCatalogue) {
-        normalized[fieldKey] = p[fieldKey] !== undefined ? p[fieldKey] : (catData[fieldKey] ?? "");
-        normalized[unitKey] = p[unitKey] !== undefined ? p[unitKey] : (catData[unitKey] ?? "None");
-      } else {
-        normalized[fieldKey] = catData[fieldKey] ?? (p[fieldKey] ?? "");
-        normalized[unitKey] = catData[unitKey] ?? (p[unitKey] ?? "None");
-      }
+      normalized[fieldKey] = catData[fieldKey] ?? (p[fieldKey] ?? "");
+      normalized[unitKey] = catData[unitKey] ?? (p[unitKey] ?? "None");
     }
 
     // Handle catalogue-specific stock field
@@ -195,29 +186,18 @@ useEffect(() => {
     }
 
     // Add price field for the current catalogue
-    // For master catalogue, also read from top-level
     if (priceField) {
-      if (isMasterCatalogue) {
-        normalized[priceField] = p[priceField] !== undefined ? p[priceField] : (catData[priceField] ?? "");
-        normalized[priceUnitField] = p[priceUnitField] !== undefined ? p[priceUnitField] : (catData[priceUnitField] ?? "/ piece");
-      } else {
-        normalized[priceField] = catData[priceField] ?? "";
-        normalized[priceUnitField] = catData[priceUnitField] ?? "/ piece";
-      }
+      normalized[priceField] = catData[priceField] ?? "";
+      normalized[priceUnitField] = catData[priceUnitField] ?? "/ piece";
       const of = offerPriceFieldFor(priceField);
-      normalized[of] = (isMasterCatalogue
-        ? p[of] !== undefined && p[of] !== null ? String(p[of]) : catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : ""
-        : catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "");
+      normalized[of] = catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "";
     }
 
     // Initialize other price fields - show if they exist
     normalized.wholesale = p.wholesale || "";
     normalized.wholesaleUnit = p.wholesaleUnit || "/ piece";
     normalized.stock = p.stock || "";
-    // For master catalogue, read orderQuantityStep from top-level first
-    normalized.orderQuantityStep = isMasterCatalogue
-      ? normalizeOrderQuantityStep(p.orderQuantityStep ?? catData.orderQuantityStep)
-      : normalizeOrderQuantityStep(catData.orderQuantityStep);
+    normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
 
     // Store master values for fallback/fill from master
     normalized.masterName = p.name || "";
@@ -439,42 +419,26 @@ useEffect(() => {
     }
   }
 
-  // For master catalogue, save only to top-level fields (not to catalogueData)
-  // For other catalogues, save to catalogueData[catalogueId]
-  if (catalogueId === "cat1") {
-    // Master catalogue: update top-level fields only
-    for (let i = 1; i <= 10; i++) {
-      copy[`field${i}`] = p[`field${i}`] ?? "";
-      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
-    }
-    if (priceField) {
-      copy[priceField] = p[priceField] ?? "";
-      copy[priceUnitField] = p[priceUnitField] ?? "/ piece";
-      copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
-    }
-    copy.badge = p.badge ?? "";
-    copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
-  } else {
-    // Other catalogues: save to catalogueData[catalogueId]
-    const catUpdates = {
-      badge: p.badge,
-      [priceField]: priceField ? p[priceField] : undefined,
-      [priceUnitField]: priceField ? p[priceUnitField] : undefined,
-      ...(priceField
-        ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
-        : {}),
-      [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
-      orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
-    };
+  // Save catalogue-specific data to catalogueData[catalogueId]
+  // For all catalogues (including master cat1), the canonical storage is catalogueData[catalogueId]
+  const catUpdates = {
+    badge: p.badge ?? "",
+    [priceField]: priceField ? (p[priceField] ?? "") : undefined,
+    [priceUnitField]: priceField ? (p[priceUnitField] ?? "/ piece") : undefined,
+    ...(priceField
+      ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
+      : {}),
+    [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
+    orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
+  };
 
-    // Save all fieldX slots
-    for (let i = 1; i <= 10; i++) {
-      catUpdates[`field${i}`] = p[`field${i}`];
-      catUpdates[`field${i}Unit`] = p[`field${i}Unit`];
-    }
-
-    copy = setCatalogueData(copy, catalogueId, catUpdates);
+  // Save all fieldX slots
+  for (let i = 1; i <= 10; i++) {
+    catUpdates[`field${i}`] = p[`field${i}`] ?? "";
+    catUpdates[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
   }
+
+  copy = setCatalogueData(copy, catalogueId, catUpdates);
 
   return copy;
 });
