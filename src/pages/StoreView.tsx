@@ -1550,33 +1550,19 @@ export default function StoreView() {
                   <label>WhatsApp Number *</label>
                   <div className="sv-phone-group">
                     <div className="sv-phone-group-country">
-                      <select value={customerWhatsappCountry} onChange={(e) => setCustomerWhatsappCountry(e.target.value)}>
-                        <option value="+1">🇺🇸 +1</option>
-                        <option value="+44">🇬🇧 +44</option>
-                        <option value="+91">🇮🇳 +91</option>
-                        <option value="+86">🇨🇳 +86</option>
-                        <option value="+81">🇯🇵 +81</option>
-                        <option value="+82">🇰🇷 +82</option>
-                        <option value="+33">🇫🇷 +33</option>
-                        <option value="+49">🇩🇪 +49</option>
-                        <option value="+39">🇮🇹 +39</option>
-                        <option value="+34">🇪🇸 +34</option>
-                        <option value="+61">🇦🇺 +61</option>
-                        <option value="+64">🇳🇿 +64</option>
-                        <option value="+27">🇿🇦 +27</option>
-                        <option value="+55">🇧🇷 +55</option>
-                        <option value="+52">🇲🇽 +52</option>
-                        <option value="+234">🇳🇬 +234</option>
-                        <option value="+254">🇰🇪 +254</option>
-                        <option value="+971">🇦🇪 +971</option>
-                        <option value="+65">🇸🇬 +65</option>
-                        <option value="+60">🇲🇾 +60</option>
-                        <option value="+66">🇹🇭 +66</option>
-                        <option value="+62">🇮🇩 +62</option>
-                        <option value="+63">🇵🇭 +63</option>
-                        <option value="+84">🇻🇳 +84</option>
-                      </select>
-                    </div>
+  <input
+    type="text"
+    value={customerWhatsappCountry}
+    onChange={(e) => {
+      const val = e.target.value.replace(/[^\d+]/g, '');
+      setCustomerWhatsappCountry(val.startsWith('+') ? val : '+' + val.replace(/\+/g, ''));
+    }}
+    placeholder="+91"
+    maxLength={5}
+    inputMode="tel"
+    style={{ textAlign: 'center' }}
+  />
+</div>
                     <div className="sv-phone-group-number">
                       <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
                     </div>
