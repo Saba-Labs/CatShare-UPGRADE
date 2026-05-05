@@ -81,7 +81,7 @@ const CSS = `
 .sv-socials { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
 .sv-social-btn { width: 34px; height: 34px; border-radius: var(--r-sm); background: var(--c-surface2); border: 1px solid var(--c-border); display: flex; align-items: center; justify-content: center; text-decoration: none; color: var(--c-text2); transition: all var(--trans); cursor: pointer; font-size: 11px; font-weight: 700; font-style: normal; font-family: var(--f-body); }
 .sv-social-btn:hover { background: var(--c-surface3); border-color: var(--c-border2); color: var(--c-text); }
-.sv-footer { margin: 14px 12px 26px; padding: 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+.sv-footer { margin: 14px 12px 80px; padding: 14px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
 .sv-footer-title { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--c-text3); margin-bottom: 10px; }
 .sv-footer .sv-biz-chips { margin-top: 0; }
 .sv-footer .sv-socials { margin-top: 10px; }
@@ -1599,8 +1599,8 @@ export default function StoreView() {
             )}
 
             {step === 'review' && (
-              <>
-                <div className="sv-review-list">
+              <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
                   {reviewSummary.items.map((item: any) => {
                     const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
                     return (
@@ -1633,7 +1633,7 @@ export default function StoreView() {
                   </div>
                   <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>Edit items</button>
                 </div>
-              </>
+              </div>
             )}
             {hasFooterDetails && renderStoreFooter()}
           </div>
