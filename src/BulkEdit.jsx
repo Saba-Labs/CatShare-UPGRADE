@@ -163,7 +163,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: isMasterCatalogue ? (p.badge || catData.badge || "") : (catData.badge || p.badge || ""),
+      badge: isMasterCatalogue ? (p.badge !== undefined ? p.badge : (catData.badge ?? "")) : (catData.badge ?? (p.badge ?? "")),
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
@@ -179,11 +179,11 @@ useEffect(() => {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
       if (isMasterCatalogue) {
-        normalized[fieldKey] = p[fieldKey] || catData[fieldKey] || "";
-        normalized[unitKey] = p[unitKey] || catData[unitKey] || "None";
+        normalized[fieldKey] = p[fieldKey] !== undefined ? p[fieldKey] : (catData[fieldKey] ?? "");
+        normalized[unitKey] = p[unitKey] !== undefined ? p[unitKey] : (catData[unitKey] ?? "None");
       } else {
-        normalized[fieldKey] = catData[fieldKey] || p[fieldKey] || "";
-        normalized[unitKey] = catData[unitKey] || p[unitKey] || "None";
+        normalized[fieldKey] = catData[fieldKey] ?? (p[fieldKey] ?? "");
+        normalized[unitKey] = catData[unitKey] ?? (p[unitKey] ?? "None");
       }
     }
 
@@ -198,11 +198,11 @@ useEffect(() => {
     // For master catalogue, also read from top-level
     if (priceField) {
       if (isMasterCatalogue) {
-        normalized[priceField] = p[priceField] || catData[priceField] || "";
-        normalized[priceUnitField] = p[priceUnitField] || catData[priceUnitField] || "/ piece";
+        normalized[priceField] = p[priceField] !== undefined ? p[priceField] : (catData[priceField] ?? "");
+        normalized[priceUnitField] = p[priceUnitField] !== undefined ? p[priceUnitField] : (catData[priceUnitField] ?? "/ piece");
       } else {
-        normalized[priceField] = catData[priceField] || "";
-        normalized[priceUnitField] = catData[priceUnitField] || "/ piece";
+        normalized[priceField] = catData[priceField] ?? "";
+        normalized[priceUnitField] = catData[priceUnitField] ?? "/ piece";
       }
       const of = offerPriceFieldFor(priceField);
       normalized[of] = (isMasterCatalogue
