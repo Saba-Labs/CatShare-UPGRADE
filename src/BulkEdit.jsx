@@ -171,11 +171,18 @@ useEffect(() => {
     };
 
     // Dynamically copy all fieldX data
+    // For master catalogue (cat1), read from top-level first; for others, read from catData first
+    const isMasterCatalogue = catalogueId === "cat1";
     for (let i = 1; i <= 10; i++) {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
-      normalized[fieldKey] = catData[fieldKey] || p[fieldKey] || "";
-      normalized[unitKey] = catData[unitKey] || p[unitKey] || "None";
+      if (isMasterCatalogue) {
+        normalized[fieldKey] = p[fieldKey] || catData[fieldKey] || "";
+        normalized[unitKey] = p[unitKey] || catData[unitKey] || "None";
+      } else {
+        normalized[fieldKey] = catData[fieldKey] || p[fieldKey] || "";
+        normalized[unitKey] = catData[unitKey] || p[unitKey] || "None";
+      }
     }
 
     // Handle catalogue-specific stock field
@@ -186,11 +193,19 @@ useEffect(() => {
     }
 
     // Add price field for the current catalogue
+    // For master catalogue, also read from top-level
     if (priceField) {
-      normalized[priceField] = catData[priceField] || "";
-      normalized[priceUnitField] = catData[priceUnitField] || "/ piece";
+      if (isMasterCatalogue) {
+        normalized[priceField] = p[priceField] || catData[priceField] || "";
+        normalized[priceUnitField] = p[priceUnitField] || catData[priceUnitField] || "/ piece";
+      } else {
+        normalized[priceField] = catData[priceField] || "";
+        normalized[priceUnitField] = catData[priceUnitField] || "/ piece";
+      }
       const of = offerPriceFieldFor(priceField);
-      normalized[of] = catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "";
+      normalized[of] = (isMasterCatalogue
+        ? p[of] !== undefined && p[of] !== null ? String(p[of]) : catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : ""
+        : catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "");
     }
 
     // Initialize other price fields - show if they exist
