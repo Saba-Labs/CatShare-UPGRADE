@@ -27,7 +27,7 @@ body { font-family: var(--font); background: var(--bg); }
 .of-page {
   max-width: 680px;
   margin: 0 auto;
-  padding: 0 0 20px;
+  padding: 0 0 120px;
 }
 
 /* ── Header ── */
