@@ -444,15 +444,15 @@ useEffect(() => {
   if (catalogueId === "cat1") {
     // Master catalogue: update top-level fields only
     for (let i = 1; i <= 10; i++) {
-      copy[`field${i}`] = p[`field${i}`];
-      copy[`field${i}Unit`] = p[`field${i}Unit`];
+      copy[`field${i}`] = p[`field${i}`] ?? "";
+      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
     }
     if (priceField) {
-      copy[priceField] = p[priceField];
-      copy[priceUnitField] = p[priceUnitField];
+      copy[priceField] = p[priceField] ?? "";
+      copy[priceUnitField] = p[priceUnitField] ?? "/ piece";
       copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
     }
-    copy.badge = p.badge;
+    copy.badge = p.badge ?? "";
     copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
   } else {
     // Other catalogues: save to catalogueData[catalogueId]
