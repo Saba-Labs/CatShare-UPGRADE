@@ -160,7 +160,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: catData.badge ?? (p.badge ?? ""),
+      badge: catData.badge || "",
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
