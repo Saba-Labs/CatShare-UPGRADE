@@ -160,7 +160,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: catData.badge ?? (p.badge ?? ""),
+      badge: catData.badge || "",
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
@@ -449,6 +449,10 @@ useEffect(() => {
     copy.wholesale = p[priceField] ?? p.wholesale ?? "";
     copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
     copy.badge = p.badge ?? "";
+    copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
+  } else {
+    copy.badge = p.masterBadge ?? "";
+    copy.orderQuantityStep = normalizeOrderQuantityStep(p.masterOrderQuantityStep);
   }
 
   return copy;

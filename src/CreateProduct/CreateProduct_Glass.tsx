@@ -1204,16 +1204,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
     newItem.wholesale = newItem.price1 || "";
     newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
 
-    // Ensure catalogueData is preserved and all catalogues have the badge synced
-    if (newItem.catalogueData) {
-      for (const cat of allCatalogues) {
-        if (newItem.catalogueData[cat.id]) {
-          // Sync badge to all catalogues to ensure consistency
-          newItem.catalogueData[cat.id].badge = newItem.badge;
-        }
-      }
-    }
-
     try {
       const all = safeGetFromStorage(productsStorageKeyNow, []);
       const isNewProduct = !editingId;

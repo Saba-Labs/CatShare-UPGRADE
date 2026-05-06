@@ -80,8 +80,32 @@ export function syncTopLevelFieldsIntoCatalogueData(
         resellStock: product?.resellStock !== false,
       };
     } else {
+      // For non-master catalogues, preserve catalogue-specific data but don't inherit from top-level fields
+      // This ensures each catalogue maintains independent badge, field1-10 values
       nextCd[cat.id] = {
         ...base,
+        // Keep the badge from the catalogue data, don't override with master's badge
+        badge: prev.badge || '',
+        // Keep field data from catalogue data, don't inherit from product top-level
+        field1: prev.field1 || '',
+        field2: prev.field2 || '',
+        field3: prev.field3 || '',
+        field4: prev.field4 || '',
+        field5: prev.field5 || '',
+        field6: prev.field6 || '',
+        field7: prev.field7 || '',
+        field8: prev.field8 || '',
+        field9: prev.field9 || '',
+        field10: prev.field10 || '',
+        field2Unit: prev.field2Unit || 'None',
+        field3Unit: prev.field3Unit || 'None',
+        field4Unit: prev.field4Unit || 'None',
+        field5Unit: prev.field5Unit || 'None',
+        field6Unit: prev.field6Unit || 'None',
+        field7Unit: prev.field7Unit || 'None',
+        field8Unit: prev.field8Unit || 'None',
+        field9Unit: prev.field9Unit || 'None',
+        field10Unit: prev.field10Unit || 'None',
         orderQuantityStep: normalizeOrderQuantityStep(prev.orderQuantityStep),
       };
     }

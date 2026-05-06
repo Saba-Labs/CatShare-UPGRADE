@@ -1184,14 +1184,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
     newItem.wholesale = newItem.price1 || "";
     newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
 
-    if (newItem.catalogueData) {
-      for (const cat of allCatalogues) {
-        if (newItem.catalogueData[cat.id]) {
-          newItem.catalogueData[cat.id].badge = newItem.badge;
-        }
-      }
-    }
-
     try {
       const all = safeGetFromStorage(productsStorageKeyNow, []);
       const isNewProduct = !editingId;
