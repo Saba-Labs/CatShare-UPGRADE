@@ -214,6 +214,8 @@ useEffect(() => {
   setDataLoaded(true);
 }, [products, stockField, catalogueId, priceField, priceUnitField, initialCatalogueId]);
 
+console.log("loaded field1 for first product:", normalized[0]?.field1, normalized[0]?.field2);
+
 
 
 
