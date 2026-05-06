@@ -440,6 +440,23 @@ useEffect(() => {
 
   copy = setCatalogueData(copy, catalogueId, catUpdates);
 
+      if (catalogueId === 'cat1') {
+        for (let i = 1; i <= 10; i++) {
+          copy[`field${i}`] = p[`field${i}`] ?? "";
+          copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+        }
+        if (priceField) {
+          copy[priceField] = p[priceField] ?? "";
+          copy[priceUnitField] = p[priceUnitField] ?? "/ piece";
+          copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
+        }
+        copy.price1 = p[priceField] ?? p.price1 ?? "";
+        copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+        copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+        copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+        copy.badge = p.badge ?? "";
+      }
+      
   return copy;
 });
 
