@@ -449,6 +449,8 @@ useEffect(() => {
     copy.wholesale = p[priceField] ?? p.wholesale ?? "";
     copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
     copy.badge = p.badge ?? "";
+  } else {
+    copy.badge = p.masterBadge ?? "";
   }
 
   return copy;
