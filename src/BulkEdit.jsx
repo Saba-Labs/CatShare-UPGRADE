@@ -449,8 +449,10 @@ useEffect(() => {
     copy.wholesale = p[priceField] ?? p.wholesale ?? "";
     copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
     copy.badge = p.badge ?? "";
+    copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
   } else {
     copy.badge = p.masterBadge ?? "";
+    copy.orderQuantityStep = normalizeOrderQuantityStep(p.masterOrderQuantityStep);
   }
 
   return copy;
