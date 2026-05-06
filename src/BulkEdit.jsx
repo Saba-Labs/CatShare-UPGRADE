@@ -439,7 +439,7 @@ useEffect(() => {
   }
 
   copy = setCatalogueData(copy, catalogueId, catUpdates);
-
+  console.log("catalogueId is:", catalogueId);
      if (catalogueId === 'cat1') {
         console.log("saving fields:", p.field1, p.field2, p.field3, p.field4, p.field5);
         for (let i = 1; i <= 10; i++) {
