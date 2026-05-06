@@ -405,6 +405,7 @@ useEffect(() => {
    const handleSave = () => {
   try {
     if (!guardCloudWrite()) return;
+    const isMasterCatalogue = catalogueId === "cat1";
     const cleanData = editedData.map((p) => {
   let copy = { ...p };
 
@@ -435,19 +436,20 @@ useEffect(() => {
   }
 
       copy = setCatalogueData(copy, catalogueId, catUpdates);
-  console.log("after save field1:", copy.field1, "cat1 field1:", copy.catalogueData?.cat1?.field1);
-  
 
-  for (let i = 1; i <= 10; i++) {
-    copy[`field${i}`] = p[`field${i}`] ?? "";
-    copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+  // Only update top-level fields when editing the master catalogue (cat1)
+  if (isMasterCatalogue) {
+    for (let i = 1; i <= 10; i++) {
+      copy[`field${i}`] = p[`field${i}`] ?? "";
+      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+    }
+
+    copy.price1 = p[priceField] ?? p.price1 ?? "";
+    copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+    copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+    copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+    copy.badge = p.badge ?? "";
   }
-
-  copy.price1 = p[priceField] ?? p.price1 ?? "";
-  copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
-  copy.wholesale = p[priceField] ?? p.wholesale ?? "";
-  copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
-  copy.badge = p.badge ?? "";
 
   return copy;
 });
