@@ -435,19 +435,20 @@ useEffect(() => {
   }
 
       copy = setCatalogueData(copy, catalogueId, catUpdates);
-  console.log("after save field1:", copy.field1, "cat1 field1:", copy.catalogueData?.cat1?.field1);
-  
 
-  for (let i = 1; i <= 10; i++) {
-    copy[`field${i}`] = p[`field${i}`] ?? "";
-    copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+  // Only update top-level fields for master catalogue
+  // For other catalogues, data is only stored in catalogueData[catalogueId]
+  if (catalogueId === "cat1") {
+    for (let i = 1; i <= 10; i++) {
+      copy[`field${i}`] = p[`field${i}`] ?? "";
+      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+    }
+    copy.price1 = p[priceField] ?? p.price1 ?? "";
+    copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+    copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+    copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+    copy.badge = p.badge ?? "";
   }
-
-  copy.price1 = p[priceField] ?? p.price1 ?? "";
-  copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
-  copy.wholesale = p[priceField] ?? p.wholesale ?? "";
-  copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
-  copy.badge = p.badge ?? "";
 
   return copy;
 });
@@ -464,9 +465,6 @@ useEffect(() => {
     } catch (jsonErr) {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
-const productToCheck = mergedData.find(p => p.field1);
-  console.log("mergedData field1:", productToCheck?.field1, "cat1:", productToCheck?.catalogueData?.cat1?.field1);
-  saveProducts(mergedData);
     // Save products (this will sync to Supabase and localStorage)
     saveProducts(mergedData);
     setProducts(mergedData);
