@@ -440,10 +440,11 @@ useEffect(() => {
 
   copy = setCatalogueData(copy, catalogueId, catUpdates);
 
-      if (catalogueId === 'cat1') {
+     if (catalogueId === 'cat1') {
+        console.log("saving fields:", p.field1, p.field2, p.field3, p.field4, p.field5);
         for (let i = 1; i <= 10; i++) {
-          copy[`field${i}`] = p[`field${i}`] || "";
-          copy[`field${i}Unit`] = p[`field${i}Unit`] || "None";
+          copy[`field${i}`] = p[`field${i}`] ?? "";
+          copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
           if (copy.catalogueData?.cat1) {
             copy.catalogueData.cat1[`field${i}`] = p[`field${i}`] || "";
             copy.catalogueData.cat1[`field${i}Unit`] = p[`field${i}Unit`] || "None";
