@@ -174,8 +174,8 @@ useEffect(() => {
     for (let i = 1; i <= 10; i++) {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
-      normalized[fieldKey] = catData[fieldKey] ?? (p[fieldKey] ?? "");
-      normalized[unitKey] = catData[unitKey] ?? (p[unitKey] ?? "None");
+      normalized[fieldKey] = catData[fieldKey] || p[fieldKey] || "";
+      normalized[unitKey] = catData[unitKey] || p[unitKey] || "None";
     }
 
     // Handle catalogue-specific stock field
