@@ -14,7 +14,7 @@ import { useAuth } from "./context/AuthContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { useSubscription } from "./context/SubscriptionContext";
 import { FREE_MAX_CATALOGUES } from "./config/freeTierLimits";
-import { syncCataloguesDefinition } from "./services/supabaseSync";
+import { syncCataloguesDefinition, syncProducts } from "./services/supabaseSync";
 import { getStorageKey, safeSetInStorage } from "./utils/safeStorage";
 import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "./services/cloudflareService";
 
@@ -335,6 +335,32 @@ export default React.memo(function ManageCatalogues({
             syncCataloguesDefinition(user.uid, updated).catch(err => {
               console.warn('⚠️ Failed to sync catalogues to Supabase:', err);
             });
+          }
+
+          // Clean up the deleted catalogue's data from all products
+          const catalogueId = catalogue.id;
+          const cleanedProducts = products.map(p => {
+            if (p.catalogueData && p.catalogueData[catalogueId]) {
+              const copy = { ...p, catalogueData: { ...p.catalogueData } };
+              delete copy.catalogueData[catalogueId];
+              return copy;
+            }
+            return p;
+          });
+
+          // Only sync if we actually removed data from products
+          if (cleanedProducts.some((p, i) => p !== products[i])) {
+            setProducts(cleanedProducts);
+            if (strictOnline) {
+              const syncRes = await syncProducts(user.uid, cleanedProducts);
+              if (!syncRes?.success) {
+                console.warn('⚠️ Failed to sync product cleanup to Supabase');
+              }
+            } else {
+              syncProducts(user.uid, cleanedProducts).catch(err => {
+                console.warn('⚠️ Failed to sync product cleanup to Supabase:', err);
+              });
+            }
           }
         }
 

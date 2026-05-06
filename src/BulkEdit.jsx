@@ -160,7 +160,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
-      badge: catData.badge || p.badge || "",
+      badge: catData.badge ?? (p.badge ?? ""),
       category: p.category || [],
       // Store original badge for fallback
       masterBadge: p.badge || "",
@@ -170,7 +170,7 @@ useEffect(() => {
           : p.wholesaleStock || "",
     };
 
-    // Dynamically copy all fieldX data
+    // Dynamically copy all fieldX data from catalogue data
     for (let i = 1; i <= 10; i++) {
       const fieldKey = `field${i}`;
       const unitKey = `field${i}Unit`;
@@ -187,8 +187,8 @@ useEffect(() => {
 
     // Add price field for the current catalogue
     if (priceField) {
-      normalized[priceField] = catData[priceField] || "";
-      normalized[priceUnitField] = catData[priceUnitField] || "/ piece";
+      normalized[priceField] = catData[priceField] || p[priceField] || p.price1 || p.wholesale || "";
+      normalized[priceUnitField] = catData[priceUnitField] || p[priceUnitField] || p.price1Unit || p.wholesaleUnit || "/ piece";
       const of = offerPriceFieldFor(priceField);
       normalized[of] = catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "";
     }
@@ -211,8 +211,10 @@ useEffect(() => {
   });
 
   setEditedData(normalized.map(item => ensureFieldDefaults(item)));
+  console.log("loaded field1 for first product:", normalized[0]?.field1, normalized[0]?.field2);
   setDataLoaded(true);
 }, [products, stockField, catalogueId, priceField, priceUnitField, initialCatalogueId]);
+
 
 
 
@@ -405,25 +407,21 @@ useEffect(() => {
     if (!guardCloudWrite()) return;
     const cleanData = editedData.map((p) => {
   let copy = { ...p };
-  // Preserve image field to maintain product-to-image associations
 
-  // Convert stock fields from string → boolean
   if (typeof copy.wholesaleStock === "string") {
     copy.wholesaleStock = copy.wholesaleStock === "in";
   }
 
-  // Handle catalogue-specific stock field
   if (stockField && stockField !== 'wholesaleStock' && stockField !== 'resellStock') {
     if (typeof copy[stockField] === "string") {
       copy[stockField] = copy[stockField] === "in";
     }
   }
 
-  // Save catalogue-specific data
   const catUpdates = {
-    badge: p.badge,
-    [priceField]: priceField ? p[priceField] : undefined,
-    [priceUnitField]: priceField ? p[priceUnitField] : undefined,
+    badge: p.badge ?? "",
+    [priceField]: priceField ? (p[priceField] ?? "") : undefined,
+    [priceUnitField]: priceField ? (p[priceUnitField] ?? "/ piece") : undefined,
     ...(priceField
       ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
       : {}),
@@ -431,13 +429,25 @@ useEffect(() => {
     orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
   };
 
-  // Save all fieldX slots
   for (let i = 1; i <= 10; i++) {
-    catUpdates[`field${i}`] = p[`field${i}`];
-    catUpdates[`field${i}Unit`] = p[`field${i}Unit`];
+    catUpdates[`field${i}`] = p[`field${i}`] ?? "";
+    catUpdates[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
   }
 
-  copy = setCatalogueData(copy, catalogueId, catUpdates);
+      copy = setCatalogueData(copy, catalogueId, catUpdates);
+  console.log("after save field1:", copy.field1, "cat1 field1:", copy.catalogueData?.cat1?.field1);
+  
+
+  for (let i = 1; i <= 10; i++) {
+    copy[`field${i}`] = p[`field${i}`] ?? "";
+    copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+  }
+
+  copy.price1 = p[priceField] ?? p.price1 ?? "";
+  copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+  copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+  copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+  copy.badge = p.badge ?? "";
 
   return copy;
 });
@@ -454,7 +464,9 @@ useEffect(() => {
     } catch (jsonErr) {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
-
+const productToCheck = mergedData.find(p => p.field1);
+  console.log("mergedData field1:", productToCheck?.field1, "cat1:", productToCheck?.catalogueData?.cat1?.field1);
+  saveProducts(mergedData);
     // Save products (this will sync to Supabase and localStorage)
     saveProducts(mergedData);
     setProducts(mergedData);
@@ -576,9 +588,15 @@ useEffect(() => {
         <div className="flex gap-2 w-full min-w-0">
           <input
             value={item[priceField] ?? ""}
-            onChange={(e) => handleFieldChange(item.id, priceField, e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                handleFieldChange(item.id, priceField, val);
+              }
+            }}
             className={cellInputFlex}
             placeholder="Price"
+            inputMode="decimal"
           />
           {(() => {
             const config = getFieldConfig(priceField);
@@ -604,7 +622,12 @@ useEffect(() => {
       return (
         <input
           value={item[offerField] ?? ""}
-          onChange={(e) => handleFieldChange(item.id, offerField, e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || /^\d*\.?\d*$/.test(val)) {
+              handleFieldChange(item.id, offerField, val);
+            }
+          }}
           className={cellInput}
           placeholder="Offer"
           inputMode="decimal"

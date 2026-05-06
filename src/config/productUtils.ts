@@ -308,7 +308,19 @@ export function saveProduct(product: Product, userId?: string): void {
  */
 export function saveProducts(products: Product[], userId?: string): void {
   try {
-    const normalized = products.map((p) => withCatalogueTopLevelSync(p));
+    const normalized = products.map((p) => {
+      const n = normalizeProduct(p);
+      // Preserve cat1 catalogueData fields that were explicitly set
+      if (p.catalogueData?.cat1 && n.catalogueData?.cat1) {
+        for (let i = 1; i <= 10; i++) {
+          if (p.catalogueData.cat1[`field${i}`] !== undefined) {
+            n.catalogueData.cat1[`field${i}`] = p.catalogueData.cat1[`field${i}`];
+            n[`field${i}`] = p.catalogueData.cat1[`field${i}`];
+          }
+        }
+      }
+      return n;
+    });
     const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(normalized));
