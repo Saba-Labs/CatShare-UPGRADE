@@ -19,7 +19,7 @@ import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
 import {
   syncTopLevelFieldsIntoCatalogueData,
-  type ProductWithCatalogueData,
+  type Produ  ctWithCatalogueData,
 } from './catalogueProductUtils';
 import { getAllCatalogues } from './catalogueConfig';
 
@@ -308,7 +308,7 @@ export function saveProduct(product: Product, userId?: string): void {
  */
 export function saveProducts(products: Product[], userId?: string): void {
   try {
-    const normalized = products.map((p) => withCatalogueTopLevelSync(p));
+    const normalized = products.map((p) => normalizeProduct(p));
     const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(normalized));
