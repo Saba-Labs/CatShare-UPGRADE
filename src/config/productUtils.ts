@@ -19,7 +19,7 @@ import { getPersistedAuthUserId } from '../utils/authUserId';
 import { getStorageKey } from '../utils/safeStorage';
 import {
   syncTopLevelFieldsIntoCatalogueData,
-  type Produ  ctWithCatalogueData,
+  type ProductWithCatalogueData,
 } from './catalogueProductUtils';
 import { getAllCatalogues } from './catalogueConfig';
 
