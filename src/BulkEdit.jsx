@@ -464,7 +464,9 @@ useEffect(() => {
     } catch (jsonErr) {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
-
+const productToCheck = mergedData.find(p => p.field1);
+  console.log("mergedData field1:", productToCheck?.field1, "cat1:", productToCheck?.catalogueData?.cat1?.field1);
+  saveProducts(mergedData);
     // Save products (this will sync to Supabase and localStorage)
     saveProducts(mergedData);
     setProducts(mergedData);
