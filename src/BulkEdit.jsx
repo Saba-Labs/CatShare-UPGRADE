@@ -405,22 +405,17 @@ useEffect(() => {
     if (!guardCloudWrite()) return;
     const cleanData = editedData.map((p) => {
   let copy = { ...p };
-  // Preserve image field to maintain product-to-image associations
 
-  // Convert stock fields from string → boolean
   if (typeof copy.wholesaleStock === "string") {
     copy.wholesaleStock = copy.wholesaleStock === "in";
   }
 
-  // Handle catalogue-specific stock field
   if (stockField && stockField !== 'wholesaleStock' && stockField !== 'resellStock') {
     if (typeof copy[stockField] === "string") {
       copy[stockField] = copy[stockField] === "in";
     }
   }
 
-  // Save catalogue-specific data to catalogueData[catalogueId]
-  // For all catalogues (including master cat1), the canonical storage is catalogueData[catalogueId]
   const catUpdates = {
     badge: p.badge ?? "",
     [priceField]: priceField ? (p[priceField] ?? "") : undefined,
@@ -432,36 +427,26 @@ useEffect(() => {
     orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
   };
 
-  // Save all fieldX slots
   for (let i = 1; i <= 10; i++) {
     catUpdates[`field${i}`] = p[`field${i}`] ?? "";
     catUpdates[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
   }
 
-  copy = setCatalogueData(copy, catalogueId, catUpdates);
-  console.log("catalogueId is:", catalogueId);
-     if (catalogueId === 'cat1') {
-        console.log("saving fields:", p.field1, p.field2, p.field3, p.field4, p.field5);
-        for (let i = 1; i <= 10; i++) {
-          copy[`field${i}`] = p[`field${i}`] ?? "";
-          copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
-          if (copy.catalogueData?.cat1) {
-            copy.catalogueData.cat1[`field${i}`] = p[`field${i}`] || "";
-            copy.catalogueData.cat1[`field${i}Unit`] = p[`field${i}Unit`] || "None";
-          }
-        }
-        if (priceField) {
-          copy[priceField] = p[priceField] ?? "";
-          copy[priceUnitField] = p[priceUnitField] ?? "/ piece";
-          copy[offerPriceFieldFor(priceField)] = p[offerPriceFieldFor(priceField)] ?? "";
-        }
-        copy.price1 = p[priceField] ?? p.price1 ?? "";
-        copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
-        copy.wholesale = p[priceField] ?? p.wholesale ?? "";
-        copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
-        copy.badge = p.badge ?? "";
-      }
-      
+      copy = setCatalogueData(copy, catalogueId, catUpdates);
+  console.log("after save field1:", copy.field1, "cat1 field1:", copy.catalogueData?.cat1?.field1);
+  
+
+  for (let i = 1; i <= 10; i++) {
+    copy[`field${i}`] = p[`field${i}`] ?? "";
+    copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+  }
+
+  copy.price1 = p[priceField] ?? p.price1 ?? "";
+  copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+  copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+  copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+  copy.badge = p.badge ?? "";
+
   return copy;
 });
 
