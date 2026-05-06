@@ -187,8 +187,8 @@ useEffect(() => {
 
     // Add price field for the current catalogue
     if (priceField) {
-      normalized[priceField] = catData[priceField] ?? "";
-      normalized[priceUnitField] = catData[priceUnitField] ?? "/ piece";
+      normalized[priceField] = catData[priceField] || p[priceField] || p.price1 || p.wholesale || "";
+      normalized[priceUnitField] = catData[priceUnitField] || p[priceUnitField] || p.price1Unit || p.wholesaleUnit || "/ piece";
       const of = offerPriceFieldFor(priceField);
       normalized[of] = catData[of] !== undefined && catData[of] !== null ? String(catData[of]) : "";
     }
