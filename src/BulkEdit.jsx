@@ -435,20 +435,19 @@ useEffect(() => {
   }
 
       copy = setCatalogueData(copy, catalogueId, catUpdates);
+  console.log("after save field1:", copy.field1, "cat1 field1:", copy.catalogueData?.cat1?.field1);
+  
 
-  // Only update top-level fields for master catalogue
-  // For other catalogues, data is only stored in catalogueData[catalogueId]
-  if (catalogueId === "cat1") {
-    for (let i = 1; i <= 10; i++) {
-      copy[`field${i}`] = p[`field${i}`] ?? "";
-      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
-    }
-    copy.price1 = p[priceField] ?? p.price1 ?? "";
-    copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
-    copy.wholesale = p[priceField] ?? p.wholesale ?? "";
-    copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
-    copy.badge = p.badge ?? "";
+  for (let i = 1; i <= 10; i++) {
+    copy[`field${i}`] = p[`field${i}`] ?? "";
+    copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
   }
+
+  copy.price1 = p[priceField] ?? p.price1 ?? "";
+  copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
+  copy.wholesale = p[priceField] ?? p.wholesale ?? "";
+  copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
+  copy.badge = p.badge ?? "";
 
   return copy;
 });
@@ -465,6 +464,9 @@ useEffect(() => {
     } catch (jsonErr) {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
+const productToCheck = mergedData.find(p => p.field1);
+  console.log("mergedData field1:", productToCheck?.field1, "cat1:", productToCheck?.catalogueData?.cat1?.field1);
+  saveProducts(mergedData);
     // Save products (this will sync to Supabase and localStorage)
     saveProducts(mergedData);
     setProducts(mergedData);
@@ -586,9 +588,15 @@ useEffect(() => {
         <div className="flex gap-2 w-full min-w-0">
           <input
             value={item[priceField] ?? ""}
-            onChange={(e) => handleFieldChange(item.id, priceField, e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                handleFieldChange(item.id, priceField, val);
+              }
+            }}
             className={cellInputFlex}
             placeholder="Price"
+            inputMode="decimal"
           />
           {(() => {
             const config = getFieldConfig(priceField);
@@ -614,7 +622,12 @@ useEffect(() => {
       return (
         <input
           value={item[offerField] ?? ""}
-          onChange={(e) => handleFieldChange(item.id, offerField, e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "" || /^\d*\.?\d*$/.test(val)) {
+              handleFieldChange(item.id, offerField, val);
+            }
+          }}
           className={cellInput}
           placeholder="Offer"
           inputMode="decimal"
