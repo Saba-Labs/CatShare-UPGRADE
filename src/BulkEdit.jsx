@@ -441,6 +441,7 @@ useEffect(() => {
   copy = setCatalogueData(copy, catalogueId, catUpdates);
 
       if (catalogueId === 'cat1') {
+        copy.badge = p.badge ?? "";
         for (let i = 1; i <= 10; i++) {
           copy[`field${i}`] = p[`field${i}`] ?? "";
           copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
