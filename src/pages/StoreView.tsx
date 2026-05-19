@@ -170,6 +170,9 @@ body { background: var(--c-bg); }
 .sv-qty.accent .sv-qty-btn { color: rgba(255,255,255,0.85); }
 .sv-qty.accent .sv-qty-btn:hover { background: rgba(0,0,0,0.12); color: white; }
 .sv-qty.accent .sv-qty-val { color: white; }
+.sv-qty--disabled { opacity: 0.5; }
+.sv-qty--disabled .sv-qty-btn { cursor: not-allowed; }
+.sv-qty--disabled .sv-qty-btn:hover { background: none; color: var(--c-text2); }
 
 .sv-pack-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: #8a6a00; background: #fffbeb; border: 1px solid #f0d060; border-radius: var(--r-full); padding: 3px 8px; font-weight: 500; }
 
@@ -706,13 +709,13 @@ const IconWAFab = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="cu
 /* ─────────────────────────────────────────────────────────────────────────────
    SUB-COMPONENTS
 ───────────────────────────────────────────────────────────────────────────── */
-function QtyControl({ value, step, onChange, accent = false }: { value: number; step: number; onChange: (d: number) => void; accent?: boolean }) {
+function QtyControl({ value, step, onChange, accent = false, disabled = false }: { value: number; step: number; onChange: (d: number) => void; accent?: boolean; disabled?: boolean }) {
   const s = normalizeOrderQuantityStep(step);
   return (
-    <div className={`sv-qty${accent ? ' accent' : ''}`}>
-      <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>−</button>
+    <div className={`sv-qty${accent ? ' accent' : ''}${disabled ? ' sv-qty--disabled' : ''}`}>
+      <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)} disabled={disabled}>−</button>
       <span className="sv-qty-val">{value}</span>
-      <button type="button" className="sv-qty-btn" onClick={() => onChange(s)}>+</button>
+      <button type="button" className="sv-qty-btn" onClick={() => onChange(s)} disabled={disabled}>+</button>
     </div>
   );
 }
@@ -1853,7 +1856,7 @@ export default function StoreView() {
                     <div className="sv-drawer-qty-label">Quantity</div>
                     <div className="sv-drawer-qty-row">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
+                        <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} disabled={getProductVariantGroups(drawerProduct).length > 0 && !isVariantSelectionComplete(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id])} />
                         {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
                       </div>
                       <div className="sv-drawer-total-wrap">
