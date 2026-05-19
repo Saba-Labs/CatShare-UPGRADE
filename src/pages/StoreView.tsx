@@ -827,6 +827,22 @@ export default function StoreView() {
   }, [drawerProduct]);
 
   useEffect(() => {
+  if (drawerProduct) {
+    window.history.pushState({ drawerOpen: true }, '');
+  }
+}, [drawerProduct]);
+
+useEffect(() => {
+  const onPopState = () => {
+    if (drawerProduct) {
+      setDrawerProduct(null);
+    }
+  };
+  window.addEventListener('popstate', onPopState);
+  return () => window.removeEventListener('popstate', onPopState);
+}, [drawerProduct]);
+
+  useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
     getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
