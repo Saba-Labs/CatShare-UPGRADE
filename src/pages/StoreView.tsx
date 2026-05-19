@@ -19,6 +19,14 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
+import ProductImageGallery from '../components/ProductImageGallery';
+import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import {
+  formatVariantSelectionSummary,
+  getProductVariantGroups,
+  isVariantSelectionComplete,
+} from '../utils/productVariants';
 import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
@@ -260,8 +268,14 @@ body { background: var(--c-bg); }
 .sv-drawer-handle { width: 36px; height: 4px; background: var(--c-surface3); border-radius: var(--r-full); margin: 12px auto 0; }
 .sv-drawer-img-wrap { width: 100%; background: var(--c-surface); position: relative; margin-top: 14px; padding: 0; box-sizing: border-box; }
 .sv-drawer-img-wrap img { display: block; width: 100%; height: auto; }
+.sv-drawer-img-wrap--gallery { aspect-ratio: 1; max-height: min(72vh, 440px); }
+.sv-drawer-img-wrap--gallery .sv-store-gallery { height: 100%; }
 .sv-drawer-img-ph { width: 100%; min-height: 180px; display: flex; align-items: center; justify-content: center; }
-.sv-drawer-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.88); border: 1px solid var(--c-border2); cursor: pointer; color: var(--c-text); font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
+.sv-pcard-img-wrap .sv-store-gallery,
+.of-img-wrap .sv-store-gallery { position: absolute; inset: 0; height: 100%; }
+.sv-pcard-img-wrap .sv-store-gallery > div,
+.of-img-wrap .sv-store-gallery > div { height: 100%; }
+.sv-drawer-close { position: absolute; top: 10px; right: 10px; z-index: 20; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.88); border: 1px solid var(--c-border2); cursor: pointer; color: var(--c-text); font-size: 13px; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
 .sv-drawer-body { padding: 18px 20px 36px; }
 .sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 400; color: var(--c-text); letter-spacing: -0.3px; line-height: 1.2; }
 .sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
@@ -476,6 +490,62 @@ function displayStoreProductImage(p: ProductWithCatalogueData | Record<string, u
   const v = r.imageVersion ?? r.image_version;
   const ver = typeof v === 'number' && Number.isFinite(v) ? v : undefined;
   return productImageDisplayUrl(raw, ver);
+}
+
+function getStoreProductGalleryProps(p: ProductWithCatalogueData | Record<string, unknown>) {
+  const urls = getProductImageUrls(p);
+  const primaryIndex = getPrimaryImageIndex(p);
+  const r = p as Record<string, unknown>;
+  const v = r.imageVersion ?? r.image_version;
+  const primaryImageVersion =
+    typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  return { urls, primaryIndex, primaryImageVersion };
+}
+
+function StoreProductImageArea({
+  product,
+  variant,
+}: {
+  product: ProductWithCatalogueData;
+  variant: 'card' | 'drawer';
+}) {
+  const { urls, primaryIndex, primaryImageVersion } = getStoreProductGalleryProps(product);
+  const fallback = displayStoreProductImage(product);
+
+  if (urls.length > 1) {
+    return (
+      <ProductImageGallery
+        urls={urls}
+        primaryIndex={primaryIndex}
+        primaryImageVersion={primaryImageVersion}
+        fillContainer
+        objectFit={variant === 'card' ? 'cover' : 'contain'}
+        showPrimaryBadge={false}
+        className="sv-store-gallery"
+      />
+    );
+  }
+
+  if (isDisplayableImageUrl(fallback)) {
+    return (
+      <img
+        key={String(fallback)}
+        src={String(fallback)}
+        alt={product.name}
+        style={
+          variant === 'card'
+            ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
+            : { display: 'block', width: '100%', height: 'auto' }
+        }
+      />
+    );
+  }
+
+  return (
+    <div className={variant === 'card' ? 'sv-pcard-img-ph' : 'sv-drawer-img-ph'}>
+      <IconImg size={variant === 'card' ? 32 : 48} />
+    </div>
+  );
 }
 
 /**
@@ -738,6 +808,7 @@ export default function StoreView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
+  const [variantSelections, setVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const overlayRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const pathFallbackSentRef = useRef(false);
@@ -920,11 +991,15 @@ export default function StoreView() {
         imageUrl: pickProductImageSrc(product),
         imageVersion: typeof iv === 'number' && Number.isFinite(iv) ? iv : undefined,
         subtitle: product.subtitle,
+        variantSummary: formatVariantSelectionSummary(
+          getProductVariantGroups(product),
+          variantSelections[productId]
+        ),
       });
       total += rowTotal;
     });
     return { items, total };
-  }, [selectedProducts, store, catalogue, allProducts]);
+  }, [selectedProducts, store, catalogue, allProducts, variantSelections]);
 
   const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
   const minimumOrderValue = useMemo(() => {
@@ -969,6 +1044,20 @@ export default function StoreView() {
 
   const handlePlaceOrder = async () => {
     if (!store?.catalogueId) return;
+    for (const item of reviewSummary.items) {
+      const product = allProducts.find((p) => p.id === item.productId);
+      if (!product) continue;
+      const groups = getProductVariantGroups(product);
+      if (
+        groups.length > 0 &&
+        !isVariantSelectionComplete(groups, variantSelections[item.productId])
+      ) {
+        alert(`Please choose all variants for "${item.name}" before placing the order.`);
+        setDrawerProduct(product);
+        setStep('products');
+        return;
+      }
+    }
     if (minimumOrderValue > 0 && reviewSummary.total < minimumOrderValue) {
       alert(
         `Minimum order value is ${fmt(minimumOrderValue, currencySymbol)}. Please add ${fmt(
@@ -998,6 +1087,7 @@ export default function StoreView() {
           imageUrl: item.imageUrl,
           imageVersion: item.imageVersion,
           quantityStep: catData.orderQuantityStep,
+          variantSummary: item.variantSummary || undefined,
         });
       });
       setSupabaseRlsUserId(store.sellerUserId);
@@ -1012,6 +1102,7 @@ export default function StoreView() {
         setCustomerWhatsappCountry('+91');
         setCustomerWhatsappNumber('');
         setDrawerProduct(null);
+        setVariantSelections({});
         setSearchQuery('');
         setSelectedCategory('all');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1339,18 +1430,7 @@ export default function StoreView() {
                     className={`of-item-card${isSelected ? ' is-selected' : ''}`}
                   >
                     <div className="of-img-wrap" onClick={() => setDrawerProduct(product)}>
-                      {isDisplayableImageUrl(imgUrl) ? (
-                        <img
-                          key={String(imgUrl)}
-                          src={String(imgUrl)}
-                          alt={product.name}
-                          className="of-img"
-                        />
-                      ) : (
-                        <div className="of-img-ph">
-                          <ImgIcon />
-                        </div>
-                      )}
+                      <StoreProductImageArea product={product} variant="card" />
                       {isSelected ? <div className="of-selected-badge">✓ Added</div> : null}
                     </div>
 
@@ -1437,9 +1517,7 @@ export default function StoreView() {
                   className={`sv-pcard${isSelected ? ' selected' : ''}`}
                 >
                   <div className="sv-pcard-img-wrap" onClick={() => setDrawerProduct(product)}>
-                    {isDisplayableImageUrl(imgUrl)
-                      ? <img key={imgUrl} src={String(imgUrl)} alt={product.name} />
-                      : <div className="sv-pcard-img-ph"><IconImg size={32} /></div>}
+                    <StoreProductImageArea product={product} variant="card" />
                     {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
                   </div>
                   <div className="sv-pcard-body">
@@ -1643,7 +1721,7 @@ export default function StoreView() {
                           })()}
                         </div>
                         <div className="sv-rcard-body">
-                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}</div>
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub">{item.variantSummary}</div>}</div>
                           <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
                         </div>
                       </div>
@@ -1710,15 +1788,13 @@ export default function StoreView() {
             const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
             return { label, value };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
-          const imgUrl = displayStoreProductImage(drawerProduct);
+          const gallery = getStoreProductGalleryProps(drawerProduct);
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
-                <div className="sv-drawer-img-wrap">
-                  {isDisplayableImageUrl(imgUrl)
-                    ? <img key={imgUrl} src={String(imgUrl)} alt={drawerProduct.name} />
-                    : <div className="sv-drawer-img-ph"><IconImg size={48} /></div>}
+                <div className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery' : ''}`}>
+                  <StoreProductImageArea product={drawerProduct} variant="drawer" />
                   <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
                 </div>
                 <div className="sv-drawer-body">
@@ -1744,6 +1820,22 @@ export default function StoreView() {
                     <div className="sv-detail-table">
                       {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}
                     </div>
+                  )}
+                  {getProductVariantGroups(drawerProduct).length > 0 && (
+                    <ProductVariantsDisplay
+                      groups={getProductVariantGroups(drawerProduct)}
+                      mode="select"
+                      selection={variantSelections[drawerProduct.id] ?? {}}
+                      onSelect={(groupId, option) => {
+                        setVariantSelections((prev) => ({
+                          ...prev,
+                          [drawerProduct.id]: {
+                            ...(prev[drawerProduct.id] ?? {}),
+                            [groupId]: option,
+                          },
+                        }));
+                      }}
+                    />
                   )}
                   <div className="sv-drawer-qty-section">
                     <div className="sv-drawer-qty-label">Quantity</div>

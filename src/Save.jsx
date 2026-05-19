@@ -5,6 +5,7 @@ import { renderProductToCanvas, canvasToBase64 } from "./utils/canvasRenderer";
 import { renderProductToCanvasGlass } from "./utils/canvasRenderer-glass";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { getAllFields, isFieldVisibleOnSurface } from "./config/fieldConfig";
+import { getProductVariantGroups } from "./utils/productVariants";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
@@ -359,6 +360,11 @@ export async function saveRenderedImage(product, type, units = {}) {
       badge: catalogueData.badge,
       cropAspectRatio: cropAspectRatio,
     };
+
+    const variantGroups = getProductVariantGroups(product);
+    if (variantGroups.length > 0) {
+      productData.variantGroups = variantGroups;
+    }
 
     // Add all enabled fields dynamically
     getAllFields()

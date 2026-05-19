@@ -162,12 +162,18 @@ export interface ProductWithCatalogueData {
   privateNotes?: string;
   imagePath?: string;
   image?: string;
+  imageUrl?: string;
+  imageVersion?: number;
+  imageUrls?: string[];
+  primaryImageIndex?: number;
   fontColor?: string;
   bgColor?: string;
   imageBgColor?: string;
   badge?: string;
   category?: string[];
   catalogueData?: Record<string, CatalogueData>;
+  /** Size / colour / custom option groups (product-level, all catalogues). */
+  variants?: import('../utils/productVariants').ProductVariantsConfig;
   [key: string]: any;
 }
 

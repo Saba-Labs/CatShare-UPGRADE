@@ -1,0 +1,84 @@
+.pve { display: flex; flex-direction: column; gap: 14px; }
+.pve-hint { font-size: 12px; line-height: 1.45; margin: 0 0 4px; opacity: 0.85; }
+.pve-empty {
+  padding: 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  text-align: center;
+}
+.pve--classic .pve-empty { background: #f3f4f6; color: #6b7280; }
+.pve--glass .pve-empty { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+
+.pve-group {
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pve--classic .pve-group { background: #f9fafb; border: 1px solid #e5e7eb; }
+.pve--glass .pve-group { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+
+.pve-group-head { display: flex; flex-direction: column; gap: 6px; }
+.pve-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; }
+.pve--classic .pve-label { color: #6b7280; }
+.pve--glass .pve-label { color: rgba(255,255,255,0.65); }
+
+.pve-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 14px;
+  border: 1px solid transparent;
+  outline: none;
+}
+.pve--classic .pve-input { background: #fff; border-color: #d1d5db; color: #111827; }
+.pve--glass .pve-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.15); color: #fff; }
+
+.pve-remove-group {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.pve--classic .pve-remove-group { color: #dc2626; }
+.pve--glass .pve-remove-group { color: #fca5a5; }
+
+.pve-options { display: flex; flex-direction: column; gap: 8px; }
+.pve-option-row { display: flex; gap: 8px; align-items: center; }
+.pve-input--option { flex: 1; }
+
+.pve-icon-btn {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pve--classic .pve-icon-btn { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
+.pve--glass .pve-icon-btn { background: rgba(239,68,68,0.2); color: #fecaca; }
+.pve-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.pve-add-option, .pve-add-group {
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border: 1px dashed transparent;
+  background: transparent;
+}
+.pve--classic .pve-add-option, .pve--classic .pve-add-group { color: #2563eb; border-color: #93c5fd; }
+.pve--glass .pve-add-option, .pve--glass .pve-add-group { color: #93c5fd; border-color: rgba(147,197,253,0.4); }
+.pve-add-group:disabled { opacity: 0.45; cursor: not-allowed; }

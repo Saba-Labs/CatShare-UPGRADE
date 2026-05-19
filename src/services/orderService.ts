@@ -21,6 +21,8 @@ export interface OrderItem {
   /** Bumps when product image changes — cache bust for CDN/browser */
   imageVersion?: number;
   quantityStep?: number;
+  /** e.g. "Size: L; Colour: Red" */
+  variantSummary?: string;
 }
 
 export interface Order {

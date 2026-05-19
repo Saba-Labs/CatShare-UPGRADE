@@ -6,6 +6,11 @@ import type { BusinessProfile } from "../config/businessProfile";
 import { EMPTY_BUSINESS_PROFILE } from "../config/businessProfile";
 import { fetchUrlAsDataUrl } from "./fetchImageCrossPlatform";
 import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
+import {
+  formatVariantOptions,
+  getProductVariantGroups,
+  type ProductVariantGroup,
+} from "./productVariants";
 
 interface ProductWithImage {
   id: string | number;
@@ -38,6 +43,7 @@ interface ProductWithImage {
   field8Unit?: string;
   field9Unit?: string;
   field10Unit?: string;
+  variantGroups?: ProductVariantGroup[];
   [key: string]: any;
 }
 
@@ -672,12 +678,19 @@ export async function generateProductPDF(
       .filter((f) => f.enabled && f.key.startsWith("field") && isFieldVisibleOnSurface(f, "pdf"))
       .map((f) => f.key);
     const activeFields = visiblePdfFieldKeys.filter((f) => product[f]);
+    const pdfVariantGroups: ProductVariantGroup[] =
+      Array.isArray(product.variantGroups) && product.variantGroups.length > 0
+        ? product.variantGroups
+        : getProductVariantGroups(product);
     const useColumns = activeFields.length > 5;
     const pRows = useColumns
       ? Math.ceil(activeFields.length / 2)
       : activeFields.length;
 
     let totalDetailsHeight = 0;
+    if (pdfVariantGroups.length > 0) {
+      totalDetailsHeight += pdfVariantGroups.length * 6;
+    }
     if (activeFields.length > 0) {
       totalDetailsHeight += pRows * 6;
     }
@@ -696,8 +709,23 @@ export async function generateProductPDF(
       detailsY = innerY + (imageHeight - totalDetailsHeight) / 2 + 2;
     }
 
-    // Fields Grid
+    // Variant groups
     pdf.setFontSize(8.5);
+    let detailRowOffset = 0;
+    for (let vi = 0; vi < pdfVariantGroups.length; vi++) {
+      const vg = pdfVariantGroups[vi];
+      const vY = detailsY + detailRowOffset * 6;
+      pdf.setFont(undefined, "bold");
+      pdf.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      const vLabel = vg.name.toUpperCase() + ":";
+      pdf.text(vLabel, detailsX, vY);
+      pdf.setFont(undefined, "normal");
+      pdf.setTextColor(textDark[0], textDark[1], textDark[2]);
+      pdf.text(formatVariantOptions(vg.options), detailsX + pdf.getTextWidth(vLabel) + 3, vY);
+      detailRowOffset++;
+    }
+
+    // Fields Grid
     for (let idx = 0; idx < activeFields.length; idx++) {
       const fieldKey = activeFields[idx];
       const label = fieldLabels[fieldKey] || fieldKey;
@@ -711,6 +739,7 @@ export async function generateProductPDF(
         : detailsX;
       const fY =
         detailsY +
+        detailRowOffset * 6 +
         (isCol2 ? idx - Math.ceil(activeFields.length / 2) : idx) * 6;
 
       pdf.setFont(undefined, "bold");
@@ -731,7 +760,9 @@ export async function generateProductPDF(
     // --- Price (Floating Glass Label Style) ---
     if (product.price || product.offerPrice) {
       const priceY =
-        detailsY + (activeFields.length > 0 ? pRows * 6 + 6 : 0);
+        detailsY +
+        (pdfVariantGroups.length + (activeFields.length > 0 ? pRows : 0)) * 6 +
+        (activeFields.length > 0 || pdfVariantGroups.length > 0 ? 6 : 0);
 
       const pUnit = product.priceUnit || "";
       const listN = parseFloat(String(product.price ?? "").trim()) || 0;

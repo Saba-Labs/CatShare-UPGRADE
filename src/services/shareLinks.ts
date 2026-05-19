@@ -4,6 +4,14 @@ import { getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogu
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { getCurrencyData } from '../utils/currencyUtils';
 import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
+import {
+  getProductImageUrls,
+  getPrimaryImageIndex,
+  getProductPrimaryImageUrl,
+  getProductPrimaryImageVersion,
+} from '../utils/productImages';
+import { getProductVariantGroups } from '../utils/productVariants';
+import type { ProductVariantGroup } from '../utils/productVariants';
 
 /** PostgREST / Supabase when a column is not in the live schema cache. */
 function isLikelyMissingCurrencyColumnsError(err: { message?: string; code?: string }): boolean {
@@ -58,6 +66,9 @@ export type ShareLinkItem = {
   priceUnit?: string;
   imageUrl?: string;
   imageVersion?: number;
+  /** Full gallery for public order form (max 5). */
+  imageUrls?: string[];
+  primaryImageIndex?: number;
   category?: string[];
   field1?: string;  field1Label?: string;  field1Unit?: string;
   field2?: string;  field2Label?: string;  field2Unit?: string;
@@ -71,6 +82,8 @@ export type ShareLinkItem = {
   field10?: string; field10Label?: string; field10Unit?: string;
   /** When >1, order qty must be multiples (e.g. 12 for dozens). Omitted = 1 (any qty). */
   quantityStep?: number;
+  /** Size / colour / custom option groups for this product. */
+  variantGroups?: ProductVariantGroup[];
 };
 
 // Converts a raw product object into a ShareLinkItem, pulling all enabled fields
@@ -116,18 +129,27 @@ export function productToShareLinkItem(
       ? String(subtitleRaw).trim()
       : undefined;
 
+  const galleryUrls = getProductImageUrls(product);
+  const primaryIx = getPrimaryImageIndex(product);
+  const variantGroups = getProductVariantGroups(product);
+
   const item: ShareLinkItem = {
     productId: product.id,
     name: product.name || '',
     ...(subtitle ? { subtitle } : {}),
     ...(categories.length > 0 ? { category: categories } : {}),
-    imageUrl: product.imageUrl || undefined,
+    imageUrl: getProductPrimaryImageUrl(product) || product.imageUrl || undefined,
     ...(typeof product.imageVersion === 'number' && Number.isFinite(product.imageVersion)
       ? { imageVersion: product.imageVersion }
-      : {}),
+      : getProductPrimaryImageVersion(product) != null
+        ? { imageVersion: getProductPrimaryImageVersion(product) }
+        : {}),
+    ...(galleryUrls.length > 0 ? { imageUrls: galleryUrls } : {}),
+    ...(galleryUrls.length > 0 ? { primaryImageIndex: primaryIx } : {}),
     price: effectivePrice !== undefined ? String(effectivePrice) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
     ...(step > 1 ? { quantityStep: step } : {}),
+    ...(variantGroups.length > 0 ? { variantGroups } : {}),
   };
 
   // Map all enabled fields with their labels

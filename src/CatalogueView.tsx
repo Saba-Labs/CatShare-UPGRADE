@@ -33,6 +33,7 @@ import { useSubscription } from "./context/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { parseWhatsAppNumber } from "./data/whatsappCountryCodes";
 import { prepareSelectedProductsForPdfExport } from "./utils/pdfProductImages";
+import { getProductVariantGroups } from "./utils/productVariants";
 import {
   canConsumePdfToday,
   recordPdfConsumption,
@@ -950,6 +951,9 @@ const handleTouchEnd = useCallback(() => {
             field8Unit: catalogueData.field8Unit,
             field9Unit: catalogueData.field9Unit,
             field10Unit: catalogueData.field10Unit,
+            ...(getProductVariantGroups(product).length > 0
+              ? { variantGroups: getProductVariantGroups(product) }
+              : {}),
           };
         });
 

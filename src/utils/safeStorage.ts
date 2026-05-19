@@ -4,6 +4,14 @@
  */
 
 import { getPersistedAuthUserId } from './authUserId';
+import { normalizeProductImageFields } from './productImages';
+
+function normalizeProductsList(products: any[]): any[] {
+  if (!Array.isArray(products)) return [];
+  return products.map((p) =>
+    p && typeof p === 'object' ? normalizeProductImageFields(p as Record<string, unknown>) : p
+  );
+}
 
 /**
  * Generate a per-user storage key
@@ -191,7 +199,7 @@ export function readProductsWithLegacyFallback(userId: string): any[] {
   if (rawKeyed !== null) {
     const parsed = safeGetFromStorage(k, [] as any[]);
     keyedArr = Array.isArray(parsed) ? parsed : [];
-    if (keyedArr.length > 0) return keyedArr;
+    if (keyedArr.length > 0) return normalizeProductsList(keyedArr);
   }
 
   const guest = localStorage.getItem('isOfflineGuest') === 'true';
@@ -200,19 +208,23 @@ export function readProductsWithLegacyFallback(userId: string): any[] {
 
   if (guest) {
     const legacy = safeGetFromStorage(LEGACY_PRODUCTS_LS, [] as any[]);
-    return Array.isArray(legacy) && legacy.length > 0 ? legacy : keyedArr;
+    return normalizeProductsList(
+      Array.isArray(legacy) && legacy.length > 0 ? legacy : keyedArr
+    );
   }
 
   // Online: different persisted id usually means another account’s keyed data — do not use shared legacy.
   // Offline: the session `userId` is authoritative; a stale `supabase_user_id` must not block legacy fallback
   // (otherwise the Products tab stays empty while `products` or `products::uid` still has rows).
   if (persisted && persisted !== userId && !offline) {
-    return keyedArr;
+    return normalizeProductsList(keyedArr);
   }
 
   const tryLegacy = (): any[] => {
     const legacy = safeGetFromStorage(LEGACY_PRODUCTS_LS, [] as any[]);
-    return Array.isArray(legacy) && legacy.length > 0 ? legacy : keyedArr;
+    return normalizeProductsList(
+      Array.isArray(legacy) && legacy.length > 0 ? legacy : keyedArr
+    );
   };
 
   if (offline && keyedArr.length === 0) {
@@ -235,7 +247,7 @@ export function readProductsWithLegacyFallback(userId: string): any[] {
     if (legacyFill.length > 0) return legacyFill;
   }
 
-  return keyedArr;
+  return normalizeProductsList(keyedArr);
 }
 
 /**

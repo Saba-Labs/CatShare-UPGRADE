@@ -8,6 +8,7 @@ import { loadImage } from './canvasRenderer';
 import { isLightColor, lightenColor } from './canvasRenderer';
 import { drawCanvasCataloguePriceLine, hasCanvasRenderablePrice } from './canvasProductPriceDraw';
 import { getAllFields } from '../config/fieldConfig';
+import { formatVariantOptions } from './productVariants';
 
 export interface ProductData {
   name: string;
@@ -18,6 +19,7 @@ export interface ProductData {
   priceUnit?: string;
   badge?: string;
   cropAspectRatio?: number;
+  variantGroups?: Array<{ id: string; name: string; options: string[] }>;
   [key: string]: any;
 }
 
@@ -162,6 +164,11 @@ export async function renderProductToCanvasGlass(
 
   if (product.subtitle) {
     detailsHeight += subtitleFontSizeBase + spacingAfterSubtitle;
+  }
+
+  const variantLineCount = product.variantGroups?.length ?? 0;
+  if (variantLineCount > 0) {
+    detailsHeight += variantLineCount * (fieldLineHeightBase + 2);
   }
 
   detailsHeight += spacingBeforeFields;
@@ -390,12 +397,33 @@ export async function renderProductToCanvasGlass(
     currentY += renderSubtitleFontSize + spacingAfterSubtitle * scale;
   }
 
+  const renderFieldFontSize = Math.floor(fieldFontSizeBase * scale);
+  const renderFieldLineHeight = renderFieldFontSize * 1.4;
+
+  if (product.variantGroups?.length) {
+    ctx.font = `500 ${renderFieldFontSize}px Arial, sans-serif`;
+    ctx.fillStyle = textColor;
+    const variantGroups = product.variantGroups;
+    let maxVariantLabelWidth = 0;
+    variantGroups.forEach((vg) => {
+      maxVariantLabelWidth = Math.max(maxVariantLabelWidth, ctx.measureText(vg.name).width);
+    });
+    const fieldPadding = 20 * scale;
+    const leftX = cardX + cardPadding + fieldPadding;
+    const vColonX = leftX + maxVariantLabelWidth + 6 * scale;
+    const vValueX = vColonX + 16 * scale;
+    variantGroups.forEach((vg) => {
+      ctx.fillText(vg.name, leftX, currentY + renderFieldFontSize * 0.8);
+      ctx.fillText(':', vColonX, currentY + renderFieldFontSize * 0.8);
+      ctx.fillText(formatVariantOptions(vg.options), vValueX, currentY + renderFieldFontSize * 0.8);
+      currentY += renderFieldLineHeight + 2 * scale;
+    });
+  }
+
   currentY += spacingBeforeFields * scale;
 
   // Fields
-  const renderFieldFontSize = Math.floor(fieldFontSizeBase * scale);
   const fieldFont = `500 ${renderFieldFontSize}px Arial, sans-serif`;
-  const renderFieldLineHeight = renderFieldFontSize * 1.4;
   const fieldPadding = 20 * scale;
 
   ctx.font = fieldFont;

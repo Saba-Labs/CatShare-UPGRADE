@@ -5,8 +5,9 @@
 
 import { getSupabaseClient } from '../supabaseClient';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
+import { getAllProductImageUrlsForDeletion, normalizeProductImageFields } from '../utils/productImages';
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
-import { deleteImageFromR2 } from './cloudflareService';
+import { deleteImageFromR2, deleteAllProductImagesFromR2 } from './cloudflareService';
 import { syncTopLevelFieldsIntoCatalogueData, type ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import { getAllCatalogues, DEFAULT_CATALOGUES, type Catalogue } from '../config/catalogueConfig';
 
@@ -53,6 +54,7 @@ export async function syncProducts(
         catalogues
       );
       const clean = { ...reconciled };
+      clean.updatedAt = new Date().toISOString();
       // Remove large binary data fields but PRESERVE imageUrl (cloud URL)
       delete clean.image;
       delete clean.imageBase64;
@@ -273,21 +275,25 @@ export async function deleteAllDeletedProducts(userId: string): Promise<SyncResu
     const rows = shelfRows || [];
 
     // Step 2: Delete images from R2. Queue failures instead of blocking.
-    const imageRows = rows.filter((r: any) => r.data?.imageUrl);
+    const imageRows = rows.filter((r: any) => getAllProductImageUrlsForDeletion(r.data).length > 0);
     if (imageRows.length > 0) {
-      console.log(`🗑️ Deleting ${imageRows.length} images from R2`);
+      console.log(`🗑️ Deleting ${imageRows.length} product image sets from R2`);
       const results = await mapWithConcurrencyLimit(
         imageRows,
         4,
-        async (r: any) => deleteImageFromR2(r.data.imageUrl)
+        async (r: any) => deleteAllProductImagesFromR2(r.data)
       );
-      const failed = results.filter(r => !r.success);
+      const failed = results.filter((r) => !r.success);
       if (failed.length > 0) {
         console.warn(`⚠️ ${failed.length} R2 deletions failed, queuing for later cleanup`);
         for (let i = 0; i < failed.length; i++) {
           try {
-            await queueR2Cleanup(userId, imageRows[i].data.imageUrl);
-          } catch { /* best effort */ }
+            for (const u of getAllProductImageUrlsForDeletion(imageRows[i].data)) {
+              await queueR2Cleanup(userId, u);
+            }
+          } catch {
+            /* best effort */
+          }
         }
       }
     }
@@ -631,7 +637,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       if (p.data != null && typeof p.data === 'object' && !Array.isArray(p.data)) {
         const row = { ...p.data };
         if (row.id == null && p.product_id != null) row.id = p.product_id;
-        return row.id != null ? row : null;
+        return row.id != null ? normalizeProductImageFields(row) : null;
       }
       if (p.product_id != null) {
         return {
@@ -647,7 +653,8 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
     const mapDeletedProductsRowToApp = (dp: any): any | null => {
       if (!dp) return null;
       if (dp.data != null && typeof dp.data === 'object' && !Array.isArray(dp.data)) {
-        return { ...dp.data, id: dp.product_id ?? dp.data?.id };
+        const row = { ...dp.data, id: dp.product_id ?? dp.data?.id };
+        return row.id != null ? normalizeProductImageFields(row) : null;
       }
       if (dp.product_id != null) {
         return { id: dp.product_id, name: dp.name ?? '', sku: dp.sku ?? null };
@@ -732,16 +739,18 @@ export async function deleteProductFromSupabase(
       console.warn('⚠️ Warning fetching shelf product for R2 cleanup:', fetchError.message);
     }
 
-    // Step 2: Delete image from Cloudflare R2 if it exists.
-    const imageUrl = shelfRow?.data?.imageUrl;
-    if (imageUrl) {
-      console.log(`🗑️ Attempting to delete R2 image for product ${normalizedProductId}`);
-      const deleteResult = await deleteImageFromR2(imageUrl);
+    // Step 2: Delete product images from Cloudflare R2 if any exist.
+    const shelfData = shelfRow?.data;
+    if (shelfData && getAllProductImageUrlsForDeletion(shelfData).length > 0) {
+      console.log(`🗑️ Attempting to delete R2 image(s) for product ${normalizedProductId}`);
+      const deleteResult = await deleteAllProductImagesFromR2(shelfData);
 
       if (!deleteResult.success) {
         console.warn('⚠️ R2 delete failed, queuing for later cleanup:', deleteResult.error);
         try {
-          await queueR2Cleanup(userId, imageUrl);
+          for (const u of getAllProductImageUrlsForDeletion(shelfData)) {
+            await queueR2Cleanup(userId, u);
+          }
         } catch (queueErr) {
           console.warn('⚠️ Could not queue R2 cleanup:', queueErr);
         }

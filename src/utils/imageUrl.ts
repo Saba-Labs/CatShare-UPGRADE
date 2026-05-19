@@ -37,6 +37,12 @@ export function productImageDisplayUrl(
     if (fromUrl != null) v = String(fromUrl);
   }
   if (!v) return raw;
-  const base = raw.split("?")[0].split("#")[0];
-  return `${base}?v=${encodeURIComponent(v)}`;
+  try {
+    const u = new URL(raw);
+    u.searchParams.set("v", v);
+    return u.toString();
+  } catch {
+    const base = raw.split("?")[0].split("#")[0];
+    return `${base}?v=${encodeURIComponent(v)}`;
+  }
 }

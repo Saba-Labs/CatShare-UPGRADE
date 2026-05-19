@@ -34,6 +34,7 @@ export type PdfExportProductRow = {
   field8Unit?: string;
   field9Unit?: string;
   field10Unit?: string;
+  variantGroups?: import("./productVariants").ProductVariantGroup[];
 };
 
 async function resolveImageForPdfRow(

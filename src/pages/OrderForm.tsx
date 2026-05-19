@@ -4,6 +4,12 @@ import { fetchShareLinkForCustomer, fetchSellerUserIdForToken, type ShareLinkIte
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import ProductImageGallery from '../components/ProductImageGallery';
+import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import {
+  formatVariantSelectionSummary,
+  isVariantSelectionComplete,
+} from '../utils/productVariants';
 import './OrderForm.css';
 
 /** CatShare on Google Play — update if store listing changes. */
@@ -14,6 +20,7 @@ const CATSHARE_PLAY_STORE_URL =
 const ORDER_FORM_DRAWER_HISTORY_KEY = 'ofProductDrawer';
 
 type QtyMap = Record<string, number>;
+type VariantSelectionMap = Record<string, Record<string, string>>;
 
 function getQuantityStep(item: ShareLinkItem): number {
   return normalizeOrderQuantityStep(item.quantityStep);
@@ -224,6 +231,7 @@ export default function OrderForm() {
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [qty, setQty] = useState<QtyMap>({});
+  const [variantSelections, setVariantSelections] = useState<VariantSelectionMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -422,6 +430,13 @@ export default function OrderForm() {
 
       const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
       lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
+      const variantLine = formatVariantSelectionSummary(
+        i.variantGroups ?? [],
+        variantSelections[i.productId]
+      );
+      if (variantLine) {
+        lines.push(`   _${variantLine}_`);
+      }
 
       if (Number.isFinite(unit)) {
         const unitLabel = getOrderUnitLabel(i.priceUnit);
@@ -449,7 +464,7 @@ export default function OrderForm() {
 
     lines.push('Please confirm availability and share payment details. Thank you!');
     return lines.join('\n');
-  }, [items, qty, currencySymbol]);
+  }, [items, qty, currencySymbol, variantSelections]);
 
   const goToConfirmOrder = () => {
     const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
@@ -458,11 +473,24 @@ export default function OrderForm() {
       return;
     }
 
+    for (const item of selectedItems) {
+      const groups = item.variantGroups ?? [];
+      if (
+        groups.length > 0 &&
+        !isVariantSelectionComplete(groups, variantSelections[item.productId])
+      ) {
+        alert(`Please choose all variants for "${item.name}" before confirming.`);
+        openProductDrawer(item);
+        return;
+      }
+    }
+
     // Navigate to confirm page with order data
     navigate(`/o/${token}/confirm`, {
       state: {
         selectedItems,
         qty,
+        variantSelections,
         currencySymbol,
         currencyCode,
         sellerWhatsapp,
@@ -926,7 +954,15 @@ export default function OrderForm() {
 
               {/* Image */}
               <div className="of-drawer-img-wrap">
-                {drawerItem.imageUrl ? (
+                {drawerItem.imageUrls && drawerItem.imageUrls.length > 1 ? (
+                  <div className="of-drawer-img of-drawer-img--gallery">
+                    <ProductImageGallery
+                      urls={drawerItem.imageUrls}
+                      primaryIndex={drawerItem.primaryImageIndex ?? 0}
+                      primaryImageVersion={drawerItem.imageVersion}
+                    />
+                  </div>
+                ) : drawerItem.imageUrl ? (
                   <img
                     key={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
                     src={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
@@ -975,6 +1011,23 @@ export default function OrderForm() {
                       </div>
                     ))}
                   </div>
+                )}
+
+                {(drawerItem.variantGroups?.length ?? 0) > 0 && (
+                  <ProductVariantsDisplay
+                    groups={drawerItem.variantGroups!}
+                    mode="select"
+                    selection={variantSelections[drawerItem.productId] ?? {}}
+                    onSelect={(groupId, option) => {
+                      setVariantSelections((prev) => ({
+                        ...prev,
+                        [drawerItem.productId]: {
+                          ...(prev[drawerItem.productId] ?? {}),
+                          [groupId]: option,
+                        },
+                      }));
+                    }}
+                  />
                 )}
 
                 {/* Quantity section */}

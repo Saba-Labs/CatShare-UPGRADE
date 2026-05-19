@@ -233,9 +233,19 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const deletedIds = new Set<string>(
       nextDeleted.map((p: any) => p?.id).filter((id: any) => id != null).map((id: any) => String(id))
     );
-    const filteredProducts = nextProducts.filter(
+    let filteredProducts = nextProducts.filter(
       (p: any) => p?.id != null && !deletedIds.has(String(p.id))
     );
+    if (localP.length > 0) {
+      const { mergeProductsData } = await import('../utils/productMerge');
+      filteredProducts = mergeProductsData(localP, filteredProducts, deletedIds);
+    }
+    if (localD.length > 0 && nextDeleted.length > 0) {
+      const { mergeProductsData } = await import('../utils/productMerge');
+      nextDeleted = mergeProductsData(localD, nextDeleted);
+    } else if (localD.length > 0 && nextDeleted.length === 0) {
+      nextDeleted = localD;
+    }
 
     // Invalidate any in-flight background cache from an older refresh before we write.
     imageCacheGenerationRef.current += 1;
@@ -346,10 +356,6 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     options?: SyncProductsToCloudOptions
   ): Promise<{ products: any[]; deletedProducts: any[] }> => {
     if (!user?.uid) throw new Error('Not authenticated');
-
-    if (!isStrictMode()) {
-      return { products, deletedProducts };
-    }
 
     if (cloudWriteWouldBeBlocked(user, isBrowserOnline())) {
       return { products, deletedProducts };

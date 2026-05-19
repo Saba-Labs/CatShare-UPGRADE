@@ -4,6 +4,7 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase, getSupabaseAccessToken } from "../supabaseClient";
 import { CapacitorHttp } from "@capacitor/core";
+import { getAllProductImageUrlsForDeletion } from "../utils/productImages";
 
 const API_BASE = import.meta.env.VITE_APP_URL || "";
 
@@ -246,4 +247,16 @@ export async function deleteImageFromR2(imageUrl: string): Promise<UploadResult>
     console.error("❌ deleteImageFromR2 threw:", err?.message || err);
     return { success: false, error: err?.message || "Unknown deletion error" };
   }
+}
+
+/** Delete every product image object in R2 referenced by `imageUrls` / legacy `imageUrl`. */
+export async function deleteAllProductImagesFromR2(
+  product: { imageUrls?: unknown; imageUrl?: unknown }
+): Promise<UploadResult> {
+  const urls = getAllProductImageUrlsForDeletion(product);
+  for (const url of urls) {
+    const r = await deleteImageFromR2(url);
+    if (!r.success) return r;
+  }
+  return { success: true };
 }

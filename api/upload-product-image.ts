@@ -76,6 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const productIdPart = parts.find((p) => p.name === "productId");
   const extPart = parts.find((p) => p.name === "ext");
+  const assetIdPart = parts.find((p) => p.name === "assetId");
   const filePart = parts.find((p) => p.name === "file" && p.filename);
 
   if (!productIdPart || !filePart) {
@@ -86,7 +87,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ext = extPart ? extPart.data.toString("utf8").trim() : "jpg";
   const safeExt = ext.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
 
-  const key = `products/${user.id}/${productId}.${safeExt}`;
+  const rawAsset =
+    (assetIdPart?.data.toString("utf8").trim() || "").replace(/[^a-zA-Z0-9_-]/g, "") ||
+    (typeof crypto.randomUUID === "function" ? crypto.randomUUID().replace(/-/g, "") : `${Date.now()}_${Math.random().toString(16).slice(2)}`);
+  const assetId = rawAsset.slice(0, 80) || "asset";
+
+  const key = `products/${user.id}/${productId}/${assetId}.${safeExt}`;
 
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const endpoint =

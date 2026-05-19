@@ -14,6 +14,12 @@ import {
   buildDataUrlFromDiskBase64,
   normalizeExistingDataUrlMime,
 } from './imageDataUrlMime';
+import {
+  getProductImageUrls,
+  getProductPrimaryImageUrl,
+  getProductPrimaryImageVersion,
+} from './productImages';
+import { productImageDisplayUrl } from './imageUrl';
 
 const HTTP_URL = /^https?:\/\//i;
 
@@ -171,8 +177,9 @@ export async function tryReadProductSourceAsDataUrl(product: {
     }
   }
 
-  if (typeof product.imageUrl === 'string' && HTTP_URL.test(product.imageUrl.trim())) {
-    return product.imageUrl.trim();
+  const primary = getProductPrimaryImageUrl(product);
+  if (primary && HTTP_URL.test(primary)) {
+    return productImageDisplayUrl(primary, getProductPrimaryImageVersion(product));
   }
   return null;
 }
@@ -212,6 +219,27 @@ export async function hydrateProductSourceForRender(product: any): Promise<boole
   const isNative = Capacitor.isNativePlatform();
   const canonical =
     uid && product?.id != null ? getUserImagePath(String(product.id), uid) : '';
+
+  const galleryUrls = getProductImageUrls(product);
+  const cloudPrimary = getProductPrimaryImageUrl(product);
+  if (galleryUrls.length > 0 && cloudPrimary && HTTP_URL.test(cloudPrimary)) {
+    try {
+      const dataUrl = await fetchUrlAsDataUrl(
+        productImageDisplayUrl(cloudPrimary, getProductPrimaryImageVersion(product))
+      );
+      product.image = dataUrl;
+      if (isNative && canonical) {
+        const base64 = stripDataUrlToBase64(dataUrl);
+        const ok = await safeWriteFile({ path: canonical, data: base64 });
+        if (ok) {
+          product.imagePath = canonical;
+        }
+      }
+      return true;
+    } catch (e) {
+      console.warn('hydrateProductSourceForRender: primary cloud image fetch failed', e);
+    }
+  }
 
   if (isNative && canonical) {
     for (const path of getOrderedSourceImagePaths(product)) {

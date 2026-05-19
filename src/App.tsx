@@ -20,6 +20,7 @@ import { initWebAnalyticsIfNeeded } from "./config/firebaseConfig";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
+import { mergeProductsData } from "./utils/productMerge";
 import {
   safeGetFromStorage,
   safeSetInStorage,
@@ -1471,43 +1472,42 @@ function AppWithBackHandler() {
         (detail?.onlyProductId != null ? [String(detail.onlyProductId)] : undefined);
       const partialSyncOpts =
         partialIds && partialIds.length > 0 ? { onlyProductIds: partialIds } : undefined;
+      const forceCloudSync =
+        (e as CustomEvent<{ forceCloudSync?: boolean }> | undefined)?.detail?.forceCloudSync ===
+        true;
 
-      if (shouldDeferCloudSyncNow()) {
-        // Keep edit flows responsive; sync can resume from non-edit views.
-        setProducts(freshProducts);
-        setDeletedProducts(freshDeleted);
+      setProducts(freshProducts);
+      setDeletedProducts(freshDeleted);
+
+      // Saves still run on /create — never skip upload for an explicit save (forceCloudSync).
+      if (shouldDeferCloudSyncNow() && !forceCloudSync) {
         return;
       }
 
-      if (isStrictMode()) {
-        try {
-          const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, partialSyncOpts);
-          setProducts(cloudData.products);
-          setDeletedProducts(cloudData.deletedProducts);
-        } catch (err: any) {
-          console.error('❌ Strict sync after product-added failed:', err?.message);
-          setProducts(freshProducts);
-        }
-      } else {
-        // Non-strict mode: load from localStorage first, then also refresh from cloud
-        setProducts(freshProducts);
-        setDeletedProducts(freshDeleted);
+      if (cloudWriteWouldBeBlocked(user, isBrowserOnline())) {
+        showToast(OFFLINE_CLOUD_WRITE_TOAST, 'error');
+        return;
+      }
 
-        // Also attempt to refresh from cloud in the background to get latest data
-        try {
-          const cloudData = await refreshFromCloud();
-          if (cloudData) {
-            setProducts(cloudData.products);
-            setDeletedProducts(cloudData.deletedProducts);
-          }
-        } catch (err) {
-          console.warn('⚠️ Background refresh from cloud failed (using local data):', err);
-        }
+      try {
+        const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
+          ...partialSyncOpts,
+          skipFullCloudRefresh: true,
+          maxSyncUiMs: 12000,
+        });
+        setProducts(cloudData.products);
+        setDeletedProducts(cloudData.deletedProducts);
+      } catch (err: any) {
+        console.error('❌ Sync after product-added failed:', err?.message);
+        showToast(
+          err?.message || 'Saved on device but cloud sync failed. Try again when online.',
+          'error'
+        );
       }
     };
     window.addEventListener("product-added", handleNewProduct);
     return () => window.removeEventListener("product-added", handleNewProduct);
-  }, [user?.uid, syncProductsToCloud, refreshFromCloud, isStrictMode, isEditFlowRoute]);
+  }, [user, syncProductsToCloud, showToast, isEditFlowRoute]);
 
   // ──────────────────────────────────────────────────────
   // STRICT REFRESH EVENT: child components dispatch this after
@@ -1624,28 +1624,6 @@ function AppWithBackHandler() {
     }
     safeSetDeletedProductsCache(user.uid, cleanedDeleted);
   }, [deletedProducts, user?.uid, startupPhase]);
-
-  const mergeProductsData = (local: any[], remote: any[], deletedIds: Set<string> = new Set()) => {
-    const merged = new Map<string, any>();
-    local.forEach((product) => {
-      if (product?.id == null) return;
-      merged.set(String(product.id), product);
-    });
-    remote.forEach((remoteProduct) => {
-      if (remoteProduct?.id == null) return;
-      if (deletedIds.size > 0 && deletedIds.has(String(remoteProduct.id))) return;
-      const id = String(remoteProduct.id);
-      const localProduct = merged.get(id);
-      if (!localProduct) {
-        merged.set(id, remoteProduct);
-      } else {
-        const localTime = new Date(localProduct.updatedAt || 0).getTime();
-        const remoteTime = new Date(remoteProduct.updatedAt || 0).getTime();
-        if (remoteTime > localTime) merged.set(id, remoteProduct);
-      }
-    });
-    return Array.from(merged.values());
-  };
 
   // Handle rendering images with chunked processing to prevent UI freeze
   // Processes in small batches with UI yielding between chunks

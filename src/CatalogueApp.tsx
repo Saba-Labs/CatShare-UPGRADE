@@ -39,6 +39,11 @@ import {
 } from "./utils/productSourceImage";
 import { HIDDEN_MENU_UNLOCKED_EVENT } from "./utils/hiddenMenuFeatures";
 import { productImageDisplayUrl, parseImageVersionFromUrl } from "./utils/imageUrl";
+import {
+  getAllProductImageUrlsForDeletion,
+  getProductPrimaryImageUrl,
+  getProductPrimaryImageVersion,
+} from "./utils/productImages";
 import { migrateUnkeyedDataToUserKeyed } from "./utils/dataMigration";
 import {
   hasSellerCatalogueCloudHydrated,
@@ -515,15 +520,18 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Load this batch in parallel
         const promises = batch.map(async (p) => {
-          // Prefer on-device source (just saved / not yet replaced in cloud) over CDN URL
-          const resolved = await tryReadProductSourceAsDataUrl(p);
-          if (resolved && resolved.startsWith("data:")) {
-            map[p.id] = resolved;
+          const primaryUrl = getProductPrimaryImageUrl(p);
+          if (primaryUrl) {
+            map[p.id] = productImageDisplayUrl(
+              primaryUrl,
+              getProductPrimaryImageVersion(p)
+            );
             return;
           }
 
-          if (p.imageUrl && typeof p.imageUrl === "string" && p.imageUrl.trim()) {
-            map[p.id] = productImageDisplayUrl(p.imageUrl, p.imageVersion);
+          const resolved = await tryReadProductSourceAsDataUrl(p);
+          if (resolved && resolved.startsWith("data:")) {
+            map[p.id] = resolved;
             return;
           }
 
@@ -1004,10 +1012,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       await deleteProductSourceImagesBestEffort(product || { id });
   
       // Delete image from R2 if product has a cloud URL
-      if (product?.imageUrl && !product.imageUrl.startsWith('undefined')) {
+      if (product && getAllProductImageUrlsForDeletion(product).length > 0) {
         try {
-          const { deleteImageFromR2 } = await import('./services/cloudflareService');
-          await deleteImageFromR2(product.imageUrl);
+          const { deleteAllProductImagesFromR2 } = await import('./services/cloudflareService');
+          await deleteAllProductImagesFromR2(product);
         } catch (err) {
           console.warn("⚠️ Could not delete R2 image:", err);
         }
@@ -1420,10 +1428,26 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                               ☰
                             </div>
                             <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                              {imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion) ? (
+                              {imageMap[p.id] ||
+                              productImageDisplayUrl(
+                                getProductPrimaryImageUrl(p),
+                                getProductPrimaryImageVersion(p)
+                              ) ? (
                                 <img
-                                  key={imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion)}
-                                  src={imageMap[p.id] || productImageDisplayUrl(p.imageUrl, p.imageVersion)}
+                                  key={
+                                    imageMap[p.id] ||
+                                    productImageDisplayUrl(
+                                      getProductPrimaryImageUrl(p),
+                                      getProductPrimaryImageVersion(p)
+                                    )
+                                  }
+                                  src={
+                                    imageMap[p.id] ||
+                                    productImageDisplayUrl(
+                                      getProductPrimaryImageUrl(p),
+                                      getProductPrimaryImageVersion(p)
+                                    )
+                                  }
                                   alt={p.name}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {

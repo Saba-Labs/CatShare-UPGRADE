@@ -624,7 +624,7 @@ export default function CreateBulk() {
 
       window.dispatchEvent(
         new CustomEvent("product-added", {
-          detail: { onlyProductIds: newIds },
+          detail: { onlyProductIds: newIds, forceCloudSync: true },
         })
       );
 

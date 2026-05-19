@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
@@ -20,6 +20,15 @@ import {
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from "../utils/offerPriceUtils";
+import {
+  getProductImageUrls,
+  getPrimaryImageIndex,
+  getProductPrimaryImageUrl,
+  getProductPrimaryImageVersion,
+  normalizeProductImageFields,
+} from "../utils/productImages";
+import { productImageDisplayUrl } from "../utils/imageUrl";
+import ProductImageGallery from "../components/ProductImageGallery";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -74,7 +83,16 @@ const lightenColor = (color, amount = 40) => {
 };
 
 // Full Screen Image Viewer Component
-const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWatermark, watermarkText, watermarkPosition }) => {
+const FullScreenImageViewer = ({
+  imageUrl,
+  productName,
+  isOpen,
+  onClose,
+  showWatermark,
+  watermarkText,
+  watermarkPosition,
+  onShareError,
+}) => {
   const containerRef = useRef(null);
   const imageRef = useRef(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -215,7 +233,7 @@ const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWat
 
   // Share functionality
   const handleShare = async () => {
-    const productName = product?.name || 'Product Image';
+    const shareTitle = productName || "Product Image";
 
     const fetchBlob = async (url) => {
       const res = await fetch(url, { mode: 'cors' });
@@ -242,10 +260,10 @@ const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWat
             blob = await fetchBlob(imageUrl);
           }
 
-          const file = new File([blob], `${productName}.png`, { type: blob.type || 'image/png' });
+          const file = new File([blob], `${shareTitle}.png`, { type: blob.type || 'image/png' });
 
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: productName, text: productName });
+            await navigator.share({ files: [file], title: shareTitle, text: shareTitle });
             return;
           }
 
@@ -274,7 +292,7 @@ const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWat
         const fileUriResult = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
         const uri = fileUriResult.uri || fileUriResult.uri;
 
-        await Share.share({ title: productName, text: productName, files: [uri] });
+        await Share.share({ title: shareTitle, text: shareTitle, files: [uri] });
         return;
       } catch (nativeErr) {
         console.warn('Capacitor Share fallback failed:', nativeErr);
@@ -283,13 +301,13 @@ const FullScreenImageViewer = ({ imageUrl, productName, isOpen, onClose, showWat
       // Final fallback: force download
       const a = document.createElement('a');
       a.href = imageUrl;
-      a.download = `${productName}.png`;
+      a.download = `${shareTitle}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error sharing image:', error);
-      setShareResult({
+      onShareError?.({
         status: "error",
         message: "Unable to share image. Please try again.",
       });
@@ -393,6 +411,9 @@ export default function ProductPreviewModal_Classic({
   }, [product?.id]);
   const [direction, setDirection] = useState(0);
   const [imageUrl, setImageUrl] = useState("");
+  const [multiGalleryUrls, setMultiGalleryUrls] = useState(null);
+  /** Synced with ProductImageGallery so fullscreen uses the visible slide (multi-image). */
+  const [previewGallerySlide, setPreviewGallerySlide] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [shareResult, setShareResult] = useState(null); // { status: 'success'|'error', message: string }
@@ -500,52 +521,82 @@ export default function ProductPreviewModal_Classic({
   useEffect(() => {
     const loadImage = async () => {
       setImageLoaded(false);
-      const withVersion = (url, version) => {
-        const raw = typeof url === "string" ? url.trim() : "";
-        if (!raw) return "";
-        if (!/^https?:\/\//i.test(raw)) return raw;
-        const v = String(version ?? "").trim();
-        if (!v) return raw;
-        return `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
-      };
-      // Priority: cloud URL > local file > base64
-      // 1. Try cloud URL first (Cloudflare R2)
-      if (product?.imageUrl) {
-        setImageUrl(withVersion(product.imageUrl, product.imageVersion));
+      const p = normalizeProductImageFields(
+        product && typeof product === "object" ? { ...product } : {}
+      );
+      const multi = getProductImageUrls(p);
+      if (multi.length > 1) {
+        setMultiGalleryUrls(multi);
+        setImageUrl("");
+        setImageLoaded(true);
+        return;
+      }
+      setMultiGalleryUrls(null);
+      // Primary from imageUrls (not legacy imageUrl alone)
+      const primary = getProductPrimaryImageUrl(p);
+      if (primary) {
+        setImageUrl(
+          productImageDisplayUrl(primary, getProductPrimaryImageVersion(p))
+        );
+        setImageLoaded(true);
         return;
       }
 
-      // 2. Try local filesystem image
-      if (product?.imagePath) {
+      // Local filesystem (offline / no cloud primary)
+      if (p?.imagePath) {
         try {
-          // Prefer External so user-* folders are found first
           try {
             const result = await Filesystem.readFile({
-              path: product.imagePath,
+              path: p.imagePath,
               directory: Directory.External,
             });
             setImageUrl(`data:image/png;base64,${result.data}`);
           } catch (externalErr) {
             const result = await Filesystem.readFile({
-              path: product.imagePath,
+              path: p.imagePath,
               directory: Directory.Data,
             });
             setImageUrl(`data:image/png;base64,${result.data}`);
           }
         } catch (err) {
           console.warn("Failed to load image from filesystem:", err);
-          setImageUrl(product.image || "");
+          setImageUrl(p.image || "");
         }
       } else {
-        // 3. Fallback to base64 in-memory image
-        setImageUrl(product.image || "");
+        setImageUrl(p.image || "");
       }
+      setImageLoaded(true);
     };
     loadImage();
 
     // Trigger field definition update to refresh cached field data
     setFieldDefinitionsUpdated(prev => prev + 1);
   }, [product]);
+
+  useEffect(() => {
+    if (!multiGalleryUrls || multiGalleryUrls.length <= 1) return;
+    const pi = getPrimaryImageIndex(product) ?? 0;
+    setPreviewGallerySlide(
+      Math.min(Math.max(0, pi), multiGalleryUrls.length - 1)
+    );
+  }, [product?.id, multiGalleryUrls]);
+
+  const fullScreenImageSrc = useMemo(() => {
+    if (!product) return imageUrl;
+    if (multiGalleryUrls && multiGalleryUrls.length > 1) {
+      const urls = multiGalleryUrls;
+      const i = Math.min(Math.max(0, previewGallerySlide), urls.length - 1);
+      const raw = String(urls[i] ?? "").trim();
+      if (!raw) return "";
+      const primarySlot = Math.min(
+        Math.max(0, getPrimaryImageIndex(product) ?? 0),
+        urls.length - 1
+      );
+      const v = i === primarySlot ? product.imageVersion : null;
+      return productImageDisplayUrl(raw, v);
+    }
+    return imageUrl;
+  }, [product, multiGalleryUrls, previewGallerySlide, imageUrl]);
 
   // Handle image click to open full screen
   const handleImageClick = (e) => {
@@ -805,6 +856,18 @@ export default function ProductPreviewModal_Classic({
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
                 )}
+                {multiGalleryUrls && multiGalleryUrls.length > 1 ? (
+                  <div style={{ width: "100%", height: "100%", position: "relative" }}>
+                    <ProductImageGallery
+                      urls={multiGalleryUrls}
+                      primaryIndex={getPrimaryImageIndex(product)}
+                      primaryImageVersion={product.imageVersion}
+                      className="h-full"
+                      slideIndex={previewGallerySlide}
+                      onSlideIndexChange={setPreviewGallerySlide}
+                    />
+                  </div>
+                ) : (
                 <img
                   src={imageUrl}
                   alt={product.name}
@@ -819,6 +882,7 @@ export default function ProductPreviewModal_Classic({
                     transition: "opacity 0.2s ease",
                   }}
                 />
+                )}
 
               {/* Watermark - Adaptive color based on background */}
               {showWatermark && (
@@ -1035,13 +1099,14 @@ export default function ProductPreviewModal_Classic({
       {/* Full Screen Image Viewer */}
       {showFullScreenImage && (
         <FullScreenImageViewer
-          imageUrl={imageUrl}
+          imageUrl={fullScreenImageSrc}
           productName={product.name}
           isOpen={showFullScreenImage}
           onClose={() => setShowFullScreenImage(false)}
           showWatermark={showWatermark}
           watermarkText={effectiveWatermarkText}
           watermarkPosition={effectiveWatermarkPosition}
+          onShareError={setShareResult}
         />
       )}
 

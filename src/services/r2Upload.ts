@@ -4,8 +4,8 @@ import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 const MAX_UPLOAD_ATTEMPTS = 4;
 const BASE_BACKOFF_MS = 400;
 
-/** Coalesce concurrent uploads for the same product (avoids duplicate work / races). */
-const inFlightProductUploads = new Map<string, Promise<{ url: string; key: string }>>();
+/** Coalesce concurrent uploads for the same product + asset (avoids duplicate work / races). */
+const inFlightProductUploads = new Map<string, Promise<{ url: string; key: string; imageVersion?: number }>>();
 
 async function dataUrlToJpegBlob(dataUrl: string, quality = 0.88): Promise<Blob> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -61,11 +61,12 @@ function resolveUploadApiBase(): string {
   return '';
 }
 
-function buildFormData(productId: string, blob: Blob): FormData {
+function buildFormData(productId: string, blob: Blob, assetId: string): FormData {
   const form = new FormData();
   form.append('productId', productId);
+  form.append('assetId', assetId);
   form.append('ext', 'jpg');
-  form.append('file', blob, `product-${productId}.jpg`);
+  form.append('file', blob, `product-${productId}-${assetId}.jpg`);
   return form;
 }
 
@@ -80,7 +81,8 @@ function sleep(ms: number): Promise<void> {
 async function postUploadWithRetries(
   endpoint: string,
   productId: string,
-  blob: Blob
+  blob: Blob,
+  assetId: string
 ): Promise<{ url: string; key: string; imageVersion?: number }> {
   let lastError: Error | null = null;
 
@@ -95,7 +97,7 @@ async function postUploadWithRetries(
       continue;
     }
 
-    const form = buildFormData(productId, blob);
+    const form = buildFormData(productId, blob, assetId);
 
     try {
       const resp = await fetch(endpoint, {
@@ -147,9 +149,18 @@ async function postUploadWithRetries(
   throw lastError || new Error('Upload failed after retries');
 }
 
+function newUploadAssetId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '');
+  }
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
 export async function uploadProductImageToR2(options: {
   productId: string;
   dataUrl: string;
+  /** Unique per file; omit to generate (recommended). */
+  assetId?: string;
 }): Promise<{ url: string; key: string; imageVersion?: number }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) throw new Error('Not authenticated');
@@ -168,18 +179,20 @@ export async function uploadProductImageToR2(options: {
   }
   const endpoint = `${base}/api/upload-product-image`;
 
-  const existing = inFlightProductUploads.get(options.productId);
+  const assetId = (options.assetId && String(options.assetId).trim()) || newUploadAssetId();
+  const flightKey = `${options.productId}:${assetId}`;
+  const existing = inFlightProductUploads.get(flightKey);
   if (existing) return existing;
 
   const promise = (async () => {
     const blob = await dataUrlToJpegBlob(options.dataUrl, 0.88);
-    return postUploadWithRetries(endpoint, options.productId, blob);
+    return postUploadWithRetries(endpoint, options.productId, blob, assetId);
   })();
 
-  inFlightProductUploads.set(options.productId, promise);
+  inFlightProductUploads.set(flightKey, promise);
   promise.finally(() => {
-    if (inFlightProductUploads.get(options.productId) === promise) {
-      inFlightProductUploads.delete(options.productId);
+    if (inFlightProductUploads.get(flightKey) === promise) {
+      inFlightProductUploads.delete(flightKey);
     }
   });
 

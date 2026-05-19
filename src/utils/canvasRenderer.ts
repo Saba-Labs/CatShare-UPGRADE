@@ -295,9 +295,11 @@ export interface ProductData {
   priceUnit?: string;
   badge?: string;
   cropAspectRatio?: number;
+  variantGroups?: Array<{ id: string; name: string; options: string[] }>;
 }
 
 import { getFieldConfig, getAllFields } from '../config/fieldConfig';
+import { formatVariantOptions } from './productVariants';
 import { drawCanvasCataloguePriceLine, hasCanvasRenderablePrice } from './canvasProductPriceDraw';
 import { getThemeById } from '../config/themeConfig';
 
@@ -348,6 +350,11 @@ export async function renderProductToCanvas(
 
   if (product.subtitle) {
     detailsHeight += subtitleFontSizeBase + spacingAfterSubtitle; // subtitle + spacing after
+  }
+
+  const variantLineCount = product.variantGroups?.length ?? 0;
+  if (variantLineCount > 0) {
+    detailsHeight += variantLineCount * (fieldLineHeightBase + 2);
   }
 
   detailsHeight += spacingBeforeFields; // spacing before fields
@@ -541,12 +548,40 @@ export async function renderProductToCanvas(
     currentY += renderSubtitleFontSize + spacingAfterSubtitle * scale; // subtitle height + spacing
   }
 
+  const renderFieldFontSize = Math.floor(fieldFontSizeBase * scale);
+  const renderFieldLineHeight = renderFieldFontSize * 1.4;
+
+  // Variant groups (Size, Colour, …)
+  if (product.variantGroups?.length) {
+    ctx.font = `${renderFieldFontSize}px Arial, sans-serif`;
+    const variantGroups = product.variantGroups;
+    let maxVariantLabelWidth = 0;
+    variantGroups.forEach((vg) => {
+      maxVariantLabelWidth = Math.max(
+        maxVariantLabelWidth,
+        ctx.measureText(vg.name).width
+      );
+    });
+    const vFieldsLeftPadding = 24 * scale;
+    const vColonX = vFieldsLeftPadding + maxVariantLabelWidth + 6 * scale;
+    const vValueX = vColonX + 16 * scale;
+
+    variantGroups.forEach((vg) => {
+      ctx.fillText(vg.name, vFieldsLeftPadding, currentY + renderFieldFontSize * 0.8);
+      ctx.fillText(':', vColonX, currentY + renderFieldFontSize * 0.8);
+      ctx.fillText(
+        formatVariantOptions(vg.options),
+        vValueX,
+        currentY + renderFieldFontSize * 0.8
+      );
+      currentY += renderFieldLineHeight + 2 * scale;
+    });
+  }
+
   currentY += spacingBeforeFields * scale;
 
   // Fields - Match HTML format with aligned colons
-  const renderFieldFontSize = Math.floor(fieldFontSizeBase * scale);
   const fieldFont = `${renderFieldFontSize}px Arial, sans-serif`;
-  const renderFieldLineHeight = renderFieldFontSize * 1.4;
 
   ctx.font = fieldFont;
   ctx.textAlign = 'left';

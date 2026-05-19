@@ -22,6 +22,14 @@ import {
   getUserImagePath,
 } from "../utils/safeStorage";
 import {
+  MAX_PRODUCT_IMAGES,
+  buildProductImagePersistFields,
+  getProductImageUrls,
+  getPrimaryImageIndex,
+  normalizeProductImageFields,
+  primaryIndexAfterSlotRemoved,
+} from "../utils/productImages";
+import {
   initializeCatalogueData,
   getCatalogueData,
   setCatalogueData,
@@ -32,6 +40,7 @@ import {
 } from "../config/catalogueProductUtils";
 import { getFieldConfig, getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
+import { parseImageVersionFromUrl } from "../utils/imageUrl";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
 import { useSubscription } from "../context/SubscriptionContext";
@@ -39,6 +48,12 @@ import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
+import ProductVariantsEditor from "../components/ProductVariantsEditor";
+import {
+  getProductVariantGroups,
+  pruneVariantGroupsForSave,
+  type ProductVariantGroup,
+} from "../utils/productVariants";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 import {
   offerPriceFieldFor,
@@ -388,7 +403,8 @@ export default function CreateProduct() {
 
   const y = useMotionValue(DRAG_RANGE);
   const [isDragging, setIsDragging] = useState(false);
-  const [formSection, setFormSection] = useState<'basic' | 'catalogue'>('basic');
+  const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants'>('basic');
+  const [variantGroups, setVariantGroups] = useState<ProductVariantGroup[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollAtTopRef = useRef(true);
 
@@ -449,7 +465,16 @@ export default function CreateProduct() {
   const [selectedCatalogue, setSelectedCatalogue] = useState<string>(catalogueParam || "cat1");
   const [fetchFieldsChecked, setFetchFieldsChecked] = useState(false);
   const [fetchPriceChecked, setFetchPriceChecked] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imageSlots, setImageSlots] = useState<string[]>([]);
+  const [primarySlotIndex, setPrimarySlotIndex] = useState(0);
+  const [cropSessionPreview, setCropSessionPreview] = useState<string | null>(null);
+  const cropModeRef = useRef<"append" | number | null>(null);
+  const imageSlotsRef = useRef<string[]>([]);
+  const cardPreview = imageSlots[primarySlotIndex] ?? imageSlots[0] ?? null;
+
+  useEffect(() => {
+    imageSlotsRef.current = imageSlots;
+  }, [imageSlots]);
   const [imageFilePath, setImageFilePath] = useState(null);
   const [showWatermark, setShowWatermarkLocal] = useState(() => {
     return safeGetFromStorage("showWatermark", true);
@@ -649,7 +674,9 @@ export default function CreateProduct() {
       const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);
       if (product) {
-        const migratedProduct = migrateProductToNewFormat(product) as ProductWithCatalogueData;
+        const migratedProduct = normalizeProductImageFields(
+          migrateProductToNewFormat(product) as ProductWithCatalogueData
+        ) as ProductWithCatalogueData;
 
         if (!migratedProduct.catalogueData) {
           migratedProduct.catalogueData = initializeCatalogueData(migratedProduct);
@@ -672,47 +699,60 @@ export default function CreateProduct() {
         setFontColor(migratedProduct.fontColor || "white");
         setImageBgOverride(migratedProduct.imageBgColor || "white");
         setAppliedAspectRatio(migratedProduct.cropAspectRatio || 1);
+        setVariantGroups(getProductVariantGroups(migratedProduct));
 
         // ✅ Restore saved color palette
 if (migratedProduct.suggestedColors?.length > 0) {
   setSuggestedColors(migratedProduct.suggestedColors);
 }
 
-        const versionedCloudUrl =
-          migratedProduct.imageUrl && typeof migratedProduct.imageUrl === "string"
-            ? `${migratedProduct.imageUrl}${migratedProduct.imageUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(String(migratedProduct.imageVersion || ""))}`
-            : "";
-        if (versionedCloudUrl) {
-          // Prefer latest cloud image for edited products; avoids stale local/base64 preview.
-          setImagePreview(versionedCloudUrl);
-        } else if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
-          setImagePreview(migratedProduct.image);
-        } else if (migratedProduct.imageUrl) {
-          setImagePreview(migratedProduct.imageUrl);
-        } else if (migratedProduct.imagePath) {
-          setImageFilePath(migratedProduct.imagePath);
-          // Try External first (visible storage), then Data (private app storage)
-          Filesystem.readFile({
-            path: migratedProduct.imagePath,
-            directory: Directory.External,
-          })
-            .then((res) => {
-              setImagePreview(`data:image/png;base64,${res.data}`);
+        const urlsFromProduct = getProductImageUrls(migratedProduct);
+        const pi = getPrimaryImageIndex(migratedProduct);
+        if (urlsFromProduct.length > 0) {
+          setImageSlots(urlsFromProduct);
+          setPrimarySlotIndex(Math.min(pi, urlsFromProduct.length - 1));
+        } else {
+          setImageSlots([]);
+          setPrimarySlotIndex(0);
+          const versionedCloudUrl =
+            migratedProduct.imageUrl && typeof migratedProduct.imageUrl === "string"
+              ? `${migratedProduct.imageUrl}${migratedProduct.imageUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(String(migratedProduct.imageVersion || ""))}`
+              : "";
+          if (versionedCloudUrl) {
+            setImageSlots([versionedCloudUrl]);
+            setPrimarySlotIndex(0);
+          } else if (migratedProduct.image && migratedProduct.image.startsWith("data:image")) {
+            setImageSlots([migratedProduct.image]);
+            setPrimarySlotIndex(0);
+          } else if (migratedProduct.imageUrl) {
+            setImageSlots([migratedProduct.imageUrl]);
+            setPrimarySlotIndex(0);
+          } else if (migratedProduct.imagePath) {
+            setImageFilePath(migratedProduct.imagePath);
+            Filesystem.readFile({
+              path: migratedProduct.imagePath,
+              directory: Directory.External,
             })
-            .catch(async () => {
-              try {
-                const res = await Filesystem.readFile({
-                  path: migratedProduct.imagePath,
-                  directory: Directory.Data,
-                });
-                setImagePreview(`data:image/png;base64,${res.data}`);
-              } catch {
-                // ✅ Local file missing — fall back to R2
-                if (migratedProduct.imageUrl) {
-                  setImagePreview(migratedProduct.imageUrl);
+              .then((res) => {
+                setImageSlots([`data:image/png;base64,${res.data}`]);
+                setPrimarySlotIndex(0);
+              })
+              .catch(async () => {
+                try {
+                  const res = await Filesystem.readFile({
+                    path: migratedProduct.imagePath,
+                    directory: Directory.Data,
+                  });
+                  setImageSlots([`data:image/png;base64,${res.data}`]);
+                  setPrimarySlotIndex(0);
+                } catch {
+                  if (migratedProduct.imageUrl) {
+                    setImageSlots([migratedProduct.imageUrl]);
+                    setPrimarySlotIndex(0);
+                  }
                 }
-              }
-            });
+              });
+          }
         }
       }
     } else {
@@ -720,6 +760,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
         ...prev,
         catalogueData: initializeCatalogueData(),
       }));
+      setImageSlots([]);
+      setPrimarySlotIndex(0);
     }
   }, [editingId]);
 
@@ -853,7 +895,26 @@ if (migratedProduct.suggestedColors?.length > 0) {
     return getCatalogueFormData()[f] || "";
   };
 
+  const removeImageAt = (index: number) => {
+    setImageSlots((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const newPrimary = primaryIndexAfterSlotRemoved(index, primarySlotIndex, prev.length);
+      setPrimarySlotIndex(newPrimary);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const openReplaceSlot = (index: number) => {
+    cropModeRef.current = index;
+    document.getElementById("fallback-file-input")?.click();
+  };
+
   const handleSelectImage = async () => {
+    if (imageSlots.length >= MAX_PRODUCT_IMAGES) {
+      showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+      return;
+    }
+    cropModeRef.current = "append";
     const defaultFolder = "Phone/Pictures/Photoroom";
     const folder = localStorage.getItem("lastUsedFolder") || defaultFolder;
 
@@ -877,7 +938,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
       const base64 = `data:image/png;base64,${fileData.data}`;
       setOriginalBase64(base64);
-      setImagePreview(base64);
+      setCropSessionPreview(base64);
       setCropping(true);
 
       localStorage.setItem("lastUsedFolder", folder);
@@ -892,7 +953,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        const base64Data = reader.result;
+        const base64Data = reader.result as string;
+        if (cropModeRef.current === "append" && imageSlotsRef.current.length >= MAX_PRODUCT_IMAGES) {
+          showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+          return;
+        }
 
         if (file.webkitRelativePath || file.name) {
           const fakePath = file.webkitRelativePath || file.name;
@@ -901,11 +966,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
         }
 
         setOriginalBase64(base64Data);
-        setImagePreview(base64Data);
+        setCropSessionPreview(base64Data);
         setCropping(true);
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = "";
   };
 
   const onCropComplete = useCallback((_, croppedAreaPixels) => {
@@ -913,15 +979,30 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }, []);
 
   const applyCrop = async () => {
-    if (!imagePreview || !croppedAreaPixels) return;
+    if (!cropSessionPreview || !croppedAreaPixels) return;
     try {
       const croppedBase64 = await getCroppedImg(
-        imagePreview,
+        cropSessionPreview,
         croppedAreaPixels
       );
-      setImagePreview(croppedBase64);
+      const mode = cropModeRef.current;
+      setImageSlots((prev) => {
+        if (mode === "append") {
+          const next = [...prev, croppedBase64].slice(0, MAX_PRODUCT_IMAGES);
+          if (prev.length === 0) {
+            setTimeout(() => setPrimarySlotIndex(0), 0);
+          }
+          return next;
+        }
+        if (typeof mode === "number") {
+          return prev.map((p, i) => (i === mode ? croppedBase64 : p));
+        }
+        return prev;
+      });
       setAppliedAspectRatio(aspectRatio);
       setCropping(false);
+      setCropSessionPreview(null);
+      cropModeRef.current = null;
       setZoom(1);
       setCrop({ x: 0, y: 0 });
     } catch (error) {
@@ -930,10 +1011,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
   };
 
   useEffect(() => {
-  if (imagePreview) {
+  if (cardPreview) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = imagePreview;
+    img.src = cardPreview;
     img.onload = () => {
       try {
         const palette = getPalette(img, 12);
@@ -969,7 +1050,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       console.warn('[CatShare] Image failed to load');
     };
   }
-}, [imagePreview]);
+}, [cardPreview]);
 
   // Calculate and update scale when preview content changes
   const calculateScale = () => {
@@ -1067,8 +1148,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     if (authUserId && !guardCloudWrite()) return;
 
-    if (!imagePreview) {
-      showToast("Please upload and crop an image before saving.", "warning");
+    if (!cardPreview || imageSlots.length === 0) {
+      showToast("Please upload and crop at least one image before saving.", "warning");
       return;
     }
 
@@ -1106,9 +1187,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
       ? getUserImagePath(id, authUserIdNow || undefined)
       : `catalogue/product-${id}.png`;
 
+    const primIx = Math.min(primarySlotIndex, Math.max(0, imageSlots.length - 1));
+    const primaryPreview = imageSlots[primIx] ?? imageSlots[0];
+
     try {
-      if (imagePreview?.startsWith("data:image")) {
-        const base64 = imagePreview.split(",")[1];
+      if (primaryPreview?.startsWith("data:image")) {
+        const base64 = primaryPreview.split(",")[1];
         await Filesystem.writeFile({
           path: imagePath,
           data: base64,
@@ -1128,36 +1212,51 @@ if (migratedProduct.suggestedColors?.length > 0) {
       ? safeGetFromStorage(productsStorageKeyNow, []).find((p: any) => p.id === editingId)
       : undefined;
 
-    let imageUrl: string | undefined;
-    let imageVersion: number | undefined;
+    const stripQuery = (u: string) => {
+      const s = String(u || "").trim();
+      const i = s.indexOf("?");
+      return i === -1 ? s : s.slice(0, i);
+    };
 
-    if (imagePreview?.startsWith("http")) {
-      imageUrl = imagePreview;
-      if (
-        typeof existingProduct?.imageVersion === "number" &&
-        Number.isFinite(existingProduct.imageVersion)
-      ) {
-        imageVersion = existingProduct.imageVersion;
-      }
-    } else if (imagePreview?.startsWith("data:image")) {
-      try {
-        const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: imagePreview });
-        if (uploaded?.url) {
-          imageUrl = uploaded.url;
-          imageVersion = uploaded.imageVersion ?? Date.now();
-        } else {
+    const imageUrls: string[] = [];
+    for (let i = 0; i < imageSlots.length; i++) {
+      const slot = imageSlots[i];
+      if (slot.startsWith("http")) {
+        imageUrls.push(slot.trim());
+      } else if (slot.startsWith("data:image")) {
+        try {
+          const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: slot });
+          if (uploaded?.url) {
+            imageUrls.push(uploaded.url);
+          } else {
+            setIsSaving(false);
+            showToast("Image upload failed: invalid response.", "error");
+            return;
+          }
+        } catch (err: any) {
           setIsSaving(false);
-          showToast("Image upload failed: invalid response.", "error");
+          showToast(
+            err?.message || "Could not upload image. Check your connection and try again.",
+            "error"
+          );
           return;
         }
-      } catch (err: any) {
-        setIsSaving(false);
-        showToast(
-          err?.message || "Could not upload image. Check your connection and try again.",
-          "error"
-        );
-        return;
       }
+    }
+
+    const imageFields = buildProductImagePersistFields({
+      imageUrls,
+      primaryImageIndex: primIx,
+    });
+    let imageVersion: number | undefined = imageFields.imageVersion;
+    if (imageVersion == null && typeof existingProduct?.imageVersion === "number" && Number.isFinite(existingProduct.imageVersion)) {
+      const prevPrimary = stripQuery(String(existingProduct.imageUrl || ""));
+      if (prevPrimary && prevPrimary === stripQuery(String(imageFields.imageUrl || ""))) {
+        imageVersion = existingProduct.imageVersion;
+      }
+    }
+    if (imageVersion == null && typeof imageFields.imageUrl === "string" && imageFields.imageUrl.startsWith("http")) {
+      imageVersion = Date.now();
     }
 
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
@@ -1167,8 +1266,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
       ...formData,
       id,
       imagePath,
-      ...(imageUrl ? { imageUrl } : {}),
+      ...imageFields,
       ...(typeof imageVersion === "number" && Number.isFinite(imageVersion) ? { imageVersion } : {}),
+      updatedAt: new Date().toISOString(),
       suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
       fontColor: fontColor || "white",
       imageBgColor: imageBgOverride || "white",
@@ -1176,6 +1276,13 @@ if (migratedProduct.suggestedColors?.length > 0) {
       cropAspectRatio: appliedAspectRatio,
       renderingType: "glass",
     };
+
+    const savedVariants = pruneVariantGroupsForSave(variantGroups);
+    if (savedVariants.groups.length > 0) {
+      newItem.variants = savedVariants;
+    } else {
+      delete newItem.variants;
+    }
 
     if (newItem.image) {
       delete newItem.image;
@@ -1227,7 +1334,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
       }
 
       window.dispatchEvent(
-        new CustomEvent("product-added", { detail: { onlyProductId: String(newItem.id) } })
+        new CustomEvent("product-added", {
+          detail: { onlyProductId: String(newItem.id), forceCloudSync: true },
+        })
       );
 
       // Check if we should show the rating modal
@@ -1298,7 +1407,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
     navigate(navigationPath);
   };
 
-  if (cropping && imagePreview) {
+  if (cropping && cropSessionPreview) {
     return (
       <div className="w-full h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
         <div className="fixed top-0 left-0 right-0 h-[40px] bg-black z-50"></div>
@@ -1340,7 +1449,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
             <div className="mb-4 rounded-lg overflow-hidden shadow-md border-2 border-blue-200 bg-white">
               <div style={{ height: 300, position: "relative" }}>
                 <Cropper
-                  image={imagePreview}
+                  image={cropSessionPreview}
                   crop={crop}
                   zoom={zoom}
                   aspect={aspectRatio}
@@ -1359,7 +1468,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
                 Apply
               </button>
               <button
-                onClick={() => setCropping(false)}
+                onClick={() => {
+                  setCropping(false);
+                  setCropSessionPreview(null);
+                  cropModeRef.current = null;
+                }}
                 className="bg-gray-200 text-gray-700 font-semibold px-6 py-2 rounded-lg transition-all"
               >
                 Cancel
@@ -1398,7 +1511,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
           className="relative flex items-center justify-center"
           style={{ opacity: imageOpacity }}
         >
-          {imagePreview && (
+          {cardPreview && (
             <motion.div
               ref={previewCardRef}
               style={{
@@ -1440,7 +1553,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   }}
                 >
                   <img
-                    src={imagePreview}
+                    src={cardPreview}
                     alt="Preview"
                     style={{
                       width: "100%",
@@ -1651,7 +1764,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
             </motion.div>
           )}
 
-          {!imagePreview && (
+          {!cardPreview && (
             <button
               onClick={handleSelectImage}
               className="text-center text-gray-400 select-none hover:text-gray-300 transition-colors cursor-pointer"
@@ -1721,7 +1834,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex gap-2">
           <button
             onClick={() => setFormSection('basic')}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
               formSection === 'basic'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -1730,8 +1843,18 @@ if (migratedProduct.suggestedColors?.length > 0) {
             Basic Info
           </button>
           <button
+            onClick={() => setFormSection('variants')}
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+              formSection === 'variants'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            Variants
+          </button>
+          <button
             onClick={() => setFormSection('catalogue')}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
               formSection === 'catalogue'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
@@ -1777,6 +1900,58 @@ if (migratedProduct.suggestedColors?.length > 0) {
               />
               </div>
             </div>
+
+              <div className="mb-5 space-y-2 pb-4 border-b border-gray-200 dark:border-gray-800">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                  Gallery (max {MAX_PRODUCT_IMAGES})
+                </label>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  Mark one image as Primary for lists, share links, and catalogue renders.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {imageSlots.map((src, idx) => (
+                    <div key={`slot-${idx}`} className="w-[88px] shrink-0 space-y-1">
+                      <div className="relative h-20 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPrimarySlotIndex(idx)}
+                        className={`w-full text-[10px] py-1 rounded font-semibold ${
+                          primarySlotIndex === idx
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                        }`}
+                      >
+                        Primary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openReplaceSlot(idx)}
+                        className="w-full text-[10px] py-1 rounded bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-100"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeImageAt(idx)}
+                        className="w-full text-[10px] py-1 rounded bg-red-50 dark:bg-red-900/40 text-red-800 dark:text-red-200"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {imageSlots.length < MAX_PRODUCT_IMAGES && (
+                  <button
+                    type="button"
+                    onClick={handleSelectImage}
+                    className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    + Add another image
+                  </button>
+                )}
+              </div>
 
               {/* Colors Section */}
               <div className="space-y-3 mb-5 pb-4 border-b border-gray-200 dark:border-gray-800">
@@ -2190,6 +2365,19 @@ if (migratedProduct.suggestedColors?.length > 0) {
                 </div>
               )}
             </>
+          )}
+
+          {formSection === 'variants' && (
+            <div className="mb-5">
+              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">
+                Product variants
+              </h3>
+              <ProductVariantsEditor
+                groups={variantGroups}
+                onChange={setVariantGroups}
+                theme="glass"
+              />
+            </div>
           )}
 
           {/* Save/Cancel Buttons */}

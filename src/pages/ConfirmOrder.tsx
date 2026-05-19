@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
+import { formatVariantSelectionSummary } from '../utils/productVariants';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
@@ -11,6 +12,7 @@ type QtyMap = Record<string, number>;
 interface ConfirmOrderState {
   selectedItems: ShareLinkItem[];
   qty: QtyMap;
+  variantSelections?: Record<string, Record<string, string>>;
   currencySymbol: string;
   currencyCode: string;
   sellerWhatsapp: string;
@@ -154,7 +156,14 @@ export default function ConfirmOrder() {
     );
   }
 
-  const { selectedItems, currencySymbol, currencyCode, sellerWhatsapp, sellerUserId } = state;
+  const {
+    selectedItems,
+    currencySymbol,
+    currencyCode,
+    sellerWhatsapp,
+    sellerUserId,
+    variantSelections = {},
+  } = state;
 
   const handleQtyChange = (productId: string, delta: number) => {
     setLocalQty((prev) => {
@@ -214,6 +223,11 @@ export default function ConfirmOrder() {
             priceUnit: i.priceUnit || undefined,
             imageUrl: i.imageUrl,
             quantityStep: i.quantityStep,
+            variantSummary:
+              formatVariantSelectionSummary(
+                i.variantGroups ?? [],
+                variantSelections[i.productId]
+              ) || undefined,
           };
         });
 
@@ -269,6 +283,13 @@ export default function ConfirmOrder() {
 
       const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
       lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
+      const variantLine = formatVariantSelectionSummary(
+        i.variantGroups ?? [],
+        variantSelections[i.productId]
+      );
+      if (variantLine) {
+        lines.push(`   _${variantLine}_`);
+      }
 
       if (Number.isFinite(unit)) {
         const unitLabel = getOrderUnitLabel(i.priceUnit);

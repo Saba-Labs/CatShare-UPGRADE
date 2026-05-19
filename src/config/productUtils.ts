@@ -22,6 +22,7 @@ import {
   type ProductWithCatalogueData,
 } from './catalogueProductUtils';
 import { getAllCatalogues } from './catalogueConfig';
+import { normalizeProductImageFields } from '../utils/productImages';
 
 /**
  * Product interface that works with both old and new field names
@@ -246,7 +247,7 @@ function withCatalogueTopLevelSync(product: Product): Product {
  * Use this when loading a product from localStorage
  */
 export function prepareProduct(product: Product): Product {
-  return normalizeProduct(product);
+  return normalizeProductImageFields(normalizeProduct(product) as Record<string, unknown>) as Product;
 }
 
 /**

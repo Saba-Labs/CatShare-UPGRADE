@@ -16,6 +16,15 @@ import {
 } from "../utils/freeTierWatermark";
 import { getCurrentCurrencySymbol, onCurrencyChange } from "../utils/currencyUtils";
 import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from "../utils/offerPriceUtils";
+import {
+  getProductImageUrls,
+  getPrimaryImageIndex,
+  getProductPrimaryImageUrl,
+  getProductPrimaryImageVersion,
+  normalizeProductImageFields,
+} from "../utils/productImages";
+import { productImageDisplayUrl } from "../utils/imageUrl";
+import ProductImageGallery from "../components/ProductImageGallery";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -116,6 +125,7 @@ export default function ProductPreviewModal_Glass({
 
   const [direction, setDirection] = useState(0);
   const [imageUrl, setImageUrl] = useState("");
+  const [multiGalleryUrls, setMultiGalleryUrls] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState(() => getCurrentCurrencySymbol());
   const [imageScale, setImageScale] = useState(1);
@@ -202,46 +212,49 @@ export default function ProductPreviewModal_Glass({
   useEffect(() => {
     const loadImage = async () => {
       setImageLoaded(false);
-      const withVersion = (url, version) => {
-        const raw = typeof url === "string" ? url.trim() : "";
-        if (!raw) return "";
-        if (!/^https?:\/\//i.test(raw)) return raw;
-        const v = String(version ?? "").trim();
-        if (!v) return raw;
-        return `${raw}${raw.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
-      };
-      // Priority: cloud URL > local file > base64
-      // 1. Try cloud URL first (Cloudflare R2)
-      if (product?.imageUrl) {
-        setImageUrl(withVersion(product.imageUrl, product.imageVersion));
+      const p = normalizeProductImageFields(
+        product && typeof product === "object" ? { ...product } : {}
+      );
+      const multi = getProductImageUrls(p);
+      if (multi.length > 1) {
+        setMultiGalleryUrls(multi);
+        setImageUrl("");
+        setImageLoaded(true);
+        return;
+      }
+      setMultiGalleryUrls(null);
+      const primary = getProductPrimaryImageUrl(p);
+      if (primary) {
+        setImageUrl(
+          productImageDisplayUrl(primary, getProductPrimaryImageVersion(p))
+        );
+        setImageLoaded(true);
         return;
       }
 
-      // 2. Try local filesystem image
-      if (product?.imagePath) {
+      if (p?.imagePath) {
         try {
-          // Prefer External (visible user-* folder), fallback to Data for legacy.
           try {
             const result = await Filesystem.readFile({
-              path: product.imagePath,
+              path: p.imagePath,
               directory: Directory.External,
             });
             setImageUrl(`data:image/png;base64,${result.data}`);
           } catch (externalErr) {
             const result = await Filesystem.readFile({
-              path: product.imagePath,
+              path: p.imagePath,
               directory: Directory.Data,
             });
             setImageUrl(`data:image/png;base64,${result.data}`);
           }
         } catch (err) {
           console.warn("Failed to load image from filesystem:", err);
-          setImageUrl(product.image || "");
+          setImageUrl(p.image || "");
         }
       } else {
-        // 3. Fallback to base64 in-memory image
-        setImageUrl(product.image || "");
+        setImageUrl(p.image || "");
       }
+      setImageLoaded(true);
     };
     loadImage();
     setFieldDefinitionsUpdated(prev => prev + 1);
@@ -475,6 +488,16 @@ export default function ProductPreviewModal_Glass({
                         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                       </div>
                     )}
+                    {multiGalleryUrls && multiGalleryUrls.length > 1 ? (
+                      <div style={{ width: "100%", height: "100%", position: "relative" }}>
+                        <ProductImageGallery
+                          urls={multiGalleryUrls}
+                          primaryIndex={getPrimaryImageIndex(product)}
+                          primaryImageVersion={product.imageVersion}
+                          className="h-full"
+                        />
+                      </div>
+                    ) : (
                     <img
                       src={imageUrl}
                       alt={product.name}
@@ -489,6 +512,7 @@ export default function ProductPreviewModal_Glass({
                         transition: "opacity 0.2s ease",
                       }}
                     />
+                    )}
 
                     {(catalogueData.badge || product.badge) && (
                       <div
