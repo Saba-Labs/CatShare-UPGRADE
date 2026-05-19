@@ -1557,7 +1557,8 @@ export default function StoreView() {
                         step={qstep}
                         onChange={(d) => {
                           const hasVariants = getProductVariantGroups(product).length > 0;
-                          if (hasVariants && quantity === 0) {
+                          const variantComplete = isVariantSelectionComplete(getProductVariantGroups(product), variantSelections[product.id]);
+                          if (hasVariants && !variantComplete) {
                             setDrawerProduct(product);
                           } else {
                             changeQty(product.id, d, qstep);
