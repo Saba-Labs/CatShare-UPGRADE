@@ -2278,9 +2278,11 @@ useEffect(() => {
 </div>
                           <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} imageVersion={item.imageVersion} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{item.name}</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>{item.name}</div>
                             {item.subtitle && (
-                              <div style={{ fontSize: 11, color: COLORS.subtle }}>{item.subtitle}</div>
+                              <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', paddingX: 6, paddingY: 2, borderRadius: 4, padding: '3px 6px' }}>
+                                {item.subtitle}
+                              </div>
                             )}
                           </div>
                           <div
