@@ -1707,6 +1707,8 @@ export default function StoreView() {
                                   <div>
                                     <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--c-text)', marginBottom: 2 }}>{item.name}</div>
                                     {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
+                                    {item.variantSummary && <div style={{ fontSize: '11px', color: 'var(--c-accent)', fontWeight: 500, marginTop: 2 }}>{item.variantSummary}</div>}
+
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                     <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
