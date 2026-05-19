@@ -1,4 +1,11 @@
 .pvd { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+@keyframes pvd-chip-error-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+.pvd--error .pvd-chip--btn {
+  animation: pvd-chip-error-glow 0.6s;
+}
 .pvd-group { display: flex; flex-direction: column; gap: 6px; }
 .pvd-group-name {
   font-size: 11px;

@@ -79,7 +79,7 @@ const CSS = `
 .sv-logo img { width: 100%; height: 100%; object-fit: cover; }
 .sv-open-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.2); border-radius: var(--r-full); padding: 5px 12px; font-size: 11px; font-weight: 600; color: var(--c-accent); font-family: var(--f-body); letter-spacing: 0.3px; }
 .sv-open-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-accent); animation: sv-pulse 2.5s infinite; }
-@keyframes sv-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
+@keyframes sv-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(16, 185, 129, 0.7)} 50%{box-shadow:0 0 0 6px rgba(16, 185, 129, 0)} }
 .sv-store-name { font-family: var(--f-head); font-size: 28px; font-weight: 400; color: var(--c-text); line-height: 1.1; letter-spacing: -0.3px; margin-bottom: 5px; }
 .sv-store-tagline { font-size: 13.5px; color: var(--c-text2); line-height: 1.55; max-width: 300px; font-weight: 400; }
 .sv-store-desc { font-size: 12px; color: var(--c-text3); line-height: 1.5; max-width: 320px; margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -138,6 +138,7 @@ const CSS = `
 .sv-pcard-body { padding: 10px 10px 5px; display: flex; flex-direction: column; gap: 2px; }
 .sv-pcard-name { font-family: var(--f-body); font-size: 13px; font-weight: 600; color: var(--c-text); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; }
+.sv-pcard-variant-summary { font-size: 11px; color: var(--c-accent); font-weight: 500; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-pcard-price { font-family: var(--f-body); font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; margin-top: 5px; }
 .sv-pcard-price-unit { font-size: 10px; font-weight: 400; color: var(--c-text3); margin-left: 1px; }
 .sv-price-strike {
@@ -279,6 +280,7 @@ body { background: var(--c-bg); }
 .sv-drawer-body { padding: 18px 20px 36px; }
 .sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 400; color: var(--c-text); letter-spacing: -0.3px; line-height: 1.2; }
 .sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-drawer-variant-summary { font-size: 13px; color: var(--c-accent); font-weight: 500; margin-top: 4px; }
 .sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.15); font-size: 11px; color: var(--c-accent); font-weight: 500; display: inline-flex; align-items: center; }
 .sv-drawer-price { font-family: var(--f-body); font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; margin-top: 14px; }
@@ -809,6 +811,7 @@ export default function StoreView() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
   const [variantSelections, setVariantSelections] = useState<Record<string, Record<string, string>>>({});
+  const [variantErrorIds, setVariantErrorIds] = useState<Set<string>>(new Set());
   const overlayRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const pathFallbackSentRef = useRef(false);
@@ -822,6 +825,22 @@ export default function StoreView() {
       drawerRef.current.scrollTop = 0;
     }
   }, [drawerProduct]);
+
+  useEffect(() => {
+  if (drawerProduct) {
+    window.history.pushState({ drawerOpen: true }, '');
+  }
+}, [drawerProduct]);
+
+useEffect(() => {
+  const onPopState = () => {
+    if (drawerProduct) {
+      setDrawerProduct(null);
+    }
+  };
+  window.addEventListener('popstate', onPopState);
+  return () => window.removeEventListener('popstate', onPopState);
+}, [drawerProduct]);
 
   useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
@@ -1018,6 +1037,18 @@ export default function StoreView() {
   }, [store?.whatsapp]);
 
   const changeQty = (productId: string, delta: number, qstep: number) => {
+    const product = drawerProduct || allProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    const groups = getProductVariantGroups(product);
+    const isComplete = isVariantSelectionComplete(groups, variantSelections[productId]);
+
+    if (groups.length > 0 && !isComplete) {
+      setVariantErrorIds(new Set([productId]));
+      setTimeout(() => setVariantErrorIds(new Set()), 600);
+      return;
+    }
+
     const s = normalizeOrderQuantityStep(qstep);
     const current = selectedProducts.get(productId) || 0;
     const rounded = Math.round(Math.max(0, current + delta) / s) * s;
@@ -1523,6 +1554,11 @@ export default function StoreView() {
                   <div className="sv-pcard-body">
                     <div className="sv-pcard-name">{product.name}</div>
                     {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
+                    {isSelected && variantSelections[product.id] && (
+                      <div className="sv-pcard-variant-summary">
+                        {formatVariantSelectionSummary(getProductVariantGroups(product), variantSelections[product.id])}
+                      </div>
+                    )}
                     {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
                         {fmt(price, currencySymbol)}
@@ -1540,7 +1576,8 @@ export default function StoreView() {
                         step={qstep}
                         onChange={(d) => {
                           const hasVariants = getProductVariantGroups(product).length > 0;
-                          if (hasVariants && quantity === 0) {
+                          const variantComplete = isVariantSelectionComplete(getProductVariantGroups(product), variantSelections[product.id]);
+                          if (hasVariants && !variantComplete) {
                             setDrawerProduct(product);
                           } else {
                             changeQty(product.id, d, qstep);
@@ -1686,6 +1723,8 @@ export default function StoreView() {
                                   <div>
                                     <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--c-text)', marginBottom: 2 }}>{item.name}</div>
                                     {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
+                                    {item.variantSummary && <div style={{ fontSize: '11px', color: 'var(--c-accent)', fontWeight: 500, marginTop: 2 }}>{item.variantSummary}</div>}
+
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                     <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
@@ -1733,7 +1772,7 @@ export default function StoreView() {
                           })()}
                         </div>
                         <div className="sv-rcard-body">
-                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub">{item.variantSummary}</div>}</div>
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub" style={{ color: 'var(--c-accent)', fontWeight: 500 }}>{item.variantSummary}</div>}</div>
                           <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
                         </div>
                       </div>
@@ -1812,6 +1851,11 @@ export default function StoreView() {
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
                   {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
+                  {variantSelections[drawerProduct.id] && (
+                    <div className="sv-drawer-variant-summary">
+                      {formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id])}
+                    </div>
+                  )}
                   {getCats(drawerProduct).length > 0 && (
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
@@ -1838,6 +1882,7 @@ export default function StoreView() {
                       groups={getProductVariantGroups(drawerProduct)}
                       mode="select"
                       selection={variantSelections[drawerProduct.id] ?? {}}
+                      error={variantErrorIds.has(drawerProduct.id)}
                       onSelect={(groupId, option) => {
                         setVariantSelections((prev) => ({
                           ...prev,
