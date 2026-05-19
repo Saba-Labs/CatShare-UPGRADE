@@ -1756,7 +1756,7 @@ export default function StoreView() {
                           })()}
                         </div>
                         <div className="sv-rcard-body">
-                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub">{item.variantSummary}</div>}</div>
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub" style={{ color: 'var(--c-accent)', fontWeight: 500 }}>{item.variantSummary}</div>}</div>
                           <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
                         </div>
                       </div>
