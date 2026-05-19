@@ -570,6 +570,5 @@ export async function saveRenderedImage(product, type, units = {}) {
     }
   } catch (err) {
     console.error("❌ saveRenderedImage failed:", err.message || err);
-    throw err; // Rethrow so caller knows rendering failed
   }
 }
