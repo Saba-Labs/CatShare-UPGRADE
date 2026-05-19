@@ -187,6 +187,7 @@ export async function tryReadProductSourceAsDataUrl(product: {
 /**
  * Load source pixels for canvas/share: disk (canonical + legacy), copy to canonical when read from legacy,
  * then imageUrl. Updates product.image and normalizes product.imagePath on native when possible.
+ * Gracefully handles fetch failures by returning whatever image is available.
  */
 export async function hydrateProductSourceForRender(product: any): Promise<boolean> {
   clearNonRenderableProductImage(product);
@@ -237,7 +238,7 @@ export async function hydrateProductSourceForRender(product: any): Promise<boole
       }
       return true;
     } catch (e) {
-      console.warn('hydrateProductSourceForRender: primary cloud image fetch failed', e);
+      console.warn('hydrateProductSourceForRender: primary cloud image fetch failed (non-critical)', e);
     }
   }
 
@@ -275,7 +276,7 @@ export async function hydrateProductSourceForRender(product: any): Promise<boole
       }
       return true;
     } catch (e) {
-      console.warn('hydrateProductSourceForRender: imageUrl fetch failed', e);
+      console.warn('hydrateProductSourceForRender: imageUrl fetch failed (non-critical)', e);
     }
   }
 

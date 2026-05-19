@@ -1535,7 +1535,19 @@ export default function StoreView() {
                   </div>
                   <div className="sv-pcard-footer">
                     <div className="sv-pcard-actions">
-                      <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(product.id, d, qstep)} accent={isSelected} />
+                      <QtyControl
+                        value={quantity}
+                        step={qstep}
+                        onChange={(d) => {
+                          const hasVariants = getProductVariantGroups(product).length > 0;
+                          if (hasVariants && quantity === 0) {
+                            setDrawerProduct(product);
+                          } else {
+                            changeQty(product.id, d, qstep);
+                          }
+                        }}
+                        accent={isSelected}
+                      />
                       <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
                     {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
