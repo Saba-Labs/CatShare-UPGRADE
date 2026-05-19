@@ -280,6 +280,7 @@ body { background: var(--c-bg); }
 .sv-drawer-body { padding: 18px 20px 36px; }
 .sv-drawer-name { font-family: var(--f-head); font-size: 22px; font-weight: 400; color: var(--c-text); letter-spacing: -0.3px; line-height: 1.2; }
 .sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
+.sv-drawer-variant-summary { font-size: 13px; color: var(--c-accent); font-weight: 500; margin-top: 4px; }
 .sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.15); font-size: 11px; color: var(--c-accent); font-weight: 500; display: inline-flex; align-items: center; }
 .sv-drawer-price { font-family: var(--f-body); font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; margin-top: 14px; }
@@ -1832,6 +1833,11 @@ export default function StoreView() {
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
                   {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
+                  {variantSelections[drawerProduct.id] && (
+                    <div className="sv-drawer-variant-summary">
+                      {formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id])}
+                    </div>
+                  )}
                   {getCats(drawerProduct).length > 0 && (
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
