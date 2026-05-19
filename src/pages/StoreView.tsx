@@ -1020,8 +1020,10 @@ export default function StoreView() {
   }, [store?.whatsapp]);
 
   const changeQty = (productId: string, delta: number, qstep: number) => {
-    if (!drawerProduct) return;
-    const groups = getProductVariantGroups(drawerProduct);
+    const product = drawerProduct || allProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    const groups = getProductVariantGroups(product);
     const isComplete = isVariantSelectionComplete(groups, variantSelections[productId]);
 
     if (groups.length > 0 && !isComplete) {
