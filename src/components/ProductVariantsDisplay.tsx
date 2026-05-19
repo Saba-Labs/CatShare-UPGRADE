@@ -12,6 +12,7 @@ type Props = {
   selection?: Record<string, string>;
   onSelect?: (groupId: string, option: string) => void;
   className?: string;
+  error?: boolean;
 };
 
 export default function ProductVariantsDisplay({
@@ -20,11 +21,12 @@ export default function ProductVariantsDisplay({
   selection = {},
   onSelect,
   className = "",
+  error = false,
 }: Props) {
   if (!groups.length) return null;
 
   return (
-    <div className={`pvd ${className}`.trim()}>
+    <div className={`pvd ${error ? 'pvd--error' : ''} ${className}`.trim()}>
       {groups.map((group) => (
         <div key={group.id} className="pvd-group">
           <div className="pvd-group-name">{group.name}</div>
