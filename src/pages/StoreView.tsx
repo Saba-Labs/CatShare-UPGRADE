@@ -138,6 +138,7 @@ const CSS = `
 .sv-pcard-body { padding: 10px 10px 5px; display: flex; flex-direction: column; gap: 2px; }
 .sv-pcard-name { font-family: var(--f-body); font-size: 13px; font-weight: 600; color: var(--c-text); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-pcard-sub { font-size: 11px; color: var(--c-text3); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-weight: 400; }
+.sv-pcard-variant-summary { font-size: 11px; color: var(--c-accent); font-weight: 500; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .sv-pcard-price { font-family: var(--f-body); font-size: 14px; font-weight: 700; color: var(--c-text); letter-spacing: -0.2px; margin-top: 5px; }
 .sv-pcard-price-unit { font-size: 10px; font-weight: 400; color: var(--c-text3); margin-left: 1px; }
 .sv-price-strike {
@@ -1534,6 +1535,11 @@ export default function StoreView() {
                   <div className="sv-pcard-body">
                     <div className="sv-pcard-name">{product.name}</div>
                     {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
+                    {isSelected && variantSelections[product.id] && (
+                      <div className="sv-pcard-variant-summary">
+                        {formatVariantSelectionSummary(getProductVariantGroups(product), variantSelections[product.id])}
+                      </div>
+                    )}
                     {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
                         {fmt(price, currencySymbol)}
