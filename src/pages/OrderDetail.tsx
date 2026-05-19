@@ -63,6 +63,7 @@ interface OrderItem {
   rowTotal?: number;
   category?: string;
   subtitle?: string;
+  variantSummary?: string;
   productId?: string;
   imageUrl?: string;
   imageVersion?: number;
@@ -2279,11 +2280,18 @@ useEffect(() => {
                           <ProductThumb url={resolveOrderItemImageUrl(item)} name={item.name} imageVersion={item.imageVersion} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 4 }}>{item.name}</div>
-                            {item.subtitle && (
-                              <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', paddingX: 6, paddingY: 2, borderRadius: 4, padding: '3px 6px' }}>
-                                {item.subtitle}
-                              </div>
-                            )}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {item.subtitle && (
+                                <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', borderRadius: 4, padding: '3px 6px' }}>
+                                  {item.subtitle}
+                                </div>
+                              )}
+                              {item.variantSummary && (
+                                <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', borderRadius: 4, padding: '3px 6px' }}>
+                                  {item.variantSummary}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div
                             data-order-snapshot-line-right
