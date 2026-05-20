@@ -48,7 +48,7 @@ export default function ProductVariantsEditor({
   };
 
   const confirmRemoveOption = () => {
-    if (!confirmDelete) return;
+    if (!confirmDelete || !('optionIndex' in confirmDelete)) return;
     const { groupIndex, optionIndex } = confirmDelete;
     const g = groups[groupIndex];
     if (!g) return;
@@ -62,7 +62,7 @@ export default function ProductVariantsEditor({
   };
 
   const confirmRemoveGroup = () => {
-    if (!confirmDelete || !('optionIndex' in confirmDelete)) return;
+    if (!confirmDelete || ('optionIndex' in confirmDelete)) return;
     const groupIndex = confirmDelete.groupIndex;
     const filtered = groups.filter((_, i) => i !== groupIndex);
     onChange(filtered);
