@@ -1847,18 +1847,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       {imageSlots.length} of {MAX_PRODUCT_IMAGES} images
                     </p>
                   </div>
-                  {imageSlots.length < MAX_PRODUCT_IMAGES && (
-                    <button
-                      type="button"
-                      onClick={handleSelectImage}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Add
-                    </button>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {imageSlots.map((src, idx) => (
@@ -1955,6 +1943,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       </div>
                     </div>
                   ))}
+                  {imageSlots.length < MAX_PRODUCT_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={handleSelectImage}
+                      className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
 
