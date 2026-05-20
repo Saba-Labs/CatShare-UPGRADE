@@ -107,6 +107,12 @@ useEffect(() => {
   setProducts(updated);
   saveProducts(updated);
   onProductsUpdate(updated);
+  // Trigger the same cloud sync event that CreateProduct uses
+  window.dispatchEvent(
+    new CustomEvent("product-added", {
+      detail: { forceCloudSync: true },
+    })
+  );
 }, [onProductsUpdate]);
 
   const handleClose = useCallback(() => {
