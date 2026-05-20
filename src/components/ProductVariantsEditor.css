@@ -154,3 +154,24 @@
 }
 .pve--classic .pve-tab--active { color: #2563eb; }
 .pve--glass .pve-tab--active { color: #93c5fd; }
+
+.pve-tab-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+.pve-tab-add:hover:not(:disabled) { opacity: 1; }
+.pve--classic .pve-tab-add { color: #2563eb; }
+.pve--glass .pve-tab-add { color: #93c5fd; }
+.pve-tab-add:disabled { opacity: 0.3; cursor: not-allowed; }
