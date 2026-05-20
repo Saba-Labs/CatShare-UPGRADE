@@ -361,10 +361,6 @@ export async function saveRenderedImage(product, type, units = {}) {
       cropAspectRatio: cropAspectRatio,
     };
 
-    const variantGroups = getProductVariantGroups(product);
-    if (variantGroups.length > 0) {
-      productData.variantGroups = variantGroups;
-    }
 
     // Add all enabled fields dynamically
     getAllFields()
