@@ -89,16 +89,16 @@ export default function ProductVariantsEditor({
                 {group.name || `Group ${idx + 1}`}
               </button>
             ))}
+            <button
+              type="button"
+              className="pve-tab-add"
+              onClick={addGroup}
+              disabled={groups.length >= MAX_VARIANT_GROUPS}
+              aria-label="Add variant group"
+            >
+              +
+            </button>
           </div>
-          <button
-            type="button"
-            className="pve-tab-add"
-            onClick={addGroup}
-            disabled={groups.length >= MAX_VARIANT_GROUPS}
-            aria-label="Add variant group"
-          >
-            +
-          </button>
         </div>
       )}
 
