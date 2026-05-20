@@ -1034,8 +1034,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }, [cardPreview]);
 
   useEffect(() => {
-    setPreviewImageIndex(0);
-  }, [imageSlots]);
+    setPreviewImageIndex(primarySlotIndex);
+  }, [imageSlots, primarySlotIndex]);
 
   // Calculate and update scale when preview content changes
   const calculateScale = () => {
