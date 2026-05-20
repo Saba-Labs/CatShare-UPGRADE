@@ -82,85 +82,67 @@ export default function AddProductsModal({
   const [products, setProducts] = useState(allProducts);
   const [search, setSearch] = useState("");
   const wasOpenRef = useRef(false);
-  const lastUpdatedRef = useRef<number>(0);
+  const productsBeforeEditRef = useRef(allProducts);
+
   const { guardCloudWrite } = useCloudWriteGate();
 
-  // Only hydrate from parent when the modal opens — not on every parent re-render (avoids jank / search reset).
+  // Only hydrate when the modal opens
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
       setProducts(allProducts);
       setSearch("");
-      lastUpdatedRef.current = Date.now();
+      productsBeforeEditRef.current = allProducts;
     }
     wasOpenRef.current = isOpen;
-  }, [isOpen]);
-
-  // Sync with parent's allProducts after a delay (allows time for our update to propagate)
-  // but keep our state if we just updated it locally
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const timeSinceLastUpdate = Date.now() - lastUpdatedRef.current;
-    if (timeSinceLastUpdate < 500) {
-      // We just made an update, don't overwrite with parent data yet
-      return;
-    }
-
-    // Check if products actually changed in parent
-    setProducts((prev) => {
-      if (JSON.stringify(prev) !== JSON.stringify(allProducts)) {
-        return allProducts;
-      }
-      return prev;
-    });
-  }, [allProducts, isOpen]);
+  }, [isOpen, allProducts]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
-    lastUpdatedRef.current = Date.now();
+    // Immediately update local state for instant visual feedback
+    setProducts(updated);
+    // Save to localStorage (this triggers Supabase sync async)
     saveProducts(updated);
+    // Tell parent to update - parent will update its state and re-render
+    // But we don't re-sync from parent's allProducts while modal is open
     onProductsUpdate(updated);
   }, [onProductsUpdate]);
 
   const handleToggleProduct = useCallback(
     (productId: string) => {
       if (!guardCloudWrite()) return;
-      let updated: any[] | undefined;
-      setProducts((prev) => {
-        updated = prev.map((p) => {
-          if (p.id === productId) {
-            const enabled = isProductEnabledForCatalogue(p, catalogueId);
-            return setProductEnabledForCatalogue(p, catalogueId, !enabled);
-          }
-          return p;
-        });
-        return updated;
+      
+      const updated = products.map((p) => {
+        if (p.id === productId) {
+          const enabled = isProductEnabledForCatalogue(p, catalogueId);
+          return setProductEnabledForCatalogue(p, catalogueId, !enabled);
+        }
+        return p;
       });
-      if (updated) persistAndNotifyParent(updated);
+
+      persistAndNotifyParent(updated);
     },
-    [catalogueId, persistAndNotifyParent, guardCloudWrite]
+    [products, catalogueId, persistAndNotifyParent, guardCloudWrite]
   );
 
   const handleToggleAllProducts = useCallback(() => {
     if (!guardCloudWrite()) return;
-    let updated: any[] | undefined;
-    setProducts((prev) => {
-      const filtered = prev.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(search.toLowerCase()) ||
-          p.subtitle?.toLowerCase().includes(search.toLowerCase())
-      );
-      const allEnabled =
-        filtered.length > 0 && filtered.every((p) => isProductEnabledForCatalogue(p, catalogueId));
-      updated = prev.map((p) => {
-        if (filtered.some((fp) => fp.id === p.id)) {
-          return setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true);
-        }
-        return p;
-      });
-      return updated;
+    
+    const filtered = products.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.subtitle?.toLowerCase().includes(search.toLowerCase())
+    );
+    const allEnabled =
+      filtered.length > 0 && filtered.every((p) => isProductEnabledForCatalogue(p, catalogueId));
+
+    const updated = products.map((p) => {
+      if (filtered.some((fp) => fp.id === p.id)) {
+        return setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true);
+      }
+      return p;
     });
-    if (updated) persistAndNotifyParent(updated);
-  }, [catalogueId, search, persistAndNotifyParent, guardCloudWrite]);
+
+    persistAndNotifyParent(updated);
+  }, [products, catalogueId, search, persistAndNotifyParent, guardCloudWrite]);
 
   const filteredProducts = products.filter(
     (p) =>
