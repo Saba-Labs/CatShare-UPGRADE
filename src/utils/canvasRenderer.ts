@@ -360,14 +360,54 @@ export async function renderProductToCanvas(
   detailsHeight += spacingBeforeFields; // spacing before fields
 
   // Field heights (only count non-empty enabled visible fields)
-  allEnabledFields.forEach(field => {
-    const visibilityKey = `${field.key}Visible`;
-    const isVisible = product[visibilityKey] !== false; // Default to visible
+  // Need to measure text to account for wrapping
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  if (tempCtx) {
+    const renderFieldFontSizeTemp = Math.floor(fieldFontSizeBase * scale);
+    const fieldFontTemp = `${renderFieldFontSizeTemp}px Arial, sans-serif`;
+    tempCtx.font = fieldFontTemp;
 
-    if (product[field.key] && isVisible) {
-      detailsHeight += fieldLineHeightBase + 2;
-    }
-  });
+    const fieldsLeftPaddingTemp = 24 * scale;
+    const maxLabelWidthTemp = Math.max(
+      ...allEnabledFields
+        .filter(f => f.enabled && product[f.key])
+        .map(f => tempCtx.measureText(f.label).width)
+    );
+    const colonXTemp = fieldsLeftPaddingTemp + maxLabelWidthTemp + 6 * scale;
+    const valueXTemp = colonXTemp + 16 * scale;
+    const maxValueWidthTemp = baseWidth * scale - valueXTemp - 24 * scale;
+
+    allEnabledFields.forEach(field => {
+      const visibilityKey = `${field.key}Visible`;
+      const isVisible = product[visibilityKey] !== false; // Default to visible
+
+      if (product[field.key] && isVisible) {
+        const unitKey = `${field.key}Unit`;
+        const val = product[field.key];
+        const unit = product[unitKey];
+        const displayText = unit && unit !== 'None' ? `${val} ${unit}` : val;
+        const valueMetrics = tempCtx.measureText(displayText);
+
+        // If value wraps to next line, count 2 line heights instead of 1
+        if (valueMetrics.width > maxValueWidthTemp) {
+          detailsHeight += (fieldLineHeightBase + 2) * 2;
+        } else {
+          detailsHeight += fieldLineHeightBase + 2;
+        }
+      }
+    });
+  } else {
+    // Fallback if temp canvas fails
+    allEnabledFields.forEach(field => {
+      const visibilityKey = `${field.key}Visible`;
+      const isVisible = product[visibilityKey] !== false;
+
+      if (product[field.key] && isVisible) {
+        detailsHeight += fieldLineHeightBase + 2;
+      }
+    });
+  }
 
   detailsHeight += spacingAfterFields; // spacing after fields
   detailsHeight += priceBarHeightBase;
