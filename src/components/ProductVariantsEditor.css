@@ -177,11 +177,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 96px;
-  height: 96px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 2px dashed;
-  border-radius: 12px;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   line-height: 1;
@@ -191,8 +191,8 @@
 }
 
 .pve-tab-add-icon {
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
 }
 
 .pve--classic .pve-tab-add {
