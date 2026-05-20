@@ -440,6 +440,7 @@ export default function CreateProduct() {
   const [cropSessionPreview, setCropSessionPreview] = useState<string | null>(null);
   const cropModeRef = useRef<"append" | number | null>(null);
   const imageSlotsRef = useRef<string[]>([]);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const cardPreview = imageSlots[primarySlotIndex] ?? imageSlots[0] ?? null;
 
   useEffect(() => {
@@ -1032,6 +1033,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
     }
   }, [cardPreview]);
 
+  useEffect(() => {
+    setPreviewImageIndex(0);
+  }, [imageSlots]);
+
   // Calculate and update scale when preview content changes
   const calculateScale = () => {
     const previewCard = previewCardRef.current;
@@ -1502,7 +1507,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                 transformOrigin: "center",
               }}
             >
-              {/* Product Image */}
+              {/* Product Image - Swipeable Gallery */}
               <div
                 style={{
                   position: "relative",
@@ -1514,18 +1519,66 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   alignItems: "center",
                   justifyContent: "center",
                   width: "100%",
+                  overflow: "hidden",
                 }}
               >
-                <img
-                  src={cardPreview}
-                  alt="Preview"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    margin: "0 auto",
-                  }}
-                />
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={previewImageIndex}
+                    src={imageSlots[previewImageIndex]}
+                    alt="Preview"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      margin: "0 auto",
+                    }}
+                  />
+                </AnimatePresence>
+
+                {imageSlots.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setPreviewImageIndex((prev) => (prev === 0 ? imageSlots.length - 1 : prev - 1))}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all z-10"
+                      style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setPreviewImageIndex((prev) => (prev === imageSlots.length - 1 ? 0 : prev + 1))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-all z-10"
+                      style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
+                    {/* Image Counter */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 12,
+                        left: 12,
+                        backgroundColor: "rgba(0, 0, 0, 0.6)",
+                        color: "white",
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        fontSize: "12px",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {previewImageIndex + 1} / {imageSlots.length}
+                    </div>
+                  </>
+                )}
 
                 {showWatermark && (
                   <div
