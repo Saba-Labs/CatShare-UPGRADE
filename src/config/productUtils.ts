@@ -311,12 +311,30 @@ export function saveProducts(products: Product[], userId?: string): void {
   try {
     const normalized = products.map((p) => {
       const n = normalizeProduct(p);
-      // Preserve cat1 catalogueData fields that were explicitly set
-      if (p.catalogueData?.cat1 && n.catalogueData?.cat1) {
-        for (let i = 1; i <= 10; i++) {
-          if (p.catalogueData.cat1[`field${i}`] !== undefined) {
-            n.catalogueData.cat1[`field${i}`] = p.catalogueData.cat1[`field${i}`];
-            n[`field${i}`] = p.catalogueData.cat1[`field${i}`];
+      // Preserve catalogueData (enabled flag + fields) that were explicitly set
+      if (p.catalogueData && typeof p.catalogueData === 'object') {
+        if (!n.catalogueData) {
+          n.catalogueData = {};
+        }
+        // Copy all catalogue data, preserving enabled flags
+        for (const catId in p.catalogueData) {
+          const sourceData = p.catalogueData[catId];
+          if (!n.catalogueData[catId]) {
+            n.catalogueData[catId] = {};
+          }
+          // Preserve enabled flag
+          if (sourceData && typeof sourceData === 'object' && 'enabled' in sourceData) {
+            n.catalogueData[catId].enabled = sourceData.enabled;
+          }
+          // Preserve field1-10 for cat1
+          if (catId === 'cat1' && sourceData && typeof sourceData === 'object') {
+            for (let i = 1; i <= 10; i++) {
+              const fieldName = `field${i}`;
+              if (fieldName in sourceData) {
+                n.catalogueData[catId][fieldName] = sourceData[fieldName];
+                n[fieldName] = sourceData[fieldName];
+              }
+            }
           }
         }
       }
