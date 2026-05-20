@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   MAX_VARIANT_GROUPS,
   MAX_VARIANT_OPTIONS_PER_GROUP,
@@ -19,6 +19,7 @@ export default function ProductVariantsEditor({
   onChange,
   theme = "classic",
 }: Props) {
+  const [currentIndex, setCurrentIndex] = useState(0);
   const rootClass =
     theme === "glass" ? "pve pve--glass" : "pve pve--classic";
 
@@ -49,84 +50,121 @@ export default function ProductVariantsEditor({
   };
 
   const removeGroup = (index: number) => {
-    onChange(groups.filter((_, i) => i !== index));
+    const filtered = groups.filter((_, i) => i !== index);
+    onChange(filtered);
+    if (currentIndex >= filtered.length && currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
   };
 
   const addGroup = () => {
     if (groups.length >= MAX_VARIANT_GROUPS) return;
     onChange([...groups, createEmptyVariantGroup("")]);
+    setCurrentIndex(groups.length);
   };
+
+  const goToPrevious = () => {
+    setCurrentIndex(Math.max(0, currentIndex - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentIndex(Math.min(groups.length - 1, currentIndex + 1));
+  };
+
+  const currentGroup = groups[currentIndex];
+  const hasGroups = groups.length > 0;
 
   return (
     <div className={rootClass}>
-      <p className="pve-hint">
-        Add option groups such as Size (S, M, L) or Colour (Red, Green). Shoppers
-        see these on shared links, your online store, and PDF exports.
-      </p>
-
-      {groups.length === 0 && (
+      {!hasGroups && (
         <div className="pve-empty">
           No variants yet. Add a group to get started.
         </div>
       )}
 
-      {groups.map((group, gi) => (
-        <div key={group.id} className="pve-group">
-          <div className="pve-group-head">
-            <label className="pve-label">Group name</label>
-            <input
-              type="text"
-              className="pve-input"
-              placeholder="e.g. Size or Colour"
-              value={group.name}
-              onChange={(e) => updateGroup(gi, { name: e.target.value })}
-              maxLength={48}
-            />
-            <button
-              type="button"
-              className="pve-remove-group"
-              onClick={() => removeGroup(gi)}
-              aria-label="Remove variant group"
-            >
-              Remove
-            </button>
+      {hasGroups && (
+        <div className="pve-partition-view">
+          <div className="pve-group-card">
+            <div className="pve-group-head">
+              <label className="pve-label">Group name</label>
+              <input
+                type="text"
+                className="pve-input"
+                placeholder="e.g. Size or Colour"
+                value={currentGroup.name}
+                onChange={(e) => updateGroup(currentIndex, { name: e.target.value })}
+                maxLength={48}
+              />
+              <button
+                type="button"
+                className="pve-remove-group"
+                onClick={() => removeGroup(currentIndex)}
+                aria-label="Remove variant group"
+              >
+                Remove
+              </button>
+            </div>
+
+            <label className="pve-label">Options</label>
+            <div className="pve-options">
+              {currentGroup.options.map((opt, oi) => (
+                <div key={`${currentGroup.id}-opt-${oi}`} className="pve-option-row">
+                  <input
+                    type="text"
+                    className="pve-input pve-input--option"
+                    placeholder={oi === 0 ? "e.g. Small" : "Another option"}
+                    value={opt}
+                    onChange={(e) => updateOption(currentIndex, oi, e.target.value)}
+                    maxLength={64}
+                  />
+                  <button
+                    type="button"
+                    className="pve-icon-btn"
+                    onClick={() => removeOption(currentIndex, oi)}
+                    disabled={currentGroup.options.length <= 1}
+                    aria-label="Remove option"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {currentGroup.options.length < MAX_VARIANT_OPTIONS_PER_GROUP && (
+              <button
+                type="button"
+                className="pve-add-option"
+                onClick={() => addOption(currentIndex)}
+              >
+                + Add option
+              </button>
+            )}
           </div>
 
-          <label className="pve-label">Options</label>
-          <div className="pve-options">
-            {group.options.map((opt, oi) => (
-              <div key={`${group.id}-opt-${oi}`} className="pve-option-row">
-                <input
-                  type="text"
-                  className="pve-input pve-input--option"
-                  placeholder={oi === 0 ? "e.g. Small" : "Another option"}
-                  value={opt}
-                  onChange={(e) => updateOption(gi, oi, e.target.value)}
-                  maxLength={64}
-                />
-                <button
-                  type="button"
-                  className="pve-icon-btn"
-                  onClick={() => removeOption(gi, oi)}
-                  disabled={group.options.length <= 1}
-                  aria-label="Remove option"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-          {group.options.length < MAX_VARIANT_OPTIONS_PER_GROUP && (
+          <div className="pve-pagination">
             <button
               type="button"
-              className="pve-add-option"
-              onClick={() => addOption(gi)}
+              className="pve-nav-btn"
+              onClick={goToPrevious}
+              disabled={currentIndex === 0}
+              aria-label="Previous group"
             >
-              + Add option
+              ←
             </button>
-          )}
+            <span className="pve-page-indicator">
+              {currentIndex + 1} / {groups.length}
+            </span>
+            <button
+              type="button"
+              className="pve-nav-btn"
+              onClick={goToNext}
+              disabled={currentIndex === groups.length - 1}
+              aria-label="Next group"
+            >
+              →
+            </button>
+          </div>
         </div>
-      ))}
+      )}
 
       <button
         type="button"
