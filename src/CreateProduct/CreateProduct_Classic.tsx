@@ -1885,7 +1885,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       <button
                         type="button"
                         onClick={() => setOpenMenuIdx(openMenuIdx === idx ? null : idx)}
-                        className="absolute -top-2 -right-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-400 dark:hover:bg-gray-500 text-white dark:text-gray-900 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        className="absolute -top-2 -right-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-gray-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
                         title="More actions"
                       >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
