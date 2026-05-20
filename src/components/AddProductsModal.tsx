@@ -4,7 +4,6 @@ import React, {
   useRef,
   useCallback,
   memo,
-  startTransition,
 } from "react";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../config/catalogueProductUtils";
@@ -92,15 +91,11 @@ export default function AddProductsModal({
       setSearch("");
     }
     wasOpenRef.current = isOpen;
-  }, [isOpen, allProducts]);
+  }, [isOpen]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
-    requestAnimationFrame(() => {
-      saveProducts(updated);
-      startTransition(() => {
-        onProductsUpdate(updated);
-      });
-    });
+    saveProducts(updated);
+    onProductsUpdate(updated);
   }, [onProductsUpdate]);
 
   const handleToggleProduct = useCallback(
