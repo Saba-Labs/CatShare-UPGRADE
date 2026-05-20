@@ -1779,16 +1779,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
             Basic Info
           </button>
           <button
-            onClick={() => setFormSection('variants')}
-            className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
-              formSection === 'variants'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-            }`}
-          >
-            Variants
-          </button>
-          <button
             onClick={() => setFormSection('catalogue')}
             className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
               formSection === 'catalogue'
@@ -1797,6 +1787,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
             }`}
           >
             Details
+          </button>
+          <button
+            onClick={() => setFormSection('variants')}
+            className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
+              formSection === 'variants'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            Variants
           </button>
         </div>
 
