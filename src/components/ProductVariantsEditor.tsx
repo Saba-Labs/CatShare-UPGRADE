@@ -167,7 +167,10 @@ export default function ProductVariantsEditor({
                 className="pve-add-option"
                 onClick={() => addOption(currentIndex)}
               >
-                + Add option
+                <svg className="pve-add-option-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add option
               </button>
             )}
           </div>
