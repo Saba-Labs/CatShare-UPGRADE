@@ -168,17 +168,19 @@
 .pve--glass .pve-tab--active { color: #93c5fd; }
 
 .pve-tab-add {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
+  padding: 0;
   margin-left: 8px;
   border: 1.5px solid;
   border-radius: 6px;
   cursor: pointer;
   font-size: 18px;
   font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
   transition: all 0.2s;
   flex-shrink: 0;
