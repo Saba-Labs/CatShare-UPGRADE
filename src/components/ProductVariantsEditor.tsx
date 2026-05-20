@@ -20,6 +20,7 @@ export default function ProductVariantsEditor({
   theme = "classic",
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState<{ groupIndex: number; optionIndex: number } | { groupIndex: number } | null>(null);
   const rootClass =
     theme === "glass" ? "pve pve--glass" : "pve pve--classic";
 
@@ -43,18 +44,32 @@ export default function ProductVariantsEditor({
   };
 
   const removeOption = (groupIndex: number, optionIndex: number) => {
+    setConfirmDelete({ groupIndex, optionIndex });
+  };
+
+  const confirmRemoveOption = () => {
+    if (!confirmDelete) return;
+    const { groupIndex, optionIndex } = confirmDelete;
     const g = groups[groupIndex];
     if (!g) return;
     const options = g.options.filter((_, i) => i !== optionIndex);
     updateGroup(groupIndex, { options: options.length > 0 ? options : [""] });
+    setConfirmDelete(null);
   };
 
   const removeGroup = (index: number) => {
-    const filtered = groups.filter((_, i) => i !== index);
+    setConfirmDelete({ groupIndex: index });
+  };
+
+  const confirmRemoveGroup = () => {
+    if (!confirmDelete || !('optionIndex' in confirmDelete)) return;
+    const groupIndex = confirmDelete.groupIndex;
+    const filtered = groups.filter((_, i) => i !== groupIndex);
     onChange(filtered);
     if (currentIndex >= filtered.length && currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     }
+    setConfirmDelete(null);
   };
 
   const addGroup = () => {
@@ -96,7 +111,9 @@ export default function ProductVariantsEditor({
               disabled={groups.length >= MAX_VARIANT_GROUPS}
               aria-label="Add variant group"
             >
-              +
+              <svg className="pve-tab-add-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
             </button>
           </div>
         </div>
@@ -117,22 +134,26 @@ export default function ProductVariantsEditor({
           <div className="pve-group-card">
             <div className="pve-group-head">
               <label className="pve-label">Group name</label>
-              <input
-                type="text"
-                className="pve-input"
-                placeholder="e.g. Size or Colour"
-                value={currentGroup.name}
-                onChange={(e) => updateGroup(currentIndex, { name: e.target.value })}
-                maxLength={48}
-              />
-              <button
-                type="button"
-                className="pve-remove-group"
-                onClick={() => removeGroup(currentIndex)}
-                aria-label="Remove variant group"
-              >
-                Remove
-              </button>
+              <div className="pve-group-head-input-wrapper">
+                <input
+                  type="text"
+                  className="pve-input"
+                  placeholder="e.g. Size or Colour"
+                  value={currentGroup.name}
+                  onChange={(e) => updateGroup(currentIndex, { name: e.target.value })}
+                  maxLength={48}
+                />
+                <button
+                  type="button"
+                  className="pve-remove-group"
+                  onClick={() => removeGroup(currentIndex)}
+                  aria-label="Remove variant group"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <label className="pve-label">Options</label>
@@ -165,9 +186,47 @@ export default function ProductVariantsEditor({
                 className="pve-add-option"
                 onClick={() => addOption(currentIndex)}
               >
-                + Add option
+                <svg className="pve-add-option-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add option
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="pve-modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="pve-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="pve-modal-title">
+              {'optionIndex' in confirmDelete ? 'Delete Option' : 'Delete Group'}
+            </h3>
+            <p className="pve-modal-text">
+              {('optionIndex' in confirmDelete ? 'Are you sure you want to delete this option? This action cannot be undone.' : 'Are you sure you want to delete this variant group? This action cannot be undone.')}
+            </p>
+            <div className="pve-modal-buttons">
+              <button
+                type="button"
+                className="pve-modal-btn pve-modal-btn--cancel"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="pve-modal-btn pve-modal-btn--delete"
+                onClick={() => {
+                  if ('optionIndex' in confirmDelete) {
+                    confirmRemoveOption();
+                  } else {
+                    confirmRemoveGroup();
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
