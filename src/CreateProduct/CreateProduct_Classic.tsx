@@ -1885,7 +1885,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       <button
                         type="button"
                         onClick={() => setOpenMenuIdx(openMenuIdx === idx ? null : idx)}
-                        className="absolute -top-2 -right-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        className="absolute -top-2 -right-2 bg-gray-500 hover:bg-gray-600 dark:bg-gray-400 dark:hover:bg-gray-500 text-white dark:text-gray-900 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
                         title="More actions"
                       >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1900,7 +1900,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: -10 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute top-full right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                          className="absolute top-10 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
                           style={{ minWidth: '140px' }}
                         >
                           <button
