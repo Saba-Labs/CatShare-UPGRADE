@@ -4,7 +4,6 @@ import React, {
   useRef,
   useCallback,
   memo,
-  startTransition,
 } from "react";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../config/catalogueProductUtils";
@@ -83,66 +82,81 @@ export default function AddProductsModal({
   const [products, setProducts] = useState(allProducts);
   const [search, setSearch] = useState("");
   const wasOpenRef = useRef(false);
+  const productsBeforeEditRef = useRef(allProducts);
+
+  const allProductsRef = useRef(allProducts);
+useEffect(() => {
+  if (!wasOpenRef.current) { 
+    allProductsRef.current = allProducts;
+  }
+}, [allProducts]);
+
   const { guardCloudWrite } = useCloudWriteGate();
 
-  // Only hydrate from parent when the modal opens — not on every parent re-render (avoids jank / search reset).
+  // Only hydrate when the modal opens
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      setProducts(allProducts);
+      setProducts(allProductsRef.current);
       setSearch("");
+      productsBeforeEditRef.current = allProductsRef.current;
     }
     wasOpenRef.current = isOpen;
-  }, [isOpen, allProducts]);
+  }, [isOpen]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
-    requestAnimationFrame(() => {
-      saveProducts(updated);
-      startTransition(() => {
-        onProductsUpdate(updated);
-      });
-    });
-  }, [onProductsUpdate]);
+  setProducts(updated);
+  saveProducts(updated);
+  onProductsUpdate(updated);
+  // Trigger the same cloud sync event that CreateProduct uses
+  window.dispatchEvent(
+    new CustomEvent("product-added", {
+      detail: { forceCloudSync: true },
+    })
+  );
+}, [onProductsUpdate]);
+
+  const handleClose = useCallback(() => {
+    onProductsUpdate(products);
+    onClose();
+  }, [products, onProductsUpdate, onClose]);
 
   const handleToggleProduct = useCallback(
     (productId: string) => {
       if (!guardCloudWrite()) return;
-      let updated: any[] | undefined;
-      setProducts((prev) => {
-        updated = prev.map((p) => {
-          if (p.id === productId) {
-            const enabled = isProductEnabledForCatalogue(p, catalogueId);
-            return setProductEnabledForCatalogue(p, catalogueId, !enabled);
-          }
-          return p;
-        });
-        return updated;
+      
+      const updated = products.map((p) => {
+        if (p.id === productId) {
+          const enabled = isProductEnabledForCatalogue(p, catalogueId);
+          return setProductEnabledForCatalogue(p, catalogueId, !enabled);
+        }
+        return p;
       });
-      if (updated) persistAndNotifyParent(updated);
+
+      persistAndNotifyParent(updated);
     },
-    [catalogueId, persistAndNotifyParent, guardCloudWrite]
+    [products, catalogueId, persistAndNotifyParent, guardCloudWrite]
   );
 
   const handleToggleAllProducts = useCallback(() => {
     if (!guardCloudWrite()) return;
-    let updated: any[] | undefined;
-    setProducts((prev) => {
-      const filtered = prev.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(search.toLowerCase()) ||
-          p.subtitle?.toLowerCase().includes(search.toLowerCase())
-      );
-      const allEnabled =
-        filtered.length > 0 && filtered.every((p) => isProductEnabledForCatalogue(p, catalogueId));
-      updated = prev.map((p) => {
-        if (filtered.some((fp) => fp.id === p.id)) {
-          return setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true);
-        }
-        return p;
-      });
-      return updated;
+    
+    const filtered = products.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.subtitle?.toLowerCase().includes(search.toLowerCase())
+    );
+    const allEnabled =
+      filtered.length > 0 && filtered.every((p) => isProductEnabledForCatalogue(p, catalogueId));
+
+    const updated = products.map((p) => {
+      if (filtered.some((fp) => fp.id === p.id)) {
+        return setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true);
+      }
+      return p;
     });
-    if (updated) persistAndNotifyParent(updated);
-  }, [catalogueId, search, persistAndNotifyParent, guardCloudWrite]);
+
+    persistAndNotifyParent(updated);
+  }, [products, catalogueId, search, persistAndNotifyParent, guardCloudWrite]);
 
   const filteredProducts = products.filter(
     (p) =>
@@ -168,7 +182,7 @@ export default function AddProductsModal({
             <h2 className="text-xl font-bold">Add Products to {catalogueLabel}</h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 text-2xl font-light transition-colors duration-150"
             >
               ×
@@ -218,7 +232,7 @@ export default function AddProductsModal({
         <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-medium transition-colors duration-150"
           >
             Close

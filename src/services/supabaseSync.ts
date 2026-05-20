@@ -49,19 +49,32 @@ export async function syncProducts(
 
     const catalogues = getAllCatalogues();
     const cleanedProducts = products.map(p => {
+      // Snapshot catalogueData before syncTopLevelFieldsIntoCatalogueData overwrites enabled flags
+      const catalogueDataSnapshot = p.catalogueData
+        ? JSON.parse(JSON.stringify(p.catalogueData))
+        : null;
+
       const reconciled = syncTopLevelFieldsIntoCatalogueData(
         p as ProductWithCatalogueData,
         catalogues
       );
       const clean = { ...reconciled };
+
+      // Restore enabled flags from snapshot
+      if (catalogueDataSnapshot && clean.catalogueData) {
+        for (const catId in catalogueDataSnapshot) {
+          if (clean.catalogueData[catId] && catalogueDataSnapshot[catId]) {
+            clean.catalogueData[catId].enabled = catalogueDataSnapshot[catId].enabled;
+          }
+        }
+      }
+
       clean.updatedAt = new Date().toISOString();
-      // Remove large binary data fields but PRESERVE imageUrl (cloud URL)
       delete clean.image;
       delete clean.imageBase64;
       delete clean.imageData;
       delete clean.imageFilename;
       delete clean.renderedImages;
-      // imageUrl is intentionally preserved - it's the Cloudflare R2 URL needed for sync
       return clean;
     });
 
