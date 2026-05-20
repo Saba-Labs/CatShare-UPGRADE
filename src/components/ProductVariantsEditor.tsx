@@ -20,7 +20,7 @@ export default function ProductVariantsEditor({
   theme = "classic",
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [confirmDelete, setConfirmDelete] = useState<{ groupIndex: number; optionIndex: number } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ groupIndex: number; optionIndex: number } | { groupIndex: number } | null>(null);
   const rootClass =
     theme === "glass" ? "pve pve--glass" : "pve pve--classic";
 
@@ -58,11 +58,18 @@ export default function ProductVariantsEditor({
   };
 
   const removeGroup = (index: number) => {
-    const filtered = groups.filter((_, i) => i !== index);
+    setConfirmDelete({ groupIndex: index });
+  };
+
+  const confirmRemoveGroup = () => {
+    if (!confirmDelete || !('optionIndex' in confirmDelete)) return;
+    const groupIndex = confirmDelete.groupIndex;
+    const filtered = groups.filter((_, i) => i !== groupIndex);
     onChange(filtered);
     if (currentIndex >= filtered.length && currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
     }
+    setConfirmDelete(null);
   };
 
   const addGroup = () => {
@@ -192,8 +199,12 @@ export default function ProductVariantsEditor({
       {confirmDelete && (
         <div className="pve-modal-overlay" onClick={() => setConfirmDelete(null)}>
           <div className="pve-modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="pve-modal-title">Delete Option</h3>
-            <p className="pve-modal-text">Are you sure you want to delete this option? This action cannot be undone.</p>
+            <h3 className="pve-modal-title">
+              {'optionIndex' in confirmDelete ? 'Delete Option' : 'Delete Group'}
+            </h3>
+            <p className="pve-modal-text">
+              {('optionIndex' in confirmDelete ? 'Are you sure you want to delete this option? This action cannot be undone.' : 'Are you sure you want to delete this variant group? This action cannot be undone.')}
+            </p>
             <div className="pve-modal-buttons">
               <button
                 type="button"
@@ -205,7 +216,13 @@ export default function ProductVariantsEditor({
               <button
                 type="button"
                 className="pve-modal-btn pve-modal-btn--delete"
-                onClick={confirmRemoveOption}
+                onClick={() => {
+                  if ('optionIndex' in confirmDelete) {
+                    confirmRemoveOption();
+                  } else {
+                    confirmRemoveGroup();
+                  }
+                }}
               >
                 Delete
               </button>
