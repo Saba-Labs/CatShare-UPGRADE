@@ -84,27 +84,32 @@ export default function AddProductsModal({
   const wasOpenRef = useRef(false);
   const productsBeforeEditRef = useRef(allProducts);
 
+  const allProductsRef = useRef(allProducts);
+  useEffect(() => {
+    allProductsRef.current = allProducts;
+  }, [allProducts]);
+
   const { guardCloudWrite } = useCloudWriteGate();
 
   // Only hydrate when the modal opens
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      setProducts(allProducts);
+      setProducts(allProductsRef.current);
       setSearch("");
-      productsBeforeEditRef.current = allProducts;
+      productsBeforeEditRef.current = allProductsRef.current;
     }
     wasOpenRef.current = isOpen;
-  }, [isOpen, allProducts]);
+  }, [isOpen]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
-    // Immediately update local state for instant visual feedback
     setProducts(updated);
-    // Save to localStorage (this triggers Supabase sync async)
     saveProducts(updated);
-    // Tell parent to update - parent will update its state and re-render
-    // But we don't re-sync from parent's allProducts while modal is open
-    onProductsUpdate(updated);
-  }, [onProductsUpdate]);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    onProductsUpdate(products);
+    onClose();
+  }, [products, onProductsUpdate, onClose]);
 
   const handleToggleProduct = useCallback(
     (productId: string) => {
@@ -168,7 +173,7 @@ export default function AddProductsModal({
             <h2 className="text-xl font-bold">Add Products to {catalogueLabel}</h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 text-2xl font-light transition-colors duration-150"
             >
               ×
@@ -218,7 +223,7 @@ export default function AddProductsModal({
         <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-medium transition-colors duration-150"
           >
             Close
