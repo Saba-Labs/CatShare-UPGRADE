@@ -82,6 +82,7 @@ export default function AddProductsModal({
   const [products, setProducts] = useState(allProducts);
   const [search, setSearch] = useState("");
   const wasOpenRef = useRef(false);
+  const lastUpdatedRef = useRef<number>(0);
   const { guardCloudWrite } = useCloudWriteGate();
 
   // Only hydrate from parent when the modal opens — not on every parent re-render (avoids jank / search reset).
@@ -89,11 +90,33 @@ export default function AddProductsModal({
     if (isOpen && !wasOpenRef.current) {
       setProducts(allProducts);
       setSearch("");
+      lastUpdatedRef.current = Date.now();
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
 
+  // Sync with parent's allProducts after a delay (allows time for our update to propagate)
+  // but keep our state if we just updated it locally
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeSinceLastUpdate = Date.now() - lastUpdatedRef.current;
+    if (timeSinceLastUpdate < 500) {
+      // We just made an update, don't overwrite with parent data yet
+      return;
+    }
+
+    // Check if products actually changed in parent
+    setProducts((prev) => {
+      if (JSON.stringify(prev) !== JSON.stringify(allProducts)) {
+        return allProducts;
+      }
+      return prev;
+    });
+  }, [allProducts, isOpen]);
+
   const persistAndNotifyParent = useCallback((updated: any[]) => {
+    lastUpdatedRef.current = Date.now();
     saveProducts(updated);
     onProductsUpdate(updated);
   }, [onProductsUpdate]);
