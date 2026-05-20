@@ -76,6 +76,21 @@ export default function ProductVariantsEditor({
 
   return (
     <div className={rootClass}>
+      {hasGroups && (
+        <div className="pve-tabs">
+          {groups.map((group, idx) => (
+            <button
+              key={group.id}
+              type="button"
+              className={`pve-tab ${idx === currentIndex ? 'pve-tab--active' : ''}`}
+              onClick={() => setCurrentIndex(idx)}
+            >
+              {group.name || `Group ${idx + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!hasGroups && (
         <div className="pve-empty">
           No variants yet. Add a group to get started.
@@ -138,30 +153,6 @@ export default function ProductVariantsEditor({
                 + Add option
               </button>
             )}
-          </div>
-
-          <div className="pve-pagination">
-            <button
-              type="button"
-              className="pve-nav-btn"
-              onClick={goToPrevious}
-              disabled={currentIndex === 0}
-              aria-label="Previous group"
-            >
-              ←
-            </button>
-            <span className="pve-page-indicator">
-              {currentIndex + 1} / {groups.length}
-            </span>
-            <button
-              type="button"
-              className="pve-nav-btn"
-              onClick={goToNext}
-              disabled={currentIndex === groups.length - 1}
-              aria-label="Next group"
-            >
-              →
-            </button>
           </div>
         </div>
       )}

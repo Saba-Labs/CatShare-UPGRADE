@@ -118,40 +118,39 @@
 .pve--glass .pve-add-option:hover, .pve--glass .pve-add-group:hover { border-color: rgba(147,197,253,0.4); background: rgba(147,197,253,0.08); }
 .pve-add-group:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.pve-pagination {
+.pve-tabs {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 8px;
+  border-bottom: 1px solid;
+  margin: -12px -12px 12px -12px;
+  padding: 0 0 0 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
+.pve--classic .pve-tabs { border-color: #e5e7eb; }
+.pve--glass .pve-tabs { border-color: rgba(255,255,255,0.08); }
 
-.pve-nav-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
+.pve-tab {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  border: 1px solid;
+  padding: 10px 12px;
+  border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
   transition: all 0.2s;
-}
-.pve--classic .pve-nav-btn { border-color: #d1d5db; color: #374151; }
-.pve--classic .pve-nav-btn:hover:not(:disabled) { border-color: #2563eb; background: rgba(37,99,235,0.05); }
-.pve--glass .pve-nav-btn { border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
-.pve--glass .pve-nav-btn:hover:not(:disabled) { border-color: rgba(147,197,253,0.4); background: rgba(147,197,253,0.08); }
-.pve-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.pve-page-indicator {
-  font-size: 12px;
-  font-weight: 600;
-  min-width: 50px;
-  text-align: center;
   opacity: 0.7;
 }
-.pve--classic .pve-page-indicator { color: #374151; }
-.pve--glass .pve-page-indicator { color: rgba(255,255,255,0.7); }
+.pve-tab:hover { opacity: 0.9; }
+.pve--classic .pve-tab { color: #6b7280; }
+.pve--glass .pve-tab { color: rgba(255,255,255,0.6); }
+
+.pve-tab--active {
+  opacity: 1;
+  border-bottom-color: currentColor;
+}
+.pve--classic .pve-tab--active { color: #2563eb; }
+.pve--glass .pve-tab--active { color: #93c5fd; }
