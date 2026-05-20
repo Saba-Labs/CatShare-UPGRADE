@@ -101,18 +101,13 @@ export default function ProductVariantsEditor({
       )}
 
       {!hasGroups && (
-        <div className="pve-empty-state">
-          <div className="pve-empty-icon">⚙️</div>
-          <h4 className="pve-empty-title">No variants yet</h4>
-          <p className="pve-empty-desc">Add option groups like Size, Colour, or Material to let customers customize their purchase.</p>
-          <button
-            type="button"
-            className="pve-empty-cta"
-            onClick={addGroup}
-          >
-            + Add your first group
-          </button>
-        </div>
+        <button
+          type="button"
+          className="pve-add-group-empty"
+          onClick={addGroup}
+        >
+          + Add variant group
+        </button>
       )}
 
       {hasGroups && (
