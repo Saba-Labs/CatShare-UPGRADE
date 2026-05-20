@@ -20,6 +20,7 @@ export default function ProductVariantsEditor({
   theme = "classic",
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState<{ groupIndex: number; optionIndex: number } | null>(null);
   const rootClass =
     theme === "glass" ? "pve pve--glass" : "pve pve--classic";
 
@@ -43,10 +44,17 @@ export default function ProductVariantsEditor({
   };
 
   const removeOption = (groupIndex: number, optionIndex: number) => {
+    setConfirmDelete({ groupIndex, optionIndex });
+  };
+
+  const confirmRemoveOption = () => {
+    if (!confirmDelete) return;
+    const { groupIndex, optionIndex } = confirmDelete;
     const g = groups[groupIndex];
     if (!g) return;
     const options = g.options.filter((_, i) => i !== optionIndex);
     updateGroup(groupIndex, { options: options.length > 0 ? options : [""] });
+    setConfirmDelete(null);
   };
 
   const removeGroup = (index: number) => {
@@ -175,6 +183,31 @@ export default function ProductVariantsEditor({
                 Add option
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="pve-modal-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="pve-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="pve-modal-title">Delete Option</h3>
+            <p className="pve-modal-text">Are you sure you want to delete this option? This action cannot be undone.</p>
+            <div className="pve-modal-buttons">
+              <button
+                type="button"
+                className="pve-modal-btn pve-modal-btn--cancel"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="pve-modal-btn pve-modal-btn--delete"
+                onClick={confirmRemoveOption}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

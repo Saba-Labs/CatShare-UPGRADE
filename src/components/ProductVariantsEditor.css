@@ -82,7 +82,7 @@
 .pve-options { display: flex; flex-direction: column; gap: 0; }
 .pve-option-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   padding: 10px 0;
   border-bottom: 1px solid;
@@ -92,6 +92,7 @@
 .pve--glass .pve-option-row { border-color: rgba(255,255,255,0.06); }
 .pve-input--option {
   flex: 1;
+  min-width: 0;
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
@@ -100,8 +101,8 @@
 }
 
 .pve-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   border-radius: 4px;
   border: none;
@@ -112,12 +113,12 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  opacity: 0.5;
+  opacity: 0.6;
   background: transparent;
 }
-.pve-icon-btn:hover:not(:disabled) { opacity: 0.8; }
-.pve--classic .pve-icon-btn { color: #6b7280; }
-.pve--glass .pve-icon-btn { color: rgba(255,255,255,0.5); }
+.pve-icon-btn:hover:not(:disabled) { opacity: 1; }
+.pve--classic .pve-icon-btn { color: #dc2626; }
+.pve--glass .pve-icon-btn { color: #fca5a5; }
 .pve-icon-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
 .pve-add-option, .pve-add-group {
@@ -231,3 +232,95 @@
   background: rgba(59,130,246,0.1);
 }
 .pve-tab-add:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.pve-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.pve-modal {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.pve--glass .pve-modal {
+  background: rgba(30, 30, 30, 0.95);
+  color: white;
+}
+
+.pve-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.pve--classic .pve-modal-title { color: #111827; }
+.pve--glass .pve-modal-title { color: #fff; }
+
+.pve-modal-text {
+  font-size: 14px;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.pve--classic .pve-modal-text { color: #6b7280; }
+.pve--glass .pve-modal-text { color: rgba(255, 255, 255, 0.7); }
+
+.pve-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.pve-modal-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pve-modal-btn--cancel {
+  background: transparent;
+  border: 1px solid;
+}
+
+.pve--classic .pve-modal-btn--cancel {
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.pve--classic .pve-modal-btn--cancel:hover {
+  border-color: #9ca3af;
+  background: rgba(156, 163, 175, 0.05);
+}
+
+.pve--glass .pve-modal-btn--cancel {
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.pve--glass .pve-modal-btn--cancel:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pve-modal-btn--delete {
+  background: #dc2626;
+  color: white;
+}
+
+.pve-modal-btn--delete:hover {
+  background: #b91c1c;
+}
