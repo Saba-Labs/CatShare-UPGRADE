@@ -129,15 +129,21 @@
 .pve--glass .pve-add-option:hover, .pve--glass .pve-add-group:hover { border-color: rgba(147,197,253,0.4); background: rgba(147,197,253,0.08); }
 .pve-add-group:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.pve-tabs-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
 .pve-tabs {
   display: flex;
   gap: 8px;
   border-bottom: 1px solid;
-  margin: -12px -12px 12px -12px;
-  padding: 0 12px;
+  flex: 1;
+  padding: 0 0 0 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  align-items: center;
 }
 .pve--classic .pve-tabs { border-color: #e5e7eb; }
 .pve--glass .pve-tabs { border-color: rgba(255,255,255,0.08); }
@@ -174,19 +180,31 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  margin-left: 6px;
-  border: none;
+  border: 1px solid;
+  border-radius: 6px;
   background: transparent;
   cursor: pointer;
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   transition: all 0.2s;
   flex-shrink: 0;
-  opacity: 0.7;
 }
-.pve-tab-add:hover:not(:disabled) { opacity: 1; }
-.pve--classic .pve-tab-add { color: #2563eb; }
-.pve--glass .pve-tab-add { color: #93c5fd; }
-.pve-tab-add:disabled { opacity: 0.3; cursor: not-allowed; }
+.pve--classic .pve-tab-add {
+  border-color: #d1d5db;
+  color: #2563eb;
+}
+.pve--classic .pve-tab-add:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: rgba(37,99,235,0.05);
+}
+.pve--glass .pve-tab-add {
+  border-color: rgba(255,255,255,0.1);
+  color: #93c5fd;
+}
+.pve--glass .pve-tab-add:hover:not(:disabled) {
+  border-color: rgba(147,197,253,0.4);
+  background: rgba(147,197,253,0.08);
+}
+.pve-tab-add:disabled { opacity: 0.4; cursor: not-allowed; }

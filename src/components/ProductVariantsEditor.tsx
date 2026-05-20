@@ -77,17 +77,19 @@ export default function ProductVariantsEditor({
   return (
     <div className={rootClass}>
       {hasGroups && (
-        <div className="pve-tabs">
-          {groups.map((group, idx) => (
-            <button
-              key={group.id}
-              type="button"
-              className={`pve-tab ${idx === currentIndex ? 'pve-tab--active' : ''}`}
-              onClick={() => setCurrentIndex(idx)}
-            >
-              {group.name || `Group ${idx + 1}`}
-            </button>
-          ))}
+        <div className="pve-tabs-wrapper">
+          <div className="pve-tabs">
+            {groups.map((group, idx) => (
+              <button
+                key={group.id}
+                type="button"
+                className={`pve-tab ${idx === currentIndex ? 'pve-tab--active' : ''}`}
+                onClick={() => setCurrentIndex(idx)}
+              >
+                {group.name || `Group ${idx + 1}`}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             className="pve-tab-add"
