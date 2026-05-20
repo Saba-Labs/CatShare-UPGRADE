@@ -36,8 +36,12 @@
 .pve--glass .pve-group-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 
 .pve-group-head { display: flex; flex-direction: column; gap: 6px; }
-.pve-group-head > .pve-input { padding-right: 40px; position: relative; }
-.pve-group-head { position: relative; }
+.pve-group-head > .pve-input { flex: 1; }
+.pve-group-head-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .pve-label { font-size: 12px; font-weight: 600; opacity: 0.65; letter-spacing: 0; text-transform: none; }
 .pve--classic .pve-label { color: #374151; }
 .pve--glass .pve-label { color: rgba(255,255,255,0.6); }
@@ -58,12 +62,9 @@
 .pve--glass .pve-input:focus { border-color: rgba(147,197,253,0.5); }
 
 .pve-remove-group {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
