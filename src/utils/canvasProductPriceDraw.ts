@@ -76,7 +76,7 @@ export function drawCanvasCataloguePriceLine(
     if (s.strike && s.t.length > 0) {
       ctx.globalAlpha = 0.75;
       ctx.fillText(s.t, x, centerY);
-      const strikeY = centerY - Math.max(3, 4 * scale * 0.75);
+      const strikeY = centerY - Math.max(1, 2 * scale * 0.75);
       ctx.strokeStyle = fontColor;
       ctx.lineWidth = Math.max(1, 1.2 * scale * 0.75);
       ctx.globalAlpha = 0.75;
