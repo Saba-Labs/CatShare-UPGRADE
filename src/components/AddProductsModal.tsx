@@ -85,9 +85,11 @@ export default function AddProductsModal({
   const productsBeforeEditRef = useRef(allProducts);
 
   const allProductsRef = useRef(allProducts);
-  useEffect(() => {
+useEffect(() => {
+  if (!wasOpenRef.current) { 
     allProductsRef.current = allProducts;
-  }, [allProducts]);
+  }
+}, [allProducts]);
 
   const { guardCloudWrite } = useCloudWriteGate();
 
@@ -102,10 +104,10 @@ export default function AddProductsModal({
   }, [isOpen]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
-    setProducts(updated);
-    saveProducts(updated);
-    onProductsUpdate(updated);
-  }, []);
+  setProducts(updated);
+  saveProducts(updated);
+  onProductsUpdate(updated);
+}, [onProductsUpdate]);
 
   const handleClose = useCallback(() => {
     onProductsUpdate(products);
