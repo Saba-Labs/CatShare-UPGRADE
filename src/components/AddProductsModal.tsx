@@ -104,6 +104,7 @@ export default function AddProductsModal({
   const persistAndNotifyParent = useCallback((updated: any[]) => {
     setProducts(updated);
     saveProducts(updated);
+    onProductsUpdate(updated);
   }, []);
 
   const handleClose = useCallback(() => {
