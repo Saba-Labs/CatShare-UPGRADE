@@ -36,6 +36,8 @@
 .pve--glass .pve-group-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 
 .pve-group-head { display: flex; flex-direction: column; gap: 6px; }
+.pve-group-head > .pve-input { padding-right: 40px; position: relative; }
+.pve-group-head { position: relative; }
 .pve-label { font-size: 12px; font-weight: 600; opacity: 0.65; letter-spacing: 0; text-transform: none; }
 .pve--classic .pve-label { color: #374151; }
 .pve--glass .pve-label { color: rgba(255,255,255,0.6); }
@@ -56,17 +58,23 @@
 .pve--glass .pve-input:focus { border-color: rgba(147,197,253,0.5); }
 
 .pve-remove-group {
-  align-self: flex-start;
-  margin-top: 2px;
-  font-size: 12px;
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
-  text-decoration: none;
-  opacity: 0.7;
+  opacity: 0.6;
   transition: opacity 0.2s;
 }
+.pve-remove-group svg { width: 18px; height: 18px; }
 .pve-remove-group:hover { opacity: 1; }
 .pve--classic .pve-remove-group { color: #dc2626; }
 .pve--glass .pve-remove-group { color: #fca5a5; }
