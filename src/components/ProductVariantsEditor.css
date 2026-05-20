@@ -1,84 +1,210 @@
-.pve { display: flex; flex-direction: column; gap: 14px; }
-.pve-hint { font-size: 12px; line-height: 1.45; margin: 0 0 4px; opacity: 0.85; }
-.pve-empty {
-  padding: 16px;
-  border-radius: 10px;
-  font-size: 13px;
+.pve { display: flex; flex-direction: column; gap: 12px; }
+.pve-add-group-empty {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 2px dotted;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
   text-align: center;
 }
-.pve--classic .pve-empty { background: #f3f4f6; color: #6b7280; }
-.pve--glass .pve-empty { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+.pve--classic .pve-add-group-empty { color: #9ca3af; border-color: #d1d5db; }
+.pve--classic .pve-add-group-empty:hover { border-color: #9ca3af; background: rgba(156,163,175,0.05); }
+.pve--glass .pve-add-group-empty { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.2); }
+.pve--glass .pve-add-group-empty:hover { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.05); }
 
-.pve-group {
-  border-radius: 12px;
-  padding: 14px;
+.pve-partition-view {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
-.pve--classic .pve-group { background: #f9fafb; border: 1px solid #e5e7eb; }
-.pve--glass .pve-group { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+
+.pve-group-card {
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pve--classic .pve-group-card { background: #f9fafb; border: 1px solid #e5e7eb; }
+.pve--glass .pve-group-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 
 .pve-group-head { display: flex; flex-direction: column; gap: 6px; }
-.pve-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; }
-.pve--classic .pve-label { color: #6b7280; }
-.pve--glass .pve-label { color: rgba(255,255,255,0.65); }
+.pve-label { font-size: 12px; font-weight: 600; opacity: 0.65; letter-spacing: 0; text-transform: none; }
+.pve--classic .pve-label { color: #374151; }
+.pve--glass .pve-label { color: rgba(255,255,255,0.6); }
 
 .pve-input {
   width: 100%;
   box-sizing: border-box;
-  border-radius: 8px;
-  padding: 9px 11px;
-  font-size: 14px;
-  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid;
   outline: none;
+  transition: border-color 0.2s;
 }
-.pve--classic .pve-input { background: #fff; border-color: #d1d5db; color: #111827; }
-.pve--glass .pve-input { background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.15); color: #fff; }
+.pve--classic .pve-input { background: transparent; border-color: #d1d5db; color: #111827; }
+.pve--classic .pve-input:focus { border-color: #2563eb; }
+.pve--glass .pve-input { background: transparent; border-color: rgba(255,255,255,0.1); color: #fff; }
+.pve--glass .pve-input:focus { border-color: rgba(147,197,253,0.5); }
 
 .pve-remove-group {
   align-self: flex-start;
-  margin-top: 4px;
+  margin-top: 2px;
   font-size: 12px;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
-  text-decoration: underline;
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.2s;
 }
+.pve-remove-group:hover { opacity: 1; }
 .pve--classic .pve-remove-group { color: #dc2626; }
 .pve--glass .pve-remove-group { color: #fca5a5; }
 
-.pve-options { display: flex; flex-direction: column; gap: 8px; }
-.pve-option-row { display: flex; gap: 8px; align-items: center; }
-.pve-input--option { flex: 1; }
+.pve-options { display: flex; flex-direction: column; gap: 0; }
+.pve-option-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid;
+}
+.pve-option-row:last-child { border-bottom: none; }
+.pve--classic .pve-option-row { border-color: #e5e7eb; }
+.pve--glass .pve-option-row { border-color: rgba(255,255,255,0.06); }
+.pve-input--option {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
 
 .pve-icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 4px;
+  border: none;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
+  opacity: 0.5;
+  background: transparent;
 }
-.pve--classic .pve-icon-btn { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
-.pve--glass .pve-icon-btn { background: rgba(239,68,68,0.2); color: #fecaca; }
-.pve-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.pve-icon-btn:hover:not(:disabled) { opacity: 0.8; }
+.pve--classic .pve-icon-btn { color: #6b7280; }
+.pve--glass .pve-icon-btn { color: rgba(255,255,255,0.5); }
+.pve-icon-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
 .pve-add-option, .pve-add-group {
   font-size: 13px;
-  font-weight: 600;
-  border-radius: 8px;
-  padding: 10px 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 8px 10px;
   cursor: pointer;
-  border: 1px dashed transparent;
+  border: 1px solid;
   background: transparent;
+  transition: all 0.2s;
+  text-align: left;
 }
-.pve--classic .pve-add-option, .pve--classic .pve-add-group { color: #2563eb; border-color: #93c5fd; }
-.pve--glass .pve-add-option, .pve--glass .pve-add-group { color: #93c5fd; border-color: rgba(147,197,253,0.4); }
+.pve--classic .pve-add-option, .pve--classic .pve-add-group { color: #2563eb; border-color: #d1d5db; }
+.pve--classic .pve-add-option:hover, .pve--classic .pve-add-group:hover { border-color: #2563eb; background: rgba(37,99,235,0.05); }
+.pve--glass .pve-add-option, .pve--glass .pve-add-group { color: #93c5fd; border-color: rgba(255,255,255,0.1); }
+.pve--glass .pve-add-option:hover, .pve--glass .pve-add-group:hover { border-color: rgba(147,197,253,0.4); background: rgba(147,197,253,0.08); }
 .pve-add-group:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.pve-tabs-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.pve-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid;
+  flex: 1;
+  padding: 0 0 0 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pve--classic .pve-tabs { border-color: #e5e7eb; }
+.pve--glass .pve-tabs { border-color: rgba(255,255,255,0.08); }
+
+.pve-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+.pve-tab:hover { opacity: 0.9; }
+.pve--classic .pve-tab { color: #6b7280; }
+.pve--glass .pve-tab { color: rgba(255,255,255,0.6); }
+
+.pve-tab--active {
+  opacity: 1;
+  border-bottom-color: currentColor;
+}
+.pve--classic .pve-tab--active { color: #2563eb; }
+.pve--glass .pve-tab--active { color: #93c5fd; }
+
+.pve-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.pve--classic .pve-tab-add {
+  border-color: #d1d5db;
+  color: #2563eb;
+}
+.pve--classic .pve-tab-add:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: rgba(37,99,235,0.05);
+}
+.pve--glass .pve-tab-add {
+  border-color: rgba(255,255,255,0.1);
+  color: #93c5fd;
+}
+.pve--glass .pve-tab-add:hover:not(:disabled) {
+  border-color: rgba(147,197,253,0.4);
+  background: rgba(147,197,253,0.08);
+}
+.pve-tab-add:disabled { opacity: 0.4; cursor: not-allowed; }

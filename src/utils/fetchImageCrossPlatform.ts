@@ -130,22 +130,27 @@ export async function fetchUrlAsDataUrl(url: string): Promise<string> {
       // Raw fetch often fails on R2 when CORS is tight; <img crossOrigin> + same fetch→blob
       // fallback in loadImage() sometimes still succeeds (matches on-screen thumbnails).
       console.warn('fetchUrlAsDataUrl: direct fetch failed, trying loadImage + canvas', fetchErr);
-      const { loadImage } = await import('./canvasRenderer');
-      const img = await loadImage(trimmed);
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
-      if (!w || !h) {
-        throw new Error('Image has zero dimensions');
+      try {
+        const { loadImage } = await import('./canvasRenderer');
+        const img = await loadImage(trimmed);
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (!w || !h) {
+          throw new Error('Image has zero dimensions');
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Canvas 2D context unavailable');
+        }
+        ctx.drawImage(img, 0, 0);
+        return canvas.toDataURL('image/png');
+      } catch (canvasErr) {
+        console.warn('fetchUrlAsDataUrl: canvas fallback also failed', canvasErr);
+        throw fetchErr;
       }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Canvas 2D context unavailable');
-      }
-      ctx.drawImage(img, 0, 0);
-      return canvas.toDataURL('image/png');
     }
   }
 

@@ -101,7 +101,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // Create an AbortController with 5 second timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort('timeout'), 5000);
 
       try {
         let resp: Response;
@@ -115,12 +115,19 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             signal: controller.signal,
           });
         } catch (fetchErr) {
-          console.debug('Subscription fetch failed:', fetchErr instanceof Error ? fetchErr.message : String(fetchErr));
+          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+          if (msg.includes('abort') || msg.includes('signal')) {
+            console.debug('Subscription fetch timed out or was aborted');
+          } else {
+            console.debug('Subscription fetch failed:', msg);
+          }
+          clearTimeout(timeoutId);
           return;
         }
 
         if (!resp.ok) {
           console.debug(`Subscription API returned status ${resp.status}`);
+          clearTimeout(timeoutId);
           return;
         }
 
@@ -150,7 +157,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         } else {
           localStorage.removeItem(LS_TRIAL_ENDS);
         }
+        clearTimeout(timeoutId);
       } catch (fetchError) {
+        clearTimeout(timeoutId);
         // Silently fail and keep cached values - this handles network errors, CORS issues, timeouts, etc.
         if (fetchError instanceof Error) {
           if (fetchError.name === 'AbortError') {
