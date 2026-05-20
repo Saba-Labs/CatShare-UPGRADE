@@ -1836,56 +1836,91 @@ if (migratedProduct.suggestedColors?.length > 0) {
               </div>
             </div>
 
-              <div className="mb-5 space-y-2 pb-4 border-b border-gray-200 dark:border-gray-800">
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
-                  Gallery (max {MAX_PRODUCT_IMAGES})
-                </label>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                  Mark one image as Primary for lists, share links, and catalogue renders.
-                </p>
+              <div className="mb-5 pb-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex items-baseline justify-between mb-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      Gallery
+                    </label>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      {imageSlots.length} of {MAX_PRODUCT_IMAGES} images
+                    </p>
+                  </div>
+                  {imageSlots.length < MAX_PRODUCT_IMAGES && (
+                    <button
+                      type="button"
+                      onClick={handleSelectImage}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-3">
                   {imageSlots.map((src, idx) => (
-                    <div key={`slot-${idx}`} className="w-[88px] shrink-0 space-y-1">
-                      <div className="relative h-20 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
-                        <img src={src} alt="" className="w-full h-full object-cover" />
+                    <div key={`slot-${idx}`} className="relative group">
+                      <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 transition-all duration-200"
+                        style={{
+                          borderColor: primarySlotIndex === idx ? '#2563eb' : '#e5e7eb',
+                        }}
+                      >
+                        <img src={src} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" />
+
+                        {primarySlotIndex === idx && (
+                          <div className="absolute inset-0 bg-blue-600/10 pointer-events-none flex items-center justify-center">
+                            <div className="bg-blue-600 text-white rounded-full p-1" style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setPrimarySlotIndex(idx)}
-                        className={`w-full text-[10px] py-1 rounded font-semibold ${
-                          primarySlotIndex === idx
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
-                        }`}
-                      >
-                        Primary
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openReplaceSlot(idx)}
-                        className="w-full text-[10px] py-1 rounded bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-100"
-                      >
-                        Replace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeImageAt(idx)}
-                        className="w-full text-[10px] py-1 rounded bg-red-50 dark:bg-red-900/40 text-red-800 dark:text-red-200"
-                      >
-                        Remove
-                      </button>
+
+                      {/* Hover Actions */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPrimarySlotIndex(idx)}
+                          title={primarySlotIndex === idx ? "Currently primary" : "Set as primary"}
+                          className="bg-white hover:bg-gray-100 text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openReplaceSlot(idx)}
+                          title="Replace image"
+                          className="bg-white hover:bg-gray-100 text-gray-800 rounded-full p-2 shadow-lg transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeImageAt(idx)}
+                          title="Remove image"
+                          className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-all"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Index Badge */}
+                      <div className="absolute -top-2 -left-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-md">
+                        {idx + 1}
+                      </div>
                     </div>
                   ))}
                 </div>
-                {imageSlots.length < MAX_PRODUCT_IMAGES && (
-                  <button
-                    type="button"
-                    onClick={handleSelectImage}
-                    className="mt-2 text-xs font-medium text-blue-600 hover:underline"
-                  >
-                    + Add another image
-                  </button>
-                )}
               </div>
 
               {/* Colors Section */}
