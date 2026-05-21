@@ -26,6 +26,7 @@ import {
   formatVariantSelectionSummary,
   getProductVariantGroups,
   isVariantSelectionComplete,
+  getVariantCombinationData,
 } from '../utils/productVariants';
 import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
