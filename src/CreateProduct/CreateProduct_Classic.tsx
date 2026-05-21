@@ -556,6 +556,59 @@ export default function CreateProduct() {
     setFetchPriceChecked(false);
   }, [selectedCatalogue]);
 
+  // Auto-save variant changes to Supabase when editing an existing product
+  useEffect(() => {
+    if (!editingId || !variantConfig.combinations?.length) return;
+
+    const autoSaveVariants = async () => {
+      try {
+        const authUserIdNow = getPersistedAuthUserId();
+        if (!authUserIdNow) return;
+
+        const productsStorageKeyNow = getStorageKey("products", authUserIdNow);
+        const all = safeGetFromStorage(productsStorageKeyNow, []);
+        const existing = all.find((p: any) => p.id === editingId);
+        if (!existing) return;
+
+        // Update the product with new variant config
+        const updated = all.map((p: any) => {
+          if (p.id === editingId) {
+            const savedVariants = pruneVariantGroupsForSave(variantGroups);
+            if (variantConfig.combinations && variantConfig.combinations.length > 0) {
+              savedVariants.combinations = variantConfig.combinations;
+            }
+            if (savedVariants.groups.length > 0) {
+              return { ...p, variants: savedVariants, updatedAt: new Date().toISOString() };
+            } else {
+              const copy = { ...p, updatedAt: new Date().toISOString() };
+              delete copy.variants;
+              return copy;
+            }
+          }
+          return p;
+        });
+
+        // Save to localStorage
+        const ok = safeSetInStorage(productsStorageKeyNow, updated);
+        if (ok) {
+          // Trigger Supabase sync with forceCloudSync flag
+          window.dispatchEvent(
+            new CustomEvent("product-added", {
+              detail: { onlyProductId: String(editingId), forceCloudSync: true },
+            })
+          );
+          console.log("✅ Variant changes auto-saved and synced to Supabase");
+        }
+      } catch (err) {
+        console.error("❌ Failed to auto-save variant changes:", err);
+      }
+    };
+
+    // Debounce the auto-save to avoid too many saves
+    const timer = setTimeout(autoSaveVariants, 1000);
+    return () => clearTimeout(timer);
+  }, [variantConfig.combinations, editingId, variantGroups]);
+
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
