@@ -228,40 +228,6 @@ export default function VariantCombinationEditor({
               className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
             />
           </div>
-
-          {/* Weight */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Weight (optional)</label>
-            <input
-              type="text"
-              value={(editingData.customFields?.weight as string) ?? ""}
-              onChange={(e) =>
-                setEditingData({
-                  ...editingData,
-                  customFields: { ...editingData.customFields, weight: e.target.value || undefined },
-                })
-              }
-              placeholder="500g"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optional)</label>
-            <textarea
-              value={(editingData.customFields?.notes as string) ?? ""}
-              onChange={(e) =>
-                setEditingData({
-                  ...editingData,
-                  customFields: { ...editingData.customFields, notes: e.target.value || undefined },
-                })
-              }
-              placeholder="Variant-specific instructions or details..."
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
-          </div>
         </div>
 
         <div className="flex gap-2 border-t pt-4">
