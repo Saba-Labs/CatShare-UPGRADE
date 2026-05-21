@@ -77,29 +77,31 @@ export default function VariantCombinationEditor({
 
     setUploadingImage(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = e.target?.result as string;
-        const raw = stripDataUriPrefix(base64);
-        const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
-        const ext = mimeType === "image/jpeg" ? "jpg" : "png";
-        const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
 
-        const result = await uploadImageToR2(raw, filename, "variant-images", mimeType as any);
-        if (result.success && result.publicUrl) {
-          setEditingData({ ...editingData, image: result.publicUrl });
-        } else {
-          alert(`Upload failed: ${result.error || "Unknown error"}`);
-        }
-        setUploadingImage(false);
-      };
-      reader.readAsDataURL(file);
+      const raw = stripDataUriPrefix(base64);
+      const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
+      const ext = mimeType === "image/jpeg" ? "jpg" : "png";
+      const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
+
+      const result = await uploadImageToR2(raw, filename, mimeType as any);
+      if (result.success && result.publicUrl) {
+        setEditingData((prev) => ({ ...prev, image: result.publicUrl }));
+      } else {
+        alert(`Upload failed: ${result.error || "Unknown error"}`);
+      }
     } catch (err) {
       console.error("Image upload error:", err);
       alert("Failed to upload image");
+    } finally {
       setUploadingImage(false);
     }
-  }, [editingData, selectedCombinationId]);
+  }, [selectedCombinationId]);
 
   if (combinations.length === 0) {
     return (
