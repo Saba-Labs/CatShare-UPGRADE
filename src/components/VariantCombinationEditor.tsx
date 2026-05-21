@@ -8,6 +8,7 @@ import {
   type VariantCombination,
 } from "../utils/productVariants";
 import { uploadImageToR2, stripDataUriPrefix } from "../services/cloudflareService";
+import { getAllFields } from "../config/fieldConfig";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
@@ -164,6 +165,52 @@ export default function VariantCombinationEditor({
             </div>
           </div>
 
+          {/* Custom Fields */}
+          {getAllFields()
+            .filter(f => f.enabled && f.key.startsWith('field'))
+            .map(field => {
+              const catData = editingData.customFields ?? {};
+              return (
+                <div key={field.key} className="flex gap-3 items-center">
+                  <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+                    {field.label}
+                  </label>
+                  <div className="relative flex-1">
+                    <input
+                      type={field.type === 'number' ? 'number' : 'text'}
+                      value={(catData[field.key] as string | number) ?? ""}
+                      onChange={(e) =>
+                        setEditingData({
+                          ...editingData,
+                          customFields: { ...editingData.customFields, [field.key]: e.target.value || undefined },
+                        })
+                      }
+                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+                    />
+                  </div>
+                  {(field.unitsEnabled && field.unitOptions && field.unitOptions.length > 0) && (
+                    <div className="relative flex-shrink-0">
+                      <select
+                        value={(catData[`${field.key}Unit`] as string) ?? "None"}
+                        onChange={(e) =>
+                          setEditingData({
+                            ...editingData,
+                            customFields: { ...editingData.customFields, [`${field.key}Unit`]: e.target.value || undefined },
+                          })
+                        }
+                        className="border border-gray-300 dark:border-gray-700 p-1.5 rounded min-w-[100px] text-xs appearance-none bg-white dark:bg-gray-800"
+                      >
+                        <option>None</option>
+                        {field.unitOptions.map(opt => (
+                          <option key={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
           {/* Price */}
           <div className="flex gap-3 items-center">
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
@@ -208,6 +255,30 @@ export default function VariantCombinationEditor({
                 autoComplete="off"
                 className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 placeholder:text-gray-400"
               />
+            </div>
+          </div>
+
+          {/* Qty Step */}
+          <div className="flex gap-3 items-start">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+              Qty step
+            </label>
+            <div className="flex-1 min-w-0">
+              <input
+                type="number"
+                min="1"
+                value={(editingData.customFields?.orderQuantityStep as number) ?? 1}
+                onChange={(e) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: { ...editingData.customFields, orderQuantityStep: e.target.value ? parseInt(e.target.value) : undefined },
+                  })
+                }
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+              />
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                1 = any quantity. E.g. 12 → only 12, 24, 36…
+              </p>
             </div>
           </div>
         </div>
