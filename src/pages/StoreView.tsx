@@ -1024,11 +1024,16 @@ useEffect(() => {
     selectedProducts.forEach((quantity, productId) => {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
+      const variantData = getVariantCombinationData(product, variantSelections[productId]);
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[productId]);
-      const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+      const variantQtyStep = variantData?.customFields?.orderQuantityStep;
+      const baseQtyStep = catData?.orderQuantityStep;
+      const quantityStep = normalizeOrderQuantityStep(variantQtyStep ?? baseQtyStep);
       const rowTotal = unitPrice * quantity;
       const pr = product as Record<string, unknown>;
       const iv = pr.imageVersion ?? pr.image_version;
+      const variantImageUrl = variantData?.image;
+      const baseImageUrl = pickProductImageSrc(product);
       items.push({
         productId,
         name: product.name,
@@ -1037,7 +1042,7 @@ useEffect(() => {
         rowTotal,
         priceUnit,
         quantityStep,
-        imageUrl: pickProductImageSrc(product),
+        imageUrl: variantImageUrl || baseImageUrl,
         imageVersion: typeof iv === 'number' && Number.isFinite(iv) ? iv : undefined,
         subtitle: product.subtitle,
         variantSummary: formatVariantSelectionSummary(
@@ -1843,6 +1848,7 @@ useEffect(() => {
         {drawerProduct && (() => {
           const fieldDefinition = getFieldsDefinition();
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
+          const variantData = getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]);
           /** Default `fieldConfig` has field1–10 `enabled: false`; guests have no seller localStorage. When the seller is logged in on the same device, `fieldsDefinition` may set `visibility.onlineStore: false` — still show any slot that has catalogue/product text so the public store matches what buyers see when logged out. */
           const visibleStoreFieldNumbers = new Set(
             fieldDefinition.fields
@@ -1858,25 +1864,51 @@ useEffect(() => {
               .filter((n) => Number.isFinite(n))
           );
           const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct, variantSelections[drawerProduct.id]);
-          const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+          const variantQtyStep = variantData?.customFields?.orderQuantityStep;
+          const baseQtyStep = catData?.orderQuantityStep;
+          const qstep = normalizeOrderQuantityStep(variantQtyStep ?? baseQtyStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
           const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
             if (!visibleStoreFieldNumbers.has(n)) return null;
+            const fieldKey = `field${n}`;
+            const fieldUnitKey = `field${n}Unit`;
+
+            // Check for variant-specific custom field value first
+            let variantValue = variantData?.customFields?.[fieldKey];
+            let variantUnit = variantData?.customFields?.[fieldUnitKey];
+
+            if (variantValue != null && String(variantValue).trim() !== '') {
+              const unitSuffix = variantUnit != null && String(variantUnit).trim() !== '' && String(variantUnit).trim() !== 'None' ? String(variantUnit).trim() : '';
+              const localLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label;
+              const label = localLabel || `Field ${n}`;
+              const value = unitSuffix ? `${String(variantValue).trim()} ${unitSuffix}` : String(variantValue).trim();
+              return { label, value };
+            }
+
+            // Fall back to base product field
             const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
             if (!picked) return null;
-            const localLabel = fieldDefinition.fields.find((f) => f.key === `field${n}`)?.label;
+            const localLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label;
             const label = picked.label || localLabel || `Field ${n}`;
             const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
             return { label, value };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
-          const gallery = getStoreProductGalleryProps(drawerProduct);
+          const baseGallery = getStoreProductGalleryProps(drawerProduct);
+          const variantImageUrl = variantData?.image;
+          const gallery = variantImageUrl
+            ? { urls: [variantImageUrl], primaryIndex: 0, primaryImageVersion: undefined }
+            : baseGallery;
           return (
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery' : ''}`}>
-                  <StoreProductImageArea product={drawerProduct} variant="drawer" />
+                  {variantImageUrl ? (
+                    <img src={variantImageUrl} alt={drawerProduct.name} style={{ display: 'block', width: '100%', height: 'auto' }} />
+                  ) : (
+                    <StoreProductImageArea product={drawerProduct} variant="drawer" />
+                  )}
                   <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
                 </div>
                 <div className="sv-drawer-body">
