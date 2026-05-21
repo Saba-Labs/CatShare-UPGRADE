@@ -2392,27 +2392,30 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
           {formSection === 'variants' && (
             <div className="mb-5">
-              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">
-                Product variants
-              </h3>
-              <ProductVariantsEditor
-                groups={variantGroups}
-                onChange={setVariantGroups}
-                theme="classic"
-              />
-              {variantGroups.length > 0 && (
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  Product variants
+                </h3>
+                {variantGroups.length > 0 && (
                   <button
                     onClick={() => {
                       setVariantConfig({ ...variantConfig, groups: variantGroups });
                       setFormSection('variantDetails');
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-xs font-medium"
+                    className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-2 px-4 rounded-lg text-xs font-semibold shadow-md shadow-green-500/30 hover:shadow-lg hover:shadow-green-500/40 transition-all flex items-center gap-2"
                   >
-                    Manage Variant Details
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Manage Details
                   </button>
-                </div>
-              )}
+                )}
+              </div>
+              <ProductVariantsEditor
+                groups={variantGroups}
+                onChange={setVariantGroups}
+                theme="classic"
+              />
             </div>
           )}
 
