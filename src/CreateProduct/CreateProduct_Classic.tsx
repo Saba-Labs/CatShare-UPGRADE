@@ -375,7 +375,8 @@ export default function CreateProduct() {
 
   const y = useMotionValue(DRAG_RANGE * 0.5);
   const [isDragging, setIsDragging] = useState(false);
-  const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants' | 'variantDetails'>('basic');
+  const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants'>('basic');
+  const [showVariantDetailsModal, setShowVariantDetailsModal] = useState(false);
   const [variantGroups, setVariantGroups] = useState<ProductVariantGroup[]>([]);
   const [variantConfig, setVariantConfig] = useState<ProductVariantsConfig>({ groups: [] });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2400,7 +2401,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <button
                     onClick={() => {
                       setVariantConfig({ ...variantConfig, groups: variantGroups });
-                      setFormSection('variantDetails');
+                      setShowVariantDetailsModal(true);
                     }}
                     className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-2 px-4 rounded-lg text-xs font-semibold shadow-md shadow-green-500/30 hover:shadow-lg hover:shadow-green-500/40 transition-all flex items-center gap-2"
                   >
@@ -2414,22 +2415,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <ProductVariantsEditor
                 groups={variantGroups}
                 onChange={setVariantGroups}
-                theme="classic"
-              />
-            </div>
-          )}
-
-          {formSection === 'variantDetails' && (
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">
-                Variant Details
-              </h3>
-              <VariantCombinationEditor
-                variantConfig={{
-                  groups: variantGroups,
-                  combinations: variantConfig.combinations,
-                }}
-                onChange={(updated) => setVariantConfig(updated)}
                 theme="classic"
               />
             </div>
@@ -2472,6 +2457,53 @@ if (migratedProduct.suggestedColors?.length > 0) {
           }}
           onClose={() => setShowColorPicker(false)}
         />
+      )}
+
+      {/* Variant Details Modal */}
+      {showVariantDetailsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+          >
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Variant Details
+              </h2>
+              <button
+                onClick={() => setShowVariantDetailsModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <VariantCombinationEditor
+                variantConfig={{
+                  groups: variantGroups,
+                  combinations: variantConfig.combinations,
+                }}
+                onChange={(updated) => setVariantConfig(updated)}
+                theme="classic"
+              />
+            </div>
+
+            <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+              <button
+                onClick={() => setShowVariantDetailsModal(false)}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-2.5 px-4 rounded-lg text-xs font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
 
     </div>
