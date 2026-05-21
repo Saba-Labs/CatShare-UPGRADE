@@ -179,71 +179,34 @@ export default function VariantCombinationEditor({
                   setEditingData({ ...editingData, price: val ? parseFloat(val) : undefined });
                 }}
                 placeholder="0.00"
+                inputMode="decimal"
+                autoComplete="off"
                 className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
               />
             </div>
           </div>
 
-          {/* SKU */}
-          <div className="flex gap-3 items-center">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
-              SKU
+          {/* Offer */}
+          <div className="flex gap-3 items-start">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+              Offer
             </label>
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={(editingData.customFields?.sku as string) ?? ""}
-                onChange={(e) =>
-                  setEditingData({
-                    ...editingData,
-                    customFields: { ...editingData.customFields, sku: e.target.value || undefined },
-                  })
-                }
-                placeholder="ABC-123-S-RED"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
-              />
-            </div>
-          </div>
-
-          {/* Stock */}
-          <div className="flex gap-3 items-center">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
-              Stock
-            </label>
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <input
                 type="number"
-                min="0"
-                value={(editingData.customFields?.stock as number) ?? ""}
-                onChange={(e) =>
+                step="0.01"
+                value={(editingData.customFields?.offer as number) ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
                   setEditingData({
                     ...editingData,
-                    customFields: { ...editingData.customFields, stock: e.target.value ? parseInt(e.target.value) : undefined },
-                  })
-                }
-                placeholder="100"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
-              />
-            </div>
-          </div>
-
-          {/* Barcode */}
-          <div className="flex gap-3 items-center">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
-              Barcode
-            </label>
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={(editingData.customFields?.barcode as string) ?? ""}
-                onChange={(e) =>
-                  setEditingData({
-                    ...editingData,
-                    customFields: { ...editingData.customFields, barcode: e.target.value || undefined },
-                  })
-                }
-                placeholder="5901234123457"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+                    customFields: { ...editingData.customFields, offer: val ? parseFloat(val) : undefined },
+                  });
+                }}
+                placeholder="Optional — lower than Price"
+                inputMode="decimal"
+                autoComplete="off"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 placeholder:text-gray-400"
               />
             </div>
           </div>
