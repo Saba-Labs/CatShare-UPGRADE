@@ -1857,7 +1857,7 @@ useEffect(() => {
               .map((f) => Number(String(f.key).replace('field', '')))
               .filter((n) => Number.isFinite(n))
           );
-          const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct);
+          const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct, variantSelections[drawerProduct.id]);
           const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
