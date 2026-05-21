@@ -306,12 +306,24 @@ export default function VariantCombinationEditor({
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-600">
-        {combinations.length} combination{combinations.length !== 1 ? "s" : ""} found
-      </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {combinations.length} combination{combinations.length !== 1 ? "s" : ""}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {existingData.length} with details set
+          </p>
+        </div>
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto scrollbar-hide">
         {combinations.map((combo) => {
           const hasData = existingData.some((c) => c.id === combo.id);
           const existing = existingData.find((c) => c.id === combo.id);
@@ -320,23 +332,44 @@ export default function VariantCombinationEditor({
             <button
               key={combo.id}
               onClick={() => handleSelectCombination(combo.id)}
-              className={`p-3 text-left rounded border-2 transition-colors ${
-                hasData ? "border-green-400 bg-green-50" : "border-gray-200 bg-white"
-              } hover:border-blue-400`}
+              className={`p-3 text-left rounded-lg border transition-all duration-200 group ${
+                hasData
+                  ? "border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:border-green-400 dark:hover:border-green-600 shadow-sm hover:shadow-md"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md"
+              }`}
             >
-              <div className="font-medium text-sm">
-                {formatVariantSelectionSummary(variantConfig.groups, combo.selections)}
+              <div className="flex items-start justify-between">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  {formatVariantSelectionSummary(variantConfig.groups, combo.selections)}
+                </div>
+                {hasData && (
+                  <div className="flex-shrink-0 ml-2">
+                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
               </div>
               {hasData && (
-                <div className="text-xs text-green-700 mt-1">
-                  {[
-                    existing?.price !== undefined && `Price: $${existing.price}`,
-                    existing?.image && "Image set",
-                    existing?.customFields?.sku && `SKU: ${existing.customFields.sku}`,
-                    existing?.customFields?.stock !== undefined && `Stock: ${existing.customFields.stock}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" • ")}
+                <div className="text-xs text-green-700 dark:text-green-300 mt-2 pt-2 border-t border-green-200 dark:border-green-800/50">
+                  <div className="space-y-1">
+                    {existing?.image && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4.5-4.5 3 3 4-4 2.5 2.5V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10z" />
+                        </svg>
+                        <span>Image</span>
+                      </div>
+                    )}
+                    {existing?.price !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M8.16 5a.5.5 0 00-.496.545l.84 4.49H4.5a.5.5 0 00-.492.41l-.8 4A.5.5 0 004 15h3.256l.933 4.967a.5.5 0 00.492.533h.138a.5.5 0 00.494-.426l.926-4.974h3.268l.933 4.973a.5.5 0 00.494.427h.138a.5.5 0 00.492-.534l-.8-4.267a.5.5 0 00-.492-.41H12.04l.84-4.49a.5.5 0 00-.496-.545h-4.22zm.324 1h3.872l-.84 4.49H7.484l.84-4.49z" />
+                        </svg>
+                        <span>${existing.price}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </button>
