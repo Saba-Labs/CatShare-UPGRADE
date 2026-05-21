@@ -10,18 +10,22 @@ import {
 import { uploadImageToR2, stripDataUriPrefix } from "../services/cloudflareService";
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
+import { useToast } from "../context/ToastContext";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
   onChange: (updatedConfig: ProductVariantsConfig) => void;
   theme?: "classic" | "glass";
+  onSave?: () => void;
 }
 
 export default function VariantCombinationEditor({
   variantConfig,
   onChange,
   theme = "classic",
+  onSave,
 }: VariantCombinationEditorProps) {
+  const { showToast } = useToast();
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<Partial<VariantCombination>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -45,9 +49,11 @@ export default function VariantCombinationEditor({
     if (!selectedCombination) return;
     const updated = upsertVariantCombination(variantConfig, selectedCombination.id, editingData);
     onChange(updated);
+    showToast("Variant details saved and syncing to cloud...", "success");
+    onSave?.();
     setSelectedCombinationId(null);
     setEditingData({});
-  }, [selectedCombination, variantConfig, editingData, onChange]);
+  }, [selectedCombination, variantConfig, editingData, onChange, onSave, showToast, theme]);
 
   const handleCancel = useCallback(() => {
     setSelectedCombinationId(null);
