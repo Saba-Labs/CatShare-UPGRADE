@@ -49,10 +49,12 @@ import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
 import ProductVariantsEditor from "../components/ProductVariantsEditor";
+import VariantCombinationEditor from "../components/VariantCombinationEditor";
 import {
   getProductVariantGroups,
   pruneVariantGroupsForSave,
   type ProductVariantGroup,
+  type ProductVariantsConfig,
 } from "../utils/productVariants";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 import {
@@ -373,8 +375,9 @@ export default function CreateProduct() {
 
   const y = useMotionValue(DRAG_RANGE * 0.5);
   const [isDragging, setIsDragging] = useState(false);
-  const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants'>('basic');
+  const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants' | 'variantDetails'>('basic');
   const [variantGroups, setVariantGroups] = useState<ProductVariantGroup[]>([]);
+  const [variantConfig, setVariantConfig] = useState<ProductVariantsConfig>({ groups: [] });
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollAtTopRef = useRef(true);
 
@@ -645,7 +648,10 @@ export default function CreateProduct() {
         setFontColor(migratedProduct.fontColor || "white");
         setImageBgOverride(migratedProduct.imageBgColor || "white");
         setAppliedAspectRatio(migratedProduct.cropAspectRatio || 1);
-        setVariantGroups(getProductVariantGroups(migratedProduct));
+        const groups = getProductVariantGroups(migratedProduct);
+        setVariantGroups(groups);
+        const variantsCfg = (migratedProduct.variants || {}) as ProductVariantsConfig;
+        setVariantConfig(variantsCfg);
 
         // ✅ Restore saved color palette
 if (migratedProduct.suggestedColors?.length > 0) {
@@ -1264,6 +1270,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
     };
 
     const savedVariants = pruneVariantGroupsForSave(variantGroups);
+    if (variantConfig.combinations && variantConfig.combinations.length > 0) {
+      savedVariants.combinations = variantConfig.combinations;
+    }
     if (savedVariants.groups.length > 0) {
       newItem.variants = savedVariants;
     } else {
@@ -2389,6 +2398,35 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <ProductVariantsEditor
                 groups={variantGroups}
                 onChange={setVariantGroups}
+                theme="classic"
+              />
+              {variantGroups.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                  <button
+                    onClick={() => {
+                      setVariantConfig({ ...variantConfig, groups: variantGroups });
+                      setFormSection('variantDetails');
+                    }}
+                    className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-xs font-medium"
+                  >
+                    Manage Variant Details
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {formSection === 'variantDetails' && (
+            <div className="mb-5">
+              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">
+                Variant Details
+              </h3>
+              <VariantCombinationEditor
+                variantConfig={{
+                  groups: variantGroups,
+                  combinations: variantConfig.combinations,
+                }}
+                onChange={(updated) => setVariantConfig(updated)}
                 theme="classic"
               />
             </div>
