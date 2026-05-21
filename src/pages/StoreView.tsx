@@ -1024,7 +1024,7 @@ useEffect(() => {
     selectedProducts.forEach((quantity, productId) => {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
-      const variantData = getVariantCombinationData(product, variantSelections[productId]);
+      const variantData = variantSelections[productId] ? getVariantCombinationData(product, variantSelections[productId]) : undefined;
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[productId]);
       const variantQtyStep = variantData?.customFields?.orderQuantityStep;
       const baseQtyStep = catData?.orderQuantityStep;
@@ -1848,7 +1848,7 @@ useEffect(() => {
         {drawerProduct && (() => {
           const fieldDefinition = getFieldsDefinition();
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
-          const variantData = getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]);
+          const variantData = variantSelections[drawerProduct.id] ? getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]) : undefined;
           /** Default `fieldConfig` has field1–10 `enabled: false`; guests have no seller localStorage. When the seller is logged in on the same device, `fieldsDefinition` may set `visibility.onlineStore: false` — still show any slot that has catalogue/product text so the public store matches what buyers see when logged out. */
           const visibleStoreFieldNumbers = new Set(
             fieldDefinition.fields
