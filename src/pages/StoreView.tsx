@@ -1928,10 +1928,11 @@ const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
   const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
   const cloudLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label?.trim() || null;
 const productRowLabel = picked?.label?.trim() || null;
+const defaultLabel = getFieldsDefinition().fields.find((f) => f.key === fieldKey)?.label || `Field ${n}`;
 
-console.log(`[field${n}]`, { fieldKey, cloudLabel, productRowLabel, firstField: fieldDefinition.fields[0] });
+console.log(`[field${n}]`, { fieldKey, cloudLabel, productRowLabel, defaultLabel, firstField: fieldDefinition.fields[0] });
 
-const label = productRowLabel || cloudLabel || `Field ${n}`;
+const label = productRowLabel || cloudLabel || defaultLabel;
 
   // 2. Check for variant-specific custom field value first
   let variantValue = variantData?.customFields?.[fieldKey];
