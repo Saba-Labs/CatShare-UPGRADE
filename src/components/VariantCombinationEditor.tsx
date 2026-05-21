@@ -124,43 +124,39 @@ export default function VariantCombinationEditor({
               Image
             </label>
             <div className="flex-1">
-              {editingData.image && (
-                <div className="mb-2 relative w-full h-24 rounded border border-gray-200 overflow-hidden bg-gray-50">
-                  <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setEditingData({ ...editingData, image: undefined })}
-                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-3">
+                {editingData.image && (
+                  <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-gray-200">
+                    <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setEditingData({ ...editingData, image: undefined })}
+                      className="absolute -top-2 -right-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-gray-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                      title="Remove image"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-1.5 px-3 rounded text-xs font-medium transition-colors"
+                  className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {uploadingImage ? "Uploading..." : "Upload"}
+                  <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                    className="hidden"
+                  />
                 </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                  className="hidden"
-                />
-              </div>
-              <div className="mt-2">
-                <input
-                  type="text"
-                  value={editingData.image ?? ""}
-                  onChange={(e) => setEditingData({ ...editingData, image: e.target.value || undefined })}
-                  placeholder="https://example.com/image.jpg"
-                  className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
-                />
               </div>
             </div>
           </div>
