@@ -657,17 +657,21 @@ function pickStorefrontDetailField(
   product: ProductWithCatalogueData,
   preferredCatalogueId: string | undefined,
   n: number
-): { text: string; unitSuffix: string } | null {
+): { text: string; unitSuffix: string; label: string | null } | null {
   const key = `field${n}`;
   const unitKey = `field${n}Unit`;
-  const tryRow = (row: Record<string, unknown> | null | undefined): { text: string; unitSuffix: string } | null => {
+  const labelKey = `field${n}Label`;
+  const tryRow = (row: Record<string, unknown> | null | undefined): { text: string; unitSuffix: string; label: string | null } | null => {
     if (!row || typeof row !== 'object') return null;
     const v = row[key];
     if (v == null || String(v).trim() === '') return null;
     const u = row[unitKey];
     const unitSuffix =
       u != null && String(u).trim() !== '' && String(u).trim() !== 'None' ? String(u).trim() : '';
-    return { text: String(v).trim(), unitSuffix };
+    const l = row[labelKey];
+    const label =
+      l != null && String(l).trim() !== '' && String(l).trim() !== 'None' ? String(l).trim() : null;
+    return { text: String(v).trim(), unitSuffix, label };
   };
 
   const cid = String(preferredCatalogueId ?? '').trim();
@@ -1861,7 +1865,8 @@ useEffect(() => {
             if (!visibleStoreFieldNumbers.has(n)) return null;
             const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
             if (!picked) return null;
-            const label = fieldDefinition.fields.find((f) => f.key === `field${n}`)?.label || `Field ${n}`;
+            const localLabel = fieldDefinition.fields.find((f) => f.key === `field${n}`)?.label;
+            const label = picked.label || localLabel || `Field ${n}`;
             const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
             return { label, value };
           }).filter(Boolean) as Array<{ label: string; value: string }>;
