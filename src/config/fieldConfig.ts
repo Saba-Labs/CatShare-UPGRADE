@@ -86,7 +86,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field4',
-    label: 'Field 4',
+    label: 'Size',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -94,7 +94,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field5',
-    label: 'Field 5',
+    label: 'Fabric',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -102,7 +102,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field6',
-    label: 'Field 6',
+    label: 'Fit',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -110,7 +110,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field7',
-    label: 'Field 7',
+    label: 'Material',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -118,7 +118,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field8',
-    label: 'Field 8',
+    label: 'Weight',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -126,7 +126,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field9',
-    label: 'Field 9',
+    label: 'Dimensions',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
@@ -134,7 +134,7 @@ export const DEFAULT_FIELDS: FieldConfig[] = [
   },
   {
     key: 'field10',
-    label: 'Field 10',
+    label: 'Care Instructions',
     type: 'text',
     enabled: false,
     unitsEnabled: false,
