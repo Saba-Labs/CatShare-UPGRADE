@@ -103,150 +103,169 @@ export default function VariantCombinationEditor({
 
   if (selectedCombination) {
     return (
-      <div className="p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-lg">
-            Edit: {formatVariantSelectionSummary(variantConfig.groups, selectedCombination.selections)}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-sm">
+            {formatVariantSelectionSummary(variantConfig.groups, selectedCombination.selections)}
           </h3>
           <button
             onClick={handleCancel}
-            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+            className="text-gray-500 hover:text-gray-700 text-lg leading-none"
           >
             ×
           </button>
         </div>
 
-        <div className="space-y-3 border-t pt-4">
+        <div className="space-y-3">
           {/* Image */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Image (optional)</label>
-            {editingData.image && (
-              <div className="mb-2 relative w-full h-32 rounded border border-gray-200 overflow-hidden bg-gray-50">
-                <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+          <div className="flex gap-3 items-start">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+              Image
+            </label>
+            <div className="flex-1">
+              {editingData.image && (
+                <div className="mb-2 relative w-full h-24 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                  <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setEditingData({ ...editingData, image: undefined })}
+                    className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setEditingData({ ...editingData, image: undefined })}
-                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-1.5 px-3 rounded text-xs font-medium transition-colors"
                 >
-                  ×
+                  {uploadingImage ? "Uploading..." : "Upload"}
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                  className="hidden"
+                />
               </div>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingImage}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2 px-3 rounded text-sm font-medium transition-colors"
-              >
-                {uploadingImage ? "Uploading..." : "Upload Image"}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                className="hidden"
-              />
-            </div>
-            <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Or paste URL:</label>
-              <input
-                type="text"
-                value={editingData.image ?? ""}
-                onChange={(e) => setEditingData({ ...editingData, image: e.target.value || undefined })}
-                placeholder="https://example.com/image.jpg"
-                className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-              />
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={editingData.image ?? ""}
+                  onChange={(e) => setEditingData({ ...editingData, image: e.target.value || undefined })}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+                />
+              </div>
             </div>
           </div>
 
           {/* Price */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Price (optional)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={editingData.price ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                setEditingData({ ...editingData, price: val ? parseFloat(val) : undefined });
-              }}
-              placeholder="0.00"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
+          <div className="flex gap-3 items-center">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+              Price
+            </label>
+            <div className="relative flex-1">
+              <input
+                type="number"
+                step="0.01"
+                value={editingData.price ?? ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditingData({ ...editingData, price: val ? parseFloat(val) : undefined });
+                }}
+                placeholder="0.00"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+              />
+            </div>
           </div>
 
           {/* SKU */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">SKU (optional)</label>
-            <input
-              type="text"
-              value={(editingData.customFields?.sku as string) ?? ""}
-              onChange={(e) =>
-                setEditingData({
-                  ...editingData,
-                  customFields: { ...editingData.customFields, sku: e.target.value || undefined },
-                })
-              }
-              placeholder="ABC-123-S-RED"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
+          <div className="flex gap-3 items-center">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+              SKU
+            </label>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={(editingData.customFields?.sku as string) ?? ""}
+                onChange={(e) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: { ...editingData.customFields, sku: e.target.value || undefined },
+                  })
+                }
+                placeholder="ABC-123-S-RED"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+              />
+            </div>
           </div>
 
           {/* Stock */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Stock (optional)</label>
-            <input
-              type="number"
-              min="0"
-              value={(editingData.customFields?.stock as number) ?? ""}
-              onChange={(e) =>
-                setEditingData({
-                  ...editingData,
-                  customFields: { ...editingData.customFields, stock: e.target.value ? parseInt(e.target.value) : undefined },
-                })
-              }
-              placeholder="100"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
+          <div className="flex gap-3 items-center">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+              Stock
+            </label>
+            <div className="relative flex-1">
+              <input
+                type="number"
+                min="0"
+                value={(editingData.customFields?.stock as number) ?? ""}
+                onChange={(e) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: { ...editingData.customFields, stock: e.target.value ? parseInt(e.target.value) : undefined },
+                  })
+                }
+                placeholder="100"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+              />
+            </div>
           </div>
 
           {/* Barcode */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Barcode (optional)</label>
-            <input
-              type="text"
-              value={(editingData.customFields?.barcode as string) ?? ""}
-              onChange={(e) =>
-                setEditingData({
-                  ...editingData,
-                  customFields: { ...editingData.customFields, barcode: e.target.value || undefined },
-                })
-              }
-              placeholder="5901234123457"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
-            />
+          <div className="flex gap-3 items-center">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+              Barcode
+            </label>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={(editingData.customFields?.barcode as string) ?? ""}
+                onChange={(e) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: { ...editingData.customFields, barcode: e.target.value || undefined },
+                  })
+                }
+                placeholder="5901234123457"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-2 border-t pt-4">
+        <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
           <button
             onClick={handleSaveData}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-sm font-medium"
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-xs font-medium flex-1"
           >
             Save
           </button>
           <button
             onClick={handleCancel}
-            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-3 rounded text-sm font-medium"
+            className="bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-3 rounded text-xs font-medium flex-1"
           >
             Cancel
           </button>
           {selectedExistingData && (
             <button
               onClick={handleDeleteData}
-              className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm font-medium"
+              className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs font-medium"
             >
               Delete
             </button>
