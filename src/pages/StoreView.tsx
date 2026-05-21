@@ -560,9 +560,16 @@ function StoreProductImageArea({
 function getStorefrontPriceAndUnit(
   catData: CatalogueData | null | undefined,
   catalogue: Catalogue | null,
-  product?: ProductWithCatalogueData | null
+  product?: ProductWithCatalogueData | null,
+  variantSelection?: Record<string, string> | null
 ): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } {
   const pr = product as Record<string, unknown> | null | undefined;
+
+  // Check if variant has override price/offer
+  let variantOverride: any = null;
+  if (product && variantSelection) {
+    variantOverride = getVariantCombinationData(product, variantSelection);
+  }
 
   const pack = (
     res: ReturnType<typeof resolveListOfferEffective>,
@@ -577,6 +584,24 @@ function getStorefrontPriceAndUnit(
       showOffer: res.showStrikeout,
     };
   };
+
+  // If variant has price override, use it
+  if (variantOverride?.price != null && typeof variantOverride.price === 'number') {
+    const listPrice = variantOverride.customFields?.offer ?? (catData ? (catData as any)[catalogue?.priceField || 'price1'] : null);
+    const offerPrice = variantOverride.customFields?.offer;
+    const priceUnit = catalogue ? (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined) : undefined;
+
+    const result: any = {
+      price: variantOverride.price,
+      priceUnit,
+      showOffer: offerPrice ? offerPrice < variantOverride.price : false,
+    };
+    if (offerPrice && offerPrice < variantOverride.price) {
+      result.listPrice = variantOverride.price;
+      result.price = offerPrice;
+    }
+    return result;
+  }
 
   // Linked catalogue row is the source of truth for the store: empty price → 0 (do not fall through to legacy top-level prices).
   if (catalogue && catData) {
@@ -995,7 +1020,7 @@ useEffect(() => {
     selectedProducts.forEach((quantity, productId) => {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
-      const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
+      const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[productId]);
       const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
       const rowTotal = unitPrice * quantity;
       const pr = product as Record<string, unknown>;
@@ -1106,7 +1131,7 @@ useEffect(() => {
       reviewSummary.items.forEach((item) => {
         const product = allProducts.find((p) => p.id === item.productId); if (!product) return;
         const catData = getCatalogueData(product, store.catalogueId);
-        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
+        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[item.productId]);
         orderItems.push({
           productId: item.productId,
           name: item.name,
@@ -1445,7 +1470,7 @@ useEffect(() => {
               const quantity = selectedProducts.get(product.id) || 0;
               const isSelected = quantity > 0;
               const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-              const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, product);
+              const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[product.id]);
               const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
               const imgUrl = displayStoreProductImage(product);
               const hasParsedPrice = Number.isFinite(price);
