@@ -9,6 +9,7 @@ import {
 } from "../utils/productVariants";
 import { uploadImageToR2, stripDataUriPrefix } from "../services/cloudflareService";
 import { getAllFields } from "../config/fieldConfig";
+import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
@@ -213,6 +214,9 @@ export default function VariantCombinationEditor({
               Price
             </label>
             <div className="relative flex-1">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600 dark:text-gray-400 pointer-events-none">
+                {getCurrentCurrencySymbol()}
+              </span>
               <input
                 type="number"
                 step="0.01"
@@ -224,7 +228,7 @@ export default function VariantCombinationEditor({
                 placeholder="0.00"
                 inputMode="decimal"
                 autoComplete="off"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+                className="w-full pl-6 pr-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
               />
             </div>
           </div>
@@ -235,6 +239,9 @@ export default function VariantCombinationEditor({
               Offer
             </label>
             <div className="relative flex-1 min-w-0">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600 dark:text-gray-400 pointer-events-none">
+                {getCurrentCurrencySymbol()}
+              </span>
               <input
                 type="number"
                 step="0.01"
@@ -249,7 +256,7 @@ export default function VariantCombinationEditor({
                 placeholder="Optional — lower than Price"
                 inputMode="decimal"
                 autoComplete="off"
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 placeholder:text-gray-400"
+                className="w-full pl-6 pr-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 placeholder:text-gray-400 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
               />
             </div>
           </div>
@@ -270,7 +277,7 @@ export default function VariantCombinationEditor({
                     customFields: { ...editingData.customFields, orderQuantityStep: e.target.value ? parseInt(e.target.value) : undefined },
                   })
                 }
-                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800"
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
               />
               <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
                 1 = any quantity. E.g. 12 → only 12, 24, 36…
