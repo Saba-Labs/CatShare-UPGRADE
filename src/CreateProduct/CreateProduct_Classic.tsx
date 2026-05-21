@@ -2537,14 +2537,33 @@ if (migratedProduct.suggestedColors?.length > 0) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
-              <VariantCombinationEditor
-                variantConfig={{
-                  groups: variantGroups,
-                  combinations: variantConfig.combinations,
-                }}
-                onChange={(updated) => setVariantConfig(updated)}
-                theme="classic"
-              />
+            <VariantCombinationEditor
+  variantConfig={{
+    groups: variantGroups,
+    combinations: variantConfig.combinations,
+  }}
+  onChange={(updated) => setVariantConfig(updated)}
+  theme="classic"
+  onSave={(updatedConfig) => {
+    if (!editingId) return;
+    const authUserIdNow = getPersistedAuthUserId();
+    if (!authUserIdNow) return;
+    const productsStorageKeyNow = getStorageKey("products", authUserIdNow);
+    const all = safeGetFromStorage(productsStorageKeyNow, []);
+    const updated = all.map((p: any) => {
+      if (p.id !== editingId) return p;
+      const savedVariants = pruneVariantGroupsForSave(variantGroups);
+      savedVariants.combinations = updatedConfig.combinations ?? [];
+      return { ...p, variants: savedVariants, updatedAt: new Date().toISOString() };
+    });
+    safeSetInStorage(productsStorageKeyNow, updated);
+    window.dispatchEvent(
+      new CustomEvent("product-added", {
+        detail: { onlyProductId: String(editingId), forceCloudSync: true },
+      })
+    );
+  }}
+/>
             </div>
 
             <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">

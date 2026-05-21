@@ -829,6 +829,22 @@ export default function StoreView() {
   const [store, setStore] = useState<StorePublic | null>(null);
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
+  const [sellerFieldsDefinition, setSellerFieldsDefinition] = useState<any>(null);
+
+  // Fetch the seller's custom field names from Supabase
+  useEffect(() => {
+    if (!store?.sellerUserId) return;
+    const supabase = getSupabaseClient();
+    // Fetch fields definition in parallel with products
+    supabase
+      .from('fields_definition')
+      .select('*')
+      .eq('user_id', store.sellerUserId)
+      .single()
+      .then(({ data }) => {
+        if (data) setSellerFieldsDefinition(data);
+      });
+  }, [store?.sellerUserId]);
   const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
@@ -937,7 +953,20 @@ useEffect(() => {
         setStore(r.data);
         if (r.data.sellerUserId && r.data.isLive !== false) {
           setProductsLoading(true);
+          
+          // Re-fetch custom labels on tab visibility restoration
+          const supabase = getSupabaseClient();
+          supabase
+            .from('fields_definition')
+            .select('*')
+            .eq('user_id', r.data.sellerUserId)
+            .single()
+            .then(({ data }) => {
+              if (data) setSellerFieldsDefinition(data);
+            });
+
           const cats = ensureCataloguesForStorefront(r.data.cataloguesDefinition, r.data.catalogueId);
+
           void getStoreProducts(r.data.sellerUserId, cats).then((result) => {
             if (result.success && result.products) {
               setAllProducts(result.products);
@@ -1845,8 +1874,28 @@ useEffect(() => {
         )}
 
         {/* ══ PRODUCT DETAIL DRAWER ══ */}
-        {drawerProduct && (() => {
-          const fieldDefinition = getFieldsDefinition();
+        {drawerProduct && sellerFieldsDefinition && (() => {
+const cloudFields: any[] | null = (() => {
+  const raw = sellerFieldsDefinition?.fields;
+  if (!raw) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : null; }
+    catch { return null; }
+  }
+  return null;
+})();
+
+const resolvedFields = cloudFields
+? cloudFields                              // seller's saved field config from Supabase
+: getFieldsDefinition().fields ?? [];     // fallback: local defaults (seller's own device)
+
+const fieldDefinition = { fields: resolvedFields };
+// TEMP DEBUG - remove after fix
+console.log('[cloudFields]', JSON.stringify(cloudFields));
+console.log('[resolvedFields]', JSON.stringify(resolvedFields));
+console.log('[fieldDefinition]', JSON.stringify(fieldDefinition));
+
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
           const variantData = variantSelections[drawerProduct.id] ? getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]) : undefined;
           /** Default `fieldConfig` has field1–10 `enabled: false`; guests have no seller localStorage. When the seller is logged in on the same device, `fieldsDefinition` may set `visibility.onlineStore: false` — still show any slot that has catalogue/product text so the public store matches what buyers see when logged out. */
@@ -1869,31 +1918,36 @@ useEffect(() => {
           const qstep = normalizeOrderQuantityStep(variantQtyStep ?? baseQtyStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
-          const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-            if (!visibleStoreFieldNumbers.has(n)) return null;
-            const fieldKey = `field${n}`;
-            const fieldUnitKey = `field${n}Unit`;
+          // ══ CORRECTED FIELDS LOOKUP: Use product context directly to bypass RLS table limits ══
+const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+  if (!visibleStoreFieldNumbers.has(n)) return null;
+  const fieldKey = `field${n}`;
+  const fieldUnitKey = `field${n}Unit`;
 
-            // Check for variant-specific custom field value first
-            let variantValue = variantData?.customFields?.[fieldKey];
-            let variantUnit = variantData?.customFields?.[fieldUnitKey];
+  // 1. Dig out the true contextual data and dynamic label from the product payload
+  const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
+  const cloudLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label?.trim() || null;
+const productRowLabel = picked?.label?.trim() || null;
 
-            if (variantValue != null && String(variantValue).trim() !== '') {
-              const unitSuffix = variantUnit != null && String(variantUnit).trim() !== '' && String(variantUnit).trim() !== 'None' ? String(variantUnit).trim() : '';
-              const localLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label;
-              const label = localLabel || `Field ${n}`;
-              const value = unitSuffix ? `${String(variantValue).trim()} ${unitSuffix}` : String(variantValue).trim();
-              return { label, value };
-            }
+console.log(`[field${n}]`, { fieldKey, cloudLabel, productRowLabel, firstField: fieldDefinition.fields[0] });
 
-            // Fall back to base product field
-            const picked = pickStorefrontDetailField(drawerProduct, store.catalogueId, n);
-            if (!picked) return null;
-            const localLabel = fieldDefinition.fields.find((f) => f.key === fieldKey)?.label;
-            const label = picked.label || localLabel || `Field ${n}`;
-            const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
-            return { label, value };
-          }).filter(Boolean) as Array<{ label: string; value: string }>;
+const label = productRowLabel || cloudLabel || `Field ${n}`;
+
+  // 2. Check for variant-specific custom field value first
+  let variantValue = variantData?.customFields?.[fieldKey];
+  let variantUnit = variantData?.customFields?.[fieldUnitKey];
+
+  if (variantValue != null && String(variantValue).trim() !== '') {
+    const unitSuffix = variantUnit != null && String(variantUnit).trim() !== '' && String(variantUnit).trim() !== 'None' ? String(variantUnit).trim() : '';
+    const value = unitSuffix ? `${String(variantValue).trim()} ${unitSuffix}` : String(variantValue).trim();
+    return { label, value };
+  }
+
+  // 3. Fall back to base product field values
+  if (!picked) return null;
+  const value = picked.unitSuffix ? `${picked.text} ${picked.unitSuffix}` : picked.text;
+  return { label, value };
+}).filter(Boolean) as Array<{ label: string; value: string }>;
           const baseGallery = getStoreProductGalleryProps(drawerProduct);
           const variantImageUrl = variantData?.image;
           const gallery = variantImageUrl

@@ -16,7 +16,7 @@ interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
   onChange: (updatedConfig: ProductVariantsConfig) => void;
   theme?: "classic" | "glass";
-  onSave?: () => void;
+  onSave?: (updatedConfig: ProductVariantsConfig) => void;
 }
 
 export default function VariantCombinationEditor({
@@ -50,7 +50,7 @@ export default function VariantCombinationEditor({
     const updated = upsertVariantCombination(variantConfig, selectedCombination.id, editingData);
     onChange(updated);
     showToast("Variant details saved and syncing to cloud...", "success");
-    onSave?.();
+    onSave?.(updated);
     setSelectedCombinationId(null);
     setEditingData({});
   }, [selectedCombination, variantConfig, editingData, onChange, onSave, showToast, theme]);
@@ -89,7 +89,7 @@ export default function VariantCombinationEditor({
       const ext = mimeType === "image/jpeg" ? "jpg" : "png";
       const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
 
-      const result = await uploadImageToR2(raw, filename, mimeType as any);
+      const result = await uploadImageToR2(raw, filename, "variants", mimeType);
       if (result.success && result.publicUrl) {
         setEditingData((prev) => ({ ...prev, image: result.publicUrl }));
       } else {

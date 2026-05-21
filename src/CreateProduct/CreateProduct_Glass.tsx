@@ -2408,13 +2408,32 @@ if (migratedProduct.suggestedColors?.length > 0) {
                 Variant Details
               </h3>
               <VariantCombinationEditor
-                variantConfig={{
-                  groups: variantGroups,
-                  combinations: variantConfig.combinations,
-                }}
-                onChange={(updated) => setVariantConfig(updated)}
-                theme="glass"
-              />
+  variantConfig={{
+    groups: variantGroups,
+    combinations: variantConfig.combinations,
+  }}
+  onChange={(updated) => setVariantConfig(updated)}
+  theme="glass"
+  onSave={(updatedConfig) => {
+    if (!editingId) return;
+    const authUserIdNow = getPersistedAuthUserId();
+    if (!authUserIdNow) return;
+    const productsStorageKeyNow = getStorageKey("products", authUserIdNow);
+    const all = safeGetFromStorage(productsStorageKeyNow, []);
+    const updated = all.map((p: any) => {
+      if (p.id !== editingId) return p;
+      const savedVariants = pruneVariantGroupsForSave(variantGroups);
+      savedVariants.combinations = updatedConfig.combinations ?? [];
+      return { ...p, variants: savedVariants, updatedAt: new Date().toISOString() };
+    });
+    safeSetInStorage(productsStorageKeyNow, updated);
+    window.dispatchEvent(
+      new CustomEvent("product-added", {
+        detail: { onlyProductId: String(editingId), forceCloudSync: true },
+      })
+    );
+  }}
+/>
             </div>
           )}
 
