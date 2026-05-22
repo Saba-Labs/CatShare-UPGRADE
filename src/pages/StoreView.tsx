@@ -769,6 +769,16 @@ function OrderFormQtyControl({
     </div>
   );
 }
+function VariantPills({ summary }: { summary: string }) {
+  const parts = summary.split(/;\s*/).filter(Boolean);
+  return (
+    <div className="sv-variant-pills">
+      {parts.map((part) => (
+        <span key={part} className="sv-variant-pill">{part}</span>
+      ))}
+    </div>
+  );
+}
 
 function StepBar({ current }: { current: 'customer' | 'review' }) {
   const done = current === 'review';
@@ -1618,11 +1628,10 @@ useEffect(() => {
                   <div className="sv-pcard-body">
                     <div className="sv-pcard-name">{product.name}</div>
                     {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
-                    {isSelected && variantSelections[product.id] && (
-                      <div className="sv-pcard-variant-summary">
-                        {formatVariantSelectionSummary(getProductVariantGroups(product), variantSelections[product.id])}
-                      </div>
-                    )}
+                    {isSelected && variantSelections[product.id] && (() => {
+                      const summary = formatVariantSelectionSummary(getProductVariantGroups(product), variantSelections[product.id]);
+                      return summary ? <VariantPills summary={summary} /> : null;
+                    })()}
                     {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
                         {fmt(price, currencySymbol)}
@@ -1787,7 +1796,7 @@ useEffect(() => {
                                   <div>
                                     <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--c-text)', marginBottom: 2 }}>{item.name}</div>
                                     {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
-                                    {item.variantSummary && <div style={{ fontSize: '11px', color: 'var(--c-accent)', fontWeight: 500, marginTop: 2 }}>{item.variantSummary}</div>}
+                                    {item.variantSummary && <VariantPills summary={item.variantSummary} />}
 
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -1836,7 +1845,7 @@ useEffect(() => {
                           })()}
                         </div>
                         <div className="sv-rcard-body">
-                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <div className="sv-rcard-sub" style={{ color: 'var(--c-accent)', fontWeight: 500 }}>{item.variantSummary}</div>}</div>
+                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <VariantPills summary={item.variantSummary} />}</div>
                           <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
                         </div>
                       </div>
@@ -1969,11 +1978,10 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
                   {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
-                  {variantSelections[drawerProduct.id] && (
-                    <div className="sv-drawer-variant-summary">
-                      {formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id])}
-                    </div>
-                  )}
+                  {variantSelections[drawerProduct.id] && (() => {
+                    const summary = formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id]);
+                    return summary ? <VariantPills summary={summary} /> : null;
+                  })()}
                   {getCats(drawerProduct).length > 0 && (
                     <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
                   )}
