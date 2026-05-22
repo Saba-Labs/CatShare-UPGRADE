@@ -420,12 +420,23 @@ export default function VariantCombinationEditor({
                   : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md"
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                  {formatVariantSelectionSummary(variantConfig.groups, combo.selections)}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {variantConfig.groups.map((group) => {
+                    const chosen = combo.selections[group.id];
+                    if (!chosen) return null;
+                    return (
+                      <span
+                        key={group.id}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                      >
+                        {group.name}: {chosen}
+                      </span>
+                    );
+                  })}
                 </div>
                 {hasData && (
-                  <div className="flex-shrink-0 ml-2">
+                  <div className="flex-shrink-0">
                     <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
