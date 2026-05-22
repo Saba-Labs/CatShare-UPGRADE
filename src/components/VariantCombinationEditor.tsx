@@ -250,7 +250,7 @@ export default function VariantCombinationEditor({
                   <div className="relative flex-1">
                     <input
                       type={field.type === 'number' ? 'number' : 'text'}
-                      value={(catData[field.key] as string | number) ?? ""}
+                      value={(catData[field.key] as string | number | undefined) ?? ""}
                       onChange={(e) =>
                         setEditingData({
                           ...editingData,
@@ -263,7 +263,7 @@ export default function VariantCombinationEditor({
                   {(field.unitsEnabled && field.unitOptions && field.unitOptions.length > 0) && (
                     <div className="relative flex-shrink-0">
                       <select
-                        value={(catData[`${field.key}Unit`] as string) ?? "None"}
+                        value={(catData[`${field.key}Unit`] as string | undefined) ?? "None"}
                         onChange={(e) =>
                           setEditingData({
                             ...editingData,
@@ -445,11 +445,11 @@ export default function VariantCombinationEditor({
               </div>
               {hasData && (
                 <div className="text-xs text-green-700 dark:text-green-300 mt-2 pt-2 border-t border-green-200 dark:border-green-800/50">
-                  <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-3">
                     {existing?.image && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4.5-4.5 3 3 4-4 2.5 2.5V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10z" />
+                          <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
                         </svg>
                         <span>Image</span>
                       </div>
@@ -457,9 +457,25 @@ export default function VariantCombinationEditor({
                     {existing?.price !== undefined && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M8.16 5a.5.5 0 00-.496.545l.84 4.49H4.5a.5.5 0 00-.492.41l-.8 4A.5.5 0 004 15h3.256l.933 4.967a.5.5 0 00.492.533h.138a.5.5 0 00.494-.426l.926-4.974h3.268l.933 4.973a.5.5 0 00.494.427h.138a.5.5 0 00.492-.534l-.8-4.267a.5.5 0 00-.492-.41H12.04l.84-4.49a.5.5 0 00-.496-.545h-4.22zm.324 1h3.872l-.84 4.49H7.484l.84-4.49z" />
+                          <path d="M8.5 5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM9 10a2 2 0 100-4 2 2 0 000 4zm0 6a4 4 0 100-8 4 4 0 000 8zm7-6a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span>${existing.price}</span>
+                        <span>{getCurrentCurrencySymbol()}{String(existing.price)}</span>
+                      </div>
+                    )}
+                    {existing?.customFields?.offer !== undefined && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm0 6a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2H4z" />
+                        </svg>
+                        <span>Offer: {getCurrentCurrencySymbol()}{String(existing.customFields.offer)}</span> 
+                      </div>
+                    )}
+                    {existing?.customFields?.orderQuantityStep !== undefined && existing.customFields.orderQuantityStep !== 1 && (
+                      <div className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                        <span>Pack: {String(existing.customFields.orderQuantityStep)}</span>
                       </div>
                     )}
                   </div>
