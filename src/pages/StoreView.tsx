@@ -285,7 +285,7 @@ body { background: var(--c-bg); }
 .sv-variant-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 .sv-variant-pill { display: inline-flex; align-items: center; background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.2); border-radius: var(--r-full); padding: 3px 10px; font-size: 12px; font-weight: 500; color: var(--c-accent); }
 .sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.15); font-size: 11px; color: var(--c-accent); font-weight: 500; display: inline-flex; align-items: center; }
+.sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-surface3); border: 1px solid var(--c-border2); font-size: 11px; color: var(--c-text2); font-weight: 500; display: inline-flex; align-items: center; }
 .sv-drawer-price { font-family: var(--f-body); font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; margin-top: 14px; }
 .sv-drawer-price span { font-size: 13px; font-weight: 400; color: var(--c-text3); margin-left: 4px; }
 .sv-detail-table { margin-top: 18px; border: 1px solid var(--c-border); border-radius: var(--r-md); overflow: hidden; }
