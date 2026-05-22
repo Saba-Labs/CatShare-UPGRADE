@@ -36,6 +36,7 @@ import {
   markSellerStoreRowFetched,
 } from '../utils/catalogueSessionHydration';
 import { Capacitor } from '@capacitor/core';
+import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 const STORE_FETCH_TIMEOUT_MS = 14_000;
@@ -1032,6 +1033,7 @@ export default function StorePage() {
   const [businessProfileOpen, setBusinessProfileOpen] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [showHomepageBuilder, setShowHomepageBuilder] = useState(false);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
 

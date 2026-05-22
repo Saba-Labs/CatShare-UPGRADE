@@ -1,0 +1,156 @@
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { useHomepageBuilder } from '../../hooks/useHomepageBuilder';
+import { useHomepageAutosave } from '../../hooks/useHomepageAutosave';
+import { useResponsiveBuilder } from '../../hooks/useResponsiveBuilder';
+import { getHomepageConfig, createHomepageConfig, updateHomepageLayout } from '../../services/homepageService';
+import { createEmptyHomepageLayout } from '../../config/homepageBuilderConfig';
+import { HomepageConfig } from '../../types/homepage';
+import BuilderToolbar from './BuilderToolbar';
+import ComponentPalette from './ComponentPalette';
+import BuilderCanvas from './BuilderCanvas';
+import PropertiesPanel from './PropertiesPanel';
+import PreviewPane from './PreviewPane';
+import './HomepageBuilder.css';
+
+interface HomepageBuilderProps {
+  storeId: string;
+  onClose?: () => void;
+}
+
+export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderProps) {
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const { state, actions } = useHomepageBuilder();
+  const responsiveState = useResponsiveBuilder();
+  const [config, setConfig] = useState<HomepageConfig | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const { saveNow } = useHomepageAutosave({
+    configId: config?.id || '',
+    layout: state.layout,
+    isDirty: state.isDirty,
+    debounceMs: 2000,
+    onSaveStart: () => {
+      // Can add visual feedback here
+    },
+    onSaveComplete: () => {
+      actions.markSaved();
+      showToast('Homepage auto-saved', 'success');
+    },
+    onSaveError: (error) => {
+      actions.setError(error.message);
+      showToast(`Failed to save: ${error.message}`, 'error');
+    },
+  });
+
+  // Load existing config or create new one
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        setIsLoading(true);
+
+        let existingConfig = await getHomepageConfig(storeId);
+
+        if (!existingConfig) {
+          // Create new config with empty layout
+          const emptyLayout = createEmptyHomepageLayout();
+          existingConfig = await createHomepageConfig(storeId, emptyLayout);
+        }
+
+        setConfig(existingConfig);
+        actions.setLayout(existingConfig.layout);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to load homepage config';
+        actions.setError(msg);
+        showToast(msg, 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, [storeId, actions, showToast]);
+
+  const handleSave = async () => {
+    if (!config) return;
+
+    try {
+      const updated = await updateHomepageLayout(config.id, state.layout);
+      setConfig(updated);
+      actions.markSaved();
+      showToast('Homepage saved successfully', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to save homepage';
+      actions.setError(msg);
+      showToast(msg, 'error');
+    }
+  };
+
+  if (!responsiveState.canEdit) {
+    return (
+      <div className="builder-mobile-restriction">
+        <div className="restriction-content">
+          <div className="restriction-icon">📱</div>
+          <h2>Homepage Editor Not Available on Mobile</h2>
+          <p>The homepage builder is optimized for desktop editing. Please use a desktop or tablet to edit your store homepage.</p>
+          <button className="btn-primary" onClick={onClose}>
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="builder-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading homepage builder...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="homepage-builder">
+      <BuilderToolbar
+        isDirty={state.isDirty}
+        isSaving={state.isDirty}
+        error={state.error}
+        onSave={handleSave}
+        onSaveNow={saveNow}
+        onPreview={() => setShowPreview(!showPreview)}
+        showPreview={showPreview}
+        onClose={onClose}
+      />
+
+      <div className="builder-layout">
+        <ComponentPalette onAddSection={actions.addSection} />
+
+        {showPreview ? (
+          <PreviewPane layout={state.layout} />
+        ) : (
+          <BuilderCanvas
+            layout={state.layout}
+            selectedSectionId={state.selectedSectionId}
+            onSelectSection={actions.selectSection}
+            onRemoveSection={actions.removeSection}
+            onDuplicateSection={actions.duplicateSection}
+            onReorderSections={actions.reorderSections}
+          />
+        )}
+
+        <PropertiesPanel
+          selectedSectionId={state.selectedSectionId}
+          sections={state.layout.sections}
+          theme={state.layout.theme}
+          onUpdateSection={actions.updateSection}
+          onUpdateTheme={actions.updateTheme}
+          storeId={storeId}
+        />
+      </div>
+    </div>
+  );
+}
