@@ -250,7 +250,7 @@ export default function VariantCombinationEditor({
                   <div className="relative flex-1">
                     <input
                       type={field.type === 'number' ? 'number' : 'text'}
-                      value={(catData[field.key] as string | number) ?? ""}
+                      value={(catData[field.key] as string | number | undefined) ?? ""}
                       onChange={(e) =>
                         setEditingData({
                           ...editingData,
@@ -263,7 +263,7 @@ export default function VariantCombinationEditor({
                   {(field.unitsEnabled && field.unitOptions && field.unitOptions.length > 0) && (
                     <div className="relative flex-shrink-0">
                       <select
-                        value={(catData[`${field.key}Unit`] as string) ?? "None"}
+                        value={(catData[`${field.key}Unit`] as string | undefined) ?? "None"}
                         onChange={(e) =>
                           setEditingData({
                             ...editingData,
@@ -459,7 +459,7 @@ export default function VariantCombinationEditor({
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M8.5 5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM9 10a2 2 0 100-4 2 2 0 000 4zm0 6a4 4 0 100-8 4 4 0 000 8zm7-6a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span>{getCurrentCurrencySymbol()}{existing.price}</span>
+                        <span>{getCurrentCurrencySymbol()}{String(existing.price)}</span>
                       </div>
                     )}
                     {existing?.customFields?.offer !== undefined && (
@@ -467,7 +467,7 @@ export default function VariantCombinationEditor({
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm0 6a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2H4z" />
                         </svg>
-                        <span>Offer: {getCurrentCurrencySymbol()}{existing.customFields.offer}</span>
+                        <span>Offer: {getCurrentCurrencySymbol()}{String(existing.customFields.offer)}</span> 
                       </div>
                     )}
                     {existing?.customFields?.orderQuantityStep !== undefined && existing.customFields.orderQuantityStep !== 1 && (
