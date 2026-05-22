@@ -475,7 +475,7 @@ export default function VariantCombinationEditor({
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
                         </svg>
-                        <span>Pack: {existing.customFields.orderQuantityStep}</span>
+                        <span>Pack: {String(existing.customFields.orderQuantityStep)}</span>
                       </div>
                     )}
                   </div>
