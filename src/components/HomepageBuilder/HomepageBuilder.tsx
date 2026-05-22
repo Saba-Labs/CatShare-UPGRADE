@@ -49,17 +49,30 @@ export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderPro
   // Load existing config or create new one
   useEffect(() => {
     const loadConfig = async () => {
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Config loading timed out after 10 seconds')), 10000)
+      );
+
       try {
         setIsLoading(true);
+        console.log('[HomepageBuilder] Starting config load for storeId:', storeId);
 
-        let existingConfig = await getHomepageConfig(storeId);
+        let existingConfig = await Promise.race([
+          getHomepageConfig(storeId),
+          timeoutPromise as Promise<any>
+        ]);
 
         if (!existingConfig) {
+          console.log('[HomepageBuilder] No existing config, creating new one');
           // Create new config with empty layout
           const emptyLayout = createEmptyHomepageLayout();
-          existingConfig = await createHomepageConfig(storeId, emptyLayout);
+          existingConfig = await Promise.race([
+            createHomepageConfig(storeId, emptyLayout),
+            timeoutPromise as Promise<any>
+          ]);
         }
 
+        console.log('[HomepageBuilder] Config loaded successfully:', existingConfig);
         setConfig(existingConfig);
         actions.setLayout(existingConfig.layout);
       } catch (error) {

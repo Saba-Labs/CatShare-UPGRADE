@@ -10,6 +10,12 @@ export const CATSHARE_AUTH_RESTORED_EVENT = 'catshare:supabase-auth-restored';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+console.log('[Supabase Init]', {
+  url: supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  allEnv: Object.keys(import.meta.env).filter(k => k.includes('SUPABASE'))
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error(
     '[CatShare] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Add them to .env.local and rebuild.',
@@ -37,8 +43,17 @@ const supabaseFetch: typeof fetch = (input, init) => {
   }
   // Spread init but exclude headers, then add our merged headers
   const { headers: _, ...restInit } = init || {};
+
+  // Log fetch requests for debugging
+  if (typeof input === 'string' && input.includes('store_homepage_configs')) {
+    console.log('[supabaseFetch]', input, 'headers:', Object.fromEntries(headers));
+  }
+
   /** Avoid stale browser HTTP cache on PostgREST/RPC (important for public storefront). */
-  return fetch(input, { ...restInit, headers, cache: 'no-store' });
+  return fetch(input, { ...restInit, headers, cache: 'no-store' }).catch(err => {
+    console.error('[supabaseFetch] Error:', err, 'URL:', input);
+    throw err;
+  });
 };
 
 export const supabase: SupabaseClient = createClient(
@@ -56,6 +71,14 @@ export const supabase: SupabaseClient = createClient(
     },
   }
 );
+
+// Test Supabase connectivity on init
+if (supabaseUrl) {
+  fetch(supabaseUrl, { method: 'HEAD', mode: 'no-cors' }).then(
+    () => console.log('[Supabase] Connectivity test passed'),
+    (err) => console.log('[Supabase] Connectivity test failed:', err.message)
+  );
+}
 
 /** Use this everywhere we previously called getSupabaseClient() — one client, session attached. */
 export function getSupabaseClient(): SupabaseClient {
