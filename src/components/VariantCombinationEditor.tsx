@@ -445,7 +445,7 @@ export default function VariantCombinationEditor({
               </div>
               {hasData && (
                 <div className="text-xs text-green-700 dark:text-green-300 mt-2 pt-2 border-t border-green-200 dark:border-green-800/50">
-                  <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-3">
                     {existing?.image && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
