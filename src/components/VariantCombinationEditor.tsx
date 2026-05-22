@@ -11,7 +11,7 @@ import {
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
-import { stripDataUriPrefix, deleteImageFromR2 } from "../services/cloudflareService";
+import { deleteImageFromR2 } from "../services/cloudflareService";
 import { uploadProductImageToR2 } from "../services/r2Upload";
 
 interface VariantCombinationEditorProps {
@@ -98,9 +98,14 @@ export default function VariantCombinationEditor({
         reader.onerror = () => reject(new Error("Could not read file"));
         reader.readAsDataURL(file);
       });
-
+      
+      const cleanComboId = String(selectedCombinationId ?? "combo")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "_")
+        .replace(/_+/g, "_");
+      
       const result = await uploadProductImageToR2({
-        productId: selectedCombinationId,
+        productId: `variant_${cleanComboId}_${Date.now()}`,
         dataUrl: base64,
       });
       if (result?.url) {
