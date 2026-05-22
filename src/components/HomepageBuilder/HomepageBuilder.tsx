@@ -86,7 +86,7 @@ export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderPro
     };
 
     loadConfig();
-  }, [storeId, actions, showToast]);
+  }, [storeId, showToast]);
 
   const handleSave = async () => {
     if (!config) return;

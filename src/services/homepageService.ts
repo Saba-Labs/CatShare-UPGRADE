@@ -148,12 +148,8 @@ export async function duplicateHomepageConfig(
   configId: string,
   newStoreId: string
 ): Promise<HomepageConfig> {
-  const supabase = getSupabaseClient();
-
-  // Fetch existing config
   const existing = await getHomepageConfig(configId);
   if (!existing) throw new Error('Homepage config not found');
-
-  // Create new config with same layout but different store
   return createHomepageConfig(newStoreId, existing.layout);
 }
+
