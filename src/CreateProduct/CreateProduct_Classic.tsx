@@ -1951,7 +1951,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: -10 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute top-10 right-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                          className="absolute top-10 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
                           style={{ minWidth: '140px' }}
                         >
                           <button
