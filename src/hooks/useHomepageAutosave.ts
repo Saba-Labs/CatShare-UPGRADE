@@ -21,7 +21,7 @@ export function useHomepageAutosave({
   onSaveComplete,
   onSaveError,
 }: UseHomepageAutosaveProps) {
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout>(undefined);
   const lastSavedRef = useRef<string>('');
 
   const save = useCallback(async () => {
