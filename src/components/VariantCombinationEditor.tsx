@@ -457,9 +457,9 @@ export default function VariantCombinationEditor({
                     {existing?.price !== undefined && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M8.16 5a.5.5 0 00-.496.545l.84 4.49H4.5a.5.5 0 00-.492.41l-.8 4A.5.5 0 004 15h3.256l.933 4.967a.5.5 0 00.492.533h.138a.5.5 0 00.494-.426l.926-4.974h3.268l.933 4.973a.5.5 0 00.494.427h.138a.5.5 0 00.492-.534l-.8-4.267a.5.5 0 00-.492-.41H12.04l.84-4.49a.5.5 0 00-.496-.545h-4.22zm.324 1h3.872l-.84 4.49H7.484l.84-4.49z" />
+                          <path d="M10.5 1.5H9.5v2h1v-2zM4 8a1 1 0 100 2 1 1 0 000-2zm11 1a1 1 0 11-2 0 1 1 0 012 0zM4.75 13c0 .414.336.75.75.75s.75-.336.75-.75-.336-.75-.75-.75-.75.336-.75.75zm8.5 0c0 .414.336.75.75.75s.75-.336.75-.75-.336-.75-.75-.75-.75.336-.75.75zM10 15a1 1 0 100 2 1 1 0 000-2z" />
                         </svg>
-                        <span>${existing.price}</span>
+                        <span>{getCurrentCurrencySymbol()}{existing.price}</span>
                       </div>
                     )}
                   </div>
