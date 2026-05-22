@@ -15,7 +15,14 @@ export async function getHomepageConfig(storeId: string): Promise<HomepageConfig
     throw error;
   }
 
-  return data as HomepageConfig;
+  return {
+    id: data.id,
+    storeId: data.store_id,
+    layout: data.layout,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    autoSavedAt: data.auto_saved_at,
+  } as HomepageConfig;
 }
 
 export async function createHomepageConfig(
@@ -35,7 +42,14 @@ export async function createHomepageConfig(
     .single();
 
   if (error) throw error;
-  return data as HomepageConfig;
+  return {
+    id: data.id,
+    storeId: data.store_id,
+    layout: data.layout,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    autoSavedAt: data.auto_saved_at,
+  } as HomepageConfig;
 }
 
 export async function updateHomepageLayout(
@@ -56,7 +70,14 @@ export async function updateHomepageLayout(
     .single();
 
   if (error) throw error;
-  return data as HomepageConfig;
+  return {
+    id: data.id,
+    storeId: data.store_id,
+    layout: data.layout,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    autoSavedAt: data.auto_saved_at,
+  } as HomepageConfig;
 }
 
 export async function autoSaveHomepage(
@@ -77,7 +98,14 @@ export async function autoSaveHomepage(
     .single();
 
   if (error) throw error;
-  return data as HomepageConfig;
+  return {
+    id: data.id,
+    storeId: data.store_id,
+    layout: data.layout,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    autoSavedAt: data.auto_saved_at,
+  } as HomepageConfig;
 }
 
 export async function deleteHomepageConfig(configId: string): Promise<void> {
