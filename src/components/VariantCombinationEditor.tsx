@@ -11,7 +11,8 @@ import {
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
-import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "../services/cloudflareService";
+import { stripDataUriPrefix, deleteImageFromR2 } from "../services/cloudflareService";
+import { uploadProductImageToR2 } from "../services/r2Upload";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
@@ -98,25 +99,15 @@ export default function VariantCombinationEditor({
         reader.readAsDataURL(file);
       });
 
-      const raw = stripDataUriPrefix(base64);
-      const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
-      const ext = mimeType === "image/jpeg" ? "jpg" : "png";
-
-      // 1. Clean the combination ID so spaces and special characters don't break the URL path
-      const cleanComboId = String(selectedCombinationId)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "_") // Replaces spaces, colons, and hyphens with underscores
-        .replace(/_+/g, "_");       // Clean up any double underscores
-
-      // 2. Use the clean string for your filename
-      const filename = `variant_${cleanComboId}_${Date.now()}.${ext}`;
-
-      const result = await uploadImageToR2(raw, filename, "variants", mimeType);
-      if (result.success && result.publicUrl) {
-        setEditingData((prev) => ({ ...prev, image: result.publicUrl }));
+      const result = await uploadProductImageToR2({
+        productId: selectedCombinationId,
+        dataUrl: base64,
+      });
+      if (result?.url) {
+        setEditingData((prev) => ({ ...prev, image: result.url }));
         showToast("Image uploaded successfully", "success");
       } else {
-        showToast(`Upload failed: ${result.error || "Unknown error"}`, "error");
+        showToast("Upload failed: could not get image URL", "error");
       }
     } catch (err) {
       console.error("Image upload error:", err);
