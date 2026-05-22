@@ -101,7 +101,15 @@ export default function VariantCombinationEditor({
       const raw = stripDataUriPrefix(base64);
       const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
       const ext = mimeType === "image/jpeg" ? "jpg" : "png";
-      const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
+
+      // 1. Clean the combination ID so spaces and special characters don't break the URL path
+      const cleanComboId = String(selectedCombinationId)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "_") // Replaces spaces, colons, and hyphens with underscores
+        .replace(/_+/g, "_");       // Clean up any double underscores
+
+      // 2. Use the clean string for your filename
+      const filename = `variant_${cleanComboId}_${Date.now()}.${ext}`;
 
       const result = await uploadImageToR2(raw, filename, "variants", mimeType);
       if (result.success && result.publicUrl) {
