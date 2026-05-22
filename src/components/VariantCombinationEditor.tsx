@@ -11,6 +11,7 @@ import {
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
+import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "../services/cloudflareService";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
@@ -70,26 +71,52 @@ export default function VariantCombinationEditor({
     setEditingData({});
   }, [selectedCombination, variantConfig, onChange]);
 
-  const handleImageUpload = useCallback((file: File) => {
+  const handleRemoveVariantImage = useCallback(async () => {
+    if (editingData.image && editingData.image.startsWith("https://")) {
+      try {
+        await deleteImageFromR2(editingData.image);
+      } catch (err) {
+        console.error("Failed to delete variant image from R2:", err);
+      }
+    }
+    setEditingData({ ...editingData, image: undefined });
+    setShowImageMenu(false);
+  }, [editingData]);
+
+  const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
       showToast("Please select an image file", "error");
       return;
     }
 
     setUploadingImage(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      setEditingData((prev) => ({ ...prev, image: base64 }));
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+
+      const raw = stripDataUriPrefix(base64);
+      const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
+      const ext = mimeType === "image/jpeg" ? "jpg" : "png";
+      const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
+
+      const result = await uploadImageToR2(raw, filename, "variants", mimeType);
+      if (result.success && result.publicUrl) {
+        setEditingData((prev) => ({ ...prev, image: result.publicUrl }));
+        showToast("Image uploaded successfully", "success");
+      } else {
+        showToast(`Upload failed: ${result.error || "Unknown error"}`, "error");
+      }
+    } catch (err) {
+      console.error("Image upload error:", err);
+      showToast("Failed to upload image", "error");
+    } finally {
       setUploadingImage(false);
-      showToast("Image added. Will sync to cloud when you save.", "success");
-    };
-    reader.onerror = () => {
-      setUploadingImage(false);
-      showToast("Failed to read image file", "error");
-    };
-    reader.readAsDataURL(file);
-  }, [showToast]);
+    }
+  }, [selectedCombinationId, showToast]);
 
   if (combinations.length === 0) {
     return (
@@ -164,10 +191,7 @@ export default function VariantCombinationEditor({
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingData({ ...editingData, image: undefined });
-                              setShowImageMenu(false);
-                            }}
+                            onClick={handleRemoveVariantImage}
                             className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2 border-t border-gray-200 dark:border-gray-700"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
