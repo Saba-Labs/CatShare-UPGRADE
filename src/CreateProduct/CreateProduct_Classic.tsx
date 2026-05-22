@@ -381,6 +381,7 @@ export default function CreateProduct() {
   const [variantConfig, setVariantConfig] = useState<ProductVariantsConfig>({ groups: [] });
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollAtTopRef = useRef(true);
+  const isVariantConfigInitializedRef = useRef(false);
 
   // Derived values for hardware-accelerated animations
   // Preview scale state must be declared before useTransform
@@ -560,6 +561,12 @@ export default function CreateProduct() {
   useEffect(() => {
     if (!editingId || !variantConfig.combinations?.length) return;
 
+    // Skip the initial load—only sync when user actually changes variants
+    if (!isVariantConfigInitializedRef.current) {
+      isVariantConfigInitializedRef.current = true;
+      return;
+    }
+
     const autoSaveVariants = async () => {
       try {
         const authUserIdNow = getPersistedAuthUserId();
@@ -673,6 +680,9 @@ export default function CreateProduct() {
   };
 
   useEffect(() => {
+    // Reset variant initialization flag when switching products
+    isVariantConfigInitializedRef.current = false;
+
     if (editingId) {
       const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);

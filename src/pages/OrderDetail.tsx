@@ -100,6 +100,12 @@ function formatTime(dateStr: string) {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
+/** Parse variant summary string (e.g., "Size: L; Colour: Green") into pills. */
+function parseVariantSummary(summary: string): string[] {
+  if (!summary || !summary.trim()) return [];
+  return summary.split(';').map(s => s.trim()).filter(Boolean);
+}
+
 function getStatusConfig(status: string) {
   switch (status) {
     case 'pending':
@@ -2286,11 +2292,11 @@ useEffect(() => {
                                   {item.subtitle}
                                 </div>
                               )}
-                              {item.variantSummary && (
-                                <div style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', borderRadius: 4, padding: '3px 6px' }}>
-                                  {item.variantSummary}
+                              {item.variantSummary && parseVariantSummary(item.variantSummary).map((pill, idx) => (
+                                <div key={idx} style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', borderRadius: 4, padding: '3px 6px' }}>
+                                  {pill}
                                 </div>
-                              )}
+                              ))}
                             </div>
                           </div>
                           <div
