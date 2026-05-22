@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   getAllVariantCombinations,
   formatVariantSelectionSummary,
@@ -28,6 +29,7 @@ export default function VariantCombinationEditor({
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<Partial<VariantCombination>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImageMenu, setShowImageMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const combinations = getAllVariantCombinations(variantConfig.groups);
@@ -121,47 +123,92 @@ export default function VariantCombinationEditor({
             <div className="flex-1">
               <div className="flex flex-wrap gap-3">
                 {editingData.image && (
-                  <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-gray-200">
-                    <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+                  <div className="relative">
+                    <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-gray-200">
+                      <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+                    </div>
+                    {/* Action Menu Button */}
                     <button
                       type="button"
-                      onClick={() => setEditingData({ ...editingData, image: undefined })}
+                      onClick={() => setShowImageMenu(!showImageMenu)}
                       className="absolute -top-2 -right-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-gray-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
-                      title="Remove image"
+                      title="More actions"
                     >
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />
+                        <path d="M10.5 1.5H9.5V.5h1v1zm0 5H9.5v-1h1v1zm0 5H9.5v-1h1v1zm0 5H9.5v-1h1v1z" />
                       </svg>
                     </button>
+                    {/* Dropdown Menu */}
+                    <AnimatePresence>
+                      {showImageMenu && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute top-10 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
+                          style={{ minWidth: '140px' }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fileInputRef.current?.click();
+                              setShowImageMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Replace
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingData({ ...editingData, image: undefined });
+                              setShowImageMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2 border-t border-gray-200 dark:border-gray-700"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Remove
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
-                >
-                  {uploadingImage ? (
-                    <div className="flex flex-col items-center justify-center gap-1">
-                      <svg className="w-6 h-6 text-blue-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                {!editingData.image && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                  >
+                    {uploadingImage ? (
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <svg className="w-6 h-6 text-blue-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Uploading...</span>
+                      </div>
+                    ) : (
+                      <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Uploading...</span>
-                    </div>
-                  ) : (
-                    <svg className="w-6 h-6 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                    className="hidden"
-                  />
-                </button>
+                    )}
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                  className="hidden"
+                />
               </div>
             </div>
           </div>
