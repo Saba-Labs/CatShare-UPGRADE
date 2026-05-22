@@ -449,7 +449,7 @@ export default function VariantCombinationEditor({
                     {existing?.image && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4.5-4.5 3 3 4-4 2.5 2.5V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10z" />
+                          <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
                         </svg>
                         <span>Image</span>
                       </div>
@@ -457,7 +457,7 @@ export default function VariantCombinationEditor({
                     {existing?.price !== undefined && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10.5 1.5H9.5v2h1v-2zM4 8a1 1 0 100 2 1 1 0 000-2zm11 1a1 1 0 11-2 0 1 1 0 012 0zM4.75 13c0 .414.336.75.75.75s.75-.336.75-.75-.336-.75-.75-.75-.75.336-.75.75zm8.5 0c0 .414.336.75.75.75s.75-.336.75-.75-.336-.75-.75-.75-.75.336-.75.75zM10 15a1 1 0 100 2 1 1 0 000-2z" />
+                          <path d="M8.5 5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM9 10a2 2 0 100-4 2 2 0 000 4zm0 6a4 4 0 100-8 4 4 0 000 8zm7-6a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                         <span>{getCurrentCurrencySymbol()}{existing.price}</span>
                       </div>
@@ -465,7 +465,7 @@ export default function VariantCombinationEditor({
                     {existing?.customFields?.offer !== undefined && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm13 2H3v10h14V5zm-5.5 9a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0-8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+                          <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm0 6a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2H4z" />
                         </svg>
                         <span>Offer: {getCurrentCurrencySymbol()}{existing.customFields.offer}</span>
                       </div>
@@ -473,7 +473,7 @@ export default function VariantCombinationEditor({
                     {existing?.customFields?.orderQuantityStep !== undefined && existing.customFields.orderQuantityStep !== 1 && (
                       <div className="flex items-center gap-1">
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" />
+                          <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
                         </svg>
                         <span>Pack: {existing.customFields.orderQuantityStep}</span>
                       </div>
