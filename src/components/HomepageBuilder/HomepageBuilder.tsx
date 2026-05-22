@@ -63,6 +63,7 @@ export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderPro
         setConfig(existingConfig);
         actions.setLayout(existingConfig.layout);
       } catch (error) {
+        console.error('[HomepageBuilder] Error loading config:', error);
         const msg = error instanceof Error ? error.message : 'Failed to load homepage config';
         actions.setError(msg);
         showToast(msg, 'error');
