@@ -2293,7 +2293,7 @@ useEffect(() => {
                                 </div>
                               )}
                               {item.variantSummary && parseVariantSummary(item.variantSummary).map((pill, idx) => (
-                                <div key={idx} style={{ fontSize: 12, color: COLORS.muted, fontWeight: 500, display: 'inline-block', backgroundColor: '#f5f5f7', borderRadius: 4, padding: '3px 6px' }}>
+                                <div key={idx} style={{ fontSize: 12, color: COLORS.green, fontWeight: 500, display: 'inline-block', backgroundColor: COLORS.greenLight, borderRadius: 4, padding: '3px 6px' }}>
                                   {pill}
                                 </div>
                               ))}
