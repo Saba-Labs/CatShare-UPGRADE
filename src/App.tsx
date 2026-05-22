@@ -69,6 +69,7 @@ const PrivacyPolicy = lazy(() => import("./PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./TermsOfService"));
 const Website = lazy(() => import("./Website"));
 const Tutorial = lazy(() => import("./Tutorial"));
+const HomepageEditorPage = lazy(() => import("./pages/HomepageEditorPage"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
@@ -2524,6 +2525,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <Store />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/homepage"
+          element={
+            <ProtectedRoute>
+              <HomepageEditorPage />
             </ProtectedRoute>
           }
         />

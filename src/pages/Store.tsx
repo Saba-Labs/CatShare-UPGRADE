@@ -788,6 +788,32 @@ const CSS = `
     line-height: 1.5;
   }
   .confirm-btns { display: flex; gap: 8px; }
+
+  /* ── Editor zone ── */
+  .editor-zone { margin-top: 4px; }
+  .editor-trigger {
+    width: 100%;
+    padding: 13px;
+    border-radius: var(--radius);
+    border: 1px solid #D0D7E2;
+    background: #F8F9FB;
+    color: #0F172A;
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: all 0.15s;
+    box-shadow: var(--shadow);
+  }
+  .editor-trigger:hover {
+    background: #EEF2F8;
+    border-color: #B5BFD0;
+    color: #0a0e1f;
+  }
   .confirm-yes {
     flex: 1;
     padding: 11px;
@@ -1897,6 +1923,17 @@ export default function StorePage() {
                 </div>
                 </div>
                 )}
+              </div>
+
+              {/* Homepage Editor */}
+              <div className="editor-zone gap">
+                <button
+                  type="button"
+                  className="editor-trigger"
+                  onClick={() => navigate('/store/homepage')}
+                >
+                  <IconEdit /> Edit homepage
+                </button>
               </div>
 
               {/* Delete */}
