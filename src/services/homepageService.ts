@@ -1,94 +1,147 @@
-import { getSupabaseClient } from '../supabaseClient';
 import { HomepageConfig, HomepageLayout } from '../types/homepage';
+import { withRetry } from '../utils/retry';
 
 export async function getHomepageConfig(storeId: string): Promise<HomepageConfig | null> {
-  const supabase = getSupabaseClient();
+  return withRetry(async () => {
+    console.log('[getHomepageConfig] Fetching for storeId:', storeId);
 
-  const { data, error } = await supabase
-    .from('store_homepage_configs')
-    .select('*')
-    .eq('store_id', storeId)
-    .single();
+    const response = await fetch('/api/homepage-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get', storeId }),
+    });
 
-  if (error) {
-    if (error.code === 'PGRST116') return null; // No rows returned
-    throw error;
-  }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch config');
+    }
 
-  return data as HomepageConfig;
+    const { data } = await response.json();
+
+    if (!data) return null;
+
+    console.log('[getHomepageConfig] Success:', data);
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      layout: data.layout,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      autoSavedAt: data.auto_saved_at,
+    } as HomepageConfig;
+  });
 }
 
 export async function createHomepageConfig(
   storeId: string,
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
-  const supabase = getSupabaseClient();
+  return withRetry(async () => {
+    const response = await fetch('/api/homepage-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create',
+        storeId,
+        layout,
+        themeSettings: layout.theme,
+      }),
+    });
 
-  const { data, error } = await supabase
-    .from('store_homepage_configs')
-    .insert({
-      store_id: storeId,
-      layout,
-      theme_settings: layout.theme,
-    })
-    .select()
-    .single();
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create config');
+    }
 
-  if (error) throw error;
-  return data as HomepageConfig;
+    const { data } = await response.json();
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      layout: data.layout,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      autoSavedAt: data.auto_saved_at,
+    } as HomepageConfig;
+  });
 }
 
 export async function updateHomepageLayout(
   configId: string,
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
-  const supabase = getSupabaseClient();
+  return withRetry(async () => {
+    const response = await fetch('/api/homepage-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update',
+        configId,
+        layout,
+        themeSettings: layout.theme,
+      }),
+    });
 
-  const { data, error } = await supabase
-    .from('store_homepage_configs')
-    .update({
-      layout,
-      theme_settings: layout.theme,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', configId)
-    .select()
-    .single();
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update config');
+    }
 
-  if (error) throw error;
-  return data as HomepageConfig;
+    const { data } = await response.json();
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      layout: data.layout,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      autoSavedAt: data.auto_saved_at,
+    } as HomepageConfig;
+  });
 }
 
 export async function autoSaveHomepage(
   configId: string,
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
-  const supabase = getSupabaseClient();
+  return withRetry(async () => {
+    const response = await fetch('/api/homepage-config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update',
+        configId,
+        layout,
+        themeSettings: layout.theme,
+      }),
+    });
 
-  const { data, error } = await supabase
-    .from('store_homepage_configs')
-    .update({
-      layout,
-      theme_settings: layout.theme,
-      auto_saved_at: new Date().toISOString(),
-    })
-    .eq('id', configId)
-    .select()
-    .single();
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to save config');
+    }
 
-  if (error) throw error;
-  return data as HomepageConfig;
+    const { data } = await response.json();
+    return {
+      id: data.id,
+      storeId: data.store_id,
+      layout: data.layout,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      autoSavedAt: data.auto_saved_at,
+    } as HomepageConfig;
+  });
 }
 
 export async function deleteHomepageConfig(configId: string): Promise<void> {
-  const supabase = getSupabaseClient();
+  const response = await fetch('/api/homepage-config', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ configId }),
+  });
 
-  const { error } = await supabase
-    .from('store_homepage_configs')
-    .delete()
-    .eq('id', configId);
-
-  if (error) throw error;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete config');
+  }
 }
 
 export async function duplicateHomepageConfig(
