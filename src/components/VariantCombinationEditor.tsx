@@ -7,7 +7,6 @@ import {
   type ProductVariantsConfig,
   type VariantCombination,
 } from "../utils/productVariants";
-import { uploadImageToR2, stripDataUriPrefix } from "../services/cloudflareService";
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
@@ -69,39 +68,26 @@ export default function VariantCombinationEditor({
     setEditingData({});
   }, [selectedCombination, variantConfig, onChange]);
 
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUpload = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      showToast("Please select an image file", "error");
       return;
     }
 
     setUploadingImage(true);
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = () => reject(new Error("Could not read file"));
-        reader.readAsDataURL(file);
-      });
-
-      const raw = stripDataUriPrefix(base64);
-      const mimeType = file.type === "image/jpeg" || file.type === "image/jpg" ? "image/jpeg" : "image/png";
-      const ext = mimeType === "image/jpeg" ? "jpg" : "png";
-      const filename = `variant_${selectedCombinationId}_${Date.now()}.${ext}`;
-
-      const result = await uploadImageToR2(raw, filename, "variants", mimeType);
-      if (result.success && result.publicUrl) {
-        setEditingData((prev) => ({ ...prev, image: result.publicUrl }));
-      } else {
-        alert(`Upload failed: ${result.error || "Unknown error"}`);
-      }
-    } catch (err) {
-      console.error("Image upload error:", err);
-      alert("Failed to upload image");
-    } finally {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setEditingData((prev) => ({ ...prev, image: base64 }));
       setUploadingImage(false);
-    }
-  }, [selectedCombinationId]);
+      showToast("Image added. Will sync to cloud when you save.", "success");
+    };
+    reader.onerror = () => {
+      setUploadingImage(false);
+      showToast("Failed to read image file", "error");
+    };
+    reader.readAsDataURL(file);
+  }, [showToast]);
 
   if (combinations.length === 0) {
     return (
