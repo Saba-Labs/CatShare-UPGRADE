@@ -6,6 +6,7 @@ import './GridCanvas.css';
 const GRID_COLUMNS = 12;
 const GRID_GAP = 16;
 const COLUMN_WIDTH = 60;
+const SNAP_THRESHOLD = 5; // pixels
 
 interface GridCanvasProps {
   layout: HomepageLayout;
@@ -59,6 +60,8 @@ export default function GridCanvas({
 
   const handleResizeStart = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (e.button !== 0) return; // Only handle left mouse button
+
     const section = layout.sections.find((s) => s.id === id);
     if (!section) return;
 
@@ -76,8 +79,17 @@ export default function GridCanvas({
     if (!resizingId || !resizeStart) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = Math.round((e.clientX - resizeStart.x) / (COLUMN_WIDTH + GRID_GAP / GRID_COLUMNS));
-      const deltaY = Math.round((e.clientY - resizeStart.y) / 220);
+      const pixelDeltaX = e.clientX - resizeStart.x;
+      const pixelDeltaY = e.clientY - resizeStart.y;
+
+      const columnPixelWidth = COLUMN_WIDTH + GRID_GAP / GRID_COLUMNS;
+      const rowPixelHeight = 220;
+
+      const rawDeltaX = pixelDeltaX / columnPixelWidth;
+      const rawDeltaY = pixelDeltaY / rowPixelHeight;
+
+      const deltaX = Math.abs(rawDeltaX) < SNAP_THRESHOLD / columnPixelWidth ? 0 : Math.round(rawDeltaX);
+      const deltaY = Math.abs(rawDeltaY) < SNAP_THRESHOLD / rowPixelHeight ? 0 : Math.round(rawDeltaY);
 
       const newWidth = Math.max(1, Math.min(GRID_COLUMNS, resizeStart.width + deltaX));
       const newHeight = Math.max(1, resizeStart.height + deltaY);
@@ -96,14 +108,20 @@ export default function GridCanvas({
     const handleMouseUp = () => {
       setResizingId(null);
       setResizeStart(null);
+      document.body.style.userSelect = 'auto';
+      document.body.style.cursor = 'auto';
     };
 
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'nwse-resize';
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = 'auto';
+      document.body.style.cursor = 'auto';
     };
   }, [resizingId, resizeStart, layout, onUpdateSectionPosition]);
 
