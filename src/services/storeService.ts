@@ -570,7 +570,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       ...(parsed as StorePublic),
       id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
-      homepageEnabled: typeof row.homepageEnabled === 'boolean' ? row.homepageEnabled : row.homepage_enabled !== false,
+      homepageEnabled: typeof row.homepageEnabled === 'boolean' ? row.homepageEnabled : typeof row.homepage_enabled === 'boolean' ? row.homepage_enabled : true,
       sellerWebsite: firstNonEmptyString(
         row.sellerWebsite,
         row.seller_website,
