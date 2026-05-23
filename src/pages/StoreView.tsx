@@ -951,13 +951,23 @@ useEffect(() => {
 
   // Load homepage config if homepage is enabled
   useEffect(() => {
-    if (!store?.id || !store.homepageEnabled) {
+    console.log('Homepage effect running - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
+    // If homepage is disabled, immediately clear the layout
+    if (store && !store.homepageEnabled) {
+      console.log('Homepage disabled - clearing layout');
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
     }
+
+    if (!store?.id) {
+      return;
+    }
+
+    console.log('Loading homepage config for store:', store.id);
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
+      console.log('Homepage config loaded:', config);
       if (config?.layout) {
         setHomepageLayout(config.layout);
       } else {
@@ -983,10 +993,12 @@ useEffect(() => {
   /** Re-hit Supabase when user returns to the tab or restores from bfcache — no local product/store cache in StoreView. */
   useEffect(() => {
     const reloadFromCloud = () => {
+      console.log('Reloading store from cloud');
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const slug = effectiveSlugRef.current;
       if (!slug) return;
       void getStoreBySlug(slug).then((r) => {
+        console.log('Fetched store from cloud:', r);
         if (!r.success || !r.data) return;
         setStoreError(null);
         setStore(r.data);
@@ -1024,7 +1036,15 @@ useEffect(() => {
       if ((e as PageTransitionEvent).persisted) reloadFromCloud();
     };
     const onStoreUpdated = (e: Event) => {
-      if (e instanceof CustomEvent && e.detail?.storeId === store?.id) {
+      if (e instanceof CustomEvent) {
+        console.log('Store updated event received:', e.detail);
+        reloadFromCloud();
+      }
+    };
+
+    const onStorageChange = (e: StorageEvent) => {
+      if (e.key === 'store-update-signal') {
+        console.log('Store update signal from localStorage:', e.newValue);
         reloadFromCloud();
       }
     };
@@ -1032,10 +1052,12 @@ useEffect(() => {
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
     window.addEventListener('store-updated', onStoreUpdated);
+    window.addEventListener('storage', onStorageChange);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('store-updated', onStoreUpdated);
+      window.removeEventListener('storage', onStorageChange);
     };
   }, [store?.id]);
 
@@ -1513,7 +1535,7 @@ useEffect(() => {
           </div>
 
           {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
-          {store?.homepageEnabled === true && homepageLayout && !homepageLoading ? (
+          {console.log('Render check:', { homepageEnabled: store?.homepageEnabled, hasLayout: !!homepageLayout, isLoading: homepageLoading }) || (store?.homepageEnabled === true && homepageLayout && !homepageLoading) ? (
             // Render custom homepage
             <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
               {homepageLayout.sections.map((section) => (

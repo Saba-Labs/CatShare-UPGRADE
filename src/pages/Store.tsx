@@ -1378,7 +1378,10 @@ export default function StorePage() {
       setStore(result.data);
       setHomepageEnabled(result.data.homepageEnabled);
       // Broadcast to other tabs/iframes that store data changed
-      window.dispatchEvent(new CustomEvent('store-updated', { detail: { storeId: result.data.id, homepageEnabled: result.data.homepageEnabled } }));
+      console.log('Dispatching store-updated event:', { storeId: result.data.id, homepageEnabled: result.data.homepageEnabled });
+      const updateSignal = { storeId: result.data.id, homepageEnabled: result.data.homepageEnabled, timestamp: Date.now() };
+      localStorage.setItem('store-update-signal', JSON.stringify(updateSignal));
+      window.dispatchEvent(new CustomEvent('store-updated', { detail: updateSignal }));
       showToast(next ? 'Homepage is now visible' : 'Homepage is hidden', next ? 'success' : 'info');
     } else {
       setHomepageEnabled(prev);
