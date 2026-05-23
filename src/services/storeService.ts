@@ -1010,8 +1010,11 @@ export async function updateStoreHomepageStatus(
       .single();
 
     if (error) {
-      console.error('❌ Error updating store homepage status:', error);
-      return { success: false, error: error.message };
+      const errorMsg = typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as any).message)
+        : String(error);
+      console.error('❌ Error updating store homepage status:', errorMsg, error);
+      return { success: false, error: errorMsg };
     }
 
     return {
@@ -1019,7 +1022,7 @@ export async function updateStoreHomepageStatus(
       data: mapStoreRow(data as Record<string, unknown>),
     };
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('❌ Exception in updateStoreHomepageStatus:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
