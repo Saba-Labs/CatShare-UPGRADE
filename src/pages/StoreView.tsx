@@ -932,6 +932,15 @@ useEffect(() => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [refetchStore]);
 
+  // Periodically refetch store data every 2 seconds to catch real-time updates
+  useEffect(() => {
+    if (!effectiveSlugRef.current) return;
+    const interval = setInterval(() => {
+      refetchStore(effectiveSlugRef.current);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [refetchStore]);
+
   /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
   useEffect(() => {
     if (storeLoading || !storeError || !hostSlug || slug) return;
