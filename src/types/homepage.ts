@@ -12,7 +12,10 @@ export type HomepageSectionType =
   | 'cta'
   | 'video'
   | 'testimonials'
-  | 'footer';
+  | 'footer'
+  | 'feature-card'
+  | 'two-column-content'
+  | 'content-grid';
 
 export interface CarouselImage {
   id: string;
@@ -213,6 +216,76 @@ export interface FooterSection {
   };
 }
 
+export interface FeatureCard {
+  id: string;
+  imageUrl: string;
+  title: string;
+  description: string;
+  link?: string;
+}
+
+export interface FeatureCardSection {
+  type: 'feature-card';
+  settings: {
+    layout: 'image-left' | 'image-right';
+    imageWidth: 'small' | 'medium' | 'large';
+    backgroundColor?: string;
+    textColor?: string;
+    padding: 'small' | 'medium' | 'large';
+  };
+  content: {
+    imageUrl: string;
+    title: string;
+    description: string;
+    buttonText?: string;
+    buttonLink?: string;
+  };
+}
+
+export interface TwoColumnContentSection {
+  type: 'two-column-content';
+  settings: {
+    columnLayout: 'text-left' | 'text-right';
+    backgroundColor?: string;
+    padding: 'small' | 'medium' | 'large';
+    gap: 'small' | 'medium' | 'large';
+  };
+  content: {
+    leftContent: {
+      title: string;
+      description: string;
+      imageUrl?: string;
+    };
+    rightContent: {
+      title: string;
+      description: string;
+      imageUrl?: string;
+    };
+  };
+}
+
+export interface ContentGridItem {
+  id: string;
+  imageUrl: string;
+  title: string;
+  description: string;
+  link?: string;
+}
+
+export interface ContentGridSection {
+  type: 'content-grid';
+  settings: {
+    title?: string;
+    columns: 2 | 3 | 4;
+    backgroundColor?: string;
+    padding: 'small' | 'medium' | 'large';
+    gap: 'small' | 'medium' | 'large';
+  };
+  content: {
+    items: ContentGridItem[];
+  };
+}
+
 export type HomepageSection =
   | CarouselSection
   | TextSection
@@ -225,7 +298,10 @@ export type HomepageSection =
   | CTASection
   | VideoSection
   | TestimonialsSection
-  | FooterSection;
+  | FooterSection
+  | FeatureCardSection
+  | TwoColumnContentSection
+  | ContentGridSection;
 
 export interface ThemeSettings {
   primaryColor?: string;
@@ -236,9 +312,18 @@ export interface ThemeSettings {
   accentColor?: string;
 }
 
+export interface GridPosition {
+  column: number;
+  row: number;
+  width: number;
+  height: number;
+}
+
 export interface HomepageLayout {
-  sections: Array<HomepageSection & { id: string; order: number }>;
+  sections: Array<HomepageSection & { id: string; order: number; gridPosition?: GridPosition }>;
   theme: ThemeSettings;
+  gridColumns?: number;
+  gridGap?: number;
 }
 
 export interface HomepageConfig {
@@ -269,6 +354,7 @@ export interface BuilderAction {
     | 'SET_LAYOUT'
     | 'SET_ERROR'
     | 'MARK_SAVED'
+    | 'UPDATE_SECTION_POSITION'
     | 'UNDO'
     | 'REDO';
   payload?: any;

@@ -23,6 +23,9 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
   video: 'Video Section',
   testimonials: 'Testimonials',
   footer: 'Footer',
+  'feature-card': 'Feature Card',
+  'two-column-content': 'Two-Column Content',
+  'content-grid': 'Content Grid',
 };
 
 export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
@@ -38,6 +41,9 @@ export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   video: 'Embedded video player',
   testimonials: 'Customer testimonials or reviews',
   footer: 'Store footer with links and info',
+  'feature-card': 'Image with title and description in a single card layout',
+  'two-column-content': 'Flexible two-column layout with text and images',
+  'content-grid': 'Multiple feature cards arranged in a responsive grid',
 };
 
 export function createDefaultSection(
@@ -261,6 +267,91 @@ export function createDefaultSection(
         },
       } as any;
 
+    case 'feature-card':
+      return {
+        id,
+        type: 'feature-card',
+        order,
+        settings: {
+          layout: 'image-left',
+          imageWidth: 'medium',
+          backgroundColor: '#FFFFFF',
+          textColor: '#1F2937',
+          padding: 'medium',
+        },
+        content: {
+          imageUrl: '',
+          title: 'Feature Title',
+          description: 'Feature description goes here. Add details about what makes this feature special.',
+          buttonText: 'Learn More',
+          buttonLink: '#',
+        },
+      } as any;
+
+    case 'two-column-content':
+      return {
+        id,
+        type: 'two-column-content',
+        order,
+        settings: {
+          columnLayout: 'text-left',
+          backgroundColor: '#F9FAFB',
+          padding: 'large',
+          gap: 'medium',
+        },
+        content: {
+          leftContent: {
+            title: 'Left Column Title',
+            description: 'Left column description text goes here.',
+            imageUrl: '',
+          },
+          rightContent: {
+            title: 'Right Column Title',
+            description: 'Right column description text goes here.',
+            imageUrl: '',
+          },
+        },
+      } as any;
+
+    case 'content-grid':
+      return {
+        id,
+        type: 'content-grid',
+        order,
+        settings: {
+          title: 'Our Features',
+          columns: 3,
+          backgroundColor: '#FFFFFF',
+          padding: 'large',
+          gap: 'medium',
+        },
+        content: {
+          items: [
+            {
+              id: uuid(),
+              imageUrl: '',
+              title: 'Feature 1',
+              description: 'First feature description',
+              link: '#',
+            },
+            {
+              id: uuid(),
+              imageUrl: '',
+              title: 'Feature 2',
+              description: 'Second feature description',
+              link: '#',
+            },
+            {
+              id: uuid(),
+              imageUrl: '',
+              title: 'Feature 3',
+              description: 'Third feature description',
+              link: '#',
+            },
+          ],
+        },
+      } as any;
+
     default:
       throw new Error(`Unknown section type: ${type}`);
   }
@@ -280,6 +371,9 @@ export const SECTION_ORDERING: HomepageSectionType[] = [
   'featured-products',
   'category-showcase',
   'product-grid',
+  'feature-card',
+  'two-column-content',
+  'content-grid',
   'text',
   'image',
   'cta',

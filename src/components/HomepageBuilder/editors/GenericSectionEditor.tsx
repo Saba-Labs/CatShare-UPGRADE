@@ -340,6 +340,262 @@ export default function GenericSectionEditor({ section, onUpdate }: GenericSecti
           </>
         );
 
+      case 'feature-card':
+        return (
+          <>
+            <div className="panel-section">
+              <label className="panel-label">Image URL</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.imageUrl || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    content: { ...(section as any).content, imageUrl: e.target.value },
+                  })
+                }
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Title</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.title}
+                onChange={(e) =>
+                  onUpdate({
+                    content: { ...(section as any).content, title: e.target.value },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Description</label>
+              <textarea
+                className="panel-input"
+                value={(section as any).content.description}
+                onChange={(e) =>
+                  onUpdate({
+                    content: { ...(section as any).content, description: e.target.value },
+                  })
+                }
+                style={{ minHeight: '60px' }}
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Button Text</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.buttonText || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    content: { ...(section as any).content, buttonText: e.target.value },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Button Link</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.buttonLink || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    content: { ...(section as any).content, buttonLink: e.target.value },
+                  })
+                }
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Layout</label>
+              <select
+                className="panel-select"
+                value={(section as any).settings.layout}
+                onChange={(e) =>
+                  onUpdate({
+                    settings: { ...(section as any).settings, layout: e.target.value },
+                  })
+                }
+              >
+                <option value="image-left">Image Left</option>
+                <option value="image-right">Image Right</option>
+              </select>
+            </div>
+          </>
+        );
+
+      case 'two-column-content':
+        return (
+          <>
+            <div className="panel-section">
+              <label className="panel-label" style={{ fontWeight: 'bold' }}>
+                Left Column
+              </label>
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Image URL</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.leftContent.imageUrl || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      leftContent: { ...(section as any).content.leftContent, imageUrl: e.target.value },
+                    },
+                  })
+                }
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Title</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.leftContent.title}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      leftContent: { ...(section as any).content.leftContent, title: e.target.value },
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Description</label>
+              <textarea
+                className="panel-input"
+                value={(section as any).content.leftContent.description}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      leftContent: { ...(section as any).content.leftContent, description: e.target.value },
+                    },
+                  })
+                }
+                style={{ minHeight: '60px' }}
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label" style={{ fontWeight: 'bold' }}>
+                Right Column
+              </label>
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Image URL</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.rightContent.imageUrl || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      rightContent: { ...(section as any).content.rightContent, imageUrl: e.target.value },
+                    },
+                  })
+                }
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Title</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).content.rightContent.title}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      rightContent: { ...(section as any).content.rightContent, title: e.target.value },
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Description</label>
+              <textarea
+                className="panel-input"
+                value={(section as any).content.rightContent.description}
+                onChange={(e) =>
+                  onUpdate({
+                    content: {
+                      ...(section as any).content,
+                      rightContent: { ...(section as any).content.rightContent, description: e.target.value },
+                    },
+                  })
+                }
+                style={{ minHeight: '60px' }}
+              />
+            </div>
+          </>
+        );
+
+      case 'content-grid':
+        return (
+          <>
+            <div className="panel-section">
+              <label className="panel-label">Grid Title</label>
+              <input
+                type="text"
+                className="panel-input"
+                value={(section as any).settings.title || ''}
+                onChange={(e) =>
+                  onUpdate({
+                    settings: { ...(section as any).settings, title: e.target.value },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">Columns</label>
+              <select
+                className="panel-select"
+                value={(section as any).settings.columns}
+                onChange={(e) =>
+                  onUpdate({
+                    settings: { ...(section as any).settings, columns: parseInt(e.target.value) },
+                  })
+                }
+              >
+                <option value="2">2 Columns</option>
+                <option value="3">3 Columns</option>
+                <option value="4">4 Columns</option>
+              </select>
+            </div>
+
+            <div style={{ padding: '12px', background: '#e0e7ff', borderRadius: '6px', fontSize: '0.875rem', color: '#3730a3' }}>
+              <p style={{ margin: 0 }}>
+                <strong>Tip:</strong> Edit grid items directly on the canvas by clicking them.
+              </p>
+            </div>
+          </>
+        );
+
       case 'featured-products':
       case 'category-showcase':
       case 'product-grid':
