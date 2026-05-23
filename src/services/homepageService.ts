@@ -5,30 +5,48 @@ export async function getHomepageConfig(storeId: string): Promise<HomepageConfig
   return withRetry(async () => {
     console.log('[getHomepageConfig] Fetching for storeId:', storeId);
 
-    const response = await fetch('/api/homepage-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get', storeId }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch config');
+    try {
+      const response = await fetch('/api/homepage-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get', storeId }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { error: text };
+        }
+        throw new Error(error.error || `Failed to fetch config (${response.status})`);
+      }
+
+      const { data } = await response.json();
+
+      if (!data) return null;
+
+      console.log('[getHomepageConfig] Success:', data);
+      return {
+        id: data.id,
+        storeId: data.store_id,
+        layout: data.layout,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        autoSavedAt: data.auto_saved_at,
+      } as HomepageConfig;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[getHomepageConfig] Fetch error:', msg);
+      throw new Error(`Failed to fetch homepage config: ${msg}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const { data } = await response.json();
-
-    if (!data) return null;
-
-    console.log('[getHomepageConfig] Success:', data);
-    return {
-      id: data.id,
-      storeId: data.store_id,
-      layout: data.layout,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      autoSavedAt: data.auto_saved_at,
-    } as HomepageConfig;
   });
 }
 
@@ -37,31 +55,49 @@ export async function createHomepageConfig(
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
   return withRetry(async () => {
-    const response = await fetch('/api/homepage-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'create',
-        storeId,
-        layout,
-        themeSettings: layout.theme,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create config');
+    try {
+      const response = await fetch('/api/homepage-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          storeId,
+          layout,
+          themeSettings: layout.theme,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { error: text };
+        }
+        throw new Error(error.error || `Failed to create config (${response.status})`);
+      }
+
+      const { data } = await response.json();
+      return {
+        id: data.id,
+        storeId: data.store_id,
+        layout: data.layout,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        autoSavedAt: data.auto_saved_at,
+      } as HomepageConfig;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[createHomepageConfig] Fetch error:', msg);
+      throw new Error(`Failed to create homepage config: ${msg}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const { data } = await response.json();
-    return {
-      id: data.id,
-      storeId: data.store_id,
-      layout: data.layout,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      autoSavedAt: data.auto_saved_at,
-    } as HomepageConfig;
   });
 }
 
@@ -70,31 +106,49 @@ export async function updateHomepageLayout(
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
   return withRetry(async () => {
-    const response = await fetch('/api/homepage-config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'update',
-        configId,
-        layout,
-        themeSettings: layout.theme,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update config');
+    try {
+      const response = await fetch('/api/homepage-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          configId,
+          layout,
+          themeSettings: layout.theme,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { error: text };
+        }
+        throw new Error(error.error || `Failed to update config (${response.status})`);
+      }
+
+      const { data } = await response.json();
+      return {
+        id: data.id,
+        storeId: data.store_id,
+        layout: data.layout,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        autoSavedAt: data.auto_saved_at,
+      } as HomepageConfig;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[updateHomepageLayout] Fetch error:', msg);
+      throw new Error(`Failed to update homepage config: ${msg}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const { data } = await response.json();
-    return {
-      id: data.id,
-      storeId: data.store_id,
-      layout: data.layout,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      autoSavedAt: data.auto_saved_at,
-    } as HomepageConfig;
   });
 }
 
@@ -103,31 +157,49 @@ export async function autoSaveHomepage(
   layout: HomepageLayout
 ): Promise<HomepageConfig> {
   return withRetry(async () => {
-    const response = await fetch('/api/homepage-config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'update',
-        configId,
-        layout,
-        themeSettings: layout.theme,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to save config');
+    try {
+      const response = await fetch('/api/homepage-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          configId,
+          layout,
+          themeSettings: layout.theme,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let error;
+        try {
+          error = JSON.parse(text);
+        } catch {
+          error = { error: text };
+        }
+        throw new Error(error.error || `Failed to save config (${response.status})`);
+      }
+
+      const { data } = await response.json();
+      return {
+        id: data.id,
+        storeId: data.store_id,
+        layout: data.layout,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+        autoSavedAt: data.auto_saved_at,
+      } as HomepageConfig;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[autoSaveHomepage] Fetch error:', msg);
+      throw new Error(`Failed to auto-save homepage: ${msg}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const { data } = await response.json();
-    return {
-      id: data.id,
-      storeId: data.store_id,
-      layout: data.layout,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      autoSavedAt: data.auto_saved_at,
-    } as HomepageConfig;
   });
 }
 
@@ -152,4 +224,3 @@ export async function duplicateHomepageConfig(
   if (!existing) throw new Error('Homepage config not found');
   return createHomepageConfig(newStoreId, existing.layout);
 }
-
