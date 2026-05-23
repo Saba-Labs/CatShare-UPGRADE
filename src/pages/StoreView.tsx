@@ -905,11 +905,32 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPopState);
 }, [drawerProduct]);
 
+  const refetchStore = useCallback(async (slug: string) => {
+    const result = await getStoreBySlug(slug);
+    if (!result.success || !result.data) {
+      setStoreError(result.error || 'Store not found');
+    } else {
+      setStore(result.data);
+      setStoreError(null);
+    }
+  }, []);
+
   useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
     getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
   }, [effectiveSlug]);
+
+  // Refetch store when tab becomes visible to ensure homepage toggle changes are reflected
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && effectiveSlugRef.current) {
+        refetchStore(effectiveSlugRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetchStore]);
 
   /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
   useEffect(() => {
