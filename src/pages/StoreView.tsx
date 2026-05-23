@@ -905,41 +905,11 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPopState);
 }, [drawerProduct]);
 
-  const refetchStore = useCallback(async (slug: string) => {
-    const result = await getStoreBySlug(slug);
-    if (!result.success || !result.data) {
-      setStoreError(result.error || 'Store not found');
-    } else {
-      setStore(result.data);
-      setStoreError(null);
-    }
-  }, []);
-
   useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
     getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
   }, [effectiveSlug]);
-
-  // Refetch store when tab becomes visible to ensure homepage toggle changes are reflected
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && effectiveSlugRef.current) {
-        refetchStore(effectiveSlugRef.current);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refetchStore]);
-
-  // Periodically refetch store data every 2 seconds to catch real-time updates
-  useEffect(() => {
-    if (!effectiveSlugRef.current) return;
-    const interval = setInterval(() => {
-      refetchStore(effectiveSlugRef.current);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [refetchStore]);
 
   /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
   useEffect(() => {
@@ -983,16 +953,20 @@ useEffect(() => {
   useEffect(() => {
     if (!store?.id || !store.homepageEnabled) {
       setHomepageLayout(null);
+      setHomepageLoading(false);
       return;
     }
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
       if (config?.layout) {
         setHomepageLayout(config.layout);
+      } else {
+        setHomepageLayout(null);
       }
       setHomepageLoading(false);
     }).catch((err) => {
       console.error('Failed to load homepage:', err);
+      setHomepageLayout(null);
       setHomepageLoading(false);
     });
   }, [store?.id, store?.homepageEnabled]);
@@ -1018,7 +992,7 @@ useEffect(() => {
         setStore(r.data);
         if (r.data.sellerUserId && r.data.isLive !== false) {
           setProductsLoading(true);
-          
+
           // Re-fetch custom labels on tab visibility restoration
           const supabase = getSupabaseClient();
           supabase
@@ -1049,14 +1023,21 @@ useEffect(() => {
     const onPageShow = (e: Event) => {
       if ((e as PageTransitionEvent).persisted) reloadFromCloud();
     };
+    const onStoreUpdated = (e: Event) => {
+      if (e instanceof CustomEvent && e.detail?.storeId === store?.id) {
+        reloadFromCloud();
+      }
+    };
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('store-updated', onStoreUpdated);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('store-updated', onStoreUpdated);
     };
-  }, []);
+  }, [store?.id]);
 
   const catalogues = useMemo(
     () => ensureCataloguesForStorefront(store?.cataloguesDefinition, store?.catalogueId),
@@ -1532,7 +1513,7 @@ useEffect(() => {
           </div>
 
           {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
-          {store?.homepageEnabled && homepageLayout && !homepageLoading ? (
+          {store?.homepageEnabled === true && homepageLayout && !homepageLoading ? (
             // Render custom homepage
             <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
               {homepageLayout.sections.map((section) => (

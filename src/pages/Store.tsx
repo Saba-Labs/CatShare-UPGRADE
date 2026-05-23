@@ -1377,6 +1377,8 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setHomepageEnabled(result.data.homepageEnabled);
+      // Broadcast to other tabs/iframes that store data changed
+      window.dispatchEvent(new CustomEvent('store-updated', { detail: { storeId: result.data.id, homepageEnabled: result.data.homepageEnabled } }));
       showToast(next ? 'Homepage is now visible' : 'Homepage is hidden', next ? 'success' : 'info');
     } else {
       setHomepageEnabled(prev);
