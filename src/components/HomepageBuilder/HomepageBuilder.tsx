@@ -58,26 +58,44 @@ export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderPro
         setIsLoading(true);
         console.log('[HomepageBuilder] Starting config load for storeId:', storeId);
 
-        let existingConfig = await Promise.race([
-          getHomepageConfig(storeId),
-          timeoutPromise as Promise<any>
-        ]);
+        let existingConfig: any = null;
+        try {
+          existingConfig = await Promise.race([
+            getHomepageConfig(storeId),
+            timeoutPromise as Promise<any>
+          ]);
+        } catch (fetchError) {
+          console.warn('[HomepageBuilder] Failed to fetch existing config:', fetchError);
+          // Continue to create a new one instead of failing
+        }
 
         if (!existingConfig) {
           console.log('[HomepageBuilder] No existing config, creating new one');
           // Create new config with empty layout
           const emptyLayout = createEmptyHomepageLayout();
-          existingConfig = await Promise.race([
-            createHomepageConfig(storeId, emptyLayout),
-            timeoutPromise as Promise<any>
-          ]);
+          try {
+            existingConfig = await Promise.race([
+              createHomepageConfig(storeId, emptyLayout),
+              timeoutPromise as Promise<any>
+            ]);
+          } catch (createError) {
+            console.warn('[HomepageBuilder] Failed to create config, using fallback:', createError);
+            // Use fallback in-memory config if creation fails
+            existingConfig = {
+              id: `temp-${Date.now()}`,
+              storeId,
+              layout: emptyLayout,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          }
         }
 
         console.log('[HomepageBuilder] Config loaded successfully:', existingConfig);
         setConfig(existingConfig);
         actions.setLayout(existingConfig.layout);
       } catch (error) {
-        console.error('[HomepageBuilder] Error loading config:', error);
+        console.error('[HomepageBuilder] Unexpected error loading config:', error);
         const msg = error instanceof Error ? error.message : 'Failed to load homepage config';
         actions.setError(msg);
         showToast(msg, 'error');

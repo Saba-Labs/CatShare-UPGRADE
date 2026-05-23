@@ -9,6 +9,7 @@ import {
   updateStoreCatalogue,
   updateStoreViewMode,
   updateStoreLiveStatus,
+  updateStoreHomepageStatus,
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
   normalizeStoreWhatsappInput,
@@ -1040,6 +1041,8 @@ export default function StorePage() {
   const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'view' | 'whatsapp' | 'minimumOrder' | null>(null);
   const [isLive, setIsLive] = useState(true);
   const [liveTogglePending, setLiveTogglePending] = useState(false);
+  const [homepageEnabled, setHomepageEnabled] = useState(true);
+  const [homepageTogglePending, setHomepageTogglePending] = useState(false);
 
   const [formSlug, setFormSlug] = useState('');
   const [formCatalogue, setFormCatalogue] = useState('');
@@ -1070,6 +1073,7 @@ export default function StorePage() {
     setFormViewMode(nextStore.viewMode === 'list' ? 'list' : 'grid');
     setShowCreateForm(false);
     setIsLive(nextStore.isLive);
+    setHomepageEnabled(nextStore.homepageEnabled);
   };
 
   useEffect(() => {
@@ -1215,6 +1219,7 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setIsLive(result.data.isLive);
+      setHomepageEnabled(result.data.homepageEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setShowCreateForm(false);
@@ -1350,12 +1355,32 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setIsLive(result.data.isLive);
+      setHomepageEnabled(result.data.homepageEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       showToast(next ? 'Store is now live' : 'Store paused', next ? 'success' : 'info');
     } else {
       setIsLive(prev);
       showToast(result.error || 'Could not update store status', 'error');
+    }
+  };
+
+  const handleHomepageToggle = async () => {
+    if (!user?.uid || homepageTogglePending) return;
+    if (!guardCloudWrite()) return;
+    const prev = homepageEnabled;
+    const next = !prev;
+    setHomepageEnabled(next);
+    setHomepageTogglePending(true);
+    const result = await updateStoreHomepageStatus(user.uid, next);
+    setHomepageTogglePending(false);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setHomepageEnabled(result.data.homepageEnabled);
+      showToast(next ? 'Homepage is now visible' : 'Homepage is hidden', next ? 'success' : 'info');
+    } else {
+      setHomepageEnabled(prev);
+      showToast(result.error || 'Could not update homepage status', 'error');
     }
   };
 
@@ -1585,6 +1610,25 @@ export default function StorePage() {
                     checked={isLive}
                     disabled={liveTogglePending}
                     onChange={() => void handleLiveToggle()}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
+
+              {/* Homepage toggle */}
+              <div className={`toggle-card gap ${homepageEnabled ? 'on' : ''}`}>
+                <div className="toggle-label-group">
+                  <div className="toggle-title">{homepageEnabled ? 'Homepage is visible' : 'Homepage is hidden'}</div>
+                  <div className="toggle-sub">
+                    {homepageEnabled ? 'Customers can see your homepage' : 'Homepage not visible to customers'}
+                  </div>
+                </div>
+                <label className={`switch${homepageTogglePending ? ' pending' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={homepageEnabled}
+                    disabled={homepageTogglePending}
+                    onChange={() => void handleHomepageToggle()}
                   />
                   <span className="slider" />
                 </label>

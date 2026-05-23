@@ -76,7 +76,9 @@
 }
 
 .grid-section.resizing {
-  opacity: 0.7;
+  opacity: 0.85;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2), 0 8px 16px rgba(37, 99, 235, 0.25);
 }
 
 .grid-section-toolbar {
