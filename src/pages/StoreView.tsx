@@ -31,6 +31,9 @@ import {
 import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { getHomepageConfig } from '../services/homepageService';
+import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
+import { HomepageLayout } from '../types/homepage';
 import './OrderForm.css';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -842,6 +845,8 @@ export default function StoreView() {
   const [storeLoading, setStoreLoading] = useState(true);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [sellerFieldsDefinition, setSellerFieldsDefinition] = useState<any>(null);
+  const [homepageLayout, setHomepageLayout] = useState<HomepageLayout | null>(null);
+  const [homepageLoading, setHomepageLoading] = useState(false);
 
   // Fetch the seller's custom field names from Supabase
   useEffect(() => {
@@ -943,6 +948,24 @@ useEffect(() => {
       setProductsLoading(false);
     });
   }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
+
+  // Load homepage config if homepage is enabled
+  useEffect(() => {
+    if (!store?.id || !store.homepageEnabled) {
+      setHomepageLayout(null);
+      return;
+    }
+    setHomepageLoading(true);
+    getHomepageConfig(store.id).then((config) => {
+      if (config?.layout) {
+        setHomepageLayout(config.layout);
+      }
+      setHomepageLoading(false);
+    }).catch((err) => {
+      console.error('Failed to load homepage:', err);
+      setHomepageLoading(false);
+    });
+  }, [store?.id, store?.homepageEnabled]);
 
   /** Temporary diagnostics: set `VITE_DEBUG_STOREFRONT=true` (or run dev) and check console for catalogue merge issues. Remove when done. */
   useEffect(() => {
@@ -1478,8 +1501,20 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* ══ STICKY SEARCH + FILTER NAV ══ */}
-          <div className="sv-nav">
+          {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
+          {store?.homepageEnabled && homepageLayout && !homepageLoading ? (
+            // Render custom homepage
+            <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
+              {homepageLayout.sections.map((section) => (
+                <div key={section.id} style={{ marginBottom: '0' }}>
+                  <SectionRenderer section={section} editMode={false} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* ══ STICKY SEARCH + FILTER NAV ══ */}
+              <div className="sv-nav">
             <div className="sv-nav-row">
               <span className="sv-count-label">
                 {searchQuery.trim() || selectedCategory !== 'all'
@@ -1674,6 +1709,8 @@ useEffect(() => {
               );
             })}
           </div>
+            </>
+          )}
 
           {hasFooterDetails && renderStoreFooter()}
 
