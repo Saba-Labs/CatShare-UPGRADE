@@ -12,6 +12,9 @@ import CTASectionView from './CTASectionView';
 import VideoSectionView from './VideoSectionView';
 import TestimonialsSectionView from './TestimonialsSectionView';
 import FooterSectionView from './FooterSectionView';
+import FeatureCardSectionView from './FeatureCardSectionView';
+import TwoColumnContentSectionView from './TwoColumnContentSectionView';
+import ContentGridSectionView from './ContentGridSectionView';
 
 interface SectionRendererProps {
   section: HomepageSection & { id: string };
@@ -46,6 +49,12 @@ export default function SectionRenderer({ section, editMode = false }: SectionRe
       return <TestimonialsSectionView {...commonProps} section={section as any} />;
     case 'footer':
       return <FooterSectionView {...commonProps} section={section as any} />;
+    case 'feature-card':
+      return <FeatureCardSectionView {...commonProps} section={section as any} />;
+    case 'two-column-content':
+      return <TwoColumnContentSectionView {...commonProps} section={section as any} />;
+    case 'content-grid':
+      return <ContentGridSectionView {...commonProps} section={section as any} />;
     default:
       return (
         <div style={{ padding: '20px', background: '#fee2e2', borderRadius: '8px', color: '#dc2626' }}>

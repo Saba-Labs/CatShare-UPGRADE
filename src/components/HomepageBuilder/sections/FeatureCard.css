@@ -1,0 +1,140 @@
+.feature-card-section {
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.feature-card-section.selected {
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+.feature-card-content {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.feature-card-content.layout-image-right {
+  flex-direction: row-reverse;
+}
+
+.feature-card-image {
+  flex: 0 0 40%;
+  min-width: 0;
+}
+
+.feature-card-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+
+.feature-card-image .image-placeholder {
+  width: 100%;
+  min-height: 250px;
+  background: #f3f4f6;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.feature-card-image .image-placeholder input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.feature-card-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.feature-card-text h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  outline: none;
+}
+
+.feature-card-text h3:focus {
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 4px;
+  padding: 0.25rem;
+}
+
+.feature-card-text p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  opacity: 0.8;
+  outline: none;
+}
+
+.feature-card-text p:focus {
+  background: rgba(37, 99, 235, 0.1);
+  border-radius: 4px;
+  padding: 0.25rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.button-group input {
+  display: none;
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.button-group input[style*="display: block"] {
+  display: block;
+}
+
+.feature-card-button {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.feature-card-button:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 768px) {
+  .feature-card-content {
+    flex-direction: column !important;
+    gap: 1.5rem;
+  }
+
+  .feature-card-image {
+    flex: 1 1 auto;
+  }
+
+  .feature-card-text h3 {
+    font-size: 1.25rem;
+  }
+}
