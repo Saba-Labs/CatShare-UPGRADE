@@ -219,6 +219,7 @@ export interface Store {
 }
 
 export interface StorePublic {
+  id: string;
   storeId: string;
   sellerUserId: string;
   storeSlug: string;
@@ -248,6 +249,8 @@ export interface StorePublic {
   viewMode?: 'grid' | 'list';
   /** False = seller paused the storefront (from `get_store_by_slug`). */
   isLive?: boolean;
+  /** Whether the custom homepage is enabled and visible to customers. */
+  homepageEnabled?: boolean;
   cataloguesDefinition?: Array<{ id: string; label: string; priceField: string; priceUnitField: string; stockField: string; folder: string; order: number; createdAt: number; isDefault?: boolean }>;
 }
 
@@ -565,7 +568,9 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
 
     const normalized: StorePublic = {
       ...(parsed as StorePublic),
+      id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
+      homepageEnabled: typeof row.homepageEnabled === 'boolean' ? row.homepageEnabled : row.homepage_enabled !== false,
       sellerWebsite: firstNonEmptyString(
         row.sellerWebsite,
         row.seller_website,

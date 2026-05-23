@@ -130,6 +130,7 @@ begin
     s.catalogue_id,
     s.created_at,
     coalesce(s.is_live, true) as is_live,
+    coalesce(s.homepage_enabled, true) as homepage_enabled,
     s.store_whatsapp
   into rec
   from public.stores s
@@ -162,6 +163,7 @@ begin
   );
 
   return jsonb_build_object(
+    'id', rec.id,
     'storeId', rec.id,
     'sellerUserId', rec.seller_user_id,
     'storeSlug', rec.store_slug,
@@ -177,6 +179,7 @@ begin
     'sellerDescription', nullif(trim(bp ->> 'description'), ''),
     'createdAt', rec.created_at,
     'isLive', coalesce(rec.is_live, true),
+    'homepageEnabled', coalesce(rec.homepage_enabled, true),
     'whatsapp', nullif(trim(rec.store_whatsapp), ''),
     'cataloguesDefinitionUserSettings', us_data -> 'cataloguesDefinition',
     'cataloguesDefinitionManaged', (
