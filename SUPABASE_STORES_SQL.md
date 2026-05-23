@@ -12,6 +12,7 @@ create table if not exists public.stores (
   catalogue_id text not null,           -- Foreign key to selected catalogue
   is_live boolean not null default true, -- Public storefront on/off (seller toggle)
   store_whatsapp text, -- Optional WhatsApp for public storefront (international format)
+  homepage_enabled boolean not null default true, -- Custom homepage feature toggle
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -24,7 +25,7 @@ create index if not exists stores_store_slug_idx
   on public.stores (store_slug);
 ```
 
-**Migration (existing databases):** live / offline toggle and optional storefront WhatsApp.
+**Migration (existing databases):** live / offline toggle, optional storefront WhatsApp, and custom homepage toggle.
 
 ```sql
 alter table public.stores
@@ -32,6 +33,9 @@ alter table public.stores
 
 alter table public.stores
   add column if not exists store_whatsapp text;
+
+alter table public.stores
+  add column if not exists homepage_enabled boolean not null default true;
 ```
 
 ### 2) RLS Policies (Seller can manage their own store, public can read via slug)
