@@ -214,6 +214,8 @@ export interface Store {
   minimumOrderValue: number | null;
   /** Product listing layout on public storefront. */
   viewMode: 'grid' | 'list';
+  /** Whether the homepage is enabled and visible to customers (persisted as `stores.homepage_enabled`). */
+  homepageEnabled: boolean;
 }
 
 export interface StorePublic {
@@ -275,6 +277,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
     minimumOrderValue,
     viewMode,
+    homepageEnabled: row.homepage_enabled !== false,
   };
 }
 
@@ -979,6 +982,45 @@ export async function updateStoreLiveStatus(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreLiveStatus:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+/**
+ * Update whether the homepage is enabled for a store
+ */
+export async function updateStoreHomepageStatus(
+  sellerUserId: string,
+  homepageEnabled: boolean
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        homepage_enabled: homepageEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store homepage status:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreHomepageStatus:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);
