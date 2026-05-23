@@ -1,5 +1,5 @@
 import { useReducer, useCallback } from 'react';
-import { BuilderState, BuilderAction, HomepageLayout, HomepageSection, HomepageSectionType } from '../types/homepage';
+import { BuilderState, BuilderAction, HomepageLayout, HomepageSection, HomepageSectionType, GridPosition } from '../types/homepage';
 import { createDefaultSection } from '../config/homepageBuilderConfig';
 import { v4 as uuid } from 'uuid';
 
@@ -112,6 +112,21 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       };
     }
 
+    case 'UPDATE_SECTION_POSITION': {
+      const { id, position } = action.payload;
+
+      return {
+        ...state,
+        layout: {
+          ...state.layout,
+          sections: state.layout.sections.map((s) =>
+            s.id === id ? { ...s, gridPosition: position } : s
+          ),
+        },
+        isDirty: true,
+      };
+    }
+
     default:
       return state;
   }
@@ -175,6 +190,10 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     });
   }, [state.layout.sections]);
 
+  const updateSectionPosition = useCallback((sectionId: string, position: GridPosition) => {
+    dispatch({ type: 'UPDATE_SECTION_POSITION', payload: { id: sectionId, position } });
+  }, []);
+
   return {
     state,
     actions: {
@@ -188,6 +207,7 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
       setError,
       markSaved,
       duplicateSection,
+      updateSectionPosition,
     },
   };
 }

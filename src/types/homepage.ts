@@ -312,9 +312,18 @@ export interface ThemeSettings {
   accentColor?: string;
 }
 
+export interface GridPosition {
+  column: number;
+  row: number;
+  width: number;
+  height: number;
+}
+
 export interface HomepageLayout {
-  sections: Array<HomepageSection & { id: string; order: number }>;
+  sections: Array<HomepageSection & { id: string; order: number; gridPosition?: GridPosition }>;
   theme: ThemeSettings;
+  gridColumns?: number;
+  gridGap?: number;
 }
 
 export interface HomepageConfig {
@@ -345,6 +354,7 @@ export interface BuilderAction {
     | 'SET_LAYOUT'
     | 'SET_ERROR'
     | 'MARK_SAVED'
+    | 'UPDATE_SECTION_POSITION'
     | 'UNDO'
     | 'REDO';
   payload?: any;
