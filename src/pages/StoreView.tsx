@@ -1049,11 +1049,17 @@ useEffect(() => {
       }
     };
 
+    // Periodic refetch every 3 seconds as fallback to catch homepage toggle changes
+    const interval = setInterval(() => {
+      reloadFromCloud();
+    }, 3000);
+
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
     window.addEventListener('store-updated', onStoreUpdated);
     window.addEventListener('storage', onStorageChange);
     return () => {
+      clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('store-updated', onStoreUpdated);
@@ -1535,7 +1541,7 @@ useEffect(() => {
           </div>
 
           {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
-          {console.log('Render check:', { homepageEnabled: store?.homepageEnabled, hasLayout: !!homepageLayout, isLoading: homepageLoading }) || (store?.homepageEnabled === true && homepageLayout && !homepageLoading) ? (
+          {store?.homepageEnabled === true && homepageLayout && !homepageLoading ? (
             // Render custom homepage
             <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
               {homepageLayout.sections.map((section) => (
