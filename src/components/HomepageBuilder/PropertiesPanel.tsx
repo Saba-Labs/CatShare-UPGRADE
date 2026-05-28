@@ -86,6 +86,7 @@ export default function PropertiesPanel({
         {selectedSection.type === 'carousel' && (
           <CarouselSectionEditor
             section={selectedSection as any}
+            storeId={storeId}
             onUpdate={(updates) => onUpdateSection(selectedSectionId, updates)}
           />
         )}

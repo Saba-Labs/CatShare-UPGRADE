@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { HomepageLayout, HomepageSection, GridPosition } from '../../types/homepage';
+import { HomepageLayout, GridPosition } from '../../types/homepage';
 import SectionRenderer from './sections/SectionRenderer';
 import './GridCanvas.css';
 
@@ -36,7 +36,7 @@ export default function GridCanvas({
     height: 1,
   });
 
-  const getPositionStyle = (section: HomepageSection & { id: string; gridPosition?: GridPosition }) => {
+  const getPositionStyle = (section: HomepageLayout['sections'][number]) => {
     const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
     const columnWidth = COLUMN_WIDTH;
     const width = pos.width * columnWidth + (pos.width - 1) * (GRID_GAP / GRID_COLUMNS);
@@ -133,6 +133,9 @@ export default function GridCanvas({
             <p>👈 Drag components from the left sidebar</p>
             <p>or</p>
             <p>click a component to add it to your homepage</p>
+            <p style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
+              Tip: select a section and drag the blue dot to resize on grid columns
+            </p>
           </div>
         </div>
       ) : (
@@ -195,9 +198,7 @@ export default function GridCanvas({
                     className="grid-resize-handle"
                     onMouseDown={(e) => handleResizeStart(e, section.id)}
                     title="Drag to resize"
-                  >
-                    ⤡
-                  </div>
+                  />
                 )}
               </div>
             ))}

@@ -262,6 +262,21 @@ function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
   return n;
 }
 
+function coerceOptionalBoolean(raw: unknown): boolean | null {
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'number') {
+    if (raw === 1) return true;
+    if (raw === 0) return false;
+    return null;
+  }
+  if (typeof raw === 'string') {
+    const t = raw.trim().toLowerCase();
+    if (t === 'true' || t === '1') return true;
+    if (t === 'false' || t === '0') return false;
+  }
+  return null;
+}
+
 function mapStoreRow(row: Record<string, unknown>): Store {
   const wa = row.store_whatsapp;
   const minimumOrderValue = normalizeOptionalNonNegativeNumber(
@@ -540,9 +555,10 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         : (row.view_mode === 'grid' || row.viewMode === 'grid')
           ? 'grid'
           : null;
+    let homepageEnabled = coerceOptionalBoolean(row.homepageEnabled ?? row.homepage_enabled);
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -564,13 +580,18 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
             ? 'list'
             : 'grid';
       }
+      if (homepageEnabled == null) {
+        homepageEnabled = coerceOptionalBoolean(
+          storeRecord?.homepage_enabled ?? storeRecord?.homepageEnabled
+        );
+      }
     }
 
     const normalized: StorePublic = {
       ...(parsed as StorePublic),
       id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
-      homepageEnabled: typeof row.homepageEnabled === 'boolean' ? row.homepageEnabled : typeof row.homepage_enabled === 'boolean' ? row.homepage_enabled : true,
+      homepageEnabled: homepageEnabled ?? true,
       sellerWebsite: firstNonEmptyString(
         row.sellerWebsite,
         row.seller_website,

@@ -65,10 +65,10 @@ export default function BuilderCanvas({
     >
       {layout.sections.length === 0 ? (
         <div className="canvas-empty">
-          <div style={{ textAlign: 'center' }}>
-            <p>👈 Drag components from the left sidebar</p>
-            <p>or</p>
-            <p>click a component to add it to your homepage</p>
+          <div className="canvas-empty-card">
+            <div className="canvas-empty-icon">＋</div>
+            <p className="canvas-empty-title">Start building your homepage</p>
+            <p className="canvas-empty-text">Drag components from the left panel or click any section to add it.</p>
           </div>
         </div>
       ) : (

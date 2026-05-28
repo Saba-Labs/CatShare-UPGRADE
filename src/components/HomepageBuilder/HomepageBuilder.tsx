@@ -9,7 +9,6 @@ import { createEmptyHomepageLayout } from '../../config/homepageBuilderConfig';
 import { HomepageConfig, GridPosition } from '../../types/homepage';
 import BuilderToolbar from './BuilderToolbar';
 import ComponentPalette from './ComponentPalette';
-import BuilderCanvas from './BuilderCanvas';
 import GridCanvas from './GridCanvas';
 import PropertiesPanel from './PropertiesPanel';
 import PreviewPane from './PreviewPane';
@@ -165,13 +164,13 @@ export default function HomepageBuilder({ storeId, onClose }: HomepageBuilderPro
         {showPreview ? (
           <PreviewPane layout={state.layout} />
         ) : (
-          <BuilderCanvas
+          <GridCanvas
             layout={state.layout}
             selectedSectionId={state.selectedSectionId}
             onSelectSection={actions.selectSection}
             onRemoveSection={actions.removeSection}
             onDuplicateSection={actions.duplicateSection}
-            onReorderSections={actions.reorderSections}
+            onUpdateSectionPosition={actions.updateSectionPosition}
           />
         )}
 

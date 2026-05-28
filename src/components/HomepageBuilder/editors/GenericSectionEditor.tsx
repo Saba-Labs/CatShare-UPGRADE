@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { HomepageSection } from '../../../types/homepage';
+import { uploadProductImageToR2 } from '../../../services/r2Upload';
 
 interface GenericSectionEditorProps {
   section: HomepageSection & { id: string };
@@ -7,26 +8,110 @@ interface GenericSectionEditorProps {
   onUpdate: (updates: Partial<HomepageSection>) => void;
 }
 
-export default function GenericSectionEditor({ section, onUpdate }: GenericSectionEditorProps) {
+export default function GenericSectionEditor({ section, storeId, onUpdate }: GenericSectionEditorProps) {
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Could not read image file.'));
+      reader.readAsDataURL(file);
+    });
+
+  const registerInputRef = (key: string) => (el: HTMLInputElement | null) => {
+    fileInputRefs.current[key] = el;
+  };
+
+  const openUploadPicker = (key: string) => {
+    fileInputRefs.current[key]?.click();
+  };
+
+  const uploadImageForField = async (
+    file: File,
+    fieldKey: string,
+    onUrl: (url: string) => void
+  ) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    try {
+      setUploadingField(fieldKey);
+      const dataUrl = await readFileAsDataUrl(file);
+      const productId = `homepage-${storeId}-${section.id}-${fieldKey}`;
+      const uploaded = await uploadProductImageToR2({ productId, dataUrl });
+      onUrl(uploaded.url);
+    } catch (err: any) {
+      alert(err?.message || 'Image upload failed.');
+    } finally {
+      setUploadingField((curr) => (curr === fieldKey ? null : curr));
+      const input = fileInputRefs.current[fieldKey];
+      if (input) input.value = '';
+    }
+  };
+
+  const renderImageUploadField = (
+    fieldKey: string,
+    label: string,
+    currentUrl: string | undefined,
+    onSetUrl: (url: string) => void
+  ) => (
+    <div className="panel-section">
+      <label className="panel-label">{label}</label>
+      <button
+        type="button"
+        className="btn-secondary"
+        style={{ width: '100%' }}
+        onClick={() => openUploadPicker(fieldKey)}
+        disabled={uploadingField === fieldKey}
+      >
+        {uploadingField === fieldKey ? 'Uploading image...' : 'Upload Image'}
+      </button>
+      <input
+        ref={registerInputRef(fieldKey)}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          void uploadImageForField(file, fieldKey, onSetUrl);
+        }}
+      />
+      {currentUrl ? (
+        <div style={{ marginTop: 8 }}>
+          <img
+            src={currentUrl}
+            alt={label}
+            style={{
+              width: '100%',
+              maxHeight: 140,
+              objectFit: 'cover',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+
   const renderEditor = () => {
     switch (section.type) {
       case 'image':
         return (
           <>
-            <div className="panel-section">
-              <label className="panel-label">Image URL</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.url || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, url: e.target.value },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            {renderImageUploadField(
+              'image.content.url',
+              'Image',
+              (section as any).content.url || '',
+              (url) =>
+                onUpdate({
+                  content: { ...(section as any).content, url },
+                })
+            )}
 
             <div className="panel-section">
               <label className="panel-label">Alt Text</label>
@@ -343,20 +428,15 @@ export default function GenericSectionEditor({ section, onUpdate }: GenericSecti
       case 'feature-card':
         return (
           <>
-            <div className="panel-section">
-              <label className="panel-label">Image URL</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.imageUrl || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, imageUrl: e.target.value },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            {renderImageUploadField(
+              'feature-card.content.imageUrl',
+              'Image',
+              (section as any).content.imageUrl || '',
+              (url) =>
+                onUpdate({
+                  content: { ...(section as any).content, imageUrl: url },
+                })
+            )}
 
             <div className="panel-section">
               <label className="panel-label">Title</label>
@@ -442,23 +522,18 @@ export default function GenericSectionEditor({ section, onUpdate }: GenericSecti
               </label>
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Image URL</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.leftContent.imageUrl || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: {
-                      ...(section as any).content,
-                      leftContent: { ...(section as any).content.leftContent, imageUrl: e.target.value },
-                    },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            {renderImageUploadField(
+              'two-column.left.imageUrl',
+              'Left Image',
+              (section as any).content.leftContent.imageUrl || '',
+              (url) =>
+                onUpdate({
+                  content: {
+                    ...(section as any).content,
+                    leftContent: { ...(section as any).content.leftContent, imageUrl: url },
+                  },
+                })
+            )}
 
             <div className="panel-section">
               <label className="panel-label">Title</label>
@@ -500,23 +575,18 @@ export default function GenericSectionEditor({ section, onUpdate }: GenericSecti
               </label>
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Image URL</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.rightContent.imageUrl || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: {
-                      ...(section as any).content,
-                      rightContent: { ...(section as any).content.rightContent, imageUrl: e.target.value },
-                    },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            {renderImageUploadField(
+              'two-column.right.imageUrl',
+              'Right Image',
+              (section as any).content.rightContent.imageUrl || '',
+              (url) =>
+                onUpdate({
+                  content: {
+                    ...(section as any).content,
+                    rightContent: { ...(section as any).content.rightContent, imageUrl: url },
+                  },
+                })
+            )}
 
             <div className="panel-section">
               <label className="panel-label">Title</label>

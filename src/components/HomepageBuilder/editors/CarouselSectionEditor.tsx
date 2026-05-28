@@ -1,28 +1,60 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { CarouselSection } from '../../../types/homepage';
+import { uploadProductImageToR2 } from '../../../services/r2Upload';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
+  storeId: string;
   onUpdate: (updates: Partial<CarouselSection>) => void;
 }
 
-export default function CarouselSectionEditor({ section, onUpdate }: CarouselSectionEditorProps) {
+export default function CarouselSectionEditor({ section, storeId, onUpdate }: CarouselSectionEditorProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Could not read image file.'));
+      reader.readAsDataURL(file);
+    });
+
   const handleAddImage = () => {
-    const url = prompt('Enter image URL:');
-    if (url) {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const dataUrl = await readFileAsDataUrl(file);
+      const productId = `homepage-${storeId}-${section.id}`;
+      const uploaded = await uploadProductImageToR2({ productId, dataUrl });
       onUpdate({
         content: {
           images: [
             ...section.content.images,
             {
               id: `img-${Date.now()}`,
-              url,
+              url: uploaded.url,
               title: '',
               caption: '',
             },
           ],
         },
       });
+    } catch (err: any) {
+      alert(err?.message || 'Image upload failed.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -42,9 +74,17 @@ export default function CarouselSectionEditor({ section, onUpdate }: CarouselSec
           className="btn-secondary"
           style={{ width: '100%' }}
           onClick={handleAddImage}
+          disabled={uploading}
         >
-          + Add Image
+          {uploading ? 'Uploading image...' : '+ Upload Image'}
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileSelected}
+        />
 
         <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
           {section.content.images.map((img) => (

@@ -37,6 +37,7 @@ export default function SortableSectionItem({
       onClick={(e) => onSelect(e, section.id)}
     >
       <div className="section-toolbar">
+        <div className="section-chip">{SECTION_LABELS[section.type] || 'Section'}</div>
         <button
           className="section-tool-btn"
           onClick={(e) => {
@@ -45,7 +46,7 @@ export default function SortableSectionItem({
           }}
           title="Duplicate section"
         >
-          📋 Duplicate
+          Duplicate
         </button>
         <button
           className="section-tool-btn danger"
@@ -57,7 +58,7 @@ export default function SortableSectionItem({
           }}
           title="Delete section"
         >
-          🗑️ Delete
+          Delete
         </button>
         <button
           className="section-tool-btn"
@@ -66,13 +67,31 @@ export default function SortableSectionItem({
           title="Drag to reorder"
           style={{ cursor: 'grab' }}
         >
-          ⋮⋮ Drag
+          Drag
         </button>
       </div>
 
-      <div style={{ padding: '16px' }}>
+      <div className="section-shell">
         <SectionRenderer section={section} editMode={true} />
       </div>
     </div>
   );
 }
+
+const SECTION_LABELS: Partial<Record<HomepageSection['type'], string>> = {
+  text: 'Text',
+  image: 'Image',
+  banner: 'Banner',
+  carousel: 'Carousel',
+  'featured-products': 'Featured Products',
+  'category-showcase': 'Categories',
+  'product-grid': 'Product Grid',
+  announcement: 'Announcement',
+  cta: 'Call To Action',
+  video: 'Video',
+  testimonials: 'Testimonials',
+  footer: 'Footer',
+  'feature-card': 'Feature Card',
+  'two-column-content': 'Two Column',
+  'content-grid': 'Content Grid',
+};

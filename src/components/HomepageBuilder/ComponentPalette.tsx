@@ -14,7 +14,10 @@ export default function ComponentPalette({ onAddSection }: ComponentPaletteProps
 
   return (
     <div className="component-palette">
-      <div className="palette-header">Components</div>
+      <div className="palette-header">
+        <div className="palette-header-title">Insert</div>
+        <div className="palette-header-subtitle">Drag or click to add sections</div>
+      </div>
       <div className="palette-sections">
         {SECTION_ORDERING.map((type) => (
           <div
@@ -25,7 +28,12 @@ export default function ComponentPalette({ onAddSection }: ComponentPaletteProps
             onClick={() => onAddSection(type)}
             title={`Drag to canvas or click to add ${SECTION_TYPE_LABELS[type]}`}
           >
-            <div className="section-item-title">{SECTION_TYPE_LABELS[type]}</div>
+            <div className="section-item-title-row">
+              <span className="section-item-icon" aria-hidden="true">
+                {SECTION_ICONS[type] || '▣'}
+              </span>
+              <div className="section-item-title">{SECTION_TYPE_LABELS[type]}</div>
+            </div>
             <div className="section-item-desc">{SECTION_TYPE_DESCRIPTIONS[type]}</div>
           </div>
         ))}
@@ -33,3 +41,21 @@ export default function ComponentPalette({ onAddSection }: ComponentPaletteProps
     </div>
   );
 }
+
+const SECTION_ICONS: Partial<Record<HomepageSectionType, string>> = {
+  carousel: '🎞',
+  text: 'T',
+  image: '🖼',
+  banner: '▭',
+  'featured-products': '⭐',
+  'category-showcase': '🗂',
+  'product-grid': '▦',
+  announcement: '📣',
+  cta: '👉',
+  video: '▶',
+  testimonials: '💬',
+  footer: '▁',
+  'feature-card': '◫',
+  'two-column-content': '⫶',
+  'content-grid': '▥',
+};
