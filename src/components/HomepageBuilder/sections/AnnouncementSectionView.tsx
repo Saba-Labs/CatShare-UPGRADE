@@ -4,9 +4,10 @@ import { AnnouncementSection } from '../../../types/homepage';
 interface AnnouncementSectionViewProps {
   section: AnnouncementSection & { id: string };
   editMode?: boolean;
+  onUpdateSection?: (updates: Partial<AnnouncementSection>) => void;
 }
 
-export default function AnnouncementSectionView({ section }: AnnouncementSectionViewProps) {
+export default function AnnouncementSectionView({ section, editMode, onUpdateSection }: AnnouncementSectionViewProps) {
   const { settings, content } = section;
 
   const iconMap = {
@@ -29,7 +30,19 @@ export default function AnnouncementSectionView({ section }: AnnouncementSection
       }}
     >
       {settings.icon !== 'none' && <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{iconMap[settings.icon]}</span>}
-      <p style={{ margin: 0, flex: 1, fontSize: '0.875rem' }}>{content.message}</p>
+      {editMode && onUpdateSection ? (
+        <p
+          className="sites-inline-editable"
+          style={{ margin: 0, flex: 1, fontSize: '0.875rem' }}
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={(e) => onUpdateSection({ content: { message: e.currentTarget.textContent || '' } })}
+        >
+          {content.message}
+        </p>
+      ) : (
+        <p style={{ margin: 0, flex: 1, fontSize: '0.875rem' }}>{content.message}</p>
+      )}
       {settings.dismissible && (
         <button
           style={{

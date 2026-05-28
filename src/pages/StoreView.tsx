@@ -34,6 +34,8 @@ import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { getHomepageConfig } from '../services/homepageService';
 import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
 import { HomepageLayout } from '../types/homepage';
+import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
+import { normalizeHomepageLayoutForWebsiteMode } from '../config/homepageBuilderConfig';
 import './OrderForm.css';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -979,7 +981,7 @@ useEffect(() => {
     }
   }, [store?.homepageEnabled, homepageLayout]);
 
-  // Load homepage config if homepage is enabled
+  // Load homepage config (draft for editor preview, published for website runtime)
   useEffect(() => {
     console.log('Homepage effect - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
     // If homepage is disabled, immediately clear the layout
@@ -999,8 +1001,11 @@ useEffect(() => {
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
       console.log('Homepage config loaded:', !!config?.layout);
-      if (config?.layout) {
-        setHomepageLayout(config.layout);
+      const nextLayout = store.websiteModeEnabled
+        ? (config?.publishedLayout || config?.layout || null)
+        : (config?.layout || null);
+      if (nextLayout) {
+        setHomepageLayout(normalizeHomepageLayoutForWebsiteMode(nextLayout));
       } else {
         setHomepageLayout(null);
       }
@@ -1010,7 +1015,7 @@ useEffect(() => {
       setHomepageLayout(null);
       setHomepageLoading(false);
     });
-  }, [store?.id, store?.homepageEnabled]);
+  }, [store?.id, store?.homepageEnabled, store?.websiteModeEnabled]);
 
   /** Temporary diagnostics: set `VITE_DEBUG_STOREFRONT=true` (or run dev) and check console for catalogue merge issues. Remove when done. */
   useEffect(() => {
@@ -1524,6 +1529,17 @@ useEffect(() => {
       <div className="sv">
         <div className="sv-page">
 
+          {store?.websiteModeEnabled ? (
+            <WebsiteRuntime
+              slug={effectiveSlug || slug || ''}
+              pathname={location.pathname}
+              homepageLayout={homepageLayout}
+              products={storeProducts}
+              store={store}
+              onSubdomain={!!hostSlug}
+            />
+          ) : (
+            <>
           {/* ══ STORE HERO ══ */}
           <div className="sv-hero">
             <div className="sv-hero-bg" />
@@ -1754,6 +1770,8 @@ useEffect(() => {
               );
             })}
           </div>
+            </>
+          )}
             </>
           )}
 

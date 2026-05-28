@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { CarouselSection } from '../../../types/homepage';
-import { uploadProductImageToR2 } from '../../../services/r2Upload';
+import { useBuilderMedia } from '../media/BuilderMediaContext';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
@@ -9,53 +9,29 @@ interface CarouselSectionEditorProps {
 }
 
 export default function CarouselSectionEditor({ section, storeId, onUpdate }: CarouselSectionEditorProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const { openMediaPicker } = useBuilderMedia();
 
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Could not read image file.'));
-      reader.readAsDataURL(file);
+  const addImageFromLibrary = () => {
+    openMediaPicker({
+      storeId,
+      assetKey: `${section.id}-slide-${Date.now()}`,
+      title: 'Add carousel image',
+      onSelect: (url) => {
+        onUpdate({
+          content: {
+            images: [
+              ...section.content.images,
+              {
+                id: `img-${Date.now()}`,
+                url,
+                title: '',
+                caption: '',
+              },
+            ],
+          },
+        });
+      },
     });
-
-  const handleAddImage = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const dataUrl = await readFileAsDataUrl(file);
-      const productId = `homepage-${storeId}-${section.id}`;
-      const uploaded = await uploadProductImageToR2({ productId, dataUrl });
-      onUpdate({
-        content: {
-          images: [
-            ...section.content.images,
-            {
-              id: `img-${Date.now()}`,
-              url: uploaded.url,
-              title: '',
-              caption: '',
-            },
-          ],
-        },
-      });
-    } catch (err: any) {
-      alert(err?.message || 'Image upload failed.');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
   };
 
   const handleRemoveImage = (imageId: string) => {
@@ -70,51 +46,18 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
     <>
       <div className="panel-section">
         <label className="panel-label">Images ({section.content.images.length})</label>
-        <button
-          className="btn-secondary"
-          style={{ width: '100%' }}
-          onClick={handleAddImage}
-          disabled={uploading}
-        >
-          {uploading ? 'Uploading image...' : '+ Upload Image'}
+        <button type="button" className="btn-secondary" style={{ width: '100%' }} onClick={addImageFromLibrary}>
+          + Add image
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={handleFileSelected}
-        />
 
         <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
           {section.content.images.map((img) => (
-            <div
-              key={img.id}
-              style={{
-                display: 'flex',
-                gap: '8px',
-                marginBottom: '8px',
-                padding: '8px',
-                background: '#f3f4f6',
-                borderRadius: '4px',
-                fontSize: '0.75rem',
-              }}
-            >
-              <img
-                src={img.url}
-                alt={img.title}
-                style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
-              />
+            <div key={img.id} className="carousel-editor-thumb-row">
+              <img src={img.url} alt={img.title} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {img.title || 'Image'}
-                </p>
+                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</p>
               </div>
-              <button
-                className="btn-icon"
-                onClick={() => handleRemoveImage(img.id)}
-                style={{ color: '#dc2626' }}
-              >
+              <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
                 ✕
               </button>
             </div>
@@ -129,7 +72,7 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           value={section.settings.height}
           onChange={(e) =>
             onUpdate({
-              settings: { ...section.settings, height: e.target.value as any },
+              settings: { ...section.settings, height: e.target.value as CarouselSection['settings']['height'] },
             })
           }
         >
@@ -146,7 +89,7 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           value={section.settings.aspectRatio}
           onChange={(e) =>
             onUpdate({
-              settings: { ...section.settings, aspectRatio: e.target.value as any },
+              settings: { ...section.settings, aspectRatio: e.target.value as CarouselSection['settings']['aspectRatio'] },
             })
           }
         >
@@ -163,7 +106,7 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           value={section.settings.animation}
           onChange={(e) =>
             onUpdate({
-              settings: { ...section.settings, animation: e.target.value as any },
+              settings: { ...section.settings, animation: e.target.value as CarouselSection['settings']['animation'] },
             })
           }
         >
@@ -196,7 +139,7 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
             value={section.settings.interval}
             onChange={(e) =>
               onUpdate({
-                settings: { ...section.settings, interval: parseInt(e.target.value) },
+                settings: { ...section.settings, interval: parseInt(e.target.value, 10) },
               })
             }
             min="1000"
@@ -212,7 +155,7 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           value={section.settings.navigation}
           onChange={(e) =>
             onUpdate({
-              settings: { ...section.settings, navigation: e.target.value as any },
+              settings: { ...section.settings, navigation: e.target.value as CarouselSection['settings']['navigation'] },
             })
           }
         >

@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { HomepageSection } from '../../../types/homepage';
-import { uploadProductImageToR2 } from '../../../services/r2Upload';
+import MediaPickerButton from '../media/MediaPickerButton';
 
 interface GenericSectionEditorProps {
   section: HomepageSection & { id: string };
@@ -9,49 +9,6 @@ interface GenericSectionEditorProps {
 }
 
 export default function GenericSectionEditor({ section, storeId, onUpdate }: GenericSectionEditorProps) {
-  const [uploadingField, setUploadingField] = useState<string | null>(null);
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Could not read image file.'));
-      reader.readAsDataURL(file);
-    });
-
-  const registerInputRef = (key: string) => (el: HTMLInputElement | null) => {
-    fileInputRefs.current[key] = el;
-  };
-
-  const openUploadPicker = (key: string) => {
-    fileInputRefs.current[key]?.click();
-  };
-
-  const uploadImageForField = async (
-    file: File,
-    fieldKey: string,
-    onUrl: (url: string) => void
-  ) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
-      return;
-    }
-    try {
-      setUploadingField(fieldKey);
-      const dataUrl = await readFileAsDataUrl(file);
-      const productId = `homepage-${storeId}-${section.id}-${fieldKey}`;
-      const uploaded = await uploadProductImageToR2({ productId, dataUrl });
-      onUrl(uploaded.url);
-    } catch (err: any) {
-      alert(err?.message || 'Image upload failed.');
-    } finally {
-      setUploadingField((curr) => (curr === fieldKey ? null : curr));
-      const input = fileInputRefs.current[fieldKey];
-      if (input) input.value = '';
-    }
-  };
-
   const renderImageUploadField = (
     fieldKey: string,
     label: string,
@@ -60,41 +17,13 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
   ) => (
     <div className="panel-section">
       <label className="panel-label">{label}</label>
-      <button
-        type="button"
-        className="btn-secondary"
-        style={{ width: '100%' }}
-        onClick={() => openUploadPicker(fieldKey)}
-        disabled={uploadingField === fieldKey}
-      >
-        {uploadingField === fieldKey ? 'Uploading image...' : 'Upload Image'}
-      </button>
-      <input
-        ref={registerInputRef(fieldKey)}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          void uploadImageForField(file, fieldKey, onSetUrl);
-        }}
+      <MediaPickerButton
+        storeId={storeId}
+        assetKey={`${section.id}-${fieldKey}`}
+        label={label}
+        currentUrl={currentUrl}
+        onUrl={onSetUrl}
       />
-      {currentUrl ? (
-        <div style={{ marginTop: 8 }}>
-          <img
-            src={currentUrl}
-            alt={label}
-            style={{
-              width: '100%',
-              maxHeight: 140,
-              objectFit: 'cover',
-              borderRadius: 8,
-              border: '1px solid #e5e7eb',
-            }}
-          />
-        </div>
-      ) : null}
     </div>
   );
 

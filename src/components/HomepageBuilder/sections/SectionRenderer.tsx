@@ -1,5 +1,5 @@
 import React from 'react';
-import { HomepageSection } from '../../../types/homepage';
+import { HomepageSection, ThemeSettings } from '../../../types/homepage';
 import CarouselSectionView from './CarouselSectionView';
 import TextSectionView from './TextSectionView';
 import ImageSectionView from './ImageSectionView';
@@ -15,14 +15,26 @@ import FooterSectionView from './FooterSectionView';
 import FeatureCardSectionView from './FeatureCardSectionView';
 import TwoColumnContentSectionView from './TwoColumnContentSectionView';
 import ContentGridSectionView from './ContentGridSectionView';
+import DividerSectionView from './DividerSectionView';
+import FaqSectionView from './FaqSectionView';
+import EmbedSectionView from './EmbedSectionView';
 
 interface SectionRendererProps {
   section: HomepageSection & { id: string };
+  theme?: ThemeSettings;
+  storeId?: string;
   editMode?: boolean;
+  onUpdateSection?: (updates: Partial<HomepageSection>) => void;
 }
 
-export default function SectionRenderer({ section, editMode = false }: SectionRendererProps) {
-  const commonProps = { section, editMode };
+export default function SectionRenderer({
+  section,
+  theme,
+  storeId,
+  editMode = false,
+  onUpdateSection,
+}: SectionRendererProps) {
+  const commonProps = { section, theme, storeId, editMode, onUpdateSection };
 
   switch (section.type) {
     case 'carousel':
@@ -55,6 +67,12 @@ export default function SectionRenderer({ section, editMode = false }: SectionRe
       return <TwoColumnContentSectionView {...commonProps} section={section as any} />;
     case 'content-grid':
       return <ContentGridSectionView {...commonProps} section={section as any} />;
+    case 'divider':
+      return <DividerSectionView section={section as any} />;
+    case 'faq':
+      return <FaqSectionView {...commonProps} section={section as any} />;
+    case 'embed':
+      return <EmbedSectionView {...commonProps} section={section as any} />;
     default:
       return (
         <div style={{ padding: '20px', background: '#fee2e2', borderRadius: '8px', color: '#dc2626' }}>

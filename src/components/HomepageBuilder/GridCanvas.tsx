@@ -1,30 +1,40 @@
 import React, { useRef, useState } from 'react';
-import { HomepageLayout, GridPosition } from '../../types/homepage';
+import { HomepageLayout, GridPosition, HomepageSection, ThemeSettings } from '../../types/homepage';
 import SectionRenderer from './sections/SectionRenderer';
+import { SECTION_TYPE_LABELS } from '../../config/homepageBuilderConfig';
+import { useBuilderMedia } from './media/BuilderMediaContext';
+import { applyMediaUrlToSection, sectionSupportsQuickMedia } from '../../utils/sectionMedia';
 import './GridCanvas.css';
 
 const GRID_COLUMNS = 12;
 const GRID_GAP = 16;
 const COLUMN_WIDTH = 60;
-const SNAP_THRESHOLD = 5; // pixels
+const SNAP_THRESHOLD = 5;
 
 interface GridCanvasProps {
   layout: HomepageLayout;
+  theme: ThemeSettings;
+  storeId: string;
   selectedSectionId: string | null;
   onSelectSection: (id: string | null) => void;
   onRemoveSection: (id: string) => void;
   onDuplicateSection: (id: string) => void;
   onUpdateSectionPosition: (id: string, position: GridPosition) => void;
+  onUpdateSection: (id: string, updates: Partial<HomepageSection>) => void;
 }
 
 export default function GridCanvas({
   layout,
+  theme,
+  storeId,
   selectedSectionId,
   onSelectSection,
   onRemoveSection,
   onDuplicateSection,
   onUpdateSectionPosition,
+  onUpdateSection,
 }: GridCanvasProps) {
+  const { openMediaPicker } = useBuilderMedia();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [resizingId, setResizingId] = useState<string | null>(null);
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -38,10 +48,8 @@ export default function GridCanvas({
 
   const getPositionStyle = (section: HomepageLayout['sections'][number]) => {
     const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
-    const columnWidth = COLUMN_WIDTH;
-    const width = pos.width * columnWidth + (pos.width - 1) * (GRID_GAP / GRID_COLUMNS);
+    const width = pos.width * COLUMN_WIDTH + (pos.width - 1) * (GRID_GAP / GRID_COLUMNS);
     const height = pos.height * 200 + (pos.height - 1) * GRID_GAP;
-
     return {
       gridColumn: `${pos.column} / span ${pos.width}`,
       gridRow: `${pos.row} / span ${pos.height}`,
@@ -54,54 +62,32 @@ export default function GridCanvas({
     onSelectSection(id);
   };
 
-  const handleCanvasClick = () => {
-    onSelectSection(null);
-  };
-
   const handleResizeStart = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (e.button !== 0) return; // Only handle left mouse button
-
+    if (e.button !== 0) return;
     const section = layout.sections.find((s) => s.id === id);
     if (!section) return;
-
     const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
     setResizingId(id);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: pos.width,
-      height: pos.height,
-    });
+    setResizeStart({ x: e.clientX, y: e.clientY, width: pos.width, height: pos.height });
   };
 
   React.useEffect(() => {
     if (!resizingId || !resizeStart) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const pixelDeltaX = e.clientX - resizeStart.x;
-      const pixelDeltaY = e.clientY - resizeStart.y;
-
       const columnPixelWidth = COLUMN_WIDTH + GRID_GAP / GRID_COLUMNS;
       const rowPixelHeight = 220;
-
-      const rawDeltaX = pixelDeltaX / columnPixelWidth;
-      const rawDeltaY = pixelDeltaY / rowPixelHeight;
-
+      const rawDeltaX = (e.clientX - resizeStart.x) / columnPixelWidth;
+      const rawDeltaY = (e.clientY - resizeStart.y) / rowPixelHeight;
       const deltaX = Math.abs(rawDeltaX) < SNAP_THRESHOLD / columnPixelWidth ? 0 : Math.round(rawDeltaX);
       const deltaY = Math.abs(rawDeltaY) < SNAP_THRESHOLD / rowPixelHeight ? 0 : Math.round(rawDeltaY);
-
       const newWidth = Math.max(1, Math.min(GRID_COLUMNS, resizeStart.width + deltaX));
       const newHeight = Math.max(1, resizeStart.height + deltaY);
-
       const section = layout.sections.find((s) => s.id === resizingId);
       if (section) {
         const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
-        onUpdateSectionPosition(resizingId, {
-          ...pos,
-          width: newWidth,
-          height: newHeight,
-        });
+        onUpdateSectionPosition(resizingId, { ...pos, width: newWidth, height: newHeight });
       }
     };
 
@@ -116,7 +102,6 @@ export default function GridCanvas({
     document.body.style.cursor = 'nwse-resize';
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -126,84 +111,90 @@ export default function GridCanvas({
   }, [resizingId, resizeStart, layout, onUpdateSectionPosition]);
 
   return (
-    <div className="grid-canvas-container" ref={canvasRef} onClick={handleCanvasClick}>
+    <div
+      className="grid-canvas-container sites-canvas"
+      ref={canvasRef}
+      onClick={() => onSelectSection(null)}
+      style={{
+        fontFamily: theme.fontFamily || undefined,
+        color: theme.textColor || undefined,
+        backgroundColor: theme.backgroundColor || '#fff',
+        ['--site-primary' as string]: theme.primaryColor || '#1a73e8',
+      }}
+    >
       {layout.sections.length === 0 ? (
-        <div className="canvas-empty">
-          <div style={{ textAlign: 'center' }}>
-            <p>👈 Drag components from the left sidebar</p>
-            <p>or</p>
-            <p>click a component to add it to your homepage</p>
-            <p style={{ marginTop: 8, fontSize: '0.85rem', color: '#6b7280' }}>
-              Tip: select a section and drag the blue dot to resize on grid columns
-            </p>
-          </div>
+        <div className="canvas-empty sites-canvas-empty">
+          <p>Click a block in Insert to start your page</p>
         </div>
       ) : (
-        <>
-          <div
-            className="grid-background"
-            style={{
-              gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
-              gap: `${GRID_GAP}px`,
-            }}
-          >
-            {Array.from({ length: 100 }).map((_, i) => (
-              <div key={i} className="grid-cell" />
-            ))}
-          </div>
-
-          <div
-            className="grid-container"
-            style={{
-              gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
-              gap: `${GRID_GAP}px`,
-            }}
-          >
-            {layout.sections.map((section) => (
+        <div
+          className="grid-container"
+          style={{
+            gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
+            gap: `${GRID_GAP}px`,
+          }}
+        >
+          {layout.sections.map((section) => {
+            const isSelected = selectedSectionId === section.id;
+            return (
               <div
                 key={section.id}
-                className={`grid-section ${selectedSectionId === section.id ? 'selected' : ''} ${resizingId === section.id ? 'resizing' : ''}`}
+                className={`grid-section sites-block ${isSelected ? 'selected' : ''} ${resizingId === section.id ? 'resizing' : ''}`}
                 style={getPositionStyle(section)}
                 onClick={(e) => handleSectionClick(e, section.id)}
               >
-                <div className="grid-section-toolbar">
-                  <button
-                    className="grid-tool-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDuplicateSection(section.id);
-                    }}
-                    title="Duplicate"
-                  >
-                    📋
-                  </button>
-                  <button
-                    className="grid-tool-btn danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveSection(section.id);
-                    }}
-                    title="Delete"
-                  >
-                    🗑️
-                  </button>
-                </div>
+                {isSelected && (
+                  <div className="sites-floating-toolbar" onClick={(e) => e.stopPropagation()}>
+                    <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
+                    {sectionSupportsQuickMedia(section.type) && (
+                      <button
+                        type="button"
+                        className="sites-float-btn"
+                        onClick={() =>
+                          openMediaPicker({
+                            storeId,
+                            assetKey: `${section.id}-quick`,
+                            title: 'Choose image',
+                            onSelect: (url) => {
+                              const patch = applyMediaUrlToSection(section, url);
+                              if (patch) onUpdateSection(section.id, patch);
+                            },
+                          })
+                        }
+                      >
+                        Image
+                      </button>
+                    )}
+                    <button type="button" className="sites-float-btn" onClick={() => onDuplicateSection(section.id)} title="Duplicate">
+                      Duplicate
+                    </button>
+                    <button type="button" className="sites-float-btn danger" onClick={() => onRemoveSection(section.id)} title="Delete">
+                      Delete
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid-section-content">
-                  <SectionRenderer section={section} editMode={true} />
+                  <SectionRenderer
+                    section={section}
+                    theme={theme}
+                    storeId={storeId}
+                    editMode={isSelected}
+                    onUpdateSection={(updates) => onUpdateSection(section.id, updates)}
+                  />
                 </div>
 
-                {selectedSectionId === section.id && (
+                {isSelected && (
                   <div
                     className="grid-resize-handle"
                     onMouseDown={(e) => handleResizeStart(e, section.id)}
-                    title="Drag to resize"
+                    title="Resize"
                   />
                 )}
               </div>
-            ))}
-          </div>
-        </>
+            );
+          })}
+        </div>
       )}
     </div>
   );

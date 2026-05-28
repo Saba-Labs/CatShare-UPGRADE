@@ -1,5 +1,19 @@
-import { HomepageConfig, HomepageLayout } from '../types/homepage';
+import { HomepageConfig, HomepageLayout, PublishHistoryEntry } from '../types/homepage';
 import { withRetry } from '../utils/retry';
+
+function mapHomepageConfigRow(data: Record<string, unknown>): HomepageConfig {
+  return {
+    id: data.id as string,
+    storeId: data.store_id as string,
+    layout: data.layout as HomepageLayout,
+    publishedLayout: (data.published_layout as HomepageLayout) || undefined,
+    publishedAt: (data.published_at as string) || null,
+    publishHistory: (data.publish_history as PublishHistoryEntry[]) || [],
+    createdAt: data.created_at as string,
+    updatedAt: data.updated_at as string,
+    autoSavedAt: data.auto_saved_at as string | undefined,
+  };
+}
 
 export async function getHomepageConfig(storeId: string): Promise<HomepageConfig | null> {
   return withRetry(async () => {
@@ -32,14 +46,7 @@ export async function getHomepageConfig(storeId: string): Promise<HomepageConfig
       if (!data) return null;
 
       console.log('[getHomepageConfig] Success:', data);
-      return {
-        id: data.id,
-        storeId: data.store_id,
-        layout: data.layout,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        autoSavedAt: data.auto_saved_at,
-      } as HomepageConfig;
+      return mapHomepageConfigRow(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[getHomepageConfig] Fetch error:', msg);
@@ -83,14 +90,7 @@ export async function createHomepageConfig(
       }
 
       const { data } = await response.json();
-      return {
-        id: data.id,
-        storeId: data.store_id,
-        layout: data.layout,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        autoSavedAt: data.auto_saved_at,
-      } as HomepageConfig;
+      return mapHomepageConfigRow(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[createHomepageConfig] Fetch error:', msg);
@@ -134,14 +134,7 @@ export async function updateHomepageLayout(
       }
 
       const { data } = await response.json();
-      return {
-        id: data.id,
-        storeId: data.store_id,
-        layout: data.layout,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        autoSavedAt: data.auto_saved_at,
-      } as HomepageConfig;
+      return mapHomepageConfigRow(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[updateHomepageLayout] Fetch error:', msg);
@@ -185,14 +178,7 @@ export async function autoSaveHomepage(
       }
 
       const { data } = await response.json();
-      return {
-        id: data.id,
-        storeId: data.store_id,
-        layout: data.layout,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-        autoSavedAt: data.auto_saved_at,
-      } as HomepageConfig;
+      return mapHomepageConfigRow(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[autoSaveHomepage] Fetch error:', msg);
@@ -223,4 +209,72 @@ export async function duplicateHomepageConfig(
   const existing = await getHomepageConfig(configId);
   if (!existing) throw new Error('Homepage config not found');
   return createHomepageConfig(newStoreId, existing.layout);
+}
+
+export async function publishHomepageConfig(
+  configId: string,
+  layout: HomepageLayout,
+  options?: { updatedBy?: string; note?: string }
+): Promise<HomepageConfig> {
+  const response = await fetch('/api/homepage-config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'publish',
+      configId,
+      layout,
+      themeSettings: layout.theme,
+      updatedBy: options?.updatedBy,
+      note: options?.note,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to publish homepage config');
+  }
+  const { data } = await response.json();
+  return mapHomepageConfigRow(data);
+}
+
+export async function unpublishHomepageConfig(configId: string): Promise<HomepageConfig> {
+  const response = await fetch('/api/homepage-config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'unpublish',
+      configId,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to unpublish homepage config');
+  }
+  const { data } = await response.json();
+  return mapHomepageConfigRow(data);
+}
+
+export async function restoreHomepageVersion(
+  configId: string,
+  versionId: string,
+  target: 'draft' | 'live' = 'draft'
+): Promise<HomepageConfig> {
+  const response = await fetch('/api/homepage-config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'restore-version',
+      configId,
+      versionId,
+      target,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to restore version');
+  }
+  const { data } = await response.json();
+  return mapHomepageConfigRow(data);
 }

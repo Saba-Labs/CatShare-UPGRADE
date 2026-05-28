@@ -10,6 +10,7 @@ import {
   updateStoreViewMode,
   updateStoreLiveStatus,
   updateStoreHomepageStatus,
+  updateStoreWebsiteModeStatus,
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
   normalizeStoreWhatsappInput,
@@ -1042,7 +1043,9 @@ export default function StorePage() {
   const [isLive, setIsLive] = useState(true);
   const [liveTogglePending, setLiveTogglePending] = useState(false);
   const [homepageEnabled, setHomepageEnabled] = useState(true);
+  const [websiteModeEnabled, setWebsiteModeEnabled] = useState(false);
   const [homepageTogglePending, setHomepageTogglePending] = useState(false);
+  const [websiteModeTogglePending, setWebsiteModeTogglePending] = useState(false);
 
   const [formSlug, setFormSlug] = useState('');
   const [formCatalogue, setFormCatalogue] = useState('');
@@ -1074,6 +1077,7 @@ export default function StorePage() {
     setShowCreateForm(false);
     setIsLive(nextStore.isLive);
     setHomepageEnabled(nextStore.homepageEnabled);
+    setWebsiteModeEnabled(nextStore.websiteModeEnabled);
   };
 
   useEffect(() => {
@@ -1220,6 +1224,7 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setHomepageEnabled(result.data.homepageEnabled);
+      setWebsiteModeEnabled(result.data.websiteModeEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       setShowCreateForm(false);
@@ -1356,12 +1361,32 @@ export default function StorePage() {
       setStore(result.data);
       setIsLive(result.data.isLive);
       setHomepageEnabled(result.data.homepageEnabled);
+      setWebsiteModeEnabled(result.data.websiteModeEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
       showToast(next ? 'Store is now live' : 'Store paused', next ? 'success' : 'info');
     } else {
       setIsLive(prev);
       showToast(result.error || 'Could not update store status', 'error');
+    }
+  };
+
+  const handleWebsiteModeToggle = async () => {
+    if (!user?.uid || websiteModeTogglePending) return;
+    if (!guardCloudWrite()) return;
+    const prev = websiteModeEnabled;
+    const next = !prev;
+    setWebsiteModeEnabled(next);
+    setWebsiteModeTogglePending(true);
+    const result = await updateStoreWebsiteModeStatus(user.uid, next);
+    setWebsiteModeTogglePending(false);
+    if (result.success && result.data) {
+      setStore(result.data);
+      setWebsiteModeEnabled(result.data.websiteModeEnabled);
+      showToast(next ? 'Website mode enabled' : 'Website mode disabled', next ? 'success' : 'info');
+    } else {
+      setWebsiteModeEnabled(prev);
+      showToast(result.error || 'Could not update website mode', 'error');
     }
   };
 
@@ -1633,6 +1658,27 @@ export default function StorePage() {
                     checked={homepageEnabled}
                     disabled={homepageTogglePending}
                     onChange={() => void handleHomepageToggle()}
+                  />
+                  <span className="slider" />
+                </label>
+              </div>
+
+              {/* Website mode toggle */}
+              <div className={`toggle-card gap ${websiteModeEnabled ? 'on' : ''}`}>
+                <div className="toggle-label-group">
+                  <div className="toggle-title">{websiteModeEnabled ? 'Website mode enabled' : 'Website mode disabled'}</div>
+                  <div className="toggle-sub">
+                    {websiteModeEnabled
+                      ? 'Uses full website header/footer and page templates'
+                      : 'Uses legacy storefront rendering'}
+                  </div>
+                </div>
+                <label className={`switch${websiteModeTogglePending ? ' pending' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={websiteModeEnabled}
+                    disabled={websiteModeTogglePending}
+                    onChange={() => void handleWebsiteModeToggle()}
                   />
                   <span className="slider" />
                 </label>

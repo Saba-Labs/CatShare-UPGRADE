@@ -4,9 +4,10 @@ import { TextSection } from '../../../types/homepage';
 interface TextSectionViewProps {
   section: TextSection & { id: string };
   editMode?: boolean;
+  onUpdateSection?: (updates: Partial<TextSection>) => void;
 }
 
-export default function TextSectionView({ section, editMode }: TextSectionViewProps) {
+export default function TextSectionView({ section, editMode, onUpdateSection }: TextSectionViewProps) {
   const { settings, content } = section;
 
   const fontSizeMap = {
@@ -17,38 +18,36 @@ export default function TextSectionView({ section, editMode }: TextSectionViewPr
   };
 
   const styles: React.CSSProperties = {
-    textAlign: settings.alignment as any,
+    textAlign: settings.alignment as React.CSSProperties['textAlign'],
     fontSize: fontSizeMap[settings.fontSize],
     color: settings.textColor || 'inherit',
     backgroundColor: settings.backgroundColor || 'transparent',
     padding:
-      settings.padding === 'small'
-        ? '16px'
-        : settings.padding === 'medium'
-          ? '24px'
-          : '32px',
+      settings.padding === 'small' ? '16px' : settings.padding === 'medium' ? '24px' : '32px',
   };
+
+  if (editMode && onUpdateSection) {
+    return (
+      <div style={styles}>
+        <div
+          className="sites-inline-editable"
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={(e) =>
+            onUpdateSection({
+              content: { text: e.currentTarget.textContent || '' },
+            })
+          }
+        >
+          {content.text}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles}>
-      {editMode ? (
-        <textarea
-          style={{
-            width: '100%',
-            minHeight: '100px',
-            padding: '8px',
-            border: '1px dashed #ddd',
-            borderRadius: '4px',
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-          }}
-          defaultValue={content.text}
-          disabled
-          placeholder="Text content here..."
-        />
-      ) : (
-        <p style={{ margin: 0 }}>{content.text}</p>
-      )}
+      <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{content.text}</p>
     </div>
   );
 }

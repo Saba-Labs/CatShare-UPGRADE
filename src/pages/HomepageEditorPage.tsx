@@ -132,6 +132,7 @@ export default function HomepageEditorPage() {
   return (
     <HomepageBuilder
       storeId={store.id}
+      storeSlug={store.storeSlug}
       onClose={() => navigate('/store')}
     />
   );

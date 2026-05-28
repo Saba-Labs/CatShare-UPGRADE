@@ -15,7 +15,10 @@ export type HomepageSectionType =
   | 'footer'
   | 'feature-card'
   | 'two-column-content'
-  | 'content-grid';
+  | 'content-grid'
+  | 'divider'
+  | 'faq'
+  | 'embed';
 
 export interface CarouselImage {
   id: string;
@@ -286,6 +289,49 @@ export interface ContentGridSection {
   };
 }
 
+export interface DividerSection {
+  type: 'divider';
+  settings: {
+    style: 'line' | 'dots' | 'space';
+    thickness: 'thin' | 'medium' | 'thick';
+    color?: string;
+    width: 'full' | 'medium' | 'narrow';
+    spacing: 'small' | 'medium' | 'large';
+  };
+  content: Record<string, never>;
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface FaqSection {
+  type: 'faq';
+  settings: {
+    title?: string;
+    backgroundColor?: string;
+    padding: 'small' | 'medium' | 'large';
+  };
+  content: {
+    items: FaqItem[];
+  };
+}
+
+export interface EmbedSection {
+  type: 'embed';
+  settings: {
+    aspectRatio: '16:9' | '4:3' | 'auto';
+    alignment: 'left' | 'center' | 'right';
+    maxWidth: 'small' | 'medium' | 'full';
+  };
+  content: {
+    embedUrl: string;
+    title?: string;
+  };
+}
+
 export type HomepageSection =
   | CarouselSection
   | TextSection
@@ -301,7 +347,10 @@ export type HomepageSection =
   | FooterSection
   | FeatureCardSection
   | TwoColumnContentSection
-  | ContentGridSection;
+  | ContentGridSection
+  | DividerSection
+  | FaqSection
+  | EmbedSection;
 
 export interface ThemeSettings {
   primaryColor?: string;
@@ -310,6 +359,7 @@ export interface ThemeSettings {
   textColor?: string;
   fontFamily?: string;
   accentColor?: string;
+  buttonStyle?: 'solid' | 'outline' | 'soft';
 }
 
 export interface GridPosition {
@@ -324,12 +374,95 @@ export interface HomepageLayout {
   theme: ThemeSettings;
   gridColumns?: number;
   gridGap?: number;
+  /** Website-mode extension for full storefront customization. */
+  websiteConfig?: WebsiteModeConfig;
+}
+
+export interface WebsiteNavItem {
+  id: string;
+  label: string;
+  href: string;
+}
+
+export interface WebsiteCustomPage {
+  id: string;
+  title: string;
+  slug: string;
+  layout: Pick<HomepageLayout, 'sections' | 'theme' | 'gridColumns' | 'gridGap'>;
+}
+
+export interface WebsiteSeoSettings {
+  metaTitle?: string;
+  metaDescription?: string;
+  keywords?: string;
+  ogImageUrl?: string;
+  faviconUrl?: string;
+  /** When false, adds noindex for the storefront */
+  allowIndexing?: boolean;
+  /** Optional Google Search Console verification token (meta tag content) */
+  googleSiteVerification?: string;
+}
+
+export interface WebsiteSiteSettings {
+  websiteName: string;
+  logoUrl?: string;
+  announcementText?: string;
+  showAnnouncement?: boolean;
+  announcementBg?: string;
+  announcementTextColor?: string;
+  navItems: WebsiteNavItem[];
+  headerBg?: string;
+  headerTextColor?: string;
+  footerBg?: string;
+  footerTextColor?: string;
+  footerColumns?: Array<{ title: string; links: WebsiteNavItem[] }>;
+}
+
+export interface WebsiteCollectionTemplate {
+  showFilters: boolean;
+  showSort: boolean;
+  columns: 2 | 3 | 4;
+  cardsStyle: 'minimal' | 'boxed';
+}
+
+export interface WebsiteProductTemplate {
+  galleryLayout: 'left-thumbs' | 'stacked';
+  showRecommendations: boolean;
+  showTrustBadges: boolean;
+  ctaStyle: 'solid' | 'outline';
+}
+
+export interface WebsiteModeConfig {
+  siteSettings: WebsiteSiteSettings;
+  seo?: WebsiteSeoSettings;
+  pages: {
+    home: HomepageLayout;
+    custom?: WebsiteCustomPage[];
+  };
+  templates: {
+    collection: WebsiteCollectionTemplate;
+    product: WebsiteProductTemplate;
+  };
+  versioning?: {
+    publishedAt?: string;
+    updatedBy?: string;
+  };
+}
+
+export interface PublishHistoryEntry {
+  id: string;
+  publishedAt: string;
+  layout: HomepageLayout;
+  note?: string;
 }
 
 export interface HomepageConfig {
   id: string;
   storeId: string;
   layout: HomepageLayout;
+  publishedLayout?: HomepageLayout;
+  publishedAt?: string | null;
+  publishHistory?: PublishHistoryEntry[];
   createdAt: string;
   updatedAt: string;
   autoSavedAt?: string;
@@ -341,6 +474,8 @@ export interface BuilderState {
   isDirty: boolean;
   isSaving: boolean;
   error: string | null;
+  history: HomepageLayout[];
+  future: HomepageLayout[];
 }
 
 export interface BuilderAction {
@@ -355,6 +490,8 @@ export interface BuilderAction {
     | 'SET_ERROR'
     | 'MARK_SAVED'
     | 'UPDATE_SECTION_POSITION'
+    | 'UPDATE_WEBSITE_CONFIG'
+    | 'ADD_PRESET_SECTIONS'
     | 'UNDO'
     | 'REDO';
   payload?: any;

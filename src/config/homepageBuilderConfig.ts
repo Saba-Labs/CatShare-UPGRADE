@@ -1,13 +1,20 @@
-import { HomepageSection, HomepageSectionType, ThemeSettings } from '../types/homepage';
+import {
+  HomepageSection,
+  HomepageSectionType,
+  ThemeSettings,
+  WebsiteModeConfig,
+  HomepageLayout,
+} from '../types/homepage';
 import { v4 as uuid } from 'uuid';
 
 export const DEFAULT_THEME: ThemeSettings = {
-  primaryColor: '#2563EB',
-  secondaryColor: '#F3F4F6',
+  primaryColor: '#1a73e8',
+  secondaryColor: '#e8f0fe',
   backgroundColor: '#FFFFFF',
-  textColor: '#1F2937',
-  fontFamily: 'DM Sans, system-ui, sans-serif',
-  accentColor: '#DC2626',
+  textColor: '#202124',
+  fontFamily: "'DM Sans', system-ui, sans-serif",
+  accentColor: '#d93025',
+  buttonStyle: 'solid',
 };
 
 export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
@@ -26,6 +33,9 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
   'feature-card': 'Feature Card',
   'two-column-content': 'Two-Column Content',
   'content-grid': 'Content Grid',
+  divider: 'Divider',
+  faq: 'FAQ',
+  embed: 'Embed',
 };
 
 export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
@@ -44,6 +54,9 @@ export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   'feature-card': 'Image with title and description in a single card layout',
   'two-column-content': 'Flexible two-column layout with text and images',
   'content-grid': 'Multiple feature cards arranged in a responsive grid',
+  divider: 'Horizontal line or spacing between sections',
+  faq: 'Expandable questions and answers',
+  embed: 'Embed videos, maps, or other iframe content',
 };
 
 export function createDefaultSection(
@@ -352,6 +365,63 @@ export function createDefaultSection(
         },
       } as any;
 
+    case 'divider':
+      return {
+        id,
+        type: 'divider',
+        order,
+        settings: {
+          style: 'line',
+          thickness: 'thin',
+          color: '#dadce0',
+          width: 'medium',
+          spacing: 'medium',
+        },
+        content: {},
+      } as any;
+
+    case 'faq':
+      return {
+        id,
+        type: 'faq',
+        order,
+        settings: {
+          title: 'Frequently asked questions',
+          backgroundColor: '#ffffff',
+          padding: 'large',
+        },
+        content: {
+          items: [
+            {
+              id: uuid(),
+              question: 'How do I place an order?',
+              answer: 'Browse our catalogue, add items to your cart, and checkout via WhatsApp or your preferred method.',
+            },
+            {
+              id: uuid(),
+              question: 'What are your delivery times?',
+              answer: 'Delivery times vary by location. Contact us for an estimate for your area.',
+            },
+          ],
+        },
+      } as any;
+
+    case 'embed':
+      return {
+        id,
+        type: 'embed',
+        order,
+        settings: {
+          aspectRatio: '16:9',
+          alignment: 'center',
+          maxWidth: 'medium',
+        },
+        content: {
+          embedUrl: '',
+          title: '',
+        },
+      } as any;
+
     default:
       throw new Error(`Unknown section type: ${type}`);
   }
@@ -361,23 +431,138 @@ export function createEmptyHomepageLayout() {
   return {
     sections: [],
     theme: DEFAULT_THEME,
+    websiteConfig: createDefaultWebsiteModeConfig(),
   };
 }
 
-export const SECTION_ORDERING: HomepageSectionType[] = [
-  'carousel',
-  'announcement',
+export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
+  return {
+    siteSettings: {
+      websiteName: 'My Store',
+      showAnnouncement: false,
+      announcementText: '',
+      announcementBg: '#111827',
+      announcementTextColor: '#ffffff',
+      headerBg: '#ffffff',
+      headerTextColor: '#111827',
+      footerBg: '#0f172a',
+      footerTextColor: '#e2e8f0',
+      navItems: [
+        { id: uuid(), label: 'Home', href: '/' },
+        { id: uuid(), label: 'Collections', href: '/collections/all' },
+      ],
+      footerColumns: [
+        {
+          title: 'Quick links',
+          links: [{ id: uuid(), label: 'Home', href: '/' }],
+        },
+      ],
+    },
+    seo: {
+      metaTitle: '',
+      metaDescription: '',
+      keywords: '',
+      allowIndexing: true,
+    },
+    pages: {
+      home: {
+        sections: [],
+        theme: DEFAULT_THEME,
+      },
+      custom: [],
+    },
+    templates: {
+      collection: {
+        showFilters: true,
+        showSort: true,
+        columns: 4,
+        cardsStyle: 'boxed',
+      },
+      product: {
+        galleryLayout: 'left-thumbs',
+        showRecommendations: true,
+        showTrustBadges: true,
+        ctaStyle: 'solid',
+      },
+    },
+    versioning: {},
+  };
+}
+
+export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): HomepageLayout {
+  const baseWebsiteConfig = createDefaultWebsiteModeConfig();
+  return {
+    ...layout,
+    websiteConfig: {
+      ...baseWebsiteConfig,
+      ...(layout.websiteConfig || {}),
+      siteSettings: {
+        ...baseWebsiteConfig.siteSettings,
+        ...(layout.websiteConfig?.siteSettings || {}),
+      },
+      seo: {
+        ...baseWebsiteConfig.seo,
+        ...(layout.websiteConfig?.seo || {}),
+      },
+      pages: {
+        home: layout.websiteConfig?.pages?.home || {
+          sections: layout.sections || [],
+          theme: layout.theme || DEFAULT_THEME,
+        },
+        custom: (layout.websiteConfig?.pages?.custom || []).map((page) => ({
+          ...page,
+          slug: page.slug || 'page',
+          title: page.title || 'Page',
+          layout: {
+            sections: page.layout?.sections || [],
+            theme: page.layout?.theme || layout.theme || DEFAULT_THEME,
+            gridColumns: page.layout?.gridColumns,
+            gridGap: page.layout?.gridGap,
+          },
+        })),
+      },
+      templates: {
+        collection: {
+          ...baseWebsiteConfig.templates.collection,
+          ...(layout.websiteConfig?.templates?.collection || {}),
+        },
+        product: {
+          ...baseWebsiteConfig.templates.product,
+          ...(layout.websiteConfig?.templates?.product || {}),
+        },
+      },
+      versioning: {
+        ...(layout.websiteConfig?.versioning || {}),
+      },
+    },
+  };
+}
+
+export const BASIC_SECTION_ORDERING: HomepageSectionType[] = [
+  'text',
+  'image',
   'banner',
+  'carousel',
+  'cta',
+  'announcement',
+  'video',
+  'embed',
+  'divider',
+  'faq',
+  'two-column-content',
+  'content-grid',
+  'feature-card',
+  'testimonials',
+  'footer',
+];
+
+export const STORE_SECTION_ORDERING: HomepageSectionType[] = [
   'featured-products',
   'category-showcase',
   'product-grid',
-  'feature-card',
-  'two-column-content',
-  'content-grid',
-  'text',
-  'image',
-  'cta',
-  'video',
-  'testimonials',
-  'footer',
+];
+
+export const SECTION_ORDERING: HomepageSectionType[] = [
+  ...BASIC_SECTION_ORDERING,
+  ...STORE_SECTION_ORDERING,
 ];

@@ -216,6 +216,8 @@ export interface Store {
   viewMode: 'grid' | 'list';
   /** Whether the homepage is enabled and visible to customers (persisted as `stores.homepage_enabled`). */
   homepageEnabled: boolean;
+  /** Whether full website-mode runtime is enabled on storefront. */
+  websiteModeEnabled: boolean;
 }
 
 export interface StorePublic {
@@ -251,6 +253,8 @@ export interface StorePublic {
   isLive?: boolean;
   /** Whether the custom homepage is enabled and visible to customers. */
   homepageEnabled?: boolean;
+  /** Whether website-mode runtime should be used by storefront. */
+  websiteModeEnabled?: boolean;
   cataloguesDefinition?: Array<{ id: string; label: string; priceField: string; priceUnitField: string; stockField: string; folder: string; order: number; createdAt: number; isDefault?: boolean }>;
 }
 
@@ -296,6 +300,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     minimumOrderValue,
     viewMode,
     homepageEnabled: row.homepage_enabled !== false,
+    websiteModeEnabled: row.website_mode_enabled === true,
   };
 }
 
@@ -556,9 +561,10 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
           ? 'grid'
           : null;
     let homepageEnabled = coerceOptionalBoolean(row.homepageEnabled ?? row.homepage_enabled);
+    let websiteModeEnabled = coerceOptionalBoolean(row.websiteModeEnabled ?? row.website_mode_enabled);
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -585,6 +591,11 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
           storeRecord?.homepage_enabled ?? storeRecord?.homepageEnabled
         );
       }
+      if (websiteModeEnabled == null) {
+        websiteModeEnabled = coerceOptionalBoolean(
+          storeRecord?.website_mode_enabled ?? storeRecord?.websiteModeEnabled
+        );
+      }
     }
 
     const normalized: StorePublic = {
@@ -592,6 +603,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
       homepageEnabled: homepageEnabled ?? true,
+      websiteModeEnabled: websiteModeEnabled ?? false,
       sellerWebsite: firstNonEmptyString(
         row.sellerWebsite,
         row.seller_website,
@@ -1050,6 +1062,45 @@ export async function updateStoreHomepageStatus(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('❌ Exception in updateStoreHomepageStatus:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreWebsiteModeStatus(
+  sellerUserId: string,
+  websiteModeEnabled: boolean
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        website_mode_enabled: websiteModeEnabled,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      const errorMsg = typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as any).message)
+        : String(error);
+      console.error('❌ Error updating website mode status:', errorMsg, error);
+      return { success: false, error: errorMsg };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('❌ Exception in updateStoreWebsiteModeStatus:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);

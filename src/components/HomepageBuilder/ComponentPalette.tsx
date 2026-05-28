@@ -1,61 +1,110 @@
 import React from 'react';
 import { HomepageSectionType } from '../../types/homepage';
-import { SECTION_TYPE_LABELS, SECTION_TYPE_DESCRIPTIONS, SECTION_ORDERING } from '../../config/homepageBuilderConfig';
+import {
+  SECTION_TYPE_LABELS,
+  BASIC_SECTION_ORDERING,
+  STORE_SECTION_ORDERING,
+} from '../../config/homepageBuilderConfig';
+import { BLOCK_PRESETS, BlockPresetId } from '../../config/blockPresets';
 
 interface ComponentPaletteProps {
   onAddSection: (type: HomepageSectionType) => void;
+  onAddPreset: (presetId: BlockPresetId) => void;
 }
 
-export default function ComponentPalette({ onAddSection }: ComponentPaletteProps) {
+export default function ComponentPalette({ onAddSection, onAddPreset }: ComponentPaletteProps) {
   const handleDragStart = (e: React.DragEvent, type: HomepageSectionType) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('sectionType', type);
   };
 
   return (
-    <div className="component-palette">
-      <div className="palette-header">
-        <div className="palette-header-title">Insert</div>
-        <div className="palette-header-subtitle">Drag or click to add sections</div>
+    <div className="sidebar-panel insert-panel">
+      <div className="sidebar-panel-header">
+        <h3>Insert</h3>
       </div>
-      <div className="palette-sections">
-        {SECTION_ORDERING.map((type) => (
-          <div
+      <p className="sidebar-hint">Add layouts or individual blocks.</p>
+
+      <div className="insert-group-label">Layouts</div>
+      <div className="preset-list">
+        {BLOCK_PRESETS.map((preset) => (
+          <button key={preset.id} type="button" className="preset-row" onClick={() => onAddPreset(preset.id)}>
+            <span className="preset-row-label">{preset.label}</span>
+            <span className="preset-row-desc">{preset.description}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="insert-group-label">Basic blocks</div>
+      <div className="insert-grid">
+        {BASIC_SECTION_ORDERING.map((type) => (
+          <button
             key={type}
-            className="section-item"
+            type="button"
+            className="insert-block"
             draggable
             onDragStart={(e) => handleDragStart(e, type)}
             onClick={() => onAddSection(type)}
-            title={`Drag to canvas or click to add ${SECTION_TYPE_LABELS[type]}`}
+            title={SECTION_TYPE_LABELS[type]}
           >
-            <div className="section-item-title-row">
-              <span className="section-item-icon" aria-hidden="true">
-                {SECTION_ICONS[type] || '▣'}
-              </span>
-              <div className="section-item-title">{SECTION_TYPE_LABELS[type]}</div>
-            </div>
-            <div className="section-item-desc">{SECTION_TYPE_DESCRIPTIONS[type]}</div>
-          </div>
+            <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
+            <span className="insert-block-label">{shortLabel(type)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="insert-group-label">Store blocks</div>
+      <div className="insert-grid insert-grid-compact">
+        {STORE_SECTION_ORDERING.map((type) => (
+          <button
+            key={type}
+            type="button"
+            className="insert-block"
+            draggable
+            onDragStart={(e) => handleDragStart(e, type)}
+            onClick={() => onAddSection(type)}
+            title={SECTION_TYPE_LABELS[type]}
+          >
+            <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
+            <span className="insert-block-label">{shortLabel(type)}</span>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
+function shortLabel(type: HomepageSectionType): string {
+  const map: Partial<Record<HomepageSectionType, string>> = {
+    'featured-products': 'Featured',
+    'category-showcase': 'Categories',
+    'product-grid': 'Products',
+    'two-column-content': '2 Columns',
+    'content-grid': 'Grid',
+    'feature-card': 'Feature',
+  };
+  if (map[type]) return map[type]!;
+  const full = SECTION_TYPE_LABELS[type];
+  return full.length > 14 ? full.split(' ')[0] : full;
+}
+
 const SECTION_ICONS: Partial<Record<HomepageSectionType, string>> = {
-  carousel: '🎞',
+  carousel: '▣',
   text: 'T',
-  image: '🖼',
+  image: '▢',
   banner: '▭',
-  'featured-products': '⭐',
-  'category-showcase': '🗂',
-  'product-grid': '▦',
-  announcement: '📣',
-  cta: '👉',
+  'featured-products': '★',
+  'category-showcase': '⊞',
+  'product-grid': '⊟',
+  announcement: '!',
+  cta: '→',
   video: '▶',
-  testimonials: '💬',
-  footer: '▁',
+  testimonials: '❝',
+  footer: '▔',
   'feature-card': '◫',
-  'two-column-content': '⫶',
-  'content-grid': '▥',
+  'two-column-content': '⫴',
+  'content-grid': '▦',
+  divider: '—',
+  faq: '?',
+  embed: '⊡',
 };
