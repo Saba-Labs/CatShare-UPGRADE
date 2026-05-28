@@ -905,6 +905,27 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPopState);
 }, [drawerProduct]);
 
+  // Listen for store-updated custom events from Store.tsx toggle
+  useEffect(() => {
+    const handleStoreUpdated = (event: Event) => {
+      console.log('STORE-UPDATED event received', event);
+      if (event instanceof CustomEvent && effectiveSlugRef.current) {
+        console.log('Custom event is valid, detail:', event.detail);
+        console.log('Refetching store for slug:', effectiveSlugRef.current);
+        getStoreBySlug(effectiveSlugRef.current).then((r) => {
+          console.log('Store refetched - success:', r.success, 'homepageEnabled:', r.data?.homepageEnabled);
+          if (r.success && r.data) {
+            console.log('Updating store state');
+            setStore(r.data);
+            setStoreError(null);
+          }
+        });
+      }
+    };
+    window.addEventListener('store-updated', handleStoreUpdated);
+    return () => window.removeEventListener('store-updated', handleStoreUpdated);
+  }, []);
+
   useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
@@ -949,20 +970,44 @@ useEffect(() => {
     });
   }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
 
+  // Safety check: if homepage is disabled but layout exists, clear it
+  useEffect(() => {
+    if (store?.homepageEnabled === false && homepageLayout) {
+      console.log('SAFETY CHECK: Clearing homepage layout because homepageEnabled is false');
+      setHomepageLayout(null);
+      setHomepageLoading(false);
+    }
+  }, [store?.homepageEnabled, homepageLayout]);
+
   // Load homepage config if homepage is enabled
   useEffect(() => {
-    if (!store?.id || !store.homepageEnabled) {
+    console.log('Homepage effect - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
+    // If homepage is disabled, immediately clear the layout
+    if (!store?.homepageEnabled) {
+      console.log('Clearing layout - homepage disabled');
       setHomepageLayout(null);
+      setHomepageLoading(false);
       return;
     }
+
+    if (!store?.id) {
+      console.log('No store id, skipping');
+      return;
+    }
+
+    console.log('Loading homepage config');
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
+      console.log('Homepage config loaded:', !!config?.layout);
       if (config?.layout) {
         setHomepageLayout(config.layout);
+      } else {
+        setHomepageLayout(null);
       }
       setHomepageLoading(false);
     }).catch((err) => {
       console.error('Failed to load homepage:', err);
+      setHomepageLayout(null);
       setHomepageLoading(false);
     });
   }, [store?.id, store?.homepageEnabled]);
@@ -988,7 +1033,7 @@ useEffect(() => {
         setStore(r.data);
         if (r.data.sellerUserId && r.data.isLive !== false) {
           setProductsLoading(true);
-          
+
           // Re-fetch custom labels on tab visibility restoration
           const supabase = getSupabaseClient();
           supabase
@@ -1026,7 +1071,7 @@ useEffect(() => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
     };
-  }, []);
+  }, [store?.id]);
 
   const catalogues = useMemo(
     () => ensureCataloguesForStorefront(store?.cataloguesDefinition, store?.catalogueId),
@@ -1502,7 +1547,7 @@ useEffect(() => {
           </div>
 
           {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
-          {store?.homepageEnabled && homepageLayout && !homepageLoading ? (
+          {store?.homepageEnabled === true && homepageLayout && !homepageLoading ? (
             // Render custom homepage
             <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
               {homepageLayout.sections.map((section) => (
