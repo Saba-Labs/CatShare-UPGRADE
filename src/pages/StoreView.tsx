@@ -951,10 +951,8 @@ useEffect(() => {
 
   // Load homepage config if homepage is enabled
   useEffect(() => {
-    console.log('Homepage effect running - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
     // If homepage is disabled, immediately clear the layout
     if (store && !store.homepageEnabled) {
-      console.log('Homepage disabled - clearing layout');
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
@@ -964,10 +962,8 @@ useEffect(() => {
       return;
     }
 
-    console.log('Loading homepage config for store:', store.id);
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
-      console.log('Homepage config loaded:', config);
       if (config?.layout) {
         setHomepageLayout(config.layout);
       } else {
@@ -993,12 +989,10 @@ useEffect(() => {
   /** Re-hit Supabase when user returns to the tab or restores from bfcache — no local product/store cache in StoreView. */
   useEffect(() => {
     const reloadFromCloud = () => {
-      console.log('Reloading store from cloud');
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const slug = effectiveSlugRef.current;
       if (!slug) return;
       void getStoreBySlug(slug).then((r) => {
-        console.log('Fetched store from cloud:', r);
         if (!r.success || !r.data) return;
         setStoreError(null);
         setStore(r.data);
@@ -1037,29 +1031,21 @@ useEffect(() => {
     };
     const onStoreUpdated = (e: Event) => {
       if (e instanceof CustomEvent) {
-        console.log('Store updated event received:', e.detail);
         reloadFromCloud();
       }
     };
 
     const onStorageChange = (e: StorageEvent) => {
       if (e.key === 'store-update-signal') {
-        console.log('Store update signal from localStorage:', e.newValue);
         reloadFromCloud();
       }
     };
-
-    // Periodic refetch every 3 seconds as fallback to catch homepage toggle changes
-    const interval = setInterval(() => {
-      reloadFromCloud();
-    }, 3000);
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
     window.addEventListener('store-updated', onStoreUpdated);
     window.addEventListener('storage', onStorageChange);
     return () => {
-      clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('store-updated', onStoreUpdated);
