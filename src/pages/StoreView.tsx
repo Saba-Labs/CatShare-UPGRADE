@@ -905,6 +905,19 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPopState);
 }, [drawerProduct]);
 
+  // Listen for store updates from localStorage and refetch
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'store-update-signal' && effectiveSlugRef.current) {
+        getStoreBySlug(effectiveSlugRef.current).then((r) => {
+          if (r.success && r.data) setStore(r.data);
+        });
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   useEffect(() => {
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
@@ -949,10 +962,18 @@ useEffect(() => {
     });
   }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
 
+  // Safety check: if homepage is disabled but layout exists, clear it
+  useEffect(() => {
+    if (store?.homepageEnabled === false && homepageLayout) {
+      setHomepageLayout(null);
+      setHomepageLoading(false);
+    }
+  }, [store?.homepageEnabled, homepageLayout]);
+
   // Load homepage config if homepage is enabled
   useEffect(() => {
     // If homepage is disabled, immediately clear the layout
-    if (store && !store.homepageEnabled) {
+    if (!store?.homepageEnabled) {
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
