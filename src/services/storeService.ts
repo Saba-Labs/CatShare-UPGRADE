@@ -458,7 +458,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
   try {
     const client = getSupabaseClient();
     const normalizedSlug = slug.toLowerCase().trim();
-    
+
     // Call the public RPC function
     const { data, error } = await client.rpc('get_store_by_slug', {
       p_slug: normalizedSlug,

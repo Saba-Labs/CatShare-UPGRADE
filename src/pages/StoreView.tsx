@@ -905,17 +905,25 @@ useEffect(() => {
   return () => window.removeEventListener('popstate', onPopState);
 }, [drawerProduct]);
 
-  // Listen for store updates from localStorage and refetch
+  // Listen for store-updated custom events from Store.tsx toggle
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'store-update-signal' && effectiveSlugRef.current) {
+    const handleStoreUpdated = (event: Event) => {
+      console.log('STORE-UPDATED event received', event);
+      if (event instanceof CustomEvent && effectiveSlugRef.current) {
+        console.log('Custom event is valid, detail:', event.detail);
+        console.log('Refetching store for slug:', effectiveSlugRef.current);
         getStoreBySlug(effectiveSlugRef.current).then((r) => {
-          if (r.success && r.data) setStore(r.data);
+          console.log('Store refetched - success:', r.success, 'homepageEnabled:', r.data?.homepageEnabled);
+          if (r.success && r.data) {
+            console.log('Updating store state');
+            setStore(r.data);
+            setStoreError(null);
+          }
         });
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('store-updated', handleStoreUpdated);
+    return () => window.removeEventListener('store-updated', handleStoreUpdated);
   }, []);
 
   useEffect(() => {
@@ -965,6 +973,7 @@ useEffect(() => {
   // Safety check: if homepage is disabled but layout exists, clear it
   useEffect(() => {
     if (store?.homepageEnabled === false && homepageLayout) {
+      console.log('SAFETY CHECK: Clearing homepage layout because homepageEnabled is false');
       setHomepageLayout(null);
       setHomepageLoading(false);
     }
@@ -972,19 +981,24 @@ useEffect(() => {
 
   // Load homepage config if homepage is enabled
   useEffect(() => {
+    console.log('Homepage effect - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
     // If homepage is disabled, immediately clear the layout
     if (!store?.homepageEnabled) {
+      console.log('Clearing layout - homepage disabled');
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
     }
 
     if (!store?.id) {
+      console.log('No store id, skipping');
       return;
     }
 
+    console.log('Loading homepage config');
     setHomepageLoading(true);
     getHomepageConfig(store.id).then((config) => {
+      console.log('Homepage config loaded:', !!config?.layout);
       if (config?.layout) {
         setHomepageLayout(config.layout);
       } else {
@@ -1050,27 +1064,12 @@ useEffect(() => {
     const onPageShow = (e: Event) => {
       if ((e as PageTransitionEvent).persisted) reloadFromCloud();
     };
-    const onStoreUpdated = (e: Event) => {
-      if (e instanceof CustomEvent) {
-        reloadFromCloud();
-      }
-    };
-
-    const onStorageChange = (e: StorageEvent) => {
-      if (e.key === 'store-update-signal') {
-        reloadFromCloud();
-      }
-    };
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pageshow', onPageShow);
-    window.addEventListener('store-updated', onStoreUpdated);
-    window.addEventListener('storage', onStorageChange);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
-      window.removeEventListener('store-updated', onStoreUpdated);
-      window.removeEventListener('storage', onStorageChange);
     };
   }, [store?.id]);
 
