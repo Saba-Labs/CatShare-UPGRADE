@@ -1,119 +1,198 @@
-import React, { useRef, useState } from 'react';
-import { HomepageLayout, GridPosition, HomepageSection, ThemeSettings } from '../../types/homepage';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { BlockAlign, BlockLayout, HomepageLayout, HomepageSection, ThemeSettings } from '../../types/homepage';
+import SortableGridSection from './SortableGridSection';
 import SectionRenderer from './sections/SectionRenderer';
-import { SECTION_TYPE_LABELS } from '../../config/homepageBuilderConfig';
+import TemplateGallery from './TemplateGallery';
+import type { WebsiteTemplateId } from '../../config/websiteTemplates';
+import {
+  SECTION_TYPE_LABELS,
+  SITE_ANNOUNCEMENT_SELECTION_ID,
+  SITE_FOOTER_SELECTION_ID,
+} from '../../config/homepageBuilderConfig';
 import { useBuilderMedia } from './media/BuilderMediaContext';
-import { applyMediaUrlToSection, sectionSupportsQuickMedia } from '../../utils/sectionMedia';
+import {
+  applyMediaUrlToSection,
+  applyMediaUrlsToSection,
+  sectionSupportsMultiMedia,
+  sectionSupportsQuickMedia,
+} from '../../utils/sectionMedia';
+import {
+  getBlockAlign,
+  getBlockInnerStyle,
+  getBlockRowStyle,
+  getBlockWidthPercent,
+  snapBlockWidth,
+  snapBlockHeight,
+} from '../../utils/blockLayout';
+import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
+import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
 import './GridCanvas.css';
-
-const GRID_COLUMNS = 12;
-const GRID_GAP = 16;
-const COLUMN_WIDTH = 60;
-const SNAP_THRESHOLD = 5;
 
 interface GridCanvasProps {
   layout: HomepageLayout;
   theme: ThemeSettings;
   storeId: string;
+  editingPageId?: string;
   selectedSectionId: string | null;
   onSelectSection: (id: string | null) => void;
   onRemoveSection: (id: string) => void;
   onDuplicateSection: (id: string) => void;
-  onUpdateSectionPosition: (id: string, position: GridPosition) => void;
   onUpdateSection: (id: string, updates: Partial<HomepageSection>) => void;
+  onUpdateSectionLayout: (id: string, blockLayout: BlockLayout) => void;
+  onReorderSections: (sections: HomepageSection[]) => void;
+  onApplyTemplate?: (id: WebsiteTemplateId) => void;
+  onStartBlank?: () => void;
+  /** @deprecated Grid resize kept for API compat; editor uses document stack layout. */
+  onUpdateSectionPosition?: (id: string, position: unknown) => void;
 }
+
+const ALIGN_OPTIONS: Array<{ value: BlockAlign; label: string }> = [
+  { value: 'left', label: '◧' },
+  { value: 'center', label: '▣' },
+  { value: 'right', label: '◨' },
+];
 
 export default function GridCanvas({
   layout,
   theme,
   storeId,
+  editingPageId = 'home',
   selectedSectionId,
   onSelectSection,
   onRemoveSection,
   onDuplicateSection,
-  onUpdateSectionPosition,
   onUpdateSection,
+  onUpdateSectionLayout,
+  onReorderSections,
+  onApplyTemplate,
+  onStartBlank,
 }: GridCanvasProps) {
   const { openMediaPicker } = useBuilderMedia();
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const [resizingId, setResizingId] = useState<string | null>(null);
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [dragState, setDragState] = useState<{ id: string; widthPercent: number } | null>(null);
+  const [heightDragState, setHeightDragState] = useState<{ id: string; heightPx: number } | null>(null);
+  const [blankStarted, setBlankStarted] = useState(false);
 
-  const getDefaultPosition = (index: number): GridPosition => ({
-    column: 1,
-    row: index + 1,
-    width: GRID_COLUMNS,
-    height: 1,
-  });
-
-  const getPositionStyle = (section: HomepageLayout['sections'][number]) => {
-    const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
-    const width = pos.width * COLUMN_WIDTH + (pos.width - 1) * (GRID_GAP / GRID_COLUMNS);
-    const height = pos.height * 200 + (pos.height - 1) * GRID_GAP;
-    return {
-      gridColumn: `${pos.column} / span ${pos.width}`,
-      gridRow: `${pos.row} / span ${pos.height}`,
-      minHeight: `${height}px`,
-    };
-  };
+  const sortedSections = useMemo(
+    () => [...layout.sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [layout.sections]
+  );
+  const siteSettings = layout.websiteConfig?.siteSettings;
+  const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
+  const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
 
   const handleSectionClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     onSelectSection(id);
   };
 
-  const handleResizeStart = (e: React.MouseEvent, id: string) => {
+  const beginResize = (e: React.PointerEvent, sectionId: string) => {
+    e.preventDefault();
     e.stopPropagation();
-    if (e.button !== 0) return;
-    const section = layout.sections.find((s) => s.id === id);
-    if (!section) return;
-    const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
-    setResizingId(id);
-    setResizeStart({ x: e.clientX, y: e.clientY, width: pos.width, height: pos.height });
+    const row = rowRefs.current[sectionId];
+    if (!row) return;
+    const rowWidth = row.getBoundingClientRect().width;
+    if (rowWidth <= 0) return;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const rect = row.getBoundingClientRect();
+      const align = getBlockAlign(sortedSections.find((s) => s.id === sectionId)?.blockLayout);
+      let ratio: number;
+      if (align === 'left') {
+        ratio = (moveEvent.clientX - rect.left) / rowWidth;
+      } else if (align === 'right') {
+        ratio = (rect.right - moveEvent.clientX) / rowWidth;
+      } else {
+        const center = rect.left + rowWidth / 2;
+        ratio = (Math.abs(moveEvent.clientX - center) * 2) / rowWidth;
+      }
+      const widthPercent = snapBlockWidth(ratio * 100);
+      setDragState({ id: sectionId, widthPercent });
+    };
+
+    const handleUp = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      setDragState((current) => {
+        if (current && current.id === sectionId) {
+          onUpdateSectionLayout(sectionId, { widthPercent: current.widthPercent });
+        }
+        return null;
+      });
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
   };
 
-  React.useEffect(() => {
-    if (!resizingId || !resizeStart) return;
+  const beginHeightResize = (e: React.PointerEvent, sectionId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const block = blockRefs.current[sectionId];
+    if (!block) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const columnPixelWidth = COLUMN_WIDTH + GRID_GAP / GRID_COLUMNS;
-      const rowPixelHeight = 220;
-      const rawDeltaX = (e.clientX - resizeStart.x) / columnPixelWidth;
-      const rawDeltaY = (e.clientY - resizeStart.y) / rowPixelHeight;
-      const deltaX = Math.abs(rawDeltaX) < SNAP_THRESHOLD / columnPixelWidth ? 0 : Math.round(rawDeltaX);
-      const deltaY = Math.abs(rawDeltaY) < SNAP_THRESHOLD / rowPixelHeight ? 0 : Math.round(rawDeltaY);
-      const newWidth = Math.max(1, Math.min(GRID_COLUMNS, resizeStart.width + deltaX));
-      const newHeight = Math.max(1, resizeStart.height + deltaY);
-      const section = layout.sections.find((s) => s.id === resizingId);
-      if (section) {
-        const pos = section.gridPosition || getDefaultPosition(layout.sections.indexOf(section));
-        onUpdateSectionPosition(resizingId, { ...pos, width: newWidth, height: newHeight });
-      }
+    const handleMove = (moveEvent: PointerEvent) => {
+      const rect = block.getBoundingClientRect();
+      const heightPx = snapBlockHeight(moveEvent.clientY - rect.top);
+      setHeightDragState({ id: sectionId, heightPx });
     };
 
-    const handleMouseUp = () => {
-      setResizingId(null);
-      setResizeStart(null);
-      document.body.style.userSelect = 'auto';
-      document.body.style.cursor = 'auto';
+    const handleUp = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      setHeightDragState((current) => {
+        if (current && current.id === sectionId) {
+          onUpdateSectionLayout(sectionId, { heightPx: current.heightPx });
+        }
+        return null;
+      });
     };
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'nwse-resize';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.userSelect = 'auto';
-      document.body.style.cursor = 'auto';
-    };
-  }, [resizingId, resizeStart, layout, onUpdateSectionPosition]);
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  const resetHeight = (sectionId: string) => {
+    onUpdateSectionLayout(sectionId, { heightPx: undefined });
+  };
+
+  const setWidth = (sectionId: string, widthPercent: number) => {
+    onUpdateSectionLayout(sectionId, { widthPercent });
+  };
+
+  const setAlign = (sectionId: string, align: BlockAlign) => {
+    onUpdateSectionLayout(sectionId, { align });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = sortedSections.findIndex((s) => s.id === active.id);
+    const newIndex = sortedSections.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    onReorderSections(arrayMove(sortedSections, oldIndex, newIndex));
+  };
+
+  const sectionIds = useMemo(() => sortedSections.map((s) => s.id), [sortedSections]);
 
   return (
     <div
       className="grid-canvas-container sites-canvas"
-      ref={canvasRef}
       onClick={() => onSelectSection(null)}
       style={{
         fontFamily: theme.fontFamily || undefined,
@@ -122,59 +201,183 @@ export default function GridCanvas({
         ['--site-primary' as string]: theme.primaryColor || '#1a73e8',
       }}
     >
-      {layout.sections.length === 0 ? (
-        <div className="canvas-empty sites-canvas-empty">
-          <p>Click a block in Insert to start your page</p>
+      {siteSettings ? (
+        <StorefrontSiteHeader
+          siteSettings={siteSettings}
+          preview
+          onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
+          isAnnouncementSelected={isSiteAnnouncementSelected}
+        />
+      ) : (
+        <div className="sites-editor-header-preview">
+          <div className="sites-editor-header-inner">
+            <span className="sites-editor-header-brand">My Store</span>
+          </div>
+        </div>
+      )}
+      {sortedSections.length === 0 ? (
+        <div className="canvas-empty sites-canvas-empty" onClick={(e) => e.stopPropagation()}>
+          {onApplyTemplate && editingPageId === 'home' && !blankStarted ? (
+            <TemplateGallery
+              variant="full"
+              onApply={onApplyTemplate}
+              onStartBlank={() => {
+                setBlankStarted(true);
+                onStartBlank?.();
+              }}
+            />
+          ) : (
+            <p>
+              {editingPageId === 'home'
+                ? 'Click a block in Insert to start your page'
+                : 'Add blocks from Insert — this page uses your site template colors and styling'}
+            </p>
+          )}
         </div>
       ) : (
-        <div
-          className="grid-container"
-          style={{
-            gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)`,
-            gap: `${GRID_GAP}px`,
-          }}
-        >
-          {layout.sections.map((section) => {
-            const isSelected = selectedSectionId === section.id;
-            return (
-              <div
-                key={section.id}
-                className={`grid-section sites-block ${isSelected ? 'selected' : ''} ${resizingId === section.id ? 'resizing' : ''}`}
-                style={getPositionStyle(section)}
-                onClick={(e) => handleSectionClick(e, section.id)}
-              >
-                {isSelected && (
-                  <div className="sites-floating-toolbar" onClick={(e) => e.stopPropagation()}>
-                    <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
-                    {sectionSupportsQuickMedia(section.type) && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
+            <div className="sites-document-stack">
+              {sortedSections.map((section) => {
+                const isSelected = selectedSectionId === section.id;
+                const liveWidth =
+                  dragState && dragState.id === section.id
+                    ? dragState.widthPercent
+                    : getBlockWidthPercent(section.blockLayout);
+                const align = getBlockAlign(section.blockLayout);
+                const liveHeight =
+                  heightDragState && heightDragState.id === section.id
+                    ? heightDragState.heightPx
+                    : section.blockLayout?.heightPx;
+                const innerStyle = {
+                  ...getBlockInnerStyle(section.blockLayout),
+                  width: `${liveWidth}%`,
+                  ...(liveHeight ? { height: `${liveHeight}px`, overflow: 'hidden' as const } : {}),
+                };
+                return (
+                  <SortableGridSection key={section.id} id={section.id}>
+                    {({ attributes, listeners, isDragging }) => (
+                      <>
+                        <button
+                          type="button"
+                          className="sites-section-drag-grip"
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder section"
+                          onClick={(e) => e.stopPropagation()}
+                          {...attributes}
+                          {...listeners}
+                        >
+                          <span className="sites-drag-grip-dots" aria-hidden />
+                        </button>
+                        <div
+                          className="sites-block-row-body"
+                          style={getBlockRowStyle(section.blockLayout)}
+                          ref={(el) => {
+                            rowRefs.current[section.id] = el;
+                          }}
+                        >
+                          <div
+                  className={`sites-document-block ${isSelected ? 'selected' : ''} ${
+                    dragState?.id === section.id || heightDragState?.id === section.id ? 'resizing' : ''
+                  }${isDragging ? ' dragging' : ''}`}
+                  style={innerStyle}
+                  ref={(el) => {
+                    blockRefs.current[section.id] = el;
+                  }}
+                  onClick={(e) => handleSectionClick(e, section.id)}
+                >
+                  {isSelected && (
+                    <div className="sites-floating-toolbar" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        className="sites-float-btn"
-                        onClick={() =>
-                          openMediaPicker({
-                            storeId,
-                            assetKey: `${section.id}-quick`,
-                            title: 'Choose image',
-                            onSelect: (url) => {
-                              const patch = applyMediaUrlToSection(section, url);
-                              if (patch) onUpdateSection(section.id, patch);
-                            },
-                          })
-                        }
+                        className="sites-float-btn sites-float-btn-drag icon"
+                        title="Drag to reorder"
+                        aria-label="Drag to reorder section"
+                        onClick={(e) => e.stopPropagation()}
+                        {...attributes}
+                        {...listeners}
                       >
-                        Image
+                        ⋮⋮
                       </button>
-                    )}
-                    <button type="button" className="sites-float-btn" onClick={() => onDuplicateSection(section.id)} title="Duplicate">
-                      Duplicate
-                    </button>
-                    <button type="button" className="sites-float-btn danger" onClick={() => onRemoveSection(section.id)} title="Delete">
-                      Delete
-                    </button>
-                  </div>
-                )}
+                      <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
+                      <div className="sites-align-group">
+                        {ALIGN_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={`sites-float-btn icon ${align === opt.value ? 'active' : ''}`}
+                            title={`Align ${opt.value}`}
+                            onClick={() => setAlign(section.id, opt.value)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="sites-width-group">
+                        {[50, 75, 100].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            className={`sites-float-btn icon ${liveWidth === w ? 'active' : ''}`}
+                            title={`${w}% width`}
+                            onClick={() => setWidth(section.id, w)}
+                          >
+                            {w}%
+                          </button>
+                        ))}
+                        {section.blockLayout?.heightPx ? (
+                          <button
+                            type="button"
+                            className="sites-float-btn icon"
+                            title="Reset height to fit content"
+                            onClick={() => resetHeight(section.id)}
+                          >
+                            ↕ Auto
+                          </button>
+                        ) : null}
+                      </div>
+                      {sectionSupportsQuickMedia(section.type) && (
+                        <button
+                          type="button"
+                          className="sites-float-btn"
+                          onClick={() => {
+                            const isMulti = sectionSupportsMultiMedia(section.type);
+                            openMediaPicker({
+                              storeId,
+                              assetKey: `${section.id}-quick`,
+                              title: isMulti ? 'Add carousel images' : 'Choose image',
+                              multiple: isMulti,
+                              onSelect: isMulti
+                                ? undefined
+                                : (url) => {
+                                    const patch = applyMediaUrlToSection(section, url);
+                                    if (patch) onUpdateSection(section.id, patch);
+                                  },
+                              onSelectMultiple: isMulti
+                                ? (urls) => {
+                                    const patch = applyMediaUrlsToSection(section, urls);
+                                    if (patch) onUpdateSection(section.id, patch);
+                                  }
+                                : undefined,
+                            });
+                          }}
+                        >
+                          {sectionSupportsMultiMedia(section.type) ? 'Images' : 'Image'}
+                        </button>
+                      )}
+                      <button type="button" className="sites-float-btn" onClick={() => onDuplicateSection(section.id)}>
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        className="sites-float-btn danger"
+                        onClick={() => onRemoveSection(section.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
 
-                <div className="grid-section-content">
                   <SectionRenderer
                     section={section}
                     theme={theme}
@@ -182,18 +385,69 @@ export default function GridCanvas({
                     editMode={isSelected}
                     onUpdateSection={(updates) => onUpdateSection(section.id, updates)}
                   />
-                </div>
 
-                {isSelected && (
-                  <div
-                    className="grid-resize-handle"
-                    onMouseDown={(e) => handleResizeStart(e, section.id)}
-                    title="Resize"
-                  />
-                )}
-              </div>
-            );
-          })}
+                  {isSelected && (
+                    <>
+                      <div
+                        className="sites-resize-handle right"
+                        title="Drag to resize width"
+                        onPointerDown={(e) => beginResize(e, section.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="sites-resize-pill" />
+                      </div>
+                      <div
+                        className="sites-resize-handle bottom"
+                        title="Drag to resize height"
+                        onPointerDown={(e) => beginHeightResize(e, section.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="sites-resize-pill horizontal" />
+                      </div>
+                      {dragState?.id === section.id && (
+                        <div className="sites-resize-badge">{liveWidth}%</div>
+                      )}
+                      {heightDragState?.id === section.id && (
+                        <div className="sites-resize-badge bottom-left">{liveHeight}px</div>
+                      )}
+                    </>
+                  )}
+                </div>
+                        </div>
+                      </>
+                    )}
+                  </SortableGridSection>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+      {siteSettings && (
+        <div
+          className={`sites-editor-footer-preview${isSiteFooterSelected ? ' selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-label="Edit site footer"
+          aria-pressed={isSiteFooterSelected}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectSection(SITE_FOOTER_SELECTION_ID);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelectSection(SITE_FOOTER_SELECTION_ID);
+            }
+          }}
+        >
+          {isSiteFooterSelected && (
+            <div className="sites-footer-selection-label" onClick={(e) => e.stopPropagation()}>
+              Footer
+            </div>
+          )}
+          <WebsiteFooter siteSettings={siteSettings} previewMode />
         </div>
       )}
     </div>

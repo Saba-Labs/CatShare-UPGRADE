@@ -97,7 +97,6 @@ const VALID_SECTION_TYPES: HomepageSectionType[] = [
   'cta',
   'video',
   'testimonials',
-  'footer',
   'feature-card',
   'two-column-content',
   'content-grid',

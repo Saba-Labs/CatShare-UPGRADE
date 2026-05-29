@@ -7,6 +7,9 @@ interface MediaPickerButtonProps {
   label?: string;
   currentUrl?: string;
   onUrl: (url: string) => void;
+  /** Allow selecting multiple images at once (calls onUrls) */
+  multiple?: boolean;
+  onUrls?: (urls: string[]) => void;
   className?: string;
   showPreview?: boolean;
 }
@@ -17,6 +20,8 @@ export default function MediaPickerButton({
   label = 'Choose image',
   currentUrl,
   onUrl,
+  multiple = false,
+  onUrls,
   className = 'btn-secondary',
   showPreview = true,
 }: MediaPickerButtonProps) {
@@ -37,11 +42,23 @@ export default function MediaPickerButton({
           openMediaPicker({
             storeId,
             assetKey,
-            title: label,
-            onSelect: (url) => {
-              setPreviewUrl(url);
-              onUrl(url);
-            },
+            title: multiple ? label.replace(/image/i, 'images') : label,
+            multiple,
+            onSelect: multiple
+              ? undefined
+              : (url) => {
+                  setPreviewUrl(url);
+                  onUrl(url);
+                },
+            onSelectMultiple: multiple
+              ? (urls) => {
+                  if (urls[0]) {
+                    setPreviewUrl(urls[0]);
+                    onUrl(urls[0]);
+                  }
+                  onUrls?.(urls);
+                }
+              : undefined,
           })
         }
       >

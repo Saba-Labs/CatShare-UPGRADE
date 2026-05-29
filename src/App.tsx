@@ -93,6 +93,7 @@ import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 import { resolveStoreSlugFromHostname } from "./utils/storefrontDomain";
+import { isHomepageEditorPath, isOfflineBuilderMode } from "./config/offlineBuilder";
 
 /** Run non-critical work after first paint to shorten time-to-interactive. */
 function scheduleIdleTask(fn: () => void) {
@@ -425,6 +426,22 @@ function AppWithBackHandler() {
 
     const userId = user.uid;
 
+    // Website builder: do not block on Supabase profile / startup sync (localStorage saves).
+    if (isHomepageEditorPath(location.pathname) && isOfflineBuilderMode()) {
+      if (startupRanForUserRef.current !== userId) {
+        startupRanForUserRef.current = userId;
+        migrateUnkeyedDataToUserKeyed(userId);
+        const localProducts = readProductsWithLegacyFallback(userId);
+        const localDeleted = readDeletedProductsWithLegacyFallback(userId);
+        setProducts((prev) => (prev.length > 0 ? prev : localProducts));
+        setDeletedProducts((prev) => (prev.length > 0 ? prev : localDeleted));
+      }
+      setCatalogueFirstLoadSettled(true);
+      setStartupPhase('done');
+      setStartupStatusText('Ready');
+      return;
+    }
+
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) {
       if (startupRanForUserRef.current === userId) return;
@@ -708,7 +725,7 @@ function AppWithBackHandler() {
     };
 
     // Wait for auth snapshot while online. Offline, proceed with local cache so startup does not stall.
-    if (supabaseDataLoading && isBrowserOnline()) {
+    if (supabaseDataLoading && isBrowserOnline() && !isHomepageEditorPath(location.pathname)) {
       setStartupStatusText('Fetching products, categories and settings');
       if (hasDeviceCatalogueCache) {
         showCachedCatalogueWhileCloudLoads();
@@ -897,6 +914,7 @@ function AppWithBackHandler() {
     areCataloguesEquivalent,
     shouldApplyRemoteCataloguesOverLocal,
     markOfflineMigrationCompletedInCloud,
+    location.pathname,
   ]);
 
   // Ensure settings/definitions hydrate on first login even if the initial auth snapshot
@@ -2350,7 +2368,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
         {/* Public Routes */}
         <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
-        <Route path="/store/:slug" element={<StoreView />} />
+        <Route path="/store/:slug/*" element={<StoreView />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />

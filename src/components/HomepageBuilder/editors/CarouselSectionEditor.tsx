@@ -1,5 +1,6 @@
 import React from 'react';
 import { CarouselSection } from '../../../types/homepage';
+import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
 
 interface CarouselSectionEditorProps {
@@ -11,23 +12,16 @@ interface CarouselSectionEditorProps {
 export default function CarouselSectionEditor({ section, storeId, onUpdate }: CarouselSectionEditorProps) {
   const { openMediaPicker } = useBuilderMedia();
 
-  const addImageFromLibrary = () => {
+  const addImagesFromLibrary = () => {
     openMediaPicker({
       storeId,
-      assetKey: `${section.id}-slide-${Date.now()}`,
-      title: 'Add carousel image',
-      onSelect: (url) => {
+      assetKey: `${section.id}-slides`,
+      title: 'Add carousel images',
+      multiple: true,
+      onSelectMultiple: (urls) => {
         onUpdate({
           content: {
-            images: [
-              ...section.content.images,
-              {
-                id: `img-${Date.now()}`,
-                url,
-                title: '',
-                caption: '',
-              },
-            ],
+            images: [...section.content.images, ...createCarouselImagesFromUrls(urls)],
           },
         });
       },
@@ -46,8 +40,8 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
     <>
       <div className="panel-section">
         <label className="panel-label">Images ({section.content.images.length})</label>
-        <button type="button" className="btn-secondary" style={{ width: '100%' }} onClick={addImageFromLibrary}>
-          + Add image
+        <button type="button" className="btn-secondary" style={{ width: '100%' }} onClick={addImagesFromLibrary}>
+          + Add images
         </button>
 
         <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>

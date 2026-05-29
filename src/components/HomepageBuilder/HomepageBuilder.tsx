@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { v4 as uuid } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { useHomepageBuilder } from '../../hooks/useHomepageBuilder';
@@ -7,11 +8,13 @@ import { useResponsiveBuilder } from '../../hooks/useResponsiveBuilder';
 import {
   getHomepageConfig,
   createHomepageConfig,
+  ensureHomepageConfig,
   updateHomepageLayout,
   publishHomepageConfig,
   unpublishHomepageConfig,
   restoreHomepageVersion,
 } from '../../services/homepageService';
+import { isPersistedHomepageConfigId } from '../../utils/homepageConfigId';
 import { buildStorefrontUrl } from '../../utils/storefrontDomain';
 import { homepageLayoutsEqual } from '../../utils/homepagePublish';
 import {
@@ -19,22 +22,41 @@ import {
   createDefaultWebsiteModeConfig,
   normalizeHomepageLayoutForWebsiteMode,
 } from '../../config/homepageBuilderConfig';
-import { HomepageConfig, WebsiteModeConfig } from '../../types/homepage';
+import { HomepageConfig, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
+import { getWebsiteTemplate, type WebsiteTemplateId } from '../../config/websiteTemplates';
+import { getSiteTheme, syncSiteThemeAcrossPages } from '../../utils/websiteSiteTheme';
+import { isOfflineBuilderMode } from '../../config/offlineBuilder';
+import BuilderMobileGate from './BuilderMobileGate';
 import BuilderToolbar, { ViewportSize } from './BuilderToolbar';
 import BuilderSidebar, { SidebarTab } from './BuilderSidebar';
 import GridCanvas from './GridCanvas';
 import PreviewPane from './PreviewPane';
 import { BuilderMediaProvider } from './media/BuilderMediaContext';
+import { BuilderCatalogueProvider } from './catalogue/BuilderCatalogueContext';
 import PublishHistoryModal from './PublishHistoryModal';
 import './HomepageBuilder.css';
 
 interface HomepageBuilderProps {
   storeId: string;
   storeSlug?: string;
+  sellerUserId?: string;
+  catalogues?: import('../../config/catalogueConfig').Catalogue[];
+  catalogueId?: string;
+  currencyCode?: string;
+  storeWhatsapp?: string | null;
   onClose?: () => void;
 }
 
-export default function HomepageBuilder({ storeId, storeSlug, onClose }: HomepageBuilderProps) {
+export default function HomepageBuilder({
+  storeId,
+  storeSlug,
+  sellerUserId,
+  catalogues,
+  catalogueId,
+  currencyCode,
+  storeWhatsapp,
+  onClose,
+}: HomepageBuilderProps) {
   const { showToast } = useToast();
   const { user } = useAuth();
   const { state, actions } = useHomepageBuilder();
@@ -49,10 +71,13 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
   const [showHistory, setShowHistory] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
+  const configPersisted = isPersistedHomepageConfigId(config?.id);
+
   useHomepageAutosave({
     configId: config?.id || '',
     layout: state.layout,
     isDirty: state.isDirty,
+    enabled: configPersisted,
     debounceMs: 2000,
     onSaveComplete: () => {
       actions.markSaved();
@@ -83,14 +108,13 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
           const emptyLayout = createEmptyHomepageLayout();
           try {
             existingConfig = await Promise.race([createHomepageConfig(storeId, emptyLayout), timeoutPromise as Promise<any>]);
-          } catch {
-            existingConfig = {
-              id: `temp-${Date.now()}`,
-              storeId,
-              layout: emptyLayout,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
+          } catch (createErr) {
+            const retryGet = await getHomepageConfig(storeId).catch(() => null);
+            if (retryGet) {
+              existingConfig = retryGet;
+            } else {
+              throw createErr;
+            }
           }
         }
 
@@ -122,10 +146,17 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
     };
   };
 
+  const resolvePersistedConfig = async () => {
+    const draftLayout = buildDraftLayout();
+    const persisted = await ensureHomepageConfig(storeId, config, draftLayout);
+    setConfig(persisted);
+    return persisted;
+  };
+
   const handleSave = async () => {
-    if (!config) return;
     try {
-      const updated = await updateHomepageLayout(config.id, buildDraftLayout());
+      const persisted = await resolvePersistedConfig();
+      const updated = await updateHomepageLayout(persisted.id, buildDraftLayout());
       setConfig(updated);
       actions.markSaved();
       showToast('Draft saved', 'success');
@@ -137,12 +168,12 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
   };
 
   const handlePublish = async () => {
-    if (!config) return;
     try {
       setIsPublishing(true);
+      const persisted = await resolvePersistedConfig();
       const draftLayout = buildDraftLayout();
-      await updateHomepageLayout(config.id, draftLayout);
-      const published = await publishHomepageConfig(config.id, draftLayout, {
+      await updateHomepageLayout(persisted.id, draftLayout);
+      const published = await publishHomepageConfig(persisted.id, draftLayout, {
         updatedBy: user?.uid,
       });
       setConfig(published);
@@ -167,10 +198,10 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
   };
 
   const handleRestoreVersion = async (versionId: string, target: 'draft' | 'live') => {
-    if (!config) return;
     try {
       setIsRestoring(true);
-      const updated = await restoreHomepageVersion(config.id, versionId, target === 'live' ? 'live' : 'draft');
+      const persisted = await resolvePersistedConfig();
+      const updated = await restoreHomepageVersion(persisted.id, versionId, target === 'live' ? 'live' : 'draft');
       const normalized = normalizeHomepageLayoutForWebsiteMode(updated.layout);
       setConfig({ ...updated, layout: normalized });
       actions.setLayout(normalized);
@@ -186,10 +217,10 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
   };
 
   const handleUnpublish = async () => {
-    if (!config) return;
     try {
       setIsRestoring(true);
-      const updated = await unpublishHomepageConfig(config.id);
+      const persisted = await resolvePersistedConfig();
+      const updated = await unpublishHomepageConfig(persisted.id);
       setConfig(updated);
       setShowHistory(false);
       showToast('Live site unpublished', 'success');
@@ -212,12 +243,36 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
 
   const updateWebsiteConfig = (updates: Partial<WebsiteModeConfig>) => {
     const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
-    actions.updateWebsiteConfig({
+    const nextPages = updates.pages
+      ? {
+          ...current.pages,
+          ...updates.pages,
+          ...(updates.pages.custom !== undefined ? { custom: updates.pages.custom } : {}),
+        }
+      : current.pages;
+    const merged: WebsiteModeConfig = {
       ...current,
       ...updates,
       siteSettings: { ...current.siteSettings, ...(updates.siteSettings || {}) },
       templates: { ...current.templates, ...(updates.templates || {}) },
-      pages: { ...current.pages, ...(updates.pages || {}) },
+      pages: nextPages,
+    };
+    actions.updateWebsiteConfig(syncSiteThemeAcrossPages(merged));
+  };
+
+  const handleUpdateTheme = (updates: Partial<ThemeSettings>) => {
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const nextTheme = { ...getSiteTheme(current), ...updates };
+    const snapshotted = snapshotCurrentPageIntoWebsiteConfig(
+      current,
+      { sections: state.layout.sections, theme: nextTheme },
+      editingPageId
+    );
+    const synced = syncSiteThemeAcrossPages(snapshotted);
+    actions.switchEditingPage({
+      websiteConfig: synced,
+      sections: (state.layout.sections || []) as typeof state.layout.sections,
+      theme: nextTheme,
     });
   };
 
@@ -226,15 +281,137 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
     const currentWebsiteConfig = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
     const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(currentWebsiteConfig, state.layout, editingPageId);
     const nextPageLayout = getPageLayout(withSnapshot, nextPageId);
-    actions.setLayout({
-      ...state.layout,
-      sections: nextPageLayout.sections || [],
-      theme: nextPageLayout.theme || state.layout.theme,
+    const siteTheme = getSiteTheme(withSnapshot);
+    actions.switchEditingPage({
       websiteConfig: withSnapshot,
+      sections: (nextPageLayout.sections || []) as typeof state.layout.sections,
+      theme: siteTheme,
     });
-    actions.updateWebsiteConfig(withSnapshot);
     actions.selectSection(null);
     setEditingPageId(nextPageId);
+  };
+
+  const handleAddPage = () => {
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const customPages = current.pages.custom || [];
+    const nextIndex = customPages.length + 1;
+    const pageId = uuid();
+    const title = `Page ${nextIndex}`;
+    const slug = `page-${nextIndex}`;
+    const siteTheme = getSiteTheme(current);
+    const newPage = {
+      id: pageId,
+      title,
+      slug,
+      layout: { sections: [], theme: { ...siteTheme } },
+    };
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+    const mergedConfig = syncSiteThemeAcrossPages({
+      ...withSnapshot,
+      pages: {
+        ...withSnapshot.pages,
+        custom: [...(withSnapshot.pages.custom || []), newPage],
+      },
+      siteSettings: {
+        ...withSnapshot.siteSettings,
+        navItems: [
+          ...withSnapshot.siteSettings.navItems,
+          { id: uuid(), label: title, href: `/${slug}` },
+        ],
+      },
+    });
+    actions.switchEditingPage({
+      websiteConfig: mergedConfig,
+      sections: [],
+      theme: siteTheme,
+    });
+    actions.selectSection(null);
+    setEditingPageId(pageId);
+  };
+
+  const handleRemovePage = (pageId: string) => {
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const page = (current.pages.custom || []).find((p) => p.id === pageId);
+    if (!page) return;
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+    const mergedConfig: WebsiteModeConfig = {
+      ...withSnapshot,
+      pages: {
+        ...withSnapshot.pages,
+        custom: (withSnapshot.pages.custom || []).filter((p) => p.id !== pageId),
+      },
+      siteSettings: {
+        ...withSnapshot.siteSettings,
+        navItems: withSnapshot.siteSettings.navItems.filter((item) => item.href !== `/${page.slug}`),
+      },
+    };
+    if (editingPageId === pageId) {
+      const homeLayout = mergedConfig.pages.home;
+      actions.switchEditingPage({
+        websiteConfig: mergedConfig,
+        sections: (homeLayout.sections || []) as typeof state.layout.sections,
+        theme: homeLayout.theme || state.layout.theme,
+      });
+      actions.selectSection(null);
+      setEditingPageId('home');
+    } else {
+      actions.updateWebsiteConfig(mergedConfig);
+    }
+  };
+
+  const handleApplyTemplate = (templateId: WebsiteTemplateId) => {
+    const tpl = getWebsiteTemplate(templateId);
+    if (!tpl) return;
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+    const homeHasContent = (withSnapshot.pages.home.sections || []).length > 0;
+    if (homeHasContent) {
+      const ok = window.confirm(
+        `Apply the "${tpl.name}" template to your whole site? Your home page content will be replaced. Custom pages keep their sections but use the same colors, footer, and shop styling.`
+      );
+      if (!ok) return;
+    }
+
+    const built = tpl.build();
+    const siteTheme = built.pages.home.theme;
+    const customPages = (withSnapshot.pages.custom || []).map((page) => ({
+      ...page,
+      layout: {
+        ...page.layout,
+        theme: siteTheme ? { ...siteTheme } : page.layout.theme,
+      },
+    }));
+    const customNavItems = customPages.map((page) => ({
+      id: uuid(),
+      label: page.title,
+      href: `/${page.slug}`,
+    }));
+    const mergedConfig: WebsiteModeConfig = {
+      ...built,
+      activeTemplateId: templateId,
+      siteSettings: {
+        ...built.siteSettings,
+        navItems: [...built.siteSettings.navItems, ...customNavItems],
+      },
+      pages: {
+        home: built.pages.home,
+        custom: customPages,
+      },
+    };
+
+    actions.switchEditingPage({
+      websiteConfig: mergedConfig,
+      sections: (built.pages.home.sections || []) as typeof state.layout.sections,
+      theme: built.pages.home.theme || state.layout.theme,
+    });
+    actions.selectSection(null);
+    setEditingPageId('home');
+    setSidebarTab('insert');
+    showToast(`Applied ${tpl.name} across your site`, 'success');
+  };
+
+  const handleStartBlank = () => {
+    setSidebarTab('insert');
   };
 
   const handleSelectSection = (id: string | null) => {
@@ -259,18 +436,7 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
       : state.layout.websiteConfig?.pages.custom?.find((p) => p.id === editingPageId)?.title || 'Page';
 
   if (!responsiveState.canEdit) {
-    return (
-      <div className="builder-mobile-restriction">
-        <div className="restriction-content">
-          <div className="restriction-icon">📱</div>
-          <h2>Editor not available on mobile</h2>
-          <p>Please use a desktop or tablet to edit your site.</p>
-          <button className="btn-primary" type="button" onClick={onClose}>
-            Go back
-          </button>
-        </div>
-      </div>
-    );
+    return <BuilderMobileGate onClose={onClose} />;
   }
 
   if (isLoading) {
@@ -284,7 +450,21 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
 
   return (
     <BuilderMediaProvider storeId={storeId}>
+    <BuilderCatalogueProvider
+      storeId={storeId}
+      storeSlug={storeSlug}
+      sellerUserId={sellerUserId}
+      catalogues={catalogues}
+      catalogueId={catalogueId}
+      currencyCode={currencyCode}
+      storeWhatsapp={storeWhatsapp}
+    >
     <div className="homepage-builder sites-editor">
+      {isOfflineBuilderMode() && (
+        <div className="builder-offline-banner" role="status">
+          Offline mode — website layouts save on this device. Cloud sync can be enabled later when Supabase is healthy.
+        </div>
+      )}
       <BuilderToolbar
         isDirty={state.isDirty}
         isSaving={state.isDirty && !isPublishing}
@@ -338,12 +518,17 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
                 layout={state.layout}
                 theme={state.layout.theme}
                 storeId={storeId}
+                editingPageId={editingPageId}
                 selectedSectionId={state.selectedSectionId}
                 onSelectSection={handleSelectSection}
                 onRemoveSection={actions.removeSection}
                 onDuplicateSection={actions.duplicateSection}
                 onUpdateSectionPosition={actions.updateSectionPosition}
+                onUpdateSectionLayout={actions.updateSectionLayout}
                 onUpdateSection={actions.updateSection}
+                onReorderSections={actions.reorderSections}
+                onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
+                onStartBlank={handleStartBlank}
               />
             </div>
           )}
@@ -362,13 +547,17 @@ export default function HomepageBuilder({ storeId, storeSlug, onClose }: Homepag
           onAddSection={actions.addSection}
           onAddPreset={actions.addBlockPreset}
           onUpdateSection={actions.updateSection}
-          onUpdateTheme={actions.updateTheme}
+          onUpdateTheme={handleUpdateTheme}
           onUpdateWebsiteConfig={updateWebsiteConfig}
           onSelectEditingPage={handleSelectEditingPage}
+          onAddPage={handleAddPage}
+          onRemovePage={handleRemovePage}
           onClearSectionSelection={() => actions.selectSection(null)}
+          onApplyTemplate={handleApplyTemplate}
         />
       </div>
     </div>
+    </BuilderCatalogueProvider>
     </BuilderMediaProvider>
   );
 }
@@ -383,21 +572,23 @@ function snapshotCurrentPageIntoWebsiteConfig(
   layout: { sections?: unknown[]; theme?: WebsiteModeConfig['pages']['home']['theme'] },
   editingPageId: string
 ): WebsiteModeConfig {
+  const siteTheme = layout.theme || getSiteTheme(websiteConfig);
+
   if (editingPageId === 'home') {
-    return {
+    return syncSiteThemeAcrossPages({
       ...websiteConfig,
       pages: {
         ...websiteConfig.pages,
         home: {
           ...websiteConfig.pages.home,
           sections: (layout.sections || []) as WebsiteModeConfig['pages']['home']['sections'],
-          theme: layout.theme || websiteConfig.pages.home.theme,
+          theme: siteTheme,
         },
       },
-    };
+    });
   }
 
-  return {
+  return syncSiteThemeAcrossPages({
     ...websiteConfig,
     pages: {
       ...websiteConfig.pages,
@@ -408,11 +599,11 @@ function snapshotCurrentPageIntoWebsiteConfig(
               layout: {
                 ...page.layout,
                 sections: (layout.sections || []) as typeof page.layout.sections,
-                theme: layout.theme || page.layout.theme,
+                theme: { ...siteTheme },
               },
             }
           : page
       ),
     },
-  };
+  });
 }

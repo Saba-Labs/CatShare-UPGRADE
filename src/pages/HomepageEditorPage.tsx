@@ -1,13 +1,33 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getSellerStore, type Store } from '../services/storeService';
+import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
+import { isOfflineBuilderMode } from '../config/offlineBuilder';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 
-const STORE_FETCH_TIMEOUT_MS = 14_000;
+const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
+
+/** Minimal local store so the editor can open without a Supabase round-trip. */
+function buildLocalFallbackStore(uid: string): Store {
+  return {
+    id: `local-${uid}`,
+    sellerUserId: uid,
+    storeSlug: 'preview',
+    catalogueId: '',
+    createdAt: new Date().toISOString(),
+    isLive: false,
+    storeWhatsapp: null,
+    minimumOrderValue: null,
+    viewMode: 'grid',
+    homepageEnabled: true,
+    websiteModeEnabled: true,
+  };
+}
 
 export default function HomepageEditorPage() {
   const navigate = useNavigate();
@@ -16,24 +36,53 @@ export default function HomepageEditorPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const effectiveUid = user?.uid ?? getPersistedAuthUserId() ?? null;
+
+  const catalogues = useMemo(
+    () =>
+      store && effectiveUid
+        ? ensureCataloguesForStorefront(getAllCatalogues(effectiveUid), store.catalogueId)
+        : [],
+    [effectiveUid, store]
+  );
+
   useEffect(() => {
     let cancelled = false;
 
     const loadStore = async () => {
-      if (!user?.uid) {
+      if (!effectiveUid) {
         setLoading(false);
+        return;
+      }
+
+      const cacheKey = sellerStoreCacheKey(effectiveUid);
+      const cached = safeGetFromStorage<Store | null>(cacheKey, null);
+
+      if (isOfflineBuilderMode()) {
+        setStore(cached ?? buildLocalFallbackStore(effectiveUid));
+        setLoading(false);
+        if (!cached) {
+          showToast('Website builder is offline — layouts save on this device', 'warning');
+        }
+        return;
+      }
+
+      if (cached) {
+        setStore(cached);
+        setLoading(false);
+        getSellerStore(effectiveUid)
+          .then((result) => {
+            if (!cancelled && result.success && result.data) setStore(result.data);
+          })
+          .catch(() => {/* offline: keep cached store */});
         return;
       }
 
       try {
         setLoading(true);
-        const cacheKey = sellerStoreCacheKey(user.uid);
-        const cached = safeGetFromStorage<Store | null>(cacheKey, null);
-
-        // Try to fetch with timeout
         type StoreResult = Awaited<ReturnType<typeof getSellerStore>>;
         const result = await Promise.race<StoreResult>([
-          getSellerStore(user.uid),
+          getSellerStore(effectiveUid),
           new Promise<StoreResult>((resolve) =>
             setTimeout(() => resolve({ success: false, error: 'Store fetch timed out' }), STORE_FETCH_TIMEOUT_MS)
           ),
@@ -44,31 +93,14 @@ export default function HomepageEditorPage() {
         if (result.success && result.data) {
           setStore(result.data);
         } else {
-          // Fall back to cached data if available
-          const fallback = cached ?? null;
-          if (fallback) {
-            setStore(fallback);
-            showToast('Using cached store settings', 'info');
-          } else {
-            showToast('Store not found. Please create a store first.', 'error');
-            navigate('/store');
-          }
+          setStore(buildLocalFallbackStore(effectiveUid));
+          showToast('Editing offline — changes are saved locally', 'warning');
         }
       } catch (error) {
         if (cancelled) return;
-        const msg = error instanceof Error ? error.message : 'Failed to load store';
         console.error('Error loading store:', error);
-
-        // Try fallback cache
-        const cacheKey = sellerStoreCacheKey(user?.uid || '');
-        const cached = safeGetFromStorage<Store | null>(cacheKey, null);
-        if (cached) {
-          setStore(cached);
-          showToast('Using cached store. Please check your connection.', 'warning');
-        } else {
-          showToast(msg, 'error');
-          navigate('/store');
-        }
+        setStore(buildLocalFallbackStore(effectiveUid));
+        showToast('Editing offline — changes are saved locally', 'warning');
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -81,7 +113,7 @@ export default function HomepageEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid, navigate, showToast]);
+  }, [effectiveUid, showToast]);
 
   if (loading) {
     return (
@@ -98,6 +130,25 @@ export default function HomepageEditorPage() {
           <span>Loading...</span>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (!effectiveUid) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', padding: 24 }}>
+        <div style={{ textAlign: 'center', maxWidth: 400 }}>
+          <h2 style={{ margin: '0 0 8px' }}>Sign in to edit your website</h2>
+          <p style={{ color: '#666', marginBottom: 16 }}>
+            Or open the app once while online so your account is cached on this device.
+          </p>
+          <button type="button" onClick={() => navigate('/login')} style={{ padding: '10px 20px', marginRight: 8 }}>
+            Log in
+          </button>
+          <button type="button" onClick={() => navigate('/store')}>
+            Back
+          </button>
+        </div>
       </div>
     );
   }
@@ -133,6 +184,10 @@ export default function HomepageEditorPage() {
     <HomepageBuilder
       storeId={store.id}
       storeSlug={store.storeSlug}
+      sellerUserId={store.sellerUserId || effectiveUid}
+      catalogues={catalogues}
+      catalogueId={store.catalogueId}
+      storeWhatsapp={store.storeWhatsapp}
       onClose={() => navigate('/store')}
     />
   );

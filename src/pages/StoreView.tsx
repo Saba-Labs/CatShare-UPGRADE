@@ -35,7 +35,19 @@ import { getHomepageConfig } from '../services/homepageService';
 import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
 import { HomepageLayout } from '../types/homepage';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
+import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
+import { collectionPagePath, productPagePath, resolveStoreWhatsapp } from '../utils/websiteStorefront';
+import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
 import { normalizeHomepageLayoutForWebsiteMode } from '../config/homepageBuilderConfig';
+import '../components/Storefront/storefront-checkout.css';
+import {
+  IconAlertTriangle,
+  IconImage,
+  IconSearch,
+  IconShoppingBag,
+  IconX,
+  PackHint,
+} from '../components/Storefront/StorefrontIcons';
 import './OrderForm.css';
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -120,7 +132,7 @@ const CSS = `
 .sv-search-input { width: 100%; height: 38px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-full); color: var(--c-text); font-size: 13px; font-family: var(--f-body); padding: 0 34px 0 36px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
 .sv-search-input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
 .sv-search-input::placeholder { color: var(--c-text3); }
-.sv-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--c-text3); pointer-events: none; }
+.sv-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--c-text3); pointer-events: none; display: flex; align-items: center; justify-content: center; }
 .sv-search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; border-radius: 50%; background: var(--c-surface3); border: none; cursor: pointer; font-size: 12px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; }
 .sv-cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 1px; }
 .sv-cats::-webkit-scrollbar { display: none; }
@@ -178,7 +190,7 @@ body { background: var(--c-bg); }
 .sv-qty.accent .sv-qty-btn:hover { background: rgba(0,0,0,0.12); color: white; }
 .sv-qty.accent .sv-qty-val { color: white; }
 
-.sv-pack-hint { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: #8a6a00; background: #fffbeb; border: 1px solid #f0d060; border-radius: var(--r-full); padding: 3px 8px; font-weight: 500; }
+.sv-pack-hint { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: #8a6a00; background: #fffbeb; border: 1px solid #f0d060; border-radius: var(--r-full); padding: 3px 8px; font-weight: 500; }
 
 /* ── Floating cart ── */
 .sv-cart { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; padding: 12px 14px 24px; pointer-events: none; z-index: 200; }
@@ -310,7 +322,7 @@ body { background: var(--c-bg); }
 
 /* ── Empty ── */
 .sv-empty { grid-column: 1/-1; text-align: center; padding: 48px 24px; }
-.sv-empty-icon { font-size: 38px; margin-bottom: 12px; opacity: 0.45; }
+.sv-empty-icon { display: flex; justify-content: center; margin-bottom: 12px; color: var(--c-text3); opacity: 0.45; }
 .sv-empty strong { display: block; font-family: var(--f-body); font-size: 15px; font-weight: 600; color: var(--c-text2); margin-bottom: 6px; }
 .sv-empty p { font-size: 13px; color: var(--c-text3); line-height: 1.55; }
 
@@ -324,7 +336,7 @@ body { background: var(--c-bg); }
 .sv-error-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); overflow: hidden; max-width: 380px; width: 100%; box-shadow: var(--shadow-lg); }
 .sv-error-stripe { height: 3px; background: linear-gradient(90deg,var(--c-accent),#4caf88); }
 .sv-error-body { padding: 36px 28px 28px; text-align: center; }
-.sv-error-icon { width: 60px; height: 60px; border-radius: 50%; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; font-size: 26px; }
+.sv-error-icon { width: 60px; height: 60px; border-radius: 50%; background: #fef2f2; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px; }
 .sv-error-title { font-family: var(--f-head); font-size: 20px; font-weight: 400; color: var(--c-text); letter-spacing: -0.2px; margin-bottom: 8px; }
 .sv-error-desc { font-size: 13.5px; color: var(--c-text3); line-height: 1.6; margin-bottom: 24px; }
 .sv-error-btn { width: 100%; height: 48px; border-radius: var(--r-full); background: var(--c-accent); color: white; border: none; font-size: 14px; font-weight: 600; font-family: var(--f-body); cursor: pointer; transition: opacity var(--trans); }
@@ -884,6 +896,24 @@ export default function StoreView() {
   const effectiveSlugRef = useRef(effectiveSlug);
   effectiveSlugRef.current = effectiveSlug;
 
+  const closeProductDrawer = useCallback(() => {
+    setDrawerProduct(null);
+    if (store?.websiteModeEnabled && /\/products\//i.test(location.pathname)) {
+      const slugForPath = effectiveSlug || store.storeSlug || '';
+      navigate(collectionPagePath(slugForPath, !!hostSlug));
+    }
+  }, [store?.websiteModeEnabled, store?.storeSlug, location.pathname, effectiveSlug, hostSlug, navigate]);
+
+  const openProductDrawer = useCallback((product: ProductWithCatalogueData) => {
+    setDrawerProduct(product);
+  }, []);
+
+  useEffect(() => {
+    if (store?.websiteModeEnabled && /\/products\//i.test(location.pathname) && drawerProduct) {
+      setDrawerProduct(null);
+    }
+  }, [store?.websiteModeEnabled, location.pathname, drawerProduct]);
+
   // Scroll drawer to top when product is selected
   useEffect(() => {
     if (drawerProduct && drawerRef.current) {
@@ -892,20 +922,20 @@ export default function StoreView() {
   }, [drawerProduct]);
 
   useEffect(() => {
-  if (drawerProduct) {
-    window.history.pushState({ drawerOpen: true }, '');
-  }
-}, [drawerProduct]);
-
-useEffect(() => {
-  const onPopState = () => {
     if (drawerProduct) {
-      setDrawerProduct(null);
+      window.history.pushState({ drawerOpen: true }, '');
     }
-  };
-  window.addEventListener('popstate', onPopState);
-  return () => window.removeEventListener('popstate', onPopState);
-}, [drawerProduct]);
+  }, [drawerProduct]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (drawerProduct) {
+        closeProductDrawer();
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [drawerProduct, closeProductDrawer]);
 
   // Listen for store-updated custom events from Store.tsx toggle
   useEffect(() => {
@@ -1179,11 +1209,9 @@ useEffect(() => {
 
   /** Digits for wa.me — same bar as hero chip (any digits); wa.me prefers full country code. */
   const sellerWhatsappDigits = useMemo(() => {
-    const w = store?.whatsapp?.trim();
-    if (!w) return '';
-    const d = w.replace(/\D/g, '');
-    return d.length > 0 ? d : '';
-  }, [store?.whatsapp]);
+    if (!store) return '';
+    return resolveStoreWhatsapp(store);
+  }, [store]);
 
   const changeQty = (productId: string, delta: number, qstep: number) => {
     const product = drawerProduct || allProducts.find(p => p.id === productId);
@@ -1206,11 +1234,54 @@ useEffect(() => {
     setSelectedProducts(map);
   };
 
+  const websiteOrderBridge = useMemo<WebsiteOrderBridgeValue | null>(() => {
+    if (!store?.websiteModeEnabled) return null;
+    return {
+      currencySymbol,
+      catalogue,
+      sellerFieldsDefinition,
+      getProductQty: (productId: string) => selectedProducts.get(productId) || 0,
+      changeProductQty: (productId: string, delta: number, qstep: number) => changeQty(productId, delta, qstep),
+      getVariantSelection: (productId: string) => variantSelections[productId] ?? {},
+      setVariantSelection: (productId: string, groupId: string, option: string) => {
+        setVariantSelections((prev) => ({
+          ...prev,
+          [productId]: { ...(prev[productId] ?? {}), [groupId]: option },
+        }));
+      },
+      hasVariantError: (productId: string) => variantErrorIds.has(productId),
+    };
+  }, [
+    store?.websiteModeEnabled,
+    currencySymbol,
+    catalogue,
+    sellerFieldsDefinition,
+    selectedProducts,
+    variantSelections,
+    variantErrorIds,
+  ]);
+
+  const websiteCheckoutTheme = useMemo(
+    () => buildWebsiteThemeVars(homepageLayout?.theme),
+    [homepageLayout?.theme]
+  );
+  const websiteCheckoutVariant =
+    homepageLayout?.websiteConfig?.templates?.product?.layoutVariant ?? 'minimal';
+  const websiteCheckoutClass = store?.websiteModeEnabled
+    ? `website-checkout wp-${websiteCheckoutVariant}`
+    : '';
+
   const handleBack = useCallback(() => {
-    if (drawerProduct) { setDrawerProduct(null); return; }
-    if (step !== 'products') { setStep(step === 'review' ? 'customer' : 'products'); return; }
+    if (drawerProduct) {
+      closeProductDrawer();
+      return;
+    }
+    if (step !== 'products') {
+      setStep(step === 'review' ? 'customer' : 'products');
+      return;
+    }
     window.history.back();
-  }, [drawerProduct, step]);
+  }, [drawerProduct, step, closeProductDrawer]);
 
   // Filter out 0-quantity items for final submission
   const reviewSummary = useMemo(() => {
@@ -1233,8 +1304,13 @@ useEffect(() => {
         !isVariantSelectionComplete(groups, variantSelections[item.productId])
       ) {
         alert(`Please choose all variants for "${item.name}" before placing the order.`);
-        setDrawerProduct(product);
-        setStep('products');
+        if (store.websiteModeEnabled) {
+          const slugForPath = effectiveSlug || store.storeSlug || '';
+          navigate(productPagePath(slugForPath, product, !!hostSlug));
+        } else {
+          setDrawerProduct(product);
+          setStep('products');
+        }
         return;
       }
     }
@@ -1370,7 +1446,9 @@ useEffect(() => {
           <div className="sv-error-card">
             <div className="sv-error-stripe" />
             <div className="sv-error-body">
-              <div className="sv-error-icon">⚠️</div>
+              <div className="sv-error-icon">
+                <IconAlertTriangle size={28} />
+              </div>
               <div className="sv-error-title">Store unavailable</div>
               <div className="sv-error-desc">{storeError || 'This store could not be found.'}</div>
               <button className="sv-error-btn" onClick={() => navigate('/')}>Go home</button>
@@ -1529,7 +1607,18 @@ useEffect(() => {
       <div className="sv">
         <div className="sv-page">
 
-          {store?.websiteModeEnabled ? (
+          {store?.websiteModeEnabled && websiteOrderBridge ? (
+            <WebsiteOrderBridgeProvider value={websiteOrderBridge}>
+              <WebsiteRuntime
+                slug={effectiveSlug || slug || ''}
+                pathname={location.pathname}
+                homepageLayout={homepageLayout}
+                products={storeProducts}
+                store={store}
+                onSubdomain={!!hostSlug}
+              />
+            </WebsiteOrderBridgeProvider>
+          ) : store?.websiteModeEnabled ? (
             <WebsiteRuntime
               slug={effectiveSlug || slug || ''}
               pathname={location.pathname}
@@ -1585,7 +1674,9 @@ useEffect(() => {
             </div>
             {storeProducts.length > 0 && (
               <div className="sv-search-wrap">
-                <span className="sv-search-icon">⌕</span>
+                <span className="sv-search-icon">
+                  <IconSearch size={16} />
+                </span>
                 <input className="sv-search-input" type="text" placeholder="Search items…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 {searchQuery && <button className="sv-search-clear" onClick={() => setSearchQuery('')}>×</button>}
               </div>
@@ -1607,10 +1698,10 @@ useEffect(() => {
           <div className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}>
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (
-              <div className="sv-empty"><div className="sv-empty-icon">🛍️</div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
+              <div className="sv-empty"><div className="sv-empty-icon"><IconShoppingBag size={40} /></div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
             )}
             {!productsLoading && storeProducts.length > 0 && filteredProducts.length === 0 && (
-              <div className="sv-empty"><div className="sv-empty-icon">🔍</div><strong>Nothing found</strong><p>Try a different search or category.</p></div>
+              <div className="sv-empty"><div className="sv-empty-icon"><IconSearch size={40} /></div><strong>Nothing found</strong><p>Try a different search or category.</p></div>
             )}
             {!productsLoading && filteredProducts.map((product) => {
               const quantity = selectedProducts.get(product.id) || 0;
@@ -1758,7 +1849,7 @@ useEffect(() => {
                       />
                       <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
-                    {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
+                    {qstep > 1 && <PackHint step={qstep} />}
                   </div>
                   {isSelected && (
                     <div className="sv-pcard-subtotal">
@@ -1775,11 +1866,11 @@ useEffect(() => {
             </>
           )}
 
-          {hasFooterDetails && renderStoreFooter()}
+          {!store?.websiteModeEnabled && hasFooterDetails && renderStoreFooter()}
 
           {/* ══ FLOATING CART BAR ══ */}
           {selectedProductCount > 0 && step === 'products' && (
-            <div className="sv-cart">
+            <div className={`sv-cart${websiteCheckoutClass ? ` ${websiteCheckoutClass}` : ''}`} style={websiteCheckoutClass ? websiteCheckoutTheme : undefined}>
               <div
                 className="sv-cart-inner"
                 onClick={() => {
@@ -1806,7 +1897,10 @@ useEffect(() => {
 
         {/* ══ MORPHING PANEL — steps 2 & 3 ══ */}
         {(step === 'customer' || step === 'review') && (
-          <div className="sv-panel">
+          <div
+            className={`sv-panel${websiteCheckoutClass ? ` ${websiteCheckoutClass}` : ''}`}
+            style={websiteCheckoutClass ? websiteCheckoutTheme : undefined}
+          >
             <div className="sv-panel-header">
               <button type="button" className="sv-panel-back" onClick={handleBack} aria-label="Go back">
                 <IconBack />
@@ -1833,58 +1927,57 @@ useEffect(() => {
             </div>
 
             {step === 'customer' && (
-              <div className="sv-form-body">
-                {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
-                  <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
-                    ⚠️ Name and WhatsApp should be filled to continue
-                  </div>
-                )}
-                {minimumOrderValue > 0 && !minimumOrderMet && (
-                  <div style={{ padding: '8px 12px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', marginBottom: '12px', fontSize: '12px', color: '#856404' }}>
-                    ⚠️ Minimum order is {fmt(minimumOrderValue, currencySymbol)}. Add {fmt(remainingToMinimum, currencySymbol)} more to continue.
-                  </div>
-                )}
-                <div className="sv-field">
-                  <label>Your Name *</label>
-                  <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
-                </div>
-                <div className="sv-field">
-                  <label>WhatsApp Number *</label>
-                  <div className="sv-phone-group">
-                    <div className="sv-phone-group-country">
-  <input
-    type="text"
-    value={customerWhatsappCountry}
-    onChange={(e) => {
-      const val = e.target.value.replace(/[^\d+]/g, '');
-      setCustomerWhatsappCountry(val.startsWith('+') ? val : '+' + val.replace(/\+/g, ''));
-    }}
-    placeholder="+91"
-    maxLength={5}
-    inputMode="tel"
-    style={{ textAlign: 'center' }}
-  />
-</div>
-                    <div className="sv-phone-group-number">
-                      <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Order Items with Quantity Controls */}
-                {orderSummary.items.length > 0 && (
-                  <>
-                    <div style={{ marginTop: 8, paddingBottom: 8 }}>
-                      <div style={{ fontSize: '10.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.7px', color: 'var(--c-text3)', marginBottom: 10, fontFamily: 'var(--f-body)' }}>
-                        Your Items
+              <div className="sv-checkout-content">
+                <div className="sv-form-body sv-checkout-grid">
+                  <section className="sv-checkout-section">
+                    {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
+                      <div className="sv-checkout-alert">
+                        Name and WhatsApp are required to continue.
                       </div>
-                      <div className="sv-review-list">
+                    )}
+                    {minimumOrderValue > 0 && !minimumOrderMet && (
+                      <div className="sv-checkout-alert">
+                        Minimum order is {fmt(minimumOrderValue, currencySymbol)}. Add {fmt(remainingToMinimum, currencySymbol)} more to continue.
+                      </div>
+                    )}
+                    <div className="sv-field">
+                      <label>Your Name *</label>
+                      <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Enter your full name" autoFocus />
+                    </div>
+                    <div className="sv-field">
+                      <label>WhatsApp Number *</label>
+                      <div className="sv-phone-group">
+                        <div className="sv-phone-group-country">
+                          <input
+                            type="text"
+                            value={customerWhatsappCountry}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^\d+]/g, '');
+                              setCustomerWhatsappCountry(val.startsWith('+') ? val : '+' + val.replace(/\+/g, ''));
+                            }}
+                            placeholder="+91"
+                            maxLength={5}
+                            inputMode="tel"
+                            style={{ textAlign: 'center' }}
+                          />
+                        </div>
+                        <div className="sv-phone-group-number">
+                          <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {orderSummary.items.length > 0 && (
+                    <section className="sv-checkout-section">
+                      <div className="sv-checkout-section-title">Your items</div>
+                      <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
                         {orderSummary.items.map((item: any) => {
                           const catData = store?.catalogueId ? getCatalogueData(allProducts.find(p => p.id === item.productId), store.catalogueId) : null;
                           const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
                           const cd = item.quantity > 0 ? fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep) : null;
                           return (
-                            <div key={item.productId} style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', display: 'flex', boxShadow: 'var(--shadow-sm)', flexDirection: 'column', gap: 10, padding: '12px', opacity: item.quantity === 0 ? 0.5 : 1, transition: 'opacity 0.2s ease' }}>
+                            <div key={item.productId} className={`sv-checkout-item-card${item.quantity === 0 ? ' is-muted' : ''}`}>
                               <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                                   {(() => {
@@ -1896,10 +1989,9 @@ useEffect(() => {
                                 </div>
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                                   <div>
-                                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--c-text)', marginBottom: 2 }}>{item.name}</div>
-                                    {item.subtitle && <div style={{ fontSize: '11px', color: 'var(--c-text3)' }}>{item.subtitle}</div>}
+                                    <div style={{ fontSize: '13.5px', fontWeight: 600, marginBottom: 2 }}>{item.name}</div>
+                                    {item.subtitle && <div style={{ fontSize: '11px', opacity: 0.65 }}>{item.subtitle}</div>}
                                     {item.variantSummary && <VariantPills summary={item.variantSummary} />}
-
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                     <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
@@ -1907,68 +1999,85 @@ useEffect(() => {
                                 </div>
                               </div>
                               {cd && (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: '11.5px', color: 'var(--c-text3)', paddingTop: 4, borderTop: '1px solid var(--c-border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: '11.5px', opacity: 0.7, paddingTop: 4, borderTop: '1px solid color-mix(in srgb, var(--site-text, #202124) 12%, transparent)' }}>
                                   <span>{cd}</span>
-                                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--c-accent)' }}>
-                                    {fmt(item.rowTotal, currencySymbol)}
-                                  </span>
+                                  <span className="sv-checkout-line-total">{fmt(item.rowTotal, currencySymbol)}</span>
                                 </div>
                               )}
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                    <div className="sv-order-pill">
-                      <div>
-                        <div className="sv-order-pill-label">Total</div>
-                        <div className="sv-order-pill-detail">{orderSummary.items.length} item{orderSummary.items.length === 1 ? '' : 's'}</div>
+                      <div className="sv-order-pill" style={{ marginTop: 14 }}>
+                        <div>
+                          <div className="sv-order-pill-label">Total</div>
+                          <div className="sv-order-pill-detail">{orderSummary.items.length} item{orderSummary.items.length === 1 ? '' : 's'}</div>
+                        </div>
+                        <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
                       </div>
-                      <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
-                    </div>
-                  </>
-                )}
+                    </section>
+                  )}
+                </div>
               </div>
             )}
 
             {step === 'review' && (
-              <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
-                  {reviewSummary.items.map((item: any) => {
-                    const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
-                    return (
-                      <div key={item.productId} className="sv-rcard">
-                        <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
-                          {(() => {
-                            const src = productImageDisplayUrl(item.imageUrl, item.imageVersion);
-                            return isDisplayableImageUrl(src)
-                              ? <img key={src} src={src} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
-                              : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>;
-                          })()}
+              <div className="sv-checkout-content">
+                <div className="sv-review-layout sv-checkout-grid sv-checkout-grid--review">
+                  <section className="sv-checkout-section">
+                    <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
+                      {reviewSummary.items.map((item: any) => {
+                        const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
+                        return (
+                          <div key={item.productId} className="sv-rcard">
+                            <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
+                              {(() => {
+                                const src = productImageDisplayUrl(item.imageUrl, item.imageVersion);
+                                return isDisplayableImageUrl(src)
+                                  ? <img key={src} src={src} alt={item.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }} />
+                                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconImg size={24} /></div>;
+                              })()}
+                            </div>
+                            <div className="sv-rcard-body">
+                              <div>
+                                <div className="sv-rcard-name">{item.name}</div>
+                                {item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}
+                                {item.variantSummary && <VariantPills summary={item.variantSummary} />}
+                              </div>
+                              <div className="sv-rcard-bottom">
+                                {cd && <span className="sv-rcard-calc">{cd}</span>}
+                                <span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="sv-review-customer" style={{ margin: '14px 0 0' }}>
+                      <div className="sv-review-customer-label">Ordering as</div>
+                      <div className="sv-review-customer-name">{customerName}</div>
+                      {customerWhatsappNumber && (
+                        <div className="sv-review-customer-phone">
+                          {customerWhatsappCountry} {customerWhatsappNumber}
                         </div>
-                        <div className="sv-rcard-body">
-                          <div><div className="sv-rcard-name">{item.name}</div>{item.subtitle && <div className="sv-rcard-sub">{item.subtitle}</div>}{item.variantSummary && <VariantPills summary={item.variantSummary} />}</div>
-                          <div className="sv-rcard-bottom">{cd && <span className="sv-rcard-calc">{cd}</span>}<span className="sv-rcard-total">{fmt(item.rowTotal, currencySymbol)}</span></div>
-                        </div>
+                      )}
+                    </div>
+                  </section>
+                  <section className="sv-checkout-section">
+                    <div className="sv-review-total-bar">
+                      <div>
+                        <div className="sv-review-total-label">Total amount</div>
+                        <div className="sv-review-total-val">{fmt(reviewSummary.total, currencySymbol)}</div>
                       </div>
-                    );
-                  })}
-                </div>
-                <div className="sv-review-customer">
-                  <div className="sv-review-customer-label">Ordering as</div>
-                  <div className="sv-review-customer-name">{customerName}</div>
-                  {customerWhatsappNumber && <div className="sv-review-customer-phone">{customerWhatsappCountry} {customerWhatsappNumber}</div>}
-                </div>
-                <div className="sv-review-total-bar">
-                  <div>
-                    <div className="sv-review-total-label">Total amount</div>
-                    <div className="sv-review-total-val">{fmt(reviewSummary.total, currencySymbol)}</div>
-                  </div>
-                  <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>Edit items</button>
+                      <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>
+                        Edit items
+                      </button>
+                    </div>
+                  </section>
                 </div>
               </div>
             )}
-            {hasFooterDetails && renderStoreFooter()}
+            {!store?.websiteModeEnabled && hasFooterDetails && renderStoreFooter()}
           </div>
         )}
 
@@ -1985,7 +2094,7 @@ useEffect(() => {
         )}
 
         {/* ══ PRODUCT DETAIL DRAWER ══ */}
-        {drawerProduct && sellerFieldsDefinition && (() => {
+        {drawerProduct && !store?.websiteModeEnabled && (() => {
 const cloudFields: any[] | null = (() => {
   const raw = sellerFieldsDefinition?.fields;
   if (!raw) return null;
@@ -2002,10 +2111,6 @@ const resolvedFields = cloudFields
 : getFieldsDefinition().fields ?? [];     // fallback: local defaults (seller's own device)
 
 const fieldDefinition = { fields: resolvedFields };
-// TEMP DEBUG - remove after fix
-console.log('[cloudFields]', JSON.stringify(cloudFields));
-console.log('[resolvedFields]', JSON.stringify(resolvedFields));
-console.log('[fieldDefinition]', JSON.stringify(fieldDefinition));
 
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
           const variantData = variantSelections[drawerProduct.id] ? getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]) : undefined;
@@ -2066,7 +2171,7 @@ const label = productRowLabel || cloudLabel || defaultLabel;
             ? { urls: [variantImageUrl], primaryIndex: 0, primaryImageVersion: undefined }
             : baseGallery;
           return (
-            <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) setDrawerProduct(null); }}>
+            <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) closeProductDrawer(); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
                 <div className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery' : ''}`}>
@@ -2075,7 +2180,9 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                   ) : (
                     <StoreProductImageArea product={drawerProduct} variant="drawer" />
                   )}
-                  <button className="sv-drawer-close" onClick={() => setDrawerProduct(null)}>✕</button>
+                  <button type="button" className="sv-drawer-close" onClick={closeProductDrawer} aria-label="Close">
+                    <IconX size={14} />
+                  </button>
                 </div>
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
@@ -2127,14 +2234,14 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                     <div className="sv-drawer-qty-row">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
-                        {qstep > 1 && <div className="sv-pack-hint">📦 Pack of {qstep}</div>}
+                        {qstep > 1 && <PackHint step={qstep} />}
                       </div>
                       <div className="sv-drawer-total-wrap">
                         {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}
                         <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
                       </div>
                     </div>
-                    <button className="sv-drawer-done" onClick={() => setDrawerProduct(null)}>Done</button>
+                    <button className="sv-drawer-done" onClick={closeProductDrawer}>Done</button>
                   </div>
                 </div>
               </div>

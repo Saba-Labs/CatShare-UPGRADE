@@ -1,9 +1,13 @@
 import React from 'react';
 import { HomepageSection, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
 import { v4 as uuid } from 'uuid';
+import { getSiteTheme } from '../../utils/websiteSiteTheme';
 import TextSectionEditor from './editors/TextSectionEditor';
 import CarouselSectionEditor from './editors/CarouselSectionEditor';
 import GenericSectionEditor from './editors/GenericSectionEditor';
+import TestimonialsSectionEditor from './editors/TestimonialsSectionEditor';
+import StoreLinkPicker from './StoreLinkPicker';
+import FooterSettingsEditor from './FooterSettingsEditor';
 
 interface PropertiesPanelProps {
   selectedSectionId: string | null;
@@ -51,7 +55,7 @@ export default function PropertiesPanel({
             slug,
             layout: {
               sections: [],
-              theme: { ...websiteConfig.pages.home.theme },
+              theme: { ...getSiteTheme(websiteConfig) },
             },
           },
         ],
@@ -151,11 +155,10 @@ export default function PropertiesPanel({
                     onChange={(e) => updateNavItem(websiteConfig, item.id, { label: e.target.value }, onUpdateWebsiteConfig)}
                     placeholder="Menu label"
                   />
-                  <input
-                    className="panel-input"
+                  <StoreLinkPicker
                     value={item.href}
-                    onChange={(e) => updateNavItem(websiteConfig, item.id, { href: sanitizeHref(e.target.value) }, onUpdateWebsiteConfig)}
-                    placeholder="/path or https://example.com"
+                    websiteConfig={websiteConfig}
+                    onChange={(href) => updateNavItem(websiteConfig, item.id, { href: sanitizeHref(href) }, onUpdateWebsiteConfig)}
                   />
                   <button
                     type="button"
@@ -192,12 +195,13 @@ export default function PropertiesPanel({
   if (activeTab === 'footer') {
     return (
       <div className="properties-panel">
-        <div className="panel-header">Footer Settings</div>
-        <div className="panel-content">
-          <div className="panel-section">
-            <label className="panel-label">Footer Background</label>
-            <input type="color" className="panel-input" value={websiteConfig.siteSettings.footerBg || '#0f172a'} onChange={(e) => onUpdateWebsiteConfig({ siteSettings: { ...websiteConfig.siteSettings, footerBg: e.target.value } as any })} />
-          </div>
+        <div className="panel-header">Footer</div>
+        <div className="panel-content sidebar-panel-sections">
+          <FooterSettingsEditor
+            siteSettings={websiteConfig.siteSettings}
+            websiteConfig={websiteConfig}
+            onUpdateWebsiteConfig={onUpdateWebsiteConfig}
+          />
         </div>
       </div>
     );
@@ -299,11 +303,19 @@ export default function PropertiesPanel({
           />
         )}
 
+        {selectedSection.type === 'testimonials' && (
+          <TestimonialsSectionEditor
+            section={selectedSection as any}
+            onUpdate={(updates) => onUpdateSection(selectedSectionId, updates)}
+          />
+        )}
+
         {/* Generic editor for other section types */}
-        {!['text', 'carousel'].includes(selectedSection.type) && (
+        {!['text', 'carousel', 'testimonials'].includes(selectedSection.type) && (
           <GenericSectionEditor
             section={selectedSection}
             storeId={storeId}
+            websiteConfig={websiteConfig}
             onUpdate={(updates) => onUpdateSection(selectedSectionId, updates)}
           />
         )}

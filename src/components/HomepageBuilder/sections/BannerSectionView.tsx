@@ -1,20 +1,42 @@
-import React from 'react';
-import { BannerSection, ThemeSettings } from '../../../types/homepage';
+import type { BannerSection, ThemeSettings } from '../../../types/homepage';
 import { getThemeButtonStyles } from '../../../utils/themeButtonStyles';
+import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
+import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 
 interface BannerSectionViewProps {
   section: BannerSection & { id: string };
   theme?: ThemeSettings;
+  storeId?: string;
   editMode?: boolean;
   onUpdateSection?: (updates: Partial<BannerSection>) => void;
 }
 
-export default function BannerSectionView({ section, theme, editMode, onUpdateSection }: BannerSectionViewProps) {
+export default function BannerSectionView({
+  section,
+  theme,
+  storeId,
+  editMode,
+  onUpdateSection,
+}: BannerSectionViewProps) {
   const { settings, content } = section;
   const heightMap = { small: '150px', medium: '250px', large: '400px' };
+  const media = useBuilderMediaOptional();
 
   const updateContent = (patch: Partial<BannerSection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
+  };
+
+  const openBackgroundPicker = () => {
+    if (!media || !storeId || !onUpdateSection) return;
+    media.openMediaPicker({
+      storeId,
+      assetKey: `${section.id}-banner-bg`,
+      title: 'Choose background image',
+      onSelect: (url) =>
+        onUpdateSection({
+          settings: { ...settings, backgroundImage: url },
+        }),
+    });
   };
 
   return (
@@ -33,6 +55,18 @@ export default function BannerSectionView({ section, theme, editMode, onUpdateSe
       }}
     >
       <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${settings.overlayOpacity})` }} />
+      {editMode && media && storeId && onUpdateSection ? (
+        <button
+          type="button"
+          className="section-image-edit-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            openBackgroundPicker();
+          }}
+        >
+          {settings.backgroundImage ? 'Change background' : '+ Add background image'}
+        </button>
+      ) : null}
       <div
         style={{
           position: 'relative',
@@ -74,19 +108,20 @@ export default function BannerSectionView({ section, theme, editMode, onUpdateSe
           <>
             <h2 style={{ margin: '0 0 8px 0', fontSize: '1.875rem', fontWeight: 600 }}>{content.title}</h2>
             {content.subtitle && <p style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{content.subtitle}</p>}
-            {content.buttonText && (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '8px 16px',
-                  borderRadius: '4px',
-                  fontWeight: 500,
-                  ...getThemeButtonStyles(theme || {}, '#fff'),
-                }}
-              >
-                {content.buttonText}
-              </span>
-            )}
+            {content.buttonText &&
+              (content.buttonLink ? (
+                <StorefrontLink
+                  href={content.buttonLink}
+                  className="sites-banner-cta"
+                  style={getThemeButtonStyles(theme || {})}
+                >
+                  {content.buttonText}
+                </StorefrontLink>
+              ) : (
+                <span className="sites-banner-cta" style={getThemeButtonStyles(theme || {})}>
+                  {content.buttonText}
+                </span>
+              ))}
           </>
         )}
       </div>

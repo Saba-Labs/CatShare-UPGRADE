@@ -9,8 +9,7 @@ import {
   updateStoreCatalogue,
   updateStoreViewMode,
   updateStoreLiveStatus,
-  updateStoreHomepageStatus,
-  updateStoreWebsiteModeStatus,
+  updateStoreWebsiteStatus,
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
   normalizeStoreWhatsappInput,
@@ -1042,10 +1041,8 @@ export default function StorePage() {
   const [editingField, setEditingField] = useState<'slug' | 'catalogue' | 'view' | 'whatsapp' | 'minimumOrder' | null>(null);
   const [isLive, setIsLive] = useState(true);
   const [liveTogglePending, setLiveTogglePending] = useState(false);
-  const [homepageEnabled, setHomepageEnabled] = useState(true);
   const [websiteModeEnabled, setWebsiteModeEnabled] = useState(false);
-  const [homepageTogglePending, setHomepageTogglePending] = useState(false);
-  const [websiteModeTogglePending, setWebsiteModeTogglePending] = useState(false);
+  const [websiteTogglePending, setWebsiteTogglePending] = useState(false);
 
   const [formSlug, setFormSlug] = useState('');
   const [formCatalogue, setFormCatalogue] = useState('');
@@ -1076,7 +1073,6 @@ export default function StorePage() {
     setFormViewMode(nextStore.viewMode === 'list' ? 'list' : 'grid');
     setShowCreateForm(false);
     setIsLive(nextStore.isLive);
-    setHomepageEnabled(nextStore.homepageEnabled);
     setWebsiteModeEnabled(nextStore.websiteModeEnabled);
   };
 
@@ -1223,7 +1219,6 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setIsLive(result.data.isLive);
-      setHomepageEnabled(result.data.homepageEnabled);
       setWebsiteModeEnabled(result.data.websiteModeEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
@@ -1360,7 +1355,6 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setIsLive(result.data.isLive);
-      setHomepageEnabled(result.data.homepageEnabled);
       setWebsiteModeEnabled(result.data.websiteModeEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
@@ -1371,45 +1365,33 @@ export default function StorePage() {
     }
   };
 
-  const handleWebsiteModeToggle = async () => {
-    if (!user?.uid || websiteModeTogglePending) return;
+  const handleWebsiteToggle = async () => {
+    if (!user?.uid || websiteTogglePending) return;
     if (!guardCloudWrite()) return;
     const prev = websiteModeEnabled;
     const next = !prev;
     setWebsiteModeEnabled(next);
-    setWebsiteModeTogglePending(true);
-    const result = await updateStoreWebsiteModeStatus(user.uid, next);
-    setWebsiteModeTogglePending(false);
+    setWebsiteTogglePending(true);
+    const result = await updateStoreWebsiteStatus(user.uid, next);
+    setWebsiteTogglePending(false);
     if (result.success && result.data) {
       setStore(result.data);
       setWebsiteModeEnabled(result.data.websiteModeEnabled);
-      showToast(next ? 'Website mode enabled' : 'Website mode disabled', next ? 'success' : 'info');
-    } else {
-      setWebsiteModeEnabled(prev);
-      showToast(result.error || 'Could not update website mode', 'error');
-    }
-  };
-
-  const handleHomepageToggle = async () => {
-    if (!user?.uid || homepageTogglePending) return;
-    if (!guardCloudWrite()) return;
-    const prev = homepageEnabled;
-    const next = !prev;
-    setHomepageEnabled(next);
-    setHomepageTogglePending(true);
-    const result = await updateStoreHomepageStatus(user.uid, next);
-    setHomepageTogglePending(false);
-    if (result.success && result.data) {
-      setStore(result.data);
-      setHomepageEnabled(result.data.homepageEnabled);
-      // Broadcast to other tabs/iframes that store data changed
-      const updateSignal = { storeId: result.data.id, homepageEnabled: result.data.homepageEnabled, timestamp: Date.now() };
+      const updateSignal = {
+        storeId: result.data.id,
+        homepageEnabled: result.data.homepageEnabled,
+        websiteModeEnabled: result.data.websiteModeEnabled,
+        timestamp: Date.now(),
+      };
       localStorage.setItem('store-update-signal', JSON.stringify(updateSignal));
       window.dispatchEvent(new CustomEvent('store-updated', { detail: updateSignal }));
-      showToast(next ? 'Homepage is now visible' : 'Homepage is hidden', next ? 'success' : 'info');
+      showToast(
+        next ? 'Custom website is live for customers' : 'Classic storefront only (no custom website)',
+        next ? 'success' : 'info'
+      );
     } else {
-      setHomepageEnabled(prev);
-      showToast(result.error || 'Could not update homepage status', 'error');
+      setWebsiteModeEnabled(prev);
+      showToast(result.error || 'Could not update website settings', 'error');
     }
   };
 
@@ -1644,41 +1626,24 @@ export default function StorePage() {
                 </label>
               </div>
 
-              {/* Homepage toggle */}
-              <div className={`toggle-card gap ${homepageEnabled ? 'on' : ''}`}>
-                <div className="toggle-label-group">
-                  <div className="toggle-title">{homepageEnabled ? 'Homepage is visible' : 'Homepage is hidden'}</div>
-                  <div className="toggle-sub">
-                    {homepageEnabled ? 'Customers can see your homepage' : 'Homepage not visible to customers'}
-                  </div>
-                </div>
-                <label className={`switch${homepageTogglePending ? ' pending' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={homepageEnabled}
-                    disabled={homepageTogglePending}
-                    onChange={() => void handleHomepageToggle()}
-                  />
-                  <span className="slider" />
-                </label>
-              </div>
-
-              {/* Website mode toggle */}
+              {/* Custom website (homepage + full storefront) */}
               <div className={`toggle-card gap ${websiteModeEnabled ? 'on' : ''}`}>
                 <div className="toggle-label-group">
-                  <div className="toggle-title">{websiteModeEnabled ? 'Website mode enabled' : 'Website mode disabled'}</div>
+                  <div className="toggle-title">
+                    {websiteModeEnabled ? 'Custom website is on' : 'Custom website is off'}
+                  </div>
                   <div className="toggle-sub">
                     {websiteModeEnabled
-                      ? 'Uses full website header/footer and page templates'
-                      : 'Uses legacy storefront rendering'}
+                      ? 'Customers see your designed homepage, menu, and themed shop pages'
+                      : 'Customers see the classic product catalogue only'}
                   </div>
                 </div>
-                <label className={`switch${websiteModeTogglePending ? ' pending' : ''}`}>
+                <label className={`switch${websiteTogglePending ? ' pending' : ''}`}>
                   <input
                     type="checkbox"
                     checked={websiteModeEnabled}
-                    disabled={websiteModeTogglePending}
-                    onChange={() => void handleWebsiteModeToggle()}
+                    disabled={websiteTogglePending}
+                    onChange={() => void handleWebsiteToggle()}
                   />
                   <span className="slider" />
                 </label>

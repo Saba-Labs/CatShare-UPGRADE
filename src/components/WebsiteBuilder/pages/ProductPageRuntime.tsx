@@ -1,26 +1,43 @@
+import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
-import ProductVariantsDisplay from '../../ProductVariantsDisplay';
-import { getProductVariantGroups } from '../../../utils/productVariants';
-import {
-  buildWhatsAppProductLink,
-  formatStorePrice,
-  getWebsiteProductImageUrl,
-  getWebsiteProductPrice,
-} from '../../../utils/websiteStorefront';
+import type { WebsiteProductTemplate } from '../../../types/homepage';
+import { getProductVariantGroups, isVariantSelectionComplete } from '../../../utils/productVariants';
+import { getCatalogueData, normalizeOrderQuantityStep } from '../../../config/catalogueProductUtils';
+import StoreProductOrderPanel from '../../Storefront/StoreProductOrderPanel';
+import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import { useWebsiteStore } from '../WebsiteStoreContext';
 import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
+import '../../Storefront/store-product-order-page.css';
 
 interface ProductPageRuntimeProps {
   product: ProductWithCatalogueData | null;
+  template?: WebsiteProductTemplate;
 }
 
-export default function ProductPageRuntime({ product }: ProductPageRuntimeProps) {
-  const { basePath, store, collectionPath } = useWebsiteStore();
-  const siteName = store.sellerBusinessName || store.storeSlug;
+export default function ProductPageRuntime({ product, template }: ProductPageRuntimeProps) {
+  const { basePath, collectionPath, store } = useWebsiteStore();
+  const orderBridge = useWebsiteOrderBridge();
+  const navigate = useNavigate();
+
+  const layoutVariant = template?.layoutVariant || 'minimal';
+
+  const variantGroups = useMemo(() => (product ? getProductVariantGroups(product) : []), [product]);
+
+  useEffect(() => {
+    if (!product || !orderBridge || variantGroups.length === 0) return;
+    const existing = orderBridge.getVariantSelection(product.id);
+    if (Object.keys(existing).length > 0) return;
+    for (const group of variantGroups) {
+      if (group.options[0]) {
+        orderBridge.setVariantSelection(product.id, group.id, group.options[0]);
+      }
+    }
+  }, [product, orderBridge, variantGroups]);
 
   if (!product) {
     return (
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: 16 }}>
+      <main className="website-product-runtime">
         <WebsiteBreadcrumbs
           items={[
             { label: 'Home', to: basePath || '/' },
@@ -33,13 +50,32 @@ export default function ProductPageRuntime({ product }: ProductPageRuntimeProps)
     );
   }
 
-  const variantGroups = getProductVariantGroups(product);
-  const img = getWebsiteProductImageUrl(product);
-  const price = getWebsiteProductPrice(product, store.catalogueId);
-  const whatsapp = store.whatsapp?.trim();
+  if (!orderBridge) {
+    return (
+      <main className="website-product-runtime">
+        <p>Unable to load ordering. Please refresh the page.</p>
+      </main>
+    );
+  }
+
+  const quantity = orderBridge.getProductQty(product.id);
+  const variantSelection = orderBridge.getVariantSelection(product.id);
+  const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+  const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+
+  const handleDone = () => {
+    const groups = getProductVariantGroups(product);
+    if (groups.length > 0 && !isVariantSelectionComplete(groups, variantSelection)) {
+      return;
+    }
+    if (quantity <= 0) {
+      orderBridge.changeProductQty(product.id, qstep, qstep);
+    }
+    navigate(collectionPath);
+  };
 
   return (
-    <main>
+    <main className={`website-product-runtime wp-${layoutVariant}`}>
       <WebsiteBreadcrumbs
         items={[
           { label: 'Home', to: basePath || '/' },
@@ -47,32 +83,21 @@ export default function ProductPageRuntime({ product }: ProductPageRuntimeProps)
           { label: product.name },
         ]}
       />
-      <div className="website-product-page">
-        <div className="website-product-gallery">
-          {img ? <img src={img} alt={product.name} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>📦</div>}
-        </div>
-        <div className="website-product-info">
-          <h1>{product.name}</h1>
-          {product.subtitle ? <p style={{ marginBottom: 10, opacity: 0.75 }}>{product.subtitle}</p> : null}
-          {price != null && (
-            <p style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1a73e8', margin: '12px 0' }}>
-              {formatStorePrice(price, store.sellerCurrencyCode)}
-            </p>
-          )}
-          {variantGroups.length > 0 ? <ProductVariantsDisplay groups={variantGroups} mode="readonly" /> : null}
-          {product.description ? <p style={{ marginTop: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{product.description}</p> : null}
-          {whatsapp && (
-            <a
-              className="website-product-cta"
-              href={buildWhatsAppProductLink(whatsapp, product.name, siteName)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Order on WhatsApp
-            </a>
-          )}
-        </div>
-      </div>
+      <StoreProductOrderPanel
+        product={product}
+        store={store}
+        currencySymbol={orderBridge.currencySymbol}
+        catalogue={orderBridge.catalogue}
+        sellerFieldsDefinition={orderBridge.sellerFieldsDefinition}
+        quantity={quantity}
+        variantSelection={variantSelection}
+        variantError={orderBridge.hasVariantError(product.id)}
+        onVariantSelect={(groupId, option) => orderBridge.setVariantSelection(product.id, groupId, option)}
+        onQtyChange={(delta) => orderBridge.changeProductQty(product.id, delta, qstep)}
+        onDone={handleDone}
+        layout="page"
+        layoutVariant={layoutVariant}
+      />
     </main>
   );
 }

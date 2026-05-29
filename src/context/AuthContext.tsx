@@ -21,6 +21,12 @@ import {
   tryGetSupabaseUserIdFromAuthToken,
   tryDiscoverCatalogueOwnerUserIdFromStorage,
 } from '../utils/authUserId';
+import {
+  AUTH_INIT_MAX_MS,
+  isOfflineBuilderMode,
+  SUPABASE_PROFILE_FETCH_TIMEOUT_MS,
+} from '../config/offlineBuilder';
+import { getSessionWithTimeout } from '../utils/supabaseSession';
 
 /** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
@@ -147,6 +153,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshSupabaseData = useCallback(async (opts?: { skipLoadingIndicator?: boolean }): Promise<SupabaseUserData | null> => {
     if (authService.isOfflineGuest()) return null;
+    if (isOfflineBuilderMode()) return null;
 
     const skipIndicator = opts?.skipLoadingIndicator === true;
     if (!skipIndicator) {
@@ -158,14 +165,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await getSessionWithTimeout();
       const uid = session?.user?.id;
       if (!uid) return null;
 
-      const result = await fetchAllUserData(uid);
+      const result = await Promise.race([
+        fetchAllUserData(uid),
+        new Promise<{ success: false; error: string }>((resolve) =>
+          setTimeout(
+            () => resolve({ success: false, error: 'Profile fetch timed out' }),
+            SUPABASE_PROFILE_FETCH_TIMEOUT_MS
+          )
+        ),
+      ]);
       const {
         data: { session: latest },
-      } = await supabase.auth.getSession();
+      } = await getSessionWithTimeout();
       if (!latest?.user || latest.user.id !== uid) return null;
 
       if (result.success && result.data) {
@@ -237,12 +252,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         activeProfileLoadsRef.current += 1;
         if (activeProfileLoadsRef.current === 1) setSupabaseDataLoading(true);
         try {
-          if (!isBrowserOnline()) {
+          if (!isBrowserOnline() || isOfflineBuilderMode()) {
+            if (!cancelled) {
+              setSupabaseData((prev) => prev ?? defaultSupabaseData);
+            }
             return;
           }
-          const result = await fetchAllUserData(uid);
+          const result = await Promise.race([
+            fetchAllUserData(uid),
+            new Promise<{ success: false; error: string }>((resolve) =>
+              setTimeout(
+                () => resolve({ success: false, error: 'Profile fetch timed out' }),
+                SUPABASE_PROFILE_FETCH_TIMEOUT_MS
+              )
+            ),
+          ]);
           if (cancelled) return;
-          const { data: { session: latest } } = await supabase.auth.getSession();
+          const { data: { session: latest } } = await getSessionWithTimeout();
           if (!latest?.user || latest.user.id !== uid) return;
 
           if (result.success && result.data) {
@@ -262,7 +288,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (!cancelled) {
             console.warn('⚠️ Error fetching Supabase data:', err instanceof Error ? err.message : String(err));
             try {
-              const { data: { session: latest } } = await supabase.auth.getSession();
+              const { data: { session: latest } } = await getSessionWithTimeout();
               if (latest?.user?.id === uid) {
                 setSupabaseData(defaultSupabaseData);
               }
@@ -386,21 +412,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const initSession = async () => {
+      const initDeadline = window.setTimeout(() => {
+        if (cancelled) return;
+        if (applyOfflineCachedIdentity()) {
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
+      }, AUTH_INIT_MAX_MS);
+
       // Fast path: no network — one session read, then cached identity. Avoids multi-retry delay
       // and keeps ProtectedRoute from showing the auth splash longer than necessary on reload.
       if (!isBrowserOnline()) {
         try {
-          // Android / airplane mode: getSession can hang; fall through to cached uid before logout.
-          const fastSession: any = await Promise.race([
-            supabase.auth.getSession(),
-            new Promise<{ data: { session: null } }>((resolve) =>
-              setTimeout(() => resolve({ data: { session: null } }), 5000)
-            ),
-          ]);
+          const fastSession = await getSessionWithTimeout();
           const session = fastSession?.data?.session ?? null;
           if (!cancelled && session?.user) {
             applySignedInSession(session.user);
             setLoading(false);
+            clearTimeout(initDeadline);
             void loadUserData(session.user.id);
             return;
           }
@@ -410,10 +440,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (cancelled) return;
         if (applyOfflineCachedIdentity()) {
           setLoading(false);
+          clearTimeout(initDeadline);
           return;
         }
         clearSignedOutState();
         setLoading(false);
+        clearTimeout(initDeadline);
         return;
       }
 
@@ -425,11 +457,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           const {
             data: { session },
-          } = await supabase.auth.getSession();
+          } = await getSessionWithTimeout();
           if (cancelled) return;
           if (session?.user) {
             applySignedInSession(session.user);
             setLoading(false);
+            clearTimeout(initDeadline);
             void loadUserData(session.user.id);
             return;
           }
@@ -439,22 +472,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (cancelled) return;
-      const recovered = await recoverSupabaseSession();
+      const recovered = await Promise.race([
+        recoverSupabaseSession(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), SUPABASE_PROFILE_FETCH_TIMEOUT_MS)),
+      ]);
       if (cancelled) return;
       if (recovered?.user) {
         applySignedInSession(recovered.user);
         setLoading(false);
+        clearTimeout(initDeadline);
         void loadUserData(recovered.user.id);
         return;
       }
 
       if (applyOfflineCachedIdentity()) {
         setLoading(false);
+        clearTimeout(initDeadline);
         return;
       }
 
       clearSignedOutState();
       setLoading(false);
+      clearTimeout(initDeadline);
     };
 
     void initSession();

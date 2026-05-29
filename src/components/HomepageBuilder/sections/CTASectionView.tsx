@@ -1,6 +1,7 @@
 import React from 'react';
 import { CTASection, ThemeSettings } from '../../../types/homepage';
 import { getThemeButtonStyles } from '../../../utils/themeButtonStyles';
+import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 
 interface CTASectionViewProps {
   section: CTASection & { id: string };
@@ -64,18 +65,36 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
           {content.description && (
             <p style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#5f6368' }}>{content.description}</p>
           )}
-          <span
-            style={{
-              display: 'inline-block',
-              padding: '10px 24px',
-              borderRadius: '4px',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              ...getThemeButtonStyles(theme || {}, settings.buttonColor),
-            }}
-          >
-            {content.buttonText}
-          </span>
+          {content.buttonText &&
+            (content.buttonLink ? (
+              <StorefrontLink
+                href={content.buttonLink}
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 24px',
+                  borderRadius: '4px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  textDecoration: 'none',
+                  ...getThemeButtonStyles(theme || {}, settings.buttonColor),
+                }}
+              >
+                {content.buttonText}
+              </StorefrontLink>
+            ) : (
+              <span
+                style={{
+                  display: 'inline-block',
+                  padding: '10px 24px',
+                  borderRadius: '4px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  ...getThemeButtonStyles(theme || {}, settings.buttonColor),
+                }}
+              >
+                {content.buttonText}
+              </span>
+            ))}
         </>
       )}
     </div>

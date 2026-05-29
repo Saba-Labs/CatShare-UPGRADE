@@ -105,17 +105,45 @@ export interface FeaturedProductsSection {
   };
 }
 
+export interface CustomCategoryItem {
+  id: string;
+  label: string;
+  imageUrl?: string;
+  link?: string;
+}
+
 export interface CategoryShowcaseSection {
   type: 'category-showcase';
   settings: {
     title: string;
-    columns: 2 | 3 | 4;
-    layout: 'grid' | 'list';
+    columns: 2 | 3 | 4 | 5 | 6;
+    /** How category tiles are arranged. */
+    layout: 'grid' | 'list' | 'carousel';
     backgroundColor?: string;
     showCount: boolean;
+    /** Card surface treatment. */
+    cardStyle?: 'minimal' | 'card' | 'bordered' | 'overlay';
+    /** Outer shape of each tile. */
+    cardShape?: 'rounded' | 'sharp' | 'pill' | 'circle';
+    /** Overall tile scale (image area height). */
+    cardSize?: 'sm' | 'md' | 'lg' | 'xl';
+    /** Image frame proportions (ignored for circle tiles in grid). */
+    imageRatio?: '1:1' | '4:3' | '3:4' | '16:9' | '2:3';
+    imageFit?: 'cover' | 'contain';
+    gap?: 'sm' | 'md' | 'lg';
+    titleAlign?: 'left' | 'center' | 'right';
+    /** Where the category name appears. */
+    labelStyle?: 'below' | 'overlay';
+    hoverEffect?: 'none' | 'lift' | 'zoom' | 'border';
+    cardBackground?: string;
+    labelColor?: string;
   };
   content: {
     categoryIds: string[];
+    /** Per-category image overrides, keyed by derived category id. */
+    categoryImages?: Record<string, string>;
+    /** Manually added category tiles that aren't derived from products. */
+    customCategories?: CustomCategoryItem[];
   };
 }
 
@@ -187,6 +215,8 @@ export interface Testimonial {
   author: string;
   role?: string;
   image?: string;
+  /** 1–5 stars; defaults to 5 when showRating is enabled */
+  rating?: number;
 }
 
 export interface TestimonialsSection {
@@ -369,8 +399,27 @@ export interface GridPosition {
   height: number;
 }
 
+/** Horizontal placement of a block within its full-width row. */
+export type BlockAlign = 'left' | 'center' | 'right';
+
+/** Per-block layout used by the document-stack editor (resizable width/height). */
+export interface BlockLayout {
+  /** Block width as a percentage of the content area (20–100). */
+  widthPercent?: number;
+  /** Optional fixed block height in pixels. Unset = natural content height. */
+  heightPx?: number;
+  align?: BlockAlign;
+}
+
 export interface HomepageLayout {
-  sections: Array<HomepageSection & { id: string; order: number; gridPosition?: GridPosition }>;
+  sections: Array<
+    HomepageSection & {
+      id: string;
+      order: number;
+      gridPosition?: GridPosition;
+      blockLayout?: BlockLayout;
+    }
+  >;
   theme: ThemeSettings;
   gridColumns?: number;
   gridGap?: number;
@@ -403,6 +452,9 @@ export interface WebsiteSeoSettings {
   googleSiteVerification?: string;
 }
 
+/** Visual style of the global storefront footer. */
+export type WebsiteFooterVariant = 'classic' | 'aurora' | 'pulse' | 'clean';
+
 export interface WebsiteSiteSettings {
   websiteName: string;
   logoUrl?: string;
@@ -413,9 +465,32 @@ export interface WebsiteSiteSettings {
   navItems: WebsiteNavItem[];
   headerBg?: string;
   headerTextColor?: string;
+  /** Footer layout/skin — set by templates, editable in Site settings. */
+  footerVariant?: WebsiteFooterVariant;
   footerBg?: string;
   footerTextColor?: string;
+  footerColBg?: string;
+  footerAccentColor?: string;
+  footerAccentBg?: string;
+  footerBorderColor?: string;
+  /** Short tagline under the store name in the global footer. */
+  footerDescription?: string;
+  /** Bottom line; defaults to “Powered by CatShare storefront”. Use {year} for the current year. */
+  footerCopyright?: string;
+  footerShowOpenBadge?: boolean;
+  footerOpenBadgeLabel?: string;
+  /** Override business profile / store address in footer. */
+  footerLocationText?: string;
+  footerPhoneText?: string;
+  footerEmailText?: string;
+  footerShowLocation?: boolean;
+  footerShowContact?: boolean;
+  footerShowStoreInfo?: boolean;
+  footerShowFollow?: boolean;
+  /** Optional quick links row (Aurora / Classic). */
   footerColumns?: Array<{ title: string; links: WebsiteNavItem[] }>;
+  /** @deprecated */
+  footerLayout?: 'columns' | 'minimal' | 'centered';
 }
 
 export interface WebsiteCollectionTemplate {
@@ -426,15 +501,28 @@ export interface WebsiteCollectionTemplate {
 }
 
 export interface WebsiteProductTemplate {
+  /** Overall structure of the storefront product/order page. */
+  layoutVariant?: 'editorial' | 'tech' | 'minimal';
   galleryLayout: 'left-thumbs' | 'stacked';
   showRecommendations: boolean;
   showTrustBadges: boolean;
   ctaStyle: 'solid' | 'outline';
+  /** Show a quantity selector in the ordering UI (defaults to true). */
+  showQuantitySelector?: boolean;
+  /** Pin a buy bar to the bottom of the screen on mobile. */
+  stickyBuyBar?: boolean;
+  /** Custom label for the order action button. */
+  orderCtaLabel?: string;
 }
+
+/** Selected storefront template — applies site-wide (home, shop, checkout, custom pages). */
+export type WebsiteActiveTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market';
 
 export interface WebsiteModeConfig {
   siteSettings: WebsiteSiteSettings;
   seo?: WebsiteSeoSettings;
+  /** Last applied website template (colors, footer, collection/product layouts). */
+  activeTemplateId?: WebsiteActiveTemplateId;
   pages: {
     home: HomepageLayout;
     custom?: WebsiteCustomPage[];
@@ -491,6 +579,8 @@ export interface BuilderAction {
     | 'MARK_SAVED'
     | 'UPDATE_SECTION_POSITION'
     | 'UPDATE_WEBSITE_CONFIG'
+    | 'UPDATE_SECTION_LAYOUT'
+    | 'SWITCH_EDITING_PAGE'
     | 'ADD_PRESET_SECTIONS'
     | 'UNDO'
     | 'REDO';

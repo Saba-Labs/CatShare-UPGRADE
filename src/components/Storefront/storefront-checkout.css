@@ -1,0 +1,225 @@
+/* Website-mode checkout (Your details + Review) — matches template theme */
+
+.website-checkout.sv-panel {
+  background: var(--site-bg, #fff);
+  color: var(--site-text, #202124);
+  font-family: var(--site-font, 'DM Sans', system-ui, sans-serif);
+}
+
+.website-checkout .sv-panel-header {
+  background: color-mix(in srgb, var(--site-bg, #fff) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+}
+
+.website-checkout .sv-panel-title {
+  font-family: var(--site-font-head, var(--site-font, inherit));
+  color: var(--site-text, #202124);
+}
+
+.website-checkout .sv-panel-subtitle {
+  color: color-mix(in srgb, var(--site-text, #202124) 55%, transparent);
+}
+
+.website-checkout .sv-panel-cta {
+  background: var(--site-primary, #1a73e8);
+  color: var(--site-on-primary, #fff);
+  border-radius: var(--site-radius, 10px);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--site-primary, #1a73e8) 32%, transparent);
+}
+
+.website-checkout .sv-panel-cta:hover:not(:disabled) {
+  filter: brightness(0.93);
+  opacity: 1;
+}
+
+.website-checkout .sv-step-num.done {
+  background: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-step-line.done {
+  background: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-step-num.active {
+  background: var(--site-text, #202124);
+}
+
+.website-checkout .sv-field input:focus,
+.website-checkout .sv-phone-group-country input:focus,
+.website-checkout .sv-phone-group-number input:focus {
+  border-color: var(--site-primary, #1a73e8);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-primary, #1a73e8) 14%, transparent);
+}
+
+.website-checkout .sv-qty.accent {
+  background: var(--site-primary, #1a73e8);
+  border-color: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-qty.accent .sv-qty-btn {
+  color: color-mix(in srgb, var(--site-on-primary, #fff) 88%, transparent);
+}
+
+.website-checkout .sv-qty.accent .sv-qty-val {
+  color: var(--site-on-primary, #fff);
+}
+
+.website-checkout .sv-variant-pill {
+  background: color-mix(in srgb, var(--site-primary, #1a73e8) 12%, var(--site-bg, #fff));
+  border: 1px solid color-mix(in srgb, var(--site-primary, #1a73e8) 28%, transparent);
+  color: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-checkout-line-total {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-rcard-total {
+  color: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-review-total-bar {
+  background: var(--site-primary, #1a73e8);
+  border-radius: var(--site-radius, 12px);
+}
+
+.website-checkout .sv-checkout-alert {
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--site-secondary, #e8f0fe) 65%, var(--site-bg, #fff));
+  border: 1px solid color-mix(in srgb, var(--site-primary, #1a73e8) 25%, transparent);
+  border-radius: var(--site-radius, 8px);
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--site-text, #202124);
+}
+
+.website-checkout .sv-checkout-content {
+  padding: 0 16px 32px;
+}
+
+.website-checkout .sv-checkout-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.website-checkout .sv-checkout-section-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: color-mix(in srgb, var(--site-text, #202124) 55%, transparent);
+  margin-bottom: 10px;
+}
+
+.website-checkout .sv-checkout-item-card {
+  background: var(--site-bg, #fff);
+  border: 1px solid color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: opacity 0.2s ease;
+}
+
+.website-checkout .sv-checkout-item-card.is-muted {
+  opacity: 0.5;
+}
+
+.website-checkout .sv-order-pill {
+  background: color-mix(in srgb, var(--site-text, #202124) 4%, var(--site-bg, #fff));
+  border-color: color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+}
+
+.website-checkout .sv-order-pill-total {
+  color: var(--site-text, #202124);
+}
+
+.website-checkout .sv-rcard {
+  background: var(--site-bg, #fff);
+  border-color: color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+}
+
+.website-checkout .sv-review-customer {
+  background: color-mix(in srgb, var(--site-text, #202124) 4%, var(--site-bg, #fff));
+  border-color: color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+}
+
+.website-checkout .sv-review-customer-name {
+  font-family: var(--site-font-head, var(--site-font, inherit));
+}
+
+/* Floating cart (website mode) */
+.website-checkout.sv-cart {
+  max-width: 520px;
+}
+
+.website-checkout .sv-cart-inner {
+  background: color-mix(in srgb, var(--site-text, #202124) 92%, #000);
+}
+
+.website-checkout .sv-cart-cta {
+  background: var(--site-primary, #1a73e8);
+  border-radius: var(--site-radius, 999px);
+}
+
+/* Typography per template */
+.website-checkout.wp-editorial .sv-panel-title {
+  font-family: var(--site-font, Georgia, serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.website-checkout.wp-tech .sv-panel-title {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 769px) {
+  .website-checkout .sv-checkout-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+  }
+
+  .website-checkout .sv-checkout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+
+  .website-checkout .sv-checkout-grid--review {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  }
+
+  .website-checkout .sv-form-body {
+    padding: 16px 0 0;
+  }
+
+  .website-checkout .sv-review-layout {
+    padding: 16px 0 0;
+  }
+
+  .website-checkout .sv-review-total-bar {
+    margin: 0;
+    position: sticky;
+    top: 80px;
+  }
+
+  .website-checkout.wp-editorial .sv-checkout-grid {
+    gap: 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .website-checkout .sv-review-total-bar {
+    margin: 0 0 24px;
+  }
+}

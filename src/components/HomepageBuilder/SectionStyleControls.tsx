@@ -37,12 +37,8 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
 
   return (
     <div className="section-style-controls">
-      <div className="sidebar-panel-header" style={{ marginTop: 0 }}>
-        <h3>Block style</h3>
-      </div>
-
       {hasAlignment && (
-        <div className="sidebar-panel-section">
+        <div className="sidebar-field">
           <label className="panel-label">Alignment</label>
           <select
             className="panel-select"
@@ -57,7 +53,7 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       )}
 
       {hasPadding && (
-        <div className="sidebar-panel-section">
+        <div className="sidebar-field">
           <label className="panel-label">Padding</label>
           <select
             className="panel-select"
@@ -72,7 +68,7 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       )}
 
       {hasBackground && (
-        <div className="sidebar-panel-section">
+        <div className="sidebar-field">
           <label className="panel-label">Background</label>
           <input
             type="color"
@@ -84,7 +80,7 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       )}
 
       {section.type === 'banner' && (
-        <div className="sidebar-panel-section">
+        <div className="sidebar-field">
           <label className="panel-label">Height</label>
           <select
             className="panel-select"
@@ -99,7 +95,7 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       )}
 
       {section.type === 'text' && (
-        <div className="sidebar-panel-section">
+        <div className="sidebar-field">
           <label className="panel-label">Text size</label>
           <select
             className="panel-select"

@@ -16,6 +16,8 @@ interface SeoSettingsPanelProps {
   storeId: string;
   storeSlug?: string;
   onUpdateWebsiteConfig: (updates: Partial<WebsiteModeConfig>) => void;
+  /** Inside a sidebar card — omit outer section chrome */
+  embedded?: boolean;
 }
 
 export default function SeoSettingsPanel({
@@ -23,6 +25,7 @@ export default function SeoSettingsPanel({
   storeId,
   storeSlug,
   onUpdateWebsiteConfig,
+  embedded = false,
 }: SeoSettingsPanelProps) {
   const seo = websiteConfig.seo || {};
   const siteName = websiteConfig.siteSettings.websiteName || 'My Store';
@@ -35,13 +38,17 @@ export default function SeoSettingsPanel({
 
   return (
     <>
-      <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>SEO</h3>
-      </div>
-      <p className="sidebar-hint">Search and social preview for your live storefront.</p>
+      {!embedded && (
+        <>
+          <div className="sidebar-panel-divider" />
+          <div className="sidebar-panel-header">
+            <h3>SEO</h3>
+          </div>
+          <p className="sidebar-hint">Search and social preview for your live storefront.</p>
+        </>
+      )}
 
-      <div className="sidebar-panel-section">
+      <div className="sidebar-field">
         <label className="panel-label">Page title</label>
         <input
           className="panel-input"
@@ -49,10 +56,10 @@ export default function SeoSettingsPanel({
           value={seo.metaTitle || ''}
           onChange={(e) => patchSeo({ metaTitle: e.target.value })}
         />
-        <p className="sidebar-hint">Leave empty to use site name on the home page.</p>
+        <p className="sidebar-field-hint">Leave empty to use site name on the home page.</p>
       </div>
 
-      <div className="sidebar-panel-section">
+      <div className="sidebar-field">
         <label className="panel-label">Meta description</label>
         <textarea
           className="panel-textarea"
@@ -63,7 +70,7 @@ export default function SeoSettingsPanel({
         />
       </div>
 
-      <div className="sidebar-panel-section">
+      <div className="sidebar-field">
         <label className="panel-label">Keywords</label>
         <input
           className="panel-input"
@@ -73,7 +80,7 @@ export default function SeoSettingsPanel({
         />
       </div>
 
-      <div className="sidebar-panel-section">
+      <div className="sidebar-field">
         <label className="panel-label">Social share image</label>
         <MediaPickerButton
           storeId={storeId}
@@ -84,17 +91,16 @@ export default function SeoSettingsPanel({
         />
       </div>
 
-      <div className="sidebar-panel-section panel-checkbox">
+      <label className="sidebar-toggle">
         <input
           type="checkbox"
-          id="seo-allow-indexing"
           checked={seo.allowIndexing !== false}
           onChange={(e) => patchSeo({ allowIndexing: e.target.checked })}
         />
-        <label htmlFor="seo-allow-indexing">Allow search engines to index</label>
-      </div>
+        <span>Allow search engines to index</span>
+      </label>
 
-      <div className="sidebar-panel-section">
+      <div className="sidebar-field">
         <label className="panel-label">Google site verification</label>
         <input
           className="panel-input"
@@ -105,7 +111,7 @@ export default function SeoSettingsPanel({
       </div>
 
       {sitemapUrl && (
-        <div className="sidebar-panel-section seo-sitemap-box">
+        <div className="sidebar-field seo-sitemap-box">
           <label className="panel-label">Sitemap</label>
           <p className="sidebar-hint" style={{ wordBreak: 'break-all' }}>
             Submit in Google Search Console:

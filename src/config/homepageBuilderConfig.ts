@@ -5,6 +5,7 @@ import {
   WebsiteModeConfig,
   HomepageLayout,
 } from '../types/homepage';
+import { syncSiteThemeAcrossPages } from '../utils/websiteSiteTheme';
 import { v4 as uuid } from 'uuid';
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -37,6 +38,12 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
   faq: 'FAQ',
   embed: 'Embed',
 };
+
+/** Canvas selection id for the site-wide footer chrome (not a page section uuid). */
+export const SITE_FOOTER_SELECTION_ID = '__site-footer__';
+
+/** Canvas selection id for the site-wide announcement bar above the header. */
+export const SITE_ANNOUNCEMENT_SELECTION_ID = '__site-announcement__';
 
 export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   carousel: 'Image carousel/slider with navigation controls',
@@ -163,6 +170,15 @@ export function createDefaultSection(
           columns: 3,
           layout: 'grid',
           showCount: true,
+          cardStyle: 'card',
+          cardShape: 'rounded',
+          cardSize: 'md',
+          imageRatio: '4:3',
+          imageFit: 'cover',
+          gap: 'md',
+          titleAlign: 'left',
+          labelStyle: 'below',
+          hoverEffect: 'lift',
         },
         content: {
           categoryIds: [],
@@ -445,17 +461,21 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       announcementTextColor: '#ffffff',
       headerBg: '#ffffff',
       headerTextColor: '#111827',
-      footerBg: '#0f172a',
-      footerTextColor: '#e2e8f0',
+      footerVariant: 'classic',
+      footerBg: '#ffffff',
+      footerTextColor: '#1a1a1a',
+      footerColBg: '#f2f2f0',
+      footerAccentColor: '#1a6b4a',
+      footerAccentBg: '#e8f4ef',
+      footerDescription: '',
+      footerShowOpenBadge: true,
+      footerShowLocation: true,
+      footerShowContact: true,
+      footerShowStoreInfo: true,
+      footerShowFollow: true,
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },
         { id: uuid(), label: 'Collections', href: '/collections/all' },
-      ],
-      footerColumns: [
-        {
-          title: 'Quick links',
-          links: [{ id: uuid(), label: 'Home', href: '/' }],
-        },
       ],
     },
     seo: {
@@ -491,7 +511,7 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
 
 export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): HomepageLayout {
   const baseWebsiteConfig = createDefaultWebsiteModeConfig();
-  return {
+  const normalized: HomepageLayout = {
     ...layout,
     websiteConfig: {
       ...baseWebsiteConfig,
@@ -504,6 +524,7 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
         ...baseWebsiteConfig.seo,
         ...(layout.websiteConfig?.seo || {}),
       },
+      activeTemplateId: layout.websiteConfig?.activeTemplateId,
       pages: {
         home: layout.websiteConfig?.pages?.home || {
           sections: layout.sections || [],
@@ -536,6 +557,32 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
       },
     },
   };
+
+  if (normalized.websiteConfig) {
+    normalized.websiteConfig = syncSiteThemeAcrossPages(normalized.websiteConfig);
+    normalized.theme = normalized.websiteConfig.pages.home.theme;
+    normalized.websiteConfig = {
+      ...normalized.websiteConfig,
+      pages: {
+        ...normalized.websiteConfig.pages,
+        home: {
+          ...normalized.websiteConfig.pages.home,
+          sections: stripLegacyFooterSections(normalized.websiteConfig.pages.home.sections || []),
+        },
+        custom: (normalized.websiteConfig.pages.custom || []).map((page) => ({
+          ...page,
+          layout: {
+            ...page.layout,
+            sections: stripLegacyFooterSections(page.layout?.sections || []),
+          },
+        })),
+      },
+    };
+  }
+
+  normalized.sections = stripLegacyFooterSections(normalized.sections || []);
+
+  return normalized;
 }
 
 export const BASIC_SECTION_ORDERING: HomepageSectionType[] = [
@@ -553,8 +600,18 @@ export const BASIC_SECTION_ORDERING: HomepageSectionType[] = [
   'content-grid',
   'feature-card',
   'testimonials',
-  'footer',
 ];
+
+/** Page sections that must not be inserted — site chrome handles these (e.g. footer). */
+export const NON_INSERTABLE_SECTION_TYPES: HomepageSectionType[] = ['footer'];
+
+export function stripLegacyFooterSections<T extends { type: string; order?: number }>(
+  sections: T[]
+): T[] {
+  return sections
+    .filter((s) => s.type !== 'footer')
+    .map((s, idx) => ({ ...s, order: idx }));
+}
 
 export const STORE_SECTION_ORDERING: HomepageSectionType[] = [
   'featured-products',

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { HomepageLayout } from '../../types/homepage';
+import { buildWebsiteThemeVars } from '../../utils/websiteThemeVars';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StorePublic } from '../../services/storeService';
 import { createDefaultWebsiteModeConfig } from '../../config/homepageBuilderConfig';
@@ -52,7 +53,7 @@ export default function WebsiteRuntime({
   const customPageLayout = customPage
     ? {
         sections: customPage.layout.sections || [],
-        theme: customPage.layout.theme || homeLayout.theme,
+        theme: homeLayout.theme,
       }
     : null;
 
@@ -86,6 +87,10 @@ export default function WebsiteRuntime({
   const storeDisplayName =
     websiteConfig.siteSettings.websiteName || store.sellerBusinessName || store.storeSlug;
 
+  const themeVars = buildWebsiteThemeVars(homeLayout.theme);
+  const productTemplate = websiteConfig.templates?.product;
+  const collectionTemplate = websiteConfig.templates?.collection;
+
   return (
     <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
       <StorefrontSeo
@@ -93,19 +98,25 @@ export default function WebsiteRuntime({
         googleSiteVerification={websiteConfig.seo?.googleSiteVerification}
         faviconUrl={websiteConfig.seo?.faviconUrl}
       />
-      <div style={{ minHeight: '100vh', background: homeLayout.theme?.backgroundColor || '#fff' }}>
+      <div
+        className="website-runtime-root"
+        style={{ minHeight: '100vh', background: homeLayout.theme?.backgroundColor || '#fff', color: homeLayout.theme?.textColor, fontFamily: homeLayout.theme?.fontFamily, ...themeVars }}
+      >
         <WebsiteHeader slug={slug} siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }} onSubdomain={onSubdomain} />
         {section === 'collections' ? (
-          <CollectionPageRuntime products={products} columns={websiteConfig.templates?.collection?.columns || 4} />
+          <CollectionPageRuntime products={products} columns={collectionTemplate?.columns || 4} cardsStyle={collectionTemplate?.cardsStyle} />
         ) : section === 'products' ? (
-          <ProductPageRuntime product={product} />
+          <ProductPageRuntime product={product} template={productTemplate} />
         ) : customPageLayout ? (
           <HomePageRuntime layout={customPageLayout as HomepageLayout} />
         ) : (
           <HomePageRuntime layout={homeLayout} />
         )}
-        <WebsiteFooter siteSettings={websiteConfig.siteSettings} />
+        <WebsiteFooter
+          siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }}
+        />
       </div>
     </WebsiteStoreProvider>
   );
 }
+

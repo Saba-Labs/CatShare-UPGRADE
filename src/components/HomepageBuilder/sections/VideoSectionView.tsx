@@ -1,6 +1,7 @@
 import React from 'react';
 import { VideoSection } from '../../../types/homepage';
 import SectionPlaceholder from './SectionPlaceholder';
+import { IconVideo } from '../../Storefront/StorefrontIcons';
 
 interface VideoSectionViewProps {
   section: VideoSection & { id: string };
@@ -27,7 +28,7 @@ export default function VideoSectionView({ section }: VideoSectionViewProps) {
             style={{ borderRadius: '8px' }}
           />
         ) : (
-          <SectionPlaceholder title="Video Section" icon="🎥" description="Add a video URL in the properties panel" />
+          <SectionPlaceholder title="Video Section" icon={<IconVideo size={48} />} description="Add a video URL in the properties panel" />
         )}
       </div>
     </div>

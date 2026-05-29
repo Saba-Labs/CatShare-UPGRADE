@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ProductGridSection } from '../../../types/homepage';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
 import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
+import { IconImage } from '../../Storefront/StorefrontIcons';
 
 interface ProductGridSectionViewProps {
   section: ProductGridSection & { id: string };
@@ -78,7 +79,7 @@ export default function ProductGridSectionView({ section, editMode }: ProductGri
                   border: '1px solid #e5e7eb',
                 }}
               >
-                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📦</div>
+                <IconImage size={40} style={{ marginBottom: 8, color: '#9ca3af' }} />
                 <p style={{ margin: '0 0 6px 0', fontWeight: 500, fontSize: '0.875rem' }}>
                   {editMode ? 'Products appear on live store' : `Product ${i + 1}`}
                 </p>

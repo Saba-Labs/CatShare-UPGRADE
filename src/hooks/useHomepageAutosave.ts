@@ -1,11 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { HomepageLayout } from '../types/homepage';
 import { autoSaveHomepage } from '../services/homepageService';
+import { isPersistedHomepageConfigId } from '../utils/homepageConfigId';
 
 interface UseHomepageAutosaveProps {
   configId: string;
   layout: HomepageLayout;
   isDirty: boolean;
+  /** When false, skips autosave (e.g. config not created in DB yet). */
+  enabled?: boolean;
   debounceMs?: number;
   onSaveStart?: () => void;
   onSaveComplete?: () => void;
@@ -16,6 +19,7 @@ export function useHomepageAutosave({
   configId,
   layout,
   isDirty,
+  enabled = true,
   debounceMs = 2000,
   onSaveStart,
   onSaveComplete,
@@ -25,6 +29,9 @@ export function useHomepageAutosave({
   const lastSavedRef = useRef<string>('');
 
   const save = useCallback(async () => {
+    if (!enabled || !isPersistedHomepageConfigId(configId)) {
+      return;
+    }
     try {
       onSaveStart?.();
 
@@ -41,10 +48,10 @@ export function useHomepageAutosave({
       const err = error instanceof Error ? error : new Error(String(error));
       onSaveError?.(err);
     }
-  }, [configId, layout, onSaveStart, onSaveComplete, onSaveError]);
+  }, [configId, layout, enabled, onSaveStart, onSaveComplete, onSaveError]);
 
   useEffect(() => {
-    if (!isDirty) return;
+    if (!enabled || !isDirty) return;
 
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -59,7 +66,7 @@ export function useHomepageAutosave({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [isDirty, layout, debounceMs, save]);
+  }, [enabled, isDirty, layout, debounceMs, save]);
 
   const saveNow = useCallback(() => {
     if (timeoutRef.current) {

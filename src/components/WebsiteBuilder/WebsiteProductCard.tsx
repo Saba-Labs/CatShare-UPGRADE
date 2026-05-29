@@ -5,21 +5,27 @@ import {
   getWebsiteProductImageUrl,
   getWebsiteProductPrice,
 } from '../../utils/websiteStorefront';
+import { ProductImagePlaceholder } from '../Storefront/StorefrontIcons';
 import { useWebsiteStore } from './WebsiteStoreContext';
 
 interface WebsiteProductCardProps {
   product: ProductWithCatalogueData;
+  cardsStyle?: 'minimal' | 'boxed';
 }
 
-export default function WebsiteProductCard({ product }: WebsiteProductCardProps) {
+export default function WebsiteProductCard({ product, cardsStyle = 'boxed' }: WebsiteProductCardProps) {
   const { productPath, store } = useWebsiteStore();
   const img = getWebsiteProductImageUrl(product);
   const price = getWebsiteProductPrice(product, store.catalogueId);
 
   return (
-    <Link to={productPath(product)} className="website-product-card">
+    <Link to={productPath(product)} className={`website-product-card website-product-card-${cardsStyle}`}>
       <div className="website-product-card-img">
-        {img ? <img src={img} alt={product.name} loading="lazy" /> : <span style={{ padding: 24, display: 'block', textAlign: 'center' }}>📦</span>}
+        {img ? (
+          <img src={img} alt={product.name} loading="lazy" />
+        ) : (
+          <ProductImagePlaceholder size={40} className="website-product-card-ph" />
+        )}
       </div>
       <div className="website-product-card-body">
         <p className="website-product-card-title">{product.name}</p>

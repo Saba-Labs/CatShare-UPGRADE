@@ -6,6 +6,7 @@ import {
   HomepageSection,
   HomepageSectionType,
   GridPosition,
+  BlockLayout,
   WebsiteModeConfig,
 } from '../types/homepage';
 import { createDefaultSection } from '../config/homepageBuilderConfig';
@@ -52,6 +53,7 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
 
     case 'ADD_SECTION': {
       const sectionType: HomepageSectionType = action.payload;
+      if (sectionType === 'footer') return state;
       const newSection = createDefaultSection(sectionType, state.layout.sections.length);
       return withHistory(
         state,
@@ -150,6 +152,26 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       return withHistory(state, {
         ...state.layout,
         websiteConfig: action.payload,
+      });
+    }
+
+    case 'UPDATE_SECTION_LAYOUT': {
+      const { id, blockLayout } = action.payload;
+      return withHistory(state, {
+        ...state.layout,
+        sections: state.layout.sections.map((s) =>
+          s.id === id ? { ...s, blockLayout: { ...s.blockLayout, ...blockLayout } } : s
+        ),
+      });
+    }
+
+    case 'SWITCH_EDITING_PAGE': {
+      const { websiteConfig, sections, theme } = action.payload;
+      return withHistory(state, {
+        ...state.layout,
+        websiteConfig,
+        sections,
+        theme,
       });
     }
 
@@ -255,9 +277,24 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     dispatch({ type: 'UPDATE_SECTION_POSITION', payload: { id: sectionId, position } });
   }, []);
 
+  const updateSectionLayout = useCallback((sectionId: string, blockLayout: BlockLayout) => {
+    dispatch({ type: 'UPDATE_SECTION_LAYOUT', payload: { id: sectionId, blockLayout } });
+  }, []);
+
   const updateWebsiteConfig = useCallback((websiteConfig: WebsiteModeConfig) => {
     dispatch({ type: 'UPDATE_WEBSITE_CONFIG', payload: websiteConfig });
   }, []);
+
+  const switchEditingPage = useCallback(
+    (payload: {
+      websiteConfig: WebsiteModeConfig;
+      sections: HomepageLayout['sections'];
+      theme: HomepageLayout['theme'];
+    }) => {
+      dispatch({ type: 'SWITCH_EDITING_PAGE', payload });
+    },
+    []
+  );
 
   const undo = useCallback(() => {
     dispatch({ type: 'UNDO' });
@@ -282,7 +319,9 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
       markSaved,
       duplicateSection,
       updateSectionPosition,
+      updateSectionLayout,
       updateWebsiteConfig,
+      switchEditingPage,
       undo,
       redo,
     },

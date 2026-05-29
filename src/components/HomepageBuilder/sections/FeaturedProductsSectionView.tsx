@@ -4,6 +4,7 @@ import { FeaturedProductsSection } from '../../../types/homepage';
 import SectionPlaceholder from './SectionPlaceholder';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
 import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
+import { IconImage, IconShoppingBag } from '../../Storefront/StorefrontIcons';
 
 interface FeaturedProductsSectionViewProps {
   section: FeaturedProductsSection & { id: string };
@@ -26,7 +27,7 @@ export default function FeaturedProductsSectionView({ section, editMode }: Featu
       {content.productIds.length === 0 ? (
         <SectionPlaceholder
           title="Featured Products"
-          icon="🛍️"
+          icon={<IconShoppingBag size={48} />}
           description={editMode ? 'Select products in the properties panel' : 'No products selected'}
           editMode={editMode}
         />
@@ -61,7 +62,7 @@ export default function FeaturedProductsSectionView({ section, editMode }: Featu
                   border: '1px solid #e5e7eb',
                 }}
               >
-                <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>📦</div>
+                <IconImage size={40} style={{ marginBottom: 8, color: '#9ca3af' }} />
                 <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>Product {i + 1}</p>
                 {settings.showPrice && <p style={{ margin: 0, color: '#2563eb', fontWeight: 600 }}>—</p>}
               </div>

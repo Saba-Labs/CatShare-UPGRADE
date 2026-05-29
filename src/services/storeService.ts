@@ -242,6 +242,8 @@ export interface StorePublic {
   phone?: string | null;
   location?: string | null;
   whatsapp?: string | null;
+  /** Same as whatsapp when loaded from `stores.store_whatsapp`. */
+  storeWhatsapp?: string | null;
   instagram?: string | null;
   twitter?: string | null;
   facebook?: string | null;
@@ -665,6 +667,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
+      normalized.storeWhatsapp = whatsapp;
     }
 
     const storeCatId = String(
@@ -1026,12 +1029,10 @@ export async function updateStoreLiveStatus(
   }
 }
 
-/**
- * Update whether the homepage is enabled for a store
- */
-export async function updateStoreHomepageStatus(
+/** Custom website on/off — keeps homepage + full website storefront in sync. */
+export async function updateStoreWebsiteStatus(
   sellerUserId: string,
-  homepageEnabled: boolean
+  enabled: boolean
 ): Promise<{ success: boolean; data?: Store; error?: string }> {
   try {
     const client = getSupabaseClient();
@@ -1040,7 +1041,8 @@ export async function updateStoreHomepageStatus(
     const { data, error } = await client
       .from('stores')
       .update({
-        homepage_enabled: homepageEnabled,
+        website_mode_enabled: enabled,
+        homepage_enabled: enabled,
         updated_at: new Date().toISOString(),
       })
       .eq('seller_user_id', sellerUserId)
@@ -1051,7 +1053,7 @@ export async function updateStoreHomepageStatus(
       const errorMsg = typeof error === 'object' && error !== null && 'message' in error
         ? String((error as any).message)
         : String(error);
-      console.error('❌ Error updating store homepage status:', errorMsg, error);
+      console.error('❌ Error updating store website status:', errorMsg, error);
       return { success: false, error: errorMsg };
     }
 
@@ -1061,7 +1063,7 @@ export async function updateStoreHomepageStatus(
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error('❌ Exception in updateStoreHomepageStatus:', errorMessage);
+    console.error('❌ Exception in updateStoreWebsiteStatus:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);
@@ -1072,39 +1074,15 @@ export async function updateStoreWebsiteModeStatus(
   sellerUserId: string,
   websiteModeEnabled: boolean
 ): Promise<{ success: boolean; data?: Store; error?: string }> {
-  try {
-    const client = getSupabaseClient();
-    setSupabaseRlsUserId(sellerUserId);
+  return updateStoreWebsiteStatus(sellerUserId, websiteModeEnabled);
+}
 
-    const { data, error } = await client
-      .from('stores')
-      .update({
-        website_mode_enabled: websiteModeEnabled,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('seller_user_id', sellerUserId)
-      .select()
-      .single();
-
-    if (error) {
-      const errorMsg = typeof error === 'object' && error !== null && 'message' in error
-        ? String((error as any).message)
-        : String(error);
-      console.error('❌ Error updating website mode status:', errorMsg, error);
-      return { success: false, error: errorMsg };
-    }
-
-    return {
-      success: true,
-      data: mapStoreRow(data as Record<string, unknown>),
-    };
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.error('❌ Exception in updateStoreWebsiteModeStatus:', errorMessage);
-    return { success: false, error: errorMessage };
-  } finally {
-    setSupabaseRlsUserId(null);
-  }
+/** @deprecated Use updateStoreWebsiteStatus — toggles homepage and website mode together. */
+export async function updateStoreHomepageStatus(
+  sellerUserId: string,
+  homepageEnabled: boolean
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  return updateStoreWebsiteStatus(sellerUserId, homepageEnabled);
 }
 
 /**

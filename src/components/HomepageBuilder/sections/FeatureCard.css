@@ -23,6 +23,7 @@
 .feature-card-image {
   flex: 0 0 40%;
   min-width: 0;
+  position: relative;
 }
 
 .feature-card-image img {

@@ -1,4 +1,5 @@
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import type { StorePublic } from '../services/storeService';
 import { getCatalogueData } from '../config/catalogueProductUtils';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
 import { productImageDisplayUrl } from '../utils/imageUrl';
@@ -50,6 +51,14 @@ export function currencySymbolFor(code?: string | null): string {
   return CURRENCY_SYMBOLS[upper] || `${upper} `;
 }
 
+/** Public storefront WhatsApp from RPC or stores.store_whatsapp. */
+export function resolveStoreWhatsapp(store: Pick<StorePublic, 'whatsapp' | 'storeWhatsapp'>): string {
+  const w = store.whatsapp?.trim() || store.storeWhatsapp?.trim();
+  if (!w) return '';
+  const digits = w.replace(/\D/g, '');
+  return digits.length > 0 ? digits : '';
+}
+
 export function formatStorePrice(amount: number, currencyCode?: string | null): string {
   const sym = currencySymbolFor(currencyCode);
   return `${sym}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -81,10 +90,37 @@ export function getWebsiteProductImageUrl(product: ProductWithCatalogueData): st
   return productImageDisplayUrl(raw, version);
 }
 
-export function buildWhatsAppProductLink(whatsapp: string, productName: string, storeName?: string): string {
+export interface WhatsAppOrderDetails {
+  storeName?: string;
+  quantity?: number;
+  /** Selected variant options, e.g. { Size: 'M', Color: 'Blue' }. */
+  variants?: Record<string, string>;
+  price?: number | null;
+  currencyCode?: string | null;
+}
+
+export function buildWhatsAppProductLink(
+  whatsapp: string,
+  productName: string,
+  details: WhatsAppOrderDetails | string = {}
+): string {
   const digits = whatsapp.replace(/\D/g, '');
-  const text = encodeURIComponent(
-    `Hi${storeName ? ` ${storeName}` : ''}, I'm interested in: ${productName}`
-  );
+  // Back-compat: a string third arg used to be the store name.
+  const opts: WhatsAppOrderDetails = typeof details === 'string' ? { storeName: details } : details;
+  const lines: string[] = [`Hi${opts.storeName ? ` ${opts.storeName}` : ''}, I'd like to order:`, `• ${productName}`];
+  if (opts.variants) {
+    const variantText = Object.entries(opts.variants)
+      .filter(([, value]) => value)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(', ');
+    if (variantText) lines.push(`  (${variantText})`);
+  }
+  if (opts.quantity && opts.quantity > 1) lines.push(`Quantity: ${opts.quantity}`);
+  if (opts.price != null) {
+    const unit = formatStorePrice(opts.price, opts.currencyCode);
+    const qty = opts.quantity && opts.quantity > 0 ? opts.quantity : 1;
+    lines.push(`Price: ${unit}${qty > 1 ? ` x ${qty} = ${formatStorePrice(opts.price * qty, opts.currencyCode)}` : ''}`);
+  }
+  const text = encodeURIComponent(lines.join('\n'));
   return `https://wa.me/${digits}?text=${text}`;
 }

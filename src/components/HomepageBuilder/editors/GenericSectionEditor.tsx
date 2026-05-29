@@ -1,14 +1,17 @@
 import React from 'react';
-import { HomepageSection } from '../../../types/homepage';
+import { HomepageSection, WebsiteModeConfig } from '../../../types/homepage';
 import MediaPickerButton from '../media/MediaPickerButton';
+import ButtonLinkField from './ButtonLinkField';
+import TestimonialsSectionEditor from './TestimonialsSectionEditor';
 
 interface GenericSectionEditorProps {
   section: HomepageSection & { id: string };
   storeId: string;
+  websiteConfig?: WebsiteModeConfig;
   onUpdate: (updates: Partial<HomepageSection>) => void;
 }
 
-export default function GenericSectionEditor({ section, storeId, onUpdate }: GenericSectionEditorProps) {
+export default function GenericSectionEditor({ section, storeId, websiteConfig, onUpdate }: GenericSectionEditorProps) {
   const renderImageUploadField = (
     fieldKey: string,
     label: string,
@@ -109,6 +112,16 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
       case 'banner':
         return (
           <>
+            {renderImageUploadField(
+              'banner.settings.backgroundImage',
+              'Background image',
+              (section as any).settings.backgroundImage || '',
+              (url) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, backgroundImage: url },
+                })
+            )}
+
             <div className="panel-section">
               <label className="panel-label">Title</label>
               <input
@@ -151,20 +164,15 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
               />
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Button Link</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.buttonLink || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, buttonLink: e.target.value },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            <ButtonLinkField
+              value={(section as any).content.buttonLink || ''}
+              websiteConfig={websiteConfig}
+              onChange={(buttonLink) =>
+                onUpdate({
+                  content: { ...(section as any).content, buttonLink },
+                })
+              }
+            />
 
             <div className="panel-section">
               <label className="panel-label">Height</label>
@@ -184,7 +192,7 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
             </div>
 
             <div className="panel-section">
-              <label className="panel-label">Background Color</label>
+              <label className="panel-label">Background color (fallback)</label>
               <input
                 type="color"
                 className="panel-input"
@@ -192,6 +200,25 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
                 onChange={(e) =>
                   onUpdate({
                     settings: { ...(section as any).settings, backgroundColor: e.target.value },
+                  })
+                }
+              />
+            </div>
+
+            <div className="panel-section">
+              <label className="panel-label">
+                Overlay darkness ({Math.round(((section as any).settings.overlayOpacity ?? 0.3) * 100)}%)
+              </label>
+              <input
+                type="range"
+                className="panel-input"
+                min={0}
+                max={1}
+                step={0.05}
+                value={(section as any).settings.overlayOpacity ?? 0.3}
+                onChange={(e) =>
+                  onUpdate({
+                    settings: { ...(section as any).settings, overlayOpacity: parseFloat(e.target.value) },
                   })
                 }
               />
@@ -244,19 +271,15 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
               />
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Button Link</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.buttonLink}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, buttonLink: e.target.value },
-                  })
-                }
-              />
-            </div>
+            <ButtonLinkField
+              value={(section as any).content.buttonLink || ''}
+              websiteConfig={websiteConfig}
+              onChange={(buttonLink) =>
+                onUpdate({
+                  content: { ...(section as any).content, buttonLink },
+                })
+              }
+            />
 
             <div className="panel-section">
               <label className="panel-label">Button Color</label>
@@ -409,20 +432,15 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
               />
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Button Link</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.buttonLink || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, buttonLink: e.target.value },
-                  })
-                }
-                placeholder="https://..."
-              />
-            </div>
+            <ButtonLinkField
+              value={(section as any).content.buttonLink || ''}
+              websiteConfig={websiteConfig}
+              onChange={(buttonLink) =>
+                onUpdate({
+                  content: { ...(section as any).content, buttonLink },
+                })
+              }
+            />
 
             <div className="panel-section">
               <label className="panel-label">Layout</label>
@@ -553,53 +571,13 @@ export default function GenericSectionEditor({ section, storeId, onUpdate }: Gen
           </>
         );
 
-      case 'content-grid':
-        return (
-          <>
-            <div className="panel-section">
-              <label className="panel-label">Grid Title</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).settings.title || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, title: e.target.value },
-                  })
-                }
-              />
-            </div>
-
-            <div className="panel-section">
-              <label className="panel-label">Columns</label>
-              <select
-                className="panel-select"
-                value={(section as any).settings.columns}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, columns: parseInt(e.target.value) },
-                  })
-                }
-              >
-                <option value="2">2 Columns</option>
-                <option value="3">3 Columns</option>
-                <option value="4">4 Columns</option>
-              </select>
-            </div>
-
-            <div style={{ padding: '12px', background: '#e0e7ff', borderRadius: '6px', fontSize: '0.875rem', color: '#3730a3' }}>
-              <p style={{ margin: 0 }}>
-                <strong>Tip:</strong> Edit grid items directly on the canvas by clicking them.
-              </p>
-            </div>
-          </>
-        );
+      case 'testimonials':
+        return <TestimonialsSectionEditor section={section as any} onUpdate={onUpdate} />;
 
       case 'featured-products':
       case 'category-showcase':
       case 'product-grid':
       case 'video':
-      case 'testimonials':
       case 'footer':
       default:
         return (

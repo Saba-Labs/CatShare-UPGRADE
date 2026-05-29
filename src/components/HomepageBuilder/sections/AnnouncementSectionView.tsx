@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnnouncementSection } from '../../../types/homepage';
+import { announcementIcon, IconX } from '../../Storefront/StorefrontIcons';
 
 interface AnnouncementSectionViewProps {
   section: AnnouncementSection & { id: string };
@@ -10,26 +11,25 @@ interface AnnouncementSectionViewProps {
 export default function AnnouncementSectionView({ section, editMode, onUpdateSection }: AnnouncementSectionViewProps) {
   const { settings, content } = section;
 
-  const iconMap = {
-    info: 'ℹ️',
-    warning: '⚠️',
-    success: '✅',
-    none: '',
-  };
-
   return (
     <div
+      className="announcement-bar-section"
       style={{
         background: settings.backgroundColor || '#fef3c7',
         color: settings.textColor || '#92400e',
         padding: '12px 16px',
-        borderRadius: '6px',
         display: 'flex',
         gap: '12px',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
-      {settings.icon !== 'none' && <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{iconMap[settings.icon]}</span>}
+      {settings.icon !== 'none' && (
+        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}>
+          {announcementIcon(settings.icon, 18)}
+        </span>
+      )}
       {editMode && onUpdateSection ? (
         <p
           className="sites-inline-editable"
@@ -45,17 +45,21 @@ export default function AnnouncementSectionView({ section, editMode, onUpdateSec
       )}
       {settings.dismissible && (
         <button
+          type="button"
+          aria-label="Dismiss"
           style={{
             background: 'none',
             border: 'none',
             color: 'inherit',
             cursor: 'pointer',
-            padding: 0,
-            fontSize: '1rem',
+            padding: 4,
             flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          ✕
+          <IconX size={16} />
         </button>
       )}
     </div>

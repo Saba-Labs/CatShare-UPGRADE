@@ -1,4 +1,3 @@
-import React from 'react';
 import { HomepageSectionType } from '../../types/homepage';
 import {
   SECTION_TYPE_LABELS,
@@ -6,6 +5,7 @@ import {
   STORE_SECTION_ORDERING,
 } from '../../config/homepageBuilderConfig';
 import { BLOCK_PRESETS, BlockPresetId } from '../../config/blockPresets';
+import SidebarSection from './SidebarSection';
 
 interface ComponentPaletteProps {
   onAddSection: (type: HomepageSectionType) => void;
@@ -20,56 +20,57 @@ export default function ComponentPalette({ onAddSection, onAddPreset }: Componen
 
   return (
     <div className="sidebar-panel insert-panel">
-      <div className="sidebar-panel-header">
-        <h3>Insert</h3>
-      </div>
-      <p className="sidebar-hint">Add layouts or individual blocks.</p>
+      <SidebarSection title="Insert" description="Add layouts or individual blocks to the page.">
+        <div className="insert-group-label">Layouts</div>
+        <div className="preset-list">
+          {BLOCK_PRESETS.map((preset) => (
+            <button key={preset.id} type="button" className="preset-row" onClick={() => onAddPreset(preset.id)}>
+              <span className="preset-row-label">{preset.label}</span>
+              <span className="preset-row-desc">{preset.description}</span>
+            </button>
+          ))}
+        </div>
 
-      <div className="insert-group-label">Layouts</div>
-      <div className="preset-list">
-        {BLOCK_PRESETS.map((preset) => (
-          <button key={preset.id} type="button" className="preset-row" onClick={() => onAddPreset(preset.id)}>
-            <span className="preset-row-label">{preset.label}</span>
-            <span className="preset-row-desc">{preset.description}</span>
-          </button>
-        ))}
-      </div>
+        <div className="insert-group-label" style={{ marginTop: 14 }}>
+          Basic blocks
+        </div>
+        <div className="insert-grid">
+          {BASIC_SECTION_ORDERING.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className="insert-block"
+              draggable
+              onDragStart={(e) => handleDragStart(e, type)}
+              onClick={() => onAddSection(type)}
+              title={SECTION_TYPE_LABELS[type]}
+            >
+              <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
+              <span className="insert-block-label">{shortLabel(type)}</span>
+            </button>
+          ))}
+        </div>
 
-      <div className="insert-group-label">Basic blocks</div>
-      <div className="insert-grid">
-        {BASIC_SECTION_ORDERING.map((type) => (
-          <button
-            key={type}
-            type="button"
-            className="insert-block"
-            draggable
-            onDragStart={(e) => handleDragStart(e, type)}
-            onClick={() => onAddSection(type)}
-            title={SECTION_TYPE_LABELS[type]}
-          >
-            <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
-            <span className="insert-block-label">{shortLabel(type)}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="insert-group-label">Store blocks</div>
-      <div className="insert-grid insert-grid-compact">
-        {STORE_SECTION_ORDERING.map((type) => (
-          <button
-            key={type}
-            type="button"
-            className="insert-block"
-            draggable
-            onDragStart={(e) => handleDragStart(e, type)}
-            onClick={() => onAddSection(type)}
-            title={SECTION_TYPE_LABELS[type]}
-          >
-            <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
-            <span className="insert-block-label">{shortLabel(type)}</span>
-          </button>
-        ))}
-      </div>
+        <div className="insert-group-label" style={{ marginTop: 14 }}>
+          Store blocks
+        </div>
+        <div className="insert-grid insert-grid-compact">
+          {STORE_SECTION_ORDERING.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className="insert-block"
+              draggable
+              onDragStart={(e) => handleDragStart(e, type)}
+              onClick={() => onAddSection(type)}
+              title={SECTION_TYPE_LABELS[type]}
+            >
+              <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
+              <span className="insert-block-label">{shortLabel(type)}</span>
+            </button>
+          ))}
+        </div>
+      </SidebarSection>
     </div>
   );
 }
@@ -100,7 +101,6 @@ const SECTION_ICONS: Partial<Record<HomepageSectionType, string>> = {
   cta: '→',
   video: '▶',
   testimonials: '❝',
-  footer: '▔',
   'feature-card': '◫',
   'two-column-content': '⫴',
   'content-grid': '▦',

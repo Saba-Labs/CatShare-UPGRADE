@@ -1,20 +1,38 @@
-import React from 'react';
-import { FeatureCardSection } from '../../../types/homepage';
+import type { FeatureCardSection } from '../../../types/homepage';
+import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
+import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './FeatureCard.css';
 
 interface FeatureCardSectionViewProps {
   section: FeatureCardSection & { id: string };
+  storeId?: string;
   editMode?: boolean;
   onUpdateSection?: (updates: Partial<FeatureCardSection>) => void;
 }
 
-export default function FeatureCardSectionView({ section, editMode, onUpdateSection }: FeatureCardSectionViewProps) {
+export default function FeatureCardSectionView({
+  section,
+  storeId,
+  editMode,
+  onUpdateSection,
+}: FeatureCardSectionViewProps) {
   const { settings, content } = section;
   const isImageLeft = settings.layout === 'image-left';
   const layoutClass = isImageLeft ? 'layout-image-left' : 'layout-image-right';
+  const media = useBuilderMediaOptional();
 
   const updateContent = (patch: Partial<FeatureCardSection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
+  };
+
+  const openImagePicker = () => {
+    if (!media || !storeId || !onUpdateSection) return;
+    media.openMediaPicker({
+      storeId,
+      assetKey: `${section.id}-feature-image`,
+      title: 'Choose image',
+      onSelect: (url) => updateContent({ imageUrl: url }),
+    });
   };
 
   return (
@@ -30,10 +48,28 @@ export default function FeatureCardSectionView({ section, editMode, onUpdateSect
       <div className={`feature-card-content ${layoutClass}`}>
         <div className="feature-card-image">
           {content.imageUrl ? (
-            <img src={content.imageUrl} alt={content.title} />
+            <img
+              src={content.imageUrl}
+              alt={content.title}
+              style={{ cursor: editMode && media ? 'pointer' : undefined }}
+              onClick={editMode && media ? openImagePicker : undefined}
+              title={editMode ? 'Click to change image' : undefined}
+            />
           ) : (
-            <div className="image-placeholder">Image</div>
+            <button
+              type="button"
+              className="image-placeholder image-placeholder--btn"
+              disabled={!editMode || !media}
+              onClick={editMode ? openImagePicker : undefined}
+            >
+              {editMode ? '+ Add image' : 'Image'}
+            </button>
           )}
+          {editMode && media && content.imageUrl ? (
+            <button type="button" className="section-image-edit-btn section-image-edit-btn--on-image" onClick={openImagePicker}>
+              Change image
+            </button>
+          ) : null}
         </div>
 
         <div className="feature-card-text">
@@ -70,11 +106,11 @@ export default function FeatureCardSectionView({ section, editMode, onUpdateSect
             <>
               <h3>{content.title}</h3>
               <p>{content.description}</p>
-              {content.buttonText && (
+              {content.buttonText && content.buttonLink && (
                 <div className="button-group">
-                  <a href={content.buttonLink || '#'} className="feature-card-button">
+                  <StorefrontLink href={content.buttonLink} className="feature-card-button">
                     {content.buttonText}
-                  </a>
+                  </StorefrontLink>
                 </div>
               )}
             </>

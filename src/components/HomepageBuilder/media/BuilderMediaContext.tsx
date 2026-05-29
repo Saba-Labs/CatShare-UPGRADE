@@ -12,7 +12,11 @@ export interface MediaPickRequest {
   storeId: string;
   assetKey: string;
   title?: string;
-  onSelect: (url: string) => void;
+  /** When true, user can select multiple library images and upload several at once */
+  multiple?: boolean;
+  /** Required for single-select; optional when `multiple` and `onSelectMultiple` are set */
+  onSelect?: (url: string) => void;
+  onSelectMultiple?: (urls: string[]) => void;
 }
 
 interface BuilderMediaContextValue {
@@ -53,7 +57,7 @@ export function BuilderMediaProvider({
       throw new Error('Please select an image file.');
     }
     const dataUrl = await readFileAsDataUrl(file);
-    const productId = `homepage-${sid}-${assetKey}`;
+    const productId = `homepage-${sid}-${assetKey}-${Date.now()}`;
     const uploaded = await uploadProductImageToR2({ productId, dataUrl });
     const next = addToBuilderMediaLibrary(sid, uploaded.url, file.name);
     setLibrary(next);
@@ -70,16 +74,43 @@ export function BuilderMediaProvider({
     setLibrary(next);
   }, []);
 
+  const closePicker = useCallback(() => setPickerRequest(null), []);
+
   const handleSelect = useCallback(
     (url: string) => {
       if (pickerRequest) {
         addToBuilderMediaLibrary(pickerRequest.storeId, url);
         refreshLibrary(pickerRequest.storeId);
-        pickerRequest.onSelect(url);
+        pickerRequest.onSelect?.(url);
       }
-      setPickerRequest(null);
+      closePicker();
     },
-    [pickerRequest, refreshLibrary]
+    [pickerRequest, refreshLibrary, closePicker]
+  );
+
+  const handleSelectMultiple = useCallback(
+    (urls: string[]) => {
+      if (!pickerRequest || urls.length === 0) return;
+      for (const url of urls) {
+        addToBuilderMediaLibrary(pickerRequest.storeId, url);
+      }
+      refreshLibrary(pickerRequest.storeId);
+      if (pickerRequest.onSelectMultiple) {
+        pickerRequest.onSelectMultiple(urls);
+      } else {
+        urls.forEach((url) => pickerRequest.onSelect?.(url));
+      }
+      closePicker();
+    },
+    [pickerRequest, refreshLibrary, closePicker]
+  );
+
+  const handleUpload = useCallback(
+    async (file: File) => {
+      if (!pickerRequest) throw new Error('No active picker');
+      return uploadImage(file, pickerRequest.storeId, pickerRequest.assetKey);
+    },
+    [pickerRequest, uploadImage]
   );
 
   const value = useMemo(
@@ -98,14 +129,13 @@ export function BuilderMediaProvider({
       {children}
       {pickerRequest && (
         <MediaPickerModal
-          title={pickerRequest.title || 'Choose image'}
+          title={pickerRequest.title || (pickerRequest.multiple ? 'Choose images' : 'Choose image')}
           library={library}
-          onClose={() => setPickerRequest(null)}
+          multiple={pickerRequest.multiple}
+          onClose={closePicker}
           onSelect={handleSelect}
-          onUpload={async (file) => {
-            const url = await uploadImage(file, pickerRequest.storeId, pickerRequest.assetKey);
-            handleSelect(url);
-          }}
+          onSelectMultiple={handleSelectMultiple}
+          onUpload={handleUpload}
           onRemove={(id) => removeFromLibrary(pickerRequest.storeId, id)}
         />
       )}

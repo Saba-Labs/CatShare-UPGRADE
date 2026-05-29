@@ -1,8 +1,9 @@
-import React from 'react';
 import { v4 as uuid } from 'uuid';
 import { WebsiteModeConfig } from '../../types/homepage';
 import SeoSettingsPanel from './SeoSettingsPanel';
 import MediaPickerButton from './media/MediaPickerButton';
+import StoreLinkPicker from './StoreLinkPicker';
+import SidebarSection from './SidebarSection';
 
 interface SiteSettingsPanelProps {
   websiteConfig: WebsiteModeConfig;
@@ -11,111 +12,137 @@ interface SiteSettingsPanelProps {
   onUpdateWebsiteConfig: (updates: Partial<WebsiteModeConfig>) => void;
 }
 
-export default function SiteSettingsPanel({ websiteConfig, storeId, storeSlug, onUpdateWebsiteConfig }: SiteSettingsPanelProps) {
+export default function SiteSettingsPanel({
+  websiteConfig,
+  storeId,
+  storeSlug,
+  onUpdateWebsiteConfig,
+}: SiteSettingsPanelProps) {
   const { siteSettings } = websiteConfig;
+  const navItems = siteSettings.navItems || [];
 
   return (
     <div className="sidebar-panel">
-      <div className="sidebar-panel-header">
-        <h3>Site</h3>
-      </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Site name</label>
-        <input
-          className="panel-input"
-          value={siteSettings.websiteName || ''}
-          onChange={(e) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, websiteName: e.target.value } })}
-        />
-      </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Logo</label>
-        <MediaPickerButton
-          storeId={storeId}
-          assetKey="site-logo"
-          label="Upload logo"
-          currentUrl={siteSettings.logoUrl}
-          onUrl={(url) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, logoUrl: url } })}
-        />
-      </div>
-      <div className="sidebar-panel-section panel-checkbox">
-        <input
-          type="checkbox"
-          id="show-announcement"
-          checked={!!siteSettings.showAnnouncement}
-          onChange={(e) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, showAnnouncement: e.target.checked } })}
-        />
-        <label htmlFor="show-announcement">Show announcement bar</label>
-      </div>
-      {siteSettings.showAnnouncement && (
-        <div className="sidebar-panel-section">
-          <label className="panel-label">Announcement</label>
+      <SidebarSection title="General" description="Name and logo shown in the site header.">
+        <div className="sidebar-field">
+          <label className="panel-label">Site name</label>
           <input
             className="panel-input"
-            value={siteSettings.announcementText || ''}
-            onChange={(e) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, announcementText: e.target.value } })}
+            value={siteSettings.websiteName || ''}
+            onChange={(e) =>
+              onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, websiteName: e.target.value } })
+            }
           />
         </div>
-      )}
+        <div className="sidebar-field">
+          <label className="panel-label">Logo</label>
+          <MediaPickerButton
+            storeId={storeId}
+            assetKey="site-logo"
+            label="Upload logo"
+            currentUrl={siteSettings.logoUrl}
+            onUrl={(url) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, logoUrl: url } })}
+          />
+        </div>
+      </SidebarSection>
 
-      <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Menu</h3>
-        <button
-          type="button"
-          className="btn-text"
-          onClick={() =>
-            onUpdateWebsiteConfig({
-              siteSettings: {
-                ...siteSettings,
-                navItems: [...(siteSettings.navItems || []), { id: uuid(), label: 'Link', href: '/' }],
-              },
-            })
-          }
-        >
-          + Add
-        </button>
-      </div>
-      <div className="nav-items-list">
-        {(siteSettings.navItems || []).map((item, index) => (
-          <div key={item.id} className="nav-item-row">
-            <input
-              className="panel-input"
-              value={item.label}
-              onChange={(e) => updateNav(websiteConfig, item.id, { label: e.target.value }, onUpdateWebsiteConfig)}
-              placeholder="Label"
-            />
-            <input
-              className="panel-input"
-              value={item.href}
-              onChange={(e) => updateNav(websiteConfig, item.id, { href: sanitizeHref(e.target.value) }, onUpdateWebsiteConfig)}
-              placeholder="/page"
-            />
-            <div className="nav-item-row-actions">
-              <button type="button" className="btn-icon-sm" disabled={index === 0} onClick={() => moveNav(websiteConfig, item.id, -1, onUpdateWebsiteConfig)}>↑</button>
-              <button type="button" className="btn-icon-sm" disabled={index === (siteSettings.navItems?.length || 0) - 1} onClick={() => moveNav(websiteConfig, item.id, 1, onUpdateWebsiteConfig)}>↓</button>
-              <button type="button" className="btn-icon-sm danger" onClick={() => removeNav(websiteConfig, item.id, onUpdateWebsiteConfig)}>×</button>
-            </div>
+      <p className="panel-hint" style={{ margin: '0 0 12px' }}>
+        To edit the free-shipping bar, click it at the top of the page preview (above the logo).
+      </p>
+
+      <SidebarSection
+        title="Navigation menu"
+        description="Links in the header and mobile menu."
+        action={
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() =>
+              onUpdateWebsiteConfig({
+                siteSettings: {
+                  ...siteSettings,
+                  navItems: [...navItems, { id: uuid(), label: 'Link', href: '/' }],
+                },
+              })
+            }
+          >
+            + Add
+          </button>
+        }
+      >
+        {navItems.length === 0 ? (
+          <p className="sidebar-empty-hint">No menu links yet. Add one to get started.</p>
+        ) : (
+          <div className="sidebar-list">
+            {navItems.map((item, index) => (
+              <div key={item.id} className="sidebar-list-item">
+                <span className="sidebar-list-item__index">Link {index + 1}</span>
+                <div className="sidebar-field">
+                  <label className="panel-label">Label</label>
+                  <input
+                    className="panel-input"
+                    value={item.label}
+                    onChange={(e) => updateNav(websiteConfig, item.id, { label: e.target.value }, onUpdateWebsiteConfig)}
+                    placeholder="e.g. Shop"
+                  />
+                </div>
+                <div className="sidebar-field">
+                  <label className="panel-label">Destination</label>
+                  <StoreLinkPicker
+                    value={item.href}
+                    websiteConfig={websiteConfig}
+                    onChange={(href) =>
+                      updateNav(websiteConfig, item.id, { href: sanitizeHref(href) }, onUpdateWebsiteConfig)
+                    }
+                  />
+                </div>
+                <div className="sidebar-list-item__actions">
+                  <button
+                    type="button"
+                    className="btn-icon-sm"
+                    disabled={index === 0}
+                    onClick={() => moveNav(websiteConfig, item.id, -1, onUpdateWebsiteConfig)}
+                    title="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon-sm"
+                    disabled={index === navItems.length - 1}
+                    onClick={() => moveNav(websiteConfig, item.id, 1, onUpdateWebsiteConfig)}
+                    title="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon-sm danger"
+                    onClick={() => removeNav(websiteConfig, item.id, onUpdateWebsiteConfig)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </SidebarSection>
 
-      <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Footer background</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={siteSettings.footerBg || '#0f172a'}
-          onChange={(e) => onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, footerBg: e.target.value } })}
+      <p className="panel-hint" style={{ margin: '0 0 12px' }}>
+        To edit your storefront footer, click it at the bottom of the page preview — the same way you edit hero and other sections.
+      </p>
+
+      <SidebarSection title="SEO" description="Search and social preview for your live storefront.">
+        <SeoSettingsPanel
+          websiteConfig={websiteConfig}
+          storeId={storeId}
+          storeSlug={storeSlug}
+          onUpdateWebsiteConfig={onUpdateWebsiteConfig}
+          embedded
         />
-      </div>
-
-      <SeoSettingsPanel
-        websiteConfig={websiteConfig}
-        storeId={storeId}
-        storeSlug={storeSlug}
-        onUpdateWebsiteConfig={onUpdateWebsiteConfig}
-      />
+      </SidebarSection>
     </div>
   );
 }
@@ -136,12 +163,19 @@ function updateNav(
   onUpdate({
     siteSettings: {
       ...websiteConfig.siteSettings,
-      navItems: (websiteConfig.siteSettings.navItems || []).map((item) => (item.id === id ? { ...item, ...updates } : item)),
+      navItems: (websiteConfig.siteSettings.navItems || []).map((item) =>
+        item.id === id ? { ...item, ...updates } : item
+      ),
     },
   });
 }
 
-function moveNav(websiteConfig: WebsiteModeConfig, id: string, dir: -1 | 1, onUpdate: (u: Partial<WebsiteModeConfig>) => void) {
+function moveNav(
+  websiteConfig: WebsiteModeConfig,
+  id: string,
+  dir: -1 | 1,
+  onUpdate: (u: Partial<WebsiteModeConfig>) => void
+) {
   const items = [...(websiteConfig.siteSettings.navItems || [])];
   const idx = items.findIndex((i) => i.id === id);
   if (idx < 0) return;
@@ -152,7 +186,11 @@ function moveNav(websiteConfig: WebsiteModeConfig, id: string, dir: -1 | 1, onUp
   onUpdate({ siteSettings: { ...websiteConfig.siteSettings, navItems: items } });
 }
 
-function removeNav(websiteConfig: WebsiteModeConfig, id: string, onUpdate: (u: Partial<WebsiteModeConfig>) => void) {
+function removeNav(
+  websiteConfig: WebsiteModeConfig,
+  id: string,
+  onUpdate: (u: Partial<WebsiteModeConfig>) => void
+) {
   onUpdate({
     siteSettings: {
       ...websiteConfig.siteSettings,
