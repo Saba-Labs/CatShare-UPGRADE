@@ -40,14 +40,21 @@ function stampPublishedLayout(
   layout: HomepageLayout,
   options?: { updatedBy?: string }
 ): HomepageLayout {
-  const nextLayout = { ...layout } as HomepageLayout & { websiteConfig?: Record<string, unknown> };
-  nextLayout.websiteConfig = { ...(nextLayout.websiteConfig || {}) };
-  nextLayout.websiteConfig.versioning = {
-    ...((nextLayout.websiteConfig.versioning as Record<string, unknown>) || {}),
-    publishedAt: new Date().toISOString(),
-    updatedBy: options?.updatedBy ?? null,
+  const websiteConfig = layout.websiteConfig;
+  if (!websiteConfig) {
+    return layout;
+  }
+  return {
+    ...layout,
+    websiteConfig: {
+      ...websiteConfig,
+      versioning: {
+        ...(websiteConfig.versioning || {}),
+        publishedAt: new Date().toISOString(),
+        updatedBy: options?.updatedBy ?? null,
+      },
+    },
   };
-  return nextLayout;
 }
 
 async function fetchHomepageConfigFromCloud(storeId: string): Promise<HomepageConfig | null> {

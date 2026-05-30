@@ -13,7 +13,7 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { BlockPresetId } from '../../../config/blockPresets';
 import { SECTION_TYPE_LABELS } from '../../../config/homepageBuilderConfig';
-import type { HomepageSection, HomepageSectionType } from '../../../types/homepage';
+import type { HomepageSectionType, LayoutSection } from '../../../types/homepage';
 import { BLOCK_PRESETS } from '../../../config/blockPresets';
 import {
   type BuilderDragData,
@@ -23,10 +23,10 @@ import {
 
 interface BuilderDndProviderProps {
   children: React.ReactNode;
-  sections: HomepageSection[];
+  sections: LayoutSection[];
   onInsertSectionAt: (type: HomepageSectionType, index: number) => void;
   onInsertPresetAt: (presetId: BlockPresetId, index: number) => void;
-  onReorderSections: (sections: HomepageSection[]) => void;
+  onReorderSections: (sections: LayoutSection[]) => void;
 }
 
 export default function BuilderDndProvider({

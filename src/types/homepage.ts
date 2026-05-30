@@ -411,15 +411,15 @@ export interface BlockLayout {
   align?: BlockAlign;
 }
 
+export type LayoutSection = HomepageSection & {
+  id: string;
+  order: number;
+  gridPosition?: GridPosition;
+  blockLayout?: BlockLayout;
+};
+
 export interface HomepageLayout {
-  sections: Array<
-    HomepageSection & {
-      id: string;
-      order: number;
-      gridPosition?: GridPosition;
-      blockLayout?: BlockLayout;
-    }
-  >;
+  sections: LayoutSection[];
   theme: ThemeSettings;
   gridColumns?: number;
   gridGap?: number;
