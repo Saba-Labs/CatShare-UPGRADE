@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { useHomepageBuilder } from '../../hooks/useHomepageBuilder';
+import type { FreeformElementType, FreeformSection } from '../../types/homepage';
+import { createFreeformElement } from '../../utils/freeformElements';
 import { useHomepageAutosave } from '../../hooks/useHomepageAutosave';
 import { useResponsiveBuilder } from '../../hooks/useResponsiveBuilder';
 import {
@@ -72,6 +74,7 @@ export default function HomepageBuilder({
   const [isPublishing, setIsPublishing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [selectedFreeformElementId, setSelectedFreeformElementId] = useState<string | null>(null);
 
   const configPersisted = isPersistedHomepageConfigId(config?.id);
 
@@ -418,7 +421,28 @@ export default function HomepageBuilder({
 
   const handleSelectSection = (id: string | null) => {
     actions.selectSection(id);
+    setSelectedFreeformElementId(null);
   };
+
+  const addFreeformElement = useCallback(
+    (elementType: FreeformElementType) => {
+      const selected = state.layout.sections.find((s) => s.id === state.selectedSectionId);
+      if (selected?.type === 'freeform') {
+        const section = selected as FreeformSection & { id: string };
+        const elements = section.content.elements || [];
+        const maxZ = elements.reduce((m, el) => Math.max(m, el.layout.zIndex ?? 0), 0);
+        const el = createFreeformElement(elementType, maxZ + 1);
+        actions.updateSection(selected.id, {
+          content: { elements: [...elements, el] },
+        } as Partial<FreeformSection>);
+        setSelectedFreeformElementId(el.id);
+        return;
+      }
+      actions.addFreeformElement(elementType);
+      showToast('Design canvas added — drag layers to position them', 'success');
+    },
+    [state.layout.sections, state.selectedSectionId, actions, showToast]
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -534,6 +558,9 @@ export default function HomepageBuilder({
                   storeId={storeId}
                   editingPageId={editingPageId}
                   selectedSectionId={state.selectedSectionId}
+                  selectedFreeformElementId={selectedFreeformElementId}
+                  onSelectFreeformElement={setSelectedFreeformElementId}
+                  onAddFreeformLayer={addFreeformElement}
                   onSelectSection={handleSelectSection}
                   onRemoveSection={actions.removeSection}
                   onDuplicateSection={actions.duplicateSection}
@@ -551,6 +578,8 @@ export default function HomepageBuilder({
               activeTab={sidebarTab}
               onTabChange={setSidebarTab}
               selectedSectionId={state.selectedSectionId}
+              selectedFreeformElementId={selectedFreeformElementId}
+              onSelectFreeformElement={setSelectedFreeformElementId}
               sections={state.layout.sections}
               theme={state.layout.theme}
               websiteConfig={state.layout.websiteConfig || createDefaultWebsiteModeConfig()}
@@ -558,6 +587,7 @@ export default function HomepageBuilder({
               storeId={storeId}
               storeSlug={storeSlug}
               onAddSection={actions.addSection}
+              onAddFreeformElement={addFreeformElement}
               onAddPreset={actions.addBlockPreset}
               onUpdateSection={actions.updateSection}
               onUpdateTheme={handleUpdateTheme}

@@ -9,5 +9,5 @@ interface WebsiteHeaderProps {
 
 export default function WebsiteHeader({ slug, siteSettings, onSubdomain }: WebsiteHeaderProps) {
   const basePath = onSubdomain ? '' : `/store/${slug}`;
-  return <StorefrontSiteHeader siteSettings={siteSettings} basePath={basePath || '/'} />;
+  return <StorefrontSiteHeader siteSettings={siteSettings} basePath={basePath} />;
 }

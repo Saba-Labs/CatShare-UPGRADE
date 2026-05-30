@@ -11,6 +11,7 @@ interface ProductGridEditorProps {
 }
 
 function currentSource(content: ProductGridSection['content']): GridSource {
+  if (content.productSource) return content.productSource;
   if (content.productIds && content.productIds.length > 0) return 'specific';
   if (content.categoryId) return 'category';
   return 'all';
@@ -27,9 +28,13 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
     onUpdate({ content: { ...content, ...patch } } as Partial<HomepageSection>);
 
   const setSource = (next: GridSource) => {
-    if (next === 'all') updateContent({ categoryId: undefined, productIds: [] });
-    else if (next === 'category') updateContent({ productIds: [] });
-    else updateContent({ categoryId: undefined });
+    if (next === 'all') {
+      updateContent({ productSource: 'all', categoryId: undefined, productIds: [] });
+    } else if (next === 'category') {
+      updateContent({ productSource: 'category', productIds: [] });
+    } else {
+      updateContent({ productSource: 'specific', categoryId: undefined, productIds: content.productIds ?? [] });
+    }
   };
 
   return (

@@ -11,6 +11,8 @@ import CategoryShowcaseEditor from './editors/CategoryShowcaseEditor';
 import ProductGridEditor from './editors/ProductGridEditor';
 import TestimonialsSectionEditor from './editors/TestimonialsSectionEditor';
 import ContentGridSectionEditor from './editors/ContentGridSectionEditor';
+import FreeformSectionEditor from './editors/FreeformSectionEditor';
+import type { FreeformSection } from '../../types/homepage';
 import FooterSettingsEditor from './FooterSettingsEditor';
 import SectionStyleControls from './SectionStyleControls';
 import SidebarSection from './SidebarSection';
@@ -25,6 +27,7 @@ const DEDICATED_EDITOR_TYPES = [
   'divider',
   'testimonials',
   'content-grid',
+  'freeform',
   ...CATALOGUE_SECTION_TYPES,
 ];
 
@@ -32,6 +35,8 @@ interface SectionQuickPanelProps {
   section: HomepageSection & { id: string };
   storeId: string;
   websiteConfig?: WebsiteModeConfig;
+  selectedFreeformElementId?: string | null;
+  onSelectFreeformElement?: (id: string | null) => void;
   onUpdateWebsiteConfig?: (updates: Partial<WebsiteModeConfig>) => void;
   onUpdate: (updates: Partial<HomepageSection>) => void;
   onBack: () => void;
@@ -41,6 +46,8 @@ export default function SectionQuickPanel({
   section,
   storeId,
   websiteConfig,
+  selectedFreeformElementId = null,
+  onSelectFreeformElement,
   onUpdateWebsiteConfig,
   onUpdate,
   onBack,
@@ -60,7 +67,7 @@ export default function SectionQuickPanel({
         </div>
       </div>
 
-      {section.type !== 'footer' && (
+      {section.type !== 'footer' && section.type !== 'freeform' && (
         <SidebarSection title="Style" icon={<FiDroplet />} description="Spacing, colors & layout">
           <SectionStyleControls section={section} onUpdate={onUpdate} />
         </SidebarSection>
@@ -103,6 +110,15 @@ export default function SectionQuickPanel({
         )}
         {section.type === 'content-grid' && (
           <ContentGridSectionEditor section={section as any} storeId={storeId} onUpdate={onUpdate} />
+        )}
+        {section.type === 'freeform' && onSelectFreeformElement && (
+          <FreeformSectionEditor
+            section={section as FreeformSection & { id: string }}
+            storeId={storeId}
+            selectedElementId={selectedFreeformElementId}
+            onSelectElement={onSelectFreeformElement}
+            onUpdate={onUpdate}
+          />
         )}
         {section.type !== 'footer' && !DEDICATED_EDITOR_TYPES.includes(section.type) && (
           <GenericSectionEditor section={section} storeId={storeId} websiteConfig={websiteConfig} onUpdate={onUpdate} />

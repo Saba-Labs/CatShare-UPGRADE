@@ -34,6 +34,7 @@ import {
   FiAlignLeft,
   FiBox,
   FiSliders,
+  FiMousePointer,
 } from 'react-icons/fi';
 import type { HomepageSectionType } from '../../types/homepage';
 import type { BlockPresetId } from '../../config/blockPresets';
@@ -77,7 +78,10 @@ export const SECTION_ICONS: Partial<Record<HomepageSectionType, IconType>> = {
   faq: FiHelpCircle,
   embed: FiCode,
   footer: FiAlignLeft,
+  freeform: FiLayout,
 };
+
+export { FiMousePointer };
 
 export {
   FiPlus,

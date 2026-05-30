@@ -12,6 +12,8 @@ import {
 import { createDefaultSection } from '../config/homepageBuilderConfig';
 import type { BlockPresetId } from '../config/blockPresets';
 import { buildBlockPresetSections } from '../config/blockPresets';
+import type { FreeformElementType } from '../types/homepage';
+import { createFreeformElement, createStarterFreeformSection } from '../utils/freeformElements';
 import { v4 as uuid } from 'uuid';
 
 const initialState: BuilderState = {
@@ -54,7 +56,10 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
     case 'ADD_SECTION': {
       const sectionType: HomepageSectionType = action.payload;
       if (sectionType === 'footer') return state;
-      const newSection = createDefaultSection(sectionType, state.layout.sections.length);
+      const newSection =
+        sectionType === 'freeform'
+          ? createStarterFreeformSection(state.layout.sections.length, uuid())
+          : createDefaultSection(sectionType, state.layout.sections.length);
       return withHistory(
         state,
         {
@@ -82,9 +87,12 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
     case 'INSERT_SECTION_AT': {
       const { sectionType, index } = action.payload as { sectionType: HomepageSectionType; index: number };
       if (sectionType === 'footer') return state;
-      const newSection = createDefaultSection(sectionType, index);
       const sections = [...state.layout.sections];
       const clampedIndex = Math.max(0, Math.min(index, sections.length));
+      const newSection =
+        sectionType === 'freeform'
+          ? createStarterFreeformSection(clampedIndex, uuid())
+          : createDefaultSection(sectionType, index);
       sections.splice(clampedIndex, 0, newSection);
       const reordered = sections.map((s, i) => ({ ...s, order: i }));
       return withHistory(state, { ...state.layout, sections: reordered }, newSection.id);
@@ -100,6 +108,17 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       const reordered = sections.map((s, i) => ({ ...s, order: i }));
       const lastId = newSections[newSections.length - 1].id;
       return withHistory(state, { ...state.layout, sections: reordered }, lastId);
+    }
+
+    case 'ADD_FREEFORM_ELEMENT': {
+      const elementType = action.payload as FreeformElementType;
+      const index = state.layout.sections.length;
+      const id = uuid();
+      const newSection = createStarterFreeformSection(index, id);
+      newSection.content.elements = [createFreeformElement(elementType, 1)];
+      const sections = [...state.layout.sections, newSection];
+      const reordered = sections.map((s, i) => ({ ...s, order: i }));
+      return withHistory(state, { ...state.layout, sections: reordered }, newSection.id);
     }
 
     case 'REMOVE_SECTION': {
@@ -256,6 +275,10 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     dispatch({ type: 'INSERT_PRESET_AT', payload: { presetId, index } });
   }, []);
 
+  const addFreeformElement = useCallback((elementType: FreeformElementType) => {
+    dispatch({ type: 'ADD_FREEFORM_ELEMENT', payload: elementType });
+  }, []);
+
   const removeSection = useCallback((sectionId: string) => {
     dispatch({ type: 'REMOVE_SECTION', payload: sectionId });
   }, []);
@@ -342,6 +365,7 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
       insertSectionAt,
       addBlockPreset,
       insertPresetAt,
+      addFreeformElement,
       removeSection,
       updateSection,
       reorderSections,

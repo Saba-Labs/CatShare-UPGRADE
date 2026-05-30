@@ -25,13 +25,7 @@ export default function SortableGridSection({ id, children }: SortableGridSectio
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`sites-block-row${isDragging ? ' is-dragging' : ''}`}
-      {...attributes}
-      {...listeners}
-    >
+    <div ref={setNodeRef} style={style} className={`sites-block-row${isDragging ? ' is-dragging' : ''}`}>
       {children({ attributes, listeners, isDragging })}
     </div>
   );

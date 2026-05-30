@@ -250,7 +250,7 @@ function buildPulseTech(): WebsiteModeConfig {
         showSearch: true,
         backgroundColor: '#0b1120',
       },
-      content: { categoryId: undefined, productIds: undefined },
+      content: { productSource: 'all', categoryId: undefined, productIds: [] },
     } as HomepageSection),
     section({
       type: 'testimonials',
@@ -377,7 +377,7 @@ function buildCleanMarket(): WebsiteModeConfig {
         showFilters: false,
         showSearch: true,
       },
-      content: { categoryId: undefined, productIds: undefined },
+      content: { productSource: 'all', categoryId: undefined, productIds: [] },
     } as HomepageSection),
     section({
       type: 'feature-card',

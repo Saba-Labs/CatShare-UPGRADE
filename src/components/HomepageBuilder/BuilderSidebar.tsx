@@ -11,7 +11,13 @@ import MediaLibraryPanel from './media/MediaLibraryPanel';
 import { SIDEBAR_TAB_META } from './builderSidebarIcons';
 import { SITE_ANNOUNCEMENT_SELECTION_ID, SITE_FOOTER_SELECTION_ID } from '../../config/homepageBuilderConfig';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
-import { HomepageSection, HomepageSectionType, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
+import {
+  HomepageSection,
+  HomepageSectionType,
+  ThemeSettings,
+  WebsiteModeConfig,
+  FreeformElementType,
+} from '../../types/homepage';
 import { BlockPresetId } from '../../config/blockPresets';
 
 export type SidebarTab = 'insert' | 'templates' | 'pages' | 'theme' | 'site' | 'photos';
@@ -27,6 +33,9 @@ interface BuilderSidebarProps {
   storeId: string;
   storeSlug?: string;
   onAddSection: (type: HomepageSectionType) => void;
+  onAddFreeformElement?: (type: FreeformElementType) => void;
+  selectedFreeformElementId?: string | null;
+  onSelectFreeformElement?: (id: string | null) => void;
   onAddPreset: (presetId: BlockPresetId) => void;
   onUpdateSection: (id: string, updates: Partial<HomepageSection>) => void;
   onUpdateTheme: (updates: Partial<ThemeSettings>) => void;
@@ -51,6 +60,9 @@ export default function BuilderSidebar({
   storeId,
   storeSlug,
   onAddSection,
+  onAddFreeformElement,
+  selectedFreeformElementId = null,
+  onSelectFreeformElement,
   onAddPreset,
   onUpdateSection,
   onUpdateTheme,
@@ -107,6 +119,8 @@ export default function BuilderSidebar({
             section={selectedSection}
             storeId={storeId}
             websiteConfig={websiteConfig}
+            selectedFreeformElementId={selectedFreeformElementId}
+            onSelectFreeformElement={onSelectFreeformElement}
             onUpdateWebsiteConfig={onUpdateWebsiteConfig}
             onUpdate={(updates) => onUpdateSection(selectedSection.id, updates)}
             onBack={onClearSectionSelection}
@@ -125,7 +139,13 @@ export default function BuilderSidebar({
           />
         ) : (
           <>
-            {activeTab === 'insert' && <ComponentPalette onAddSection={onAddSection} onAddPreset={onAddPreset} />}
+            {activeTab === 'insert' && (
+              <ComponentPalette
+                onAddSection={onAddSection}
+                onAddFreeformElement={onAddFreeformElement}
+                onAddPreset={onAddPreset}
+              />
+            )}
             {activeTab === 'templates' && onApplyTemplate && (
               <TemplateGallery variant="compact" onApply={onApplyTemplate} />
             )}

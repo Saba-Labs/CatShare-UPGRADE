@@ -21,6 +21,15 @@ function collectFromSections(sections: HomepageSection[] | undefined, into: Set<
 
     addUrl(into, settings.backgroundImage);
 
+    if (s.type === 'freeform') {
+      const elements = (content as { elements?: Array<{ type?: string; content?: { url?: string } }> })
+        .elements;
+      elements?.forEach((el) => {
+        if (el.type === 'image') addUrl(into, el.content?.url);
+      });
+      continue;
+    }
+
     switch (s.type) {
       case 'image':
         addUrl(into, (content as { url?: string }).url);

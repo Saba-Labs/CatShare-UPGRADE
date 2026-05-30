@@ -18,7 +18,8 @@ export type HomepageSectionType =
   | 'content-grid'
   | 'divider'
   | 'faq'
-  | 'embed';
+  | 'embed'
+  | 'freeform';
 
 export interface CarouselImage {
   id: string;
@@ -160,6 +161,8 @@ export interface ProductGridSection {
     backgroundColor?: string;
   };
   content: {
+    /** How products are chosen for this grid (persisted; do not infer from ids alone). */
+    productSource?: 'all' | 'category' | 'specific';
     categoryId?: string;
     productIds?: string[];
   };
@@ -362,6 +365,66 @@ export interface EmbedSection {
   };
 }
 
+export type FreeformElementType = 'text' | 'image' | 'button';
+
+/** Position and size within a design canvas (% of canvas box). */
+export interface FreeformElementLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex: number;
+}
+
+export interface FreeformTextElement {
+  id: string;
+  type: 'text';
+  layout: FreeformElementLayout;
+  content: {
+    text: string;
+    fontSize?: number;
+    color?: string;
+    fontWeight?: 'normal' | 'bold';
+    textAlign?: 'left' | 'center' | 'right';
+  };
+}
+
+export interface FreeformImageElement {
+  id: string;
+  type: 'image';
+  layout: FreeformElementLayout;
+  content: {
+    url: string;
+    alt?: string;
+    objectFit?: 'cover' | 'contain' | 'fill';
+    rounded?: boolean;
+    shadow?: boolean;
+  };
+}
+
+export interface FreeformButtonElement {
+  id: string;
+  type: 'button';
+  layout: FreeformElementLayout;
+  content: {
+    label: string;
+    href: string;
+  };
+}
+
+export type FreeformElement = FreeformTextElement | FreeformImageElement | FreeformButtonElement;
+
+export interface FreeformSection {
+  type: 'freeform';
+  settings: {
+    minHeightPx: number;
+    backgroundColor?: string;
+  };
+  content: {
+    elements: FreeformElement[];
+  };
+}
+
 export type HomepageSection =
   | CarouselSection
   | TextSection
@@ -380,7 +443,8 @@ export type HomepageSection =
   | ContentGridSection
   | DividerSection
   | FaqSection
-  | EmbedSection;
+  | EmbedSection
+  | FreeformSection;
 
 export interface ThemeSettings {
   primaryColor?: string;
@@ -584,6 +648,7 @@ export interface BuilderAction {
     | 'ADD_PRESET_SECTIONS'
     | 'INSERT_SECTION_AT'
     | 'INSERT_PRESET_AT'
+    | 'ADD_FREEFORM_ELEMENT'
     | 'UNDO'
     | 'REDO';
   payload?: any;

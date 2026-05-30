@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { WebsiteModeConfig } from '../../types/homepage';
 import { buildStoreLinkOptions, groupStoreLinkOptions } from '../../utils/storeLinkOptions';
+import { normalizeStorefrontPath } from '../../utils/storefrontHref';
 import { useBuilderCatalogue } from './catalogue/BuilderCatalogueContext';
 
 interface StoreLinkPickerProps {
@@ -41,7 +42,7 @@ export default function StoreLinkPicker({
         className="panel-select"
         value={matchedOption?.href || ''}
         onChange={(e) => {
-          if (e.target.value) onChange(e.target.value);
+          if (e.target.value) onChange(normalizeStorefrontPath(e.target.value));
         }}
         aria-label="Choose a store link"
       >
@@ -61,7 +62,7 @@ export default function StoreLinkPicker({
           type="text"
           className="panel-input"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(normalizeStorefrontPath(e.target.value))}
           placeholder={placeholder}
         />
       )}

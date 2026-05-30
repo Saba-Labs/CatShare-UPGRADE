@@ -12,13 +12,17 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {error:
   }
   componentDidCatch(error: Error) {
     console.error("APP CRASH:", error.message, error.stack);
-    this.setState({ error: error.message });
+    this.setState({ error: `${error.message}\n\nOpen DevTools (F12) → Console for details.` });
   }
   render() {
     if (this.state.error) {
       return (
-        <div style={{padding: 20, color: 'red', background: 'white', fontSize: 14}}>
-          <b>App Error:</b><br/>{this.state.error}
+        <div style={{padding: 20, color: '#b91c1c', background: 'white', fontSize: 14, maxWidth: 480, margin: '40px auto', lineHeight: 1.5}}>
+          <b>App failed to start</b>
+          <pre style={{whiteSpace: 'pre-wrap', marginTop: 12, fontFamily: 'system-ui, sans-serif', fontSize: 13}}>{this.state.error}</pre>
+          <p style={{marginTop: 16, color: '#374151', fontSize: 13}}>
+            Try: stop the dev server, run <code>npm run dev</code> again, then hard-refresh (Ctrl+Shift+R).
+          </p>
         </div>
       );
     }

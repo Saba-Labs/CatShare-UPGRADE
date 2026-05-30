@@ -18,12 +18,18 @@ import ContentGridSectionView from './ContentGridSectionView';
 import DividerSectionView from './DividerSectionView';
 import FaqSectionView from './FaqSectionView';
 import EmbedSectionView from './EmbedSectionView';
+import FreeformSectionView from './FreeformSectionView';
+import type { FreeformElementType, FreeformSection } from '../../../types/homepage';
 
 interface SectionRendererProps {
   section: HomepageSection & { id: string };
   theme?: ThemeSettings;
   storeId?: string;
   editMode?: boolean;
+  selectedFreeformElementId?: string | null;
+  onSelectFreeformElement?: (elementId: string | null) => void;
+  onAddFreeformLayer?: (type: FreeformElementType) => void;
+  onActivateFreeform?: () => void;
   onUpdateSection?: (updates: Partial<HomepageSection>) => void;
 }
 
@@ -32,6 +38,10 @@ export default function SectionRenderer({
   theme,
   storeId,
   editMode = false,
+  selectedFreeformElementId = null,
+  onSelectFreeformElement,
+  onAddFreeformLayer,
+  onActivateFreeform,
   onUpdateSection,
 }: SectionRendererProps) {
   const commonProps = { section, theme, storeId, editMode, onUpdateSection };
@@ -73,6 +83,20 @@ export default function SectionRenderer({
       return <FaqSectionView {...commonProps} section={section as any} />;
     case 'embed':
       return <EmbedSectionView {...commonProps} section={section as any} />;
+    case 'freeform':
+      return (
+        <FreeformSectionView
+          section={section as FreeformSection & { id: string }}
+          theme={theme}
+          storeId={storeId}
+          editMode={editMode}
+          selectedElementId={selectedFreeformElementId}
+          onSelectElement={onSelectFreeformElement}
+          onAddLayer={onAddFreeformLayer}
+          onActivate={onActivateFreeform}
+          onUpdateSection={onUpdateSection as (u: Partial<FreeformSection>) => void}
+        />
+      );
     default:
       return (
         <div style={{ padding: '20px', background: '#fee2e2', borderRadius: '8px', color: '#dc2626' }}>

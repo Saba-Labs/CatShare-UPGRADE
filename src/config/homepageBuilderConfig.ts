@@ -4,9 +4,12 @@ import {
   ThemeSettings,
   WebsiteModeConfig,
   HomepageLayout,
+  WebsiteSiteSettings,
 } from '../types/homepage';
 import { syncSiteThemeAcrossPages } from '../utils/websiteSiteTheme';
 import { v4 as uuid } from 'uuid';
+import { normalizeStorefrontPath } from '../utils/storefrontHref';
+import { normalizeFreeformElementsList } from '../utils/freeformElements';
 
 export const DEFAULT_THEME: ThemeSettings = {
   primaryColor: '#1a73e8',
@@ -37,6 +40,7 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
   divider: 'Divider',
   faq: 'FAQ',
   embed: 'Embed',
+  freeform: 'Design Canvas',
 };
 
 /** Canvas selection id for the site-wide footer chrome (not a page section uuid). */
@@ -64,6 +68,7 @@ export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   divider: 'Horizontal line or spacing between sections',
   faq: 'Expandable questions and answers',
   embed: 'Embed videos, maps, or other iframe content',
+  freeform: 'Free-form canvas — place text, images, and buttons anywhere with drag and resize',
 };
 
 export function createDefaultSection(
@@ -200,8 +205,9 @@ export function createDefaultSection(
           showSearch: true,
         },
         content: {
+          productSource: 'all',
           categoryId: undefined,
-          productIds: undefined,
+          productIds: [],
         },
       } as any;
 
@@ -438,6 +444,20 @@ export function createDefaultSection(
         },
       } as any;
 
+    case 'freeform':
+      return {
+        id,
+        type: 'freeform',
+        order,
+        settings: {
+          minHeightPx: 420,
+          backgroundColor: '#f1f3f4',
+        },
+        content: {
+          elements: [],
+        },
+      } as HomepageSection & { id: string; order: number };
+
     default:
       throw new Error(`Unknown section type: ${type}`);
   }
@@ -509,6 +529,27 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
   };
 }
 
+function normalizeSiteLinkHref(href: string): string {
+  return normalizeStorefrontPath(href);
+}
+
+function normalizeSiteSettingsLinks(site: WebsiteSiteSettings): WebsiteSiteSettings {
+  return {
+    ...site,
+    navItems: (site.navItems || []).map((item) => ({
+      ...item,
+      href: normalizeSiteLinkHref(item.href),
+    })),
+    footerColumns: (site.footerColumns || []).map((column) => ({
+      ...column,
+      links: (column.links || []).map((link) => ({
+        ...link,
+        href: normalizeSiteLinkHref(link.href),
+      })),
+    })),
+  };
+}
+
 export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): HomepageLayout {
   const baseWebsiteConfig = createDefaultWebsiteModeConfig();
   const normalized: HomepageLayout = {
@@ -560,6 +601,10 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
 
   if (normalized.websiteConfig) {
     normalized.websiteConfig = syncSiteThemeAcrossPages(normalized.websiteConfig);
+    normalized.websiteConfig = {
+      ...normalized.websiteConfig,
+      siteSettings: normalizeSiteSettingsLinks(normalized.websiteConfig.siteSettings),
+    };
     normalized.theme = normalized.websiteConfig.pages.home.theme;
     normalized.websiteConfig = {
       ...normalized.websiteConfig,
@@ -567,25 +612,54 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
         ...normalized.websiteConfig.pages,
         home: {
           ...normalized.websiteConfig.pages.home,
-          sections: stripLegacyFooterSections(normalized.websiteConfig.pages.home.sections || []),
+          sections: stripLegacyFooterSections(normalized.websiteConfig.pages.home.sections || []).map(
+            normalizeFreeformSectionShape
+          ),
         },
         custom: (normalized.websiteConfig.pages.custom || []).map((page) => ({
           ...page,
           layout: {
             ...page.layout,
-            sections: stripLegacyFooterSections(page.layout?.sections || []),
+            sections: stripLegacyFooterSections(page.layout?.sections || []).map(
+              normalizeFreeformSectionShape
+            ),
           },
         })),
       },
     };
   }
 
-  normalized.sections = stripLegacyFooterSections(normalized.sections || []);
+  normalized.sections = stripLegacyFooterSections(normalized.sections || []).map(
+    normalizeFreeformSectionShape
+  );
 
   return normalized;
 }
 
+/** Ensure saved/partial freeform blocks do not crash the editor or storefront. */
+function normalizeFreeformSectionShape<T extends { type: string; content?: unknown; settings?: unknown }>(
+  section: T
+): T {
+  if (section.type !== 'freeform') return section;
+  const raw = section as T & {
+    content?: { elements?: unknown[] };
+    settings?: { minHeightPx?: number; backgroundColor?: string };
+  };
+  return {
+    ...section,
+    settings: {
+      minHeightPx: raw.settings?.minHeightPx ?? 420,
+      backgroundColor: raw.settings?.backgroundColor ?? '#f1f3f4',
+      ...raw.settings,
+    },
+    content: {
+      elements: normalizeFreeformElementsList(raw.content?.elements),
+    },
+  } as T;
+}
+
 export const BASIC_SECTION_ORDERING: HomepageSectionType[] = [
+  'freeform',
   'text',
   'image',
   'banner',

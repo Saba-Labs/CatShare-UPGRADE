@@ -1,6 +1,13 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
-import { BlockAlign, BlockLayout, HomepageLayout, HomepageSection, ThemeSettings } from '../../types/homepage';
+import {
+  BlockAlign,
+  BlockLayout,
+  FreeformElementType,
+  HomepageLayout,
+  HomepageSection,
+  ThemeSettings,
+} from '../../types/homepage';
 import SortableGridSection from './SortableGridSection';
 import SectionRenderer from './sections/SectionRenderer';
 import TemplateGallery from './TemplateGallery';
@@ -37,6 +44,9 @@ interface GridCanvasProps {
   storeId: string;
   editingPageId?: string;
   selectedSectionId: string | null;
+  selectedFreeformElementId?: string | null;
+  onSelectFreeformElement?: (elementId: string | null) => void;
+  onAddFreeformLayer?: (type: FreeformElementType) => void;
   onSelectSection: (id: string | null) => void;
   onRemoveSection: (id: string) => void;
   onDuplicateSection: (id: string) => void;
@@ -61,6 +71,9 @@ export default function GridCanvas({
   storeId,
   editingPageId = 'home',
   selectedSectionId,
+  selectedFreeformElementId = null,
+  onSelectFreeformElement,
+  onAddFreeformLayer,
   onSelectSection,
   onRemoveSection,
   onDuplicateSection,
@@ -240,6 +253,7 @@ export default function GridCanvas({
               <SectionDropIndicator index={0} expanded={paletteDragActive} />
               {sortedSections.map((section, sectionIndex) => {
                 const isSelected = selectedSectionId === section.id;
+                const isFreeform = section.type === 'freeform';
                 const liveWidth =
                   dragState && dragState.id === section.id
                     ? dragState.widthPercent
@@ -251,20 +265,22 @@ export default function GridCanvas({
                     : section.blockLayout?.heightPx;
                 const innerStyle = {
                   ...getBlockInnerStyle(section.blockLayout),
-                  width: `${liveWidth}%`,
-                  ...(liveHeight ? { height: `${liveHeight}px`, overflow: 'hidden' as const } : {}),
+                  width: isFreeform ? '100%' : `${liveWidth}%`,
+                  ...(liveHeight && !isFreeform ? { height: `${liveHeight}px`, overflow: 'hidden' as const } : {}),
                 };
                 return (
                   <Fragment key={section.id}>
                   <SortableGridSection id={section.id}>
-                    {({ isDragging }) => (
+                    {({ isDragging, listeners, attributes: handleAttributes }) => (
                       <>
                         <div
                           className="sites-section-drag-grip"
                           title="Drag to move"
-                          aria-hidden
+                          aria-label="Drag section to reorder"
+                          {...listeners}
+                          {...handleAttributes}
                         >
-                          <span className="sites-drag-grip-dots" />
+                          <span className="sites-drag-grip-dots" aria-hidden />
                         </div>
                         <div
                           className="sites-block-row-body"
@@ -274,7 +290,7 @@ export default function GridCanvas({
                           }}
                         >
                           <div
-                  className={`sites-document-block ${isSelected ? 'selected' : ''} ${
+                  className={`sites-document-block${isFreeform ? ' freeform-block-wrap' : ''} ${isSelected ? 'selected' : ''} ${
                     dragState?.id === section.id || heightDragState?.id === section.id ? 'resizing' : ''
                   }${isDragging ? ' dragging' : ''}`}
                   style={innerStyle}
@@ -290,7 +306,12 @@ export default function GridCanvas({
                       onPointerDown={(e) => e.stopPropagation()}
                     >
                       <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
-                      <span className="sites-floating-hint">Drag block to move</span>
+                      <span className="sites-floating-hint">
+                        {isFreeform
+                          ? 'Click canvas to edit layers'
+                          : 'Drag block to move'}
+                      </span>
+                      {!isFreeform && (
                       <div className="sites-align-group">
                         {ALIGN_OPTIONS.map((opt) => (
                           <button
@@ -304,6 +325,8 @@ export default function GridCanvas({
                           </button>
                         ))}
                       </div>
+                      )}
+                      {!isFreeform && (
                       <div className="sites-width-group">
                         {[50, 75, 100].map((w) => (
                           <button
@@ -327,6 +350,7 @@ export default function GridCanvas({
                           </button>
                         ) : null}
                       </div>
+                      )}
                       {sectionSupportsQuickMedia(section.type) && (
                         <button
                           type="button"
@@ -374,10 +398,24 @@ export default function GridCanvas({
                     theme={theme}
                     storeId={storeId}
                     editMode={isSelected}
+                    selectedFreeformElementId={
+                      isFreeform && isSelected ? selectedFreeformElementId : null
+                    }
+                    onSelectFreeformElement={
+                      isFreeform ? onSelectFreeformElement : undefined
+                    }
+                    onAddFreeformLayer={
+                      isFreeform && isSelected ? onAddFreeformLayer : undefined
+                    }
+                    onActivateFreeform={
+                      isFreeform && !isSelected
+                        ? () => onSelectSection(section.id)
+                        : undefined
+                    }
                     onUpdateSection={(updates) => onUpdateSection(section.id, updates)}
                   />
 
-                  {isSelected && (
+                  {isSelected && !isFreeform && (
                     <>
                       <div
                         className="sites-resize-handle right"

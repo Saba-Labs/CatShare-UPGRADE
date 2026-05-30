@@ -14,16 +14,20 @@ export default function ProductGridSectionView({ section, editMode }: ProductGri
   const { settings, content } = section;
   const storeCtx = useWebsiteStoreOptional();
 
+  const source =
+    content.productSource ||
+    (content.productIds?.length ? 'specific' : content.categoryId ? 'category' : 'all');
+
   let displayProducts = storeCtx?.products || [];
-  if (storeCtx && content.categoryId) {
+  if (storeCtx && source === 'category' && content.categoryId) {
     const catId = String(content.categoryId).toLowerCase();
     displayProducts = displayProducts.filter((p) => {
       const cats = Array.isArray(p.category) ? p.category : p.category ? [String(p.category)] : [];
       return cats.some((c) => String(c).toLowerCase() === catId);
     });
   }
-  if (storeCtx && content.productIds?.length) {
-    displayProducts = content.productIds
+  if (storeCtx && source === 'specific') {
+    displayProducts = (content.productIds || [])
       .map((id) => storeCtx.products.find((p) => p.id === id))
       .filter((p): p is NonNullable<typeof p> => !!p);
   }

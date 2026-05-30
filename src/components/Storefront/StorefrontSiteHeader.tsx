@@ -1,19 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { WebsiteNavItem, WebsiteSiteSettings } from '../../types/homepage';
+import { isExternalHref, normalizeStorefrontPath, resolveStorefrontHref } from '../../utils/storefrontHref';
 import './storefront-site-header.css';
 
 const DEFAULT_NAV: WebsiteNavItem[] = [{ id: 'home', label: 'Home', href: '/' }];
-
-function resolveNavHref(href: string, basePath: string): string {
-  if (/^https?:\/\//i.test(href)) return href;
-  if (href.startsWith('/')) {
-    const suffix = href === '/' ? '' : href;
-    const combined = `${basePath}${suffix}`;
-    return combined.replace(/([^:]\/)\/+/g, '$1');
-  }
-  return href;
-}
 
 interface StorefrontSiteHeaderProps {
   siteSettings: WebsiteSiteSettings;
@@ -83,8 +74,9 @@ export default function StorefrontSiteHeader({
         </span>
       );
     }
-    const to = resolveNavHref(item.href, basePath);
-    if (/^https?:\/\//i.test(to)) {
+    const normalizedHref = normalizeStorefrontPath(item.href);
+    const to = resolveStorefrontHref(normalizedHref, basePath);
+    if (isExternalHref(normalizedHref)) {
       return (
         <a key={item.id} href={to} className={className} onClick={onNavigate}>
           {item.label}
