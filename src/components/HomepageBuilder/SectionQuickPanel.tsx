@@ -14,6 +14,7 @@ import ContentGridSectionEditor from './editors/ContentGridSectionEditor';
 import FooterSettingsEditor from './FooterSettingsEditor';
 import SectionStyleControls from './SectionStyleControls';
 import SidebarSection from './SidebarSection';
+import { FiArrowLeft, FiDroplet, FiSliders, SECTION_ICONS } from './builderSidebarIcons';
 
 const CATALOGUE_SECTION_TYPES = ['featured-products', 'category-showcase', 'product-grid'];
 const DEDICATED_EDITOR_TYPES = [
@@ -44,23 +45,32 @@ export default function SectionQuickPanel({
   onUpdate,
   onBack,
 }: SectionQuickPanelProps) {
+  const SectionIcon = SECTION_ICONS[section.type];
+  const sectionTitle = SECTION_TYPE_LABELS[section.type] || 'Section';
+
   return (
     <div className="sidebar-panel">
       <div className="sidebar-panel-toolbar">
-        <button type="button" className="btn-text sidebar-back-btn" onClick={onBack}>
-          ← Back
+        <button type="button" className="btn-icon-action sidebar-back-btn" onClick={onBack} title="Back" aria-label="Back">
+          <FiArrowLeft aria-hidden />
         </button>
-        <h3 className="sidebar-panel-toolbar__title">{SECTION_TYPE_LABELS[section.type] || 'Section'}</h3>
+        <div className="sidebar-panel-toolbar__head">
+          {SectionIcon ? <SectionIcon className="sidebar-panel-toolbar__icon" aria-hidden /> : null}
+          <h3 className="sidebar-panel-toolbar__title">{sectionTitle}</h3>
+        </div>
       </div>
-      <p className="sidebar-top-hint">Click text on the page to edit inline. Use these controls for advanced options.</p>
 
       {section.type !== 'footer' && (
-        <SidebarSection title="Block style">
+        <SidebarSection title="Style" icon={<FiDroplet />} description="Spacing, colors & layout">
           <SectionStyleControls section={section} onUpdate={onUpdate} />
         </SidebarSection>
       )}
 
-      <SidebarSection title={section.type === 'footer' ? 'Footer settings' : 'Content & settings'}>
+      <SidebarSection
+        title={section.type === 'footer' ? 'Footer' : 'Content'}
+        icon={<FiSliders />}
+        description="Block settings"
+      >
         {section.type === 'footer' && websiteConfig && onUpdateWebsiteConfig && (
           <FooterSettingsEditor
             siteSettings={websiteConfig.siteSettings}

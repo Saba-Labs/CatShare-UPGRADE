@@ -12,12 +12,14 @@ export default function TemplateGallery({ variant = 'full', onApply, onStartBlan
 
   return (
     <div className={`template-gallery template-gallery-${variant}`}>
-      <div className="template-gallery-head">
-        <h3 className="template-gallery-title">Start with a template</h3>
-        <p className="template-gallery-sub">
-          One template for your whole site — home, shop, product pages, checkout, and every page you add.
-        </p>
-      </div>
+      {variant === 'full' && (
+        <div className="template-gallery-head">
+          <h3 className="template-gallery-title">Templates</h3>
+          <p className="template-gallery-sub">
+            One look for your whole site — home, shop, checkout & pages.
+          </p>
+        </div>
+      )}
 
       <div className="template-gallery-grid">
         {WEBSITE_TEMPLATES.map((tpl) => (
@@ -47,8 +49,8 @@ export default function TemplateGallery({ variant = 'full', onApply, onStartBlan
                   <span key={color} className="template-swatch" style={{ background: color }} title={color} />
                 ))}
               </div>
-              <button type="button" className="template-apply-btn" onClick={() => onApply(tpl.id)}>
-                Use this template
+              <button type="button" className="template-apply-btn" onClick={() => onApply(tpl.id)} title={`Use ${tpl.name}`}>
+                {variant === 'compact' ? 'Use' : 'Use this template'}
               </button>
             </div>
           </div>

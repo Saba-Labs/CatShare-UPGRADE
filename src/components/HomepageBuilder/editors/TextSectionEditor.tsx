@@ -1,5 +1,6 @@
 import React from 'react';
 import { TextSection } from '../../../types/homepage';
+import ColorPickerField from '../ColorPickerField';
 
 interface TextSectionEditorProps {
   section: TextSection & { id: string };
@@ -76,33 +77,18 @@ export default function TextSectionEditor({ section, onUpdate }: TextSectionEdit
         </select>
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Text Color</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={section.settings.textColor || '#000000'}
-          onChange={(e) =>
-            onUpdate({
-              settings: { ...section.settings, textColor: e.target.value },
-            })
-          }
-        />
-      </div>
+      <ColorPickerField
+        label="Text"
+        value={section.settings.textColor || '#000000'}
+        defaultValue="#000000"
+        onChange={(textColor) => onUpdate({ settings: { ...section.settings, textColor } })}
+      />
 
-      <div className="panel-section">
-        <label className="panel-label">Background Color</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={section.settings.backgroundColor || '#ffffff'}
-          onChange={(e) =>
-            onUpdate({
-              settings: { ...section.settings, backgroundColor: e.target.value },
-            })
-          }
-        />
-      </div>
+      <ColorPickerField
+        label="Background"
+        value={section.settings.backgroundColor || '#ffffff'}
+        onChange={(backgroundColor) => onUpdate({ settings: { ...section.settings, backgroundColor } })}
+      />
     </>
   );
 }

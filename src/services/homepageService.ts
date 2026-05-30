@@ -1,5 +1,5 @@
 import { HomepageConfig, HomepageLayout, PublishHistoryEntry } from '../types/homepage';
-import { isPersistedHomepageConfigId } from '../utils/homepageConfigId';
+import { isPersistedHomepageConfigId, isPersistedStoreId } from '../utils/homepageConfigId';
 import { withRetry } from '../utils/retry';
 import { getSupabaseClient } from '../supabaseClient';
 import {
@@ -14,10 +14,11 @@ import {
 } from './homepageLocalStore';
 
 /**
- * TEMPORARY: run the homepage editor fully offline (localStorage), with no Supabase calls.
- * Flip to `false` (or wire to an env flag) to reconnect the backend once it's ready.
+ * When true, the editor keeps drafts in localStorage (see VITE_USE_LOCAL_HOMEPAGE_STORE).
+ * Public storefronts always read published layout from Supabase regardless of this flag.
  */
-export const USE_LOCAL_HOMEPAGE_STORE = true;
+export const USE_LOCAL_HOMEPAGE_STORE =
+  String(import.meta.env.VITE_USE_LOCAL_HOMEPAGE_STORE || '').toLowerCase() === 'true';
 
 const TABLE = 'store_homepage_configs';
 
@@ -35,24 +36,167 @@ function mapHomepageConfigRow(data: Record<string, unknown>): HomepageConfig {
   };
 }
 
-export async function getHomepageConfig(storeId: string): Promise<HomepageConfig | null> {
-  if (USE_LOCAL_HOMEPAGE_STORE) {
-    return localGetHomepageConfig(storeId);
+function stampPublishedLayout(
+  layout: HomepageLayout,
+  options?: { updatedBy?: string }
+): HomepageLayout {
+  const nextLayout = { ...layout } as HomepageLayout & { websiteConfig?: Record<string, unknown> };
+  nextLayout.websiteConfig = { ...(nextLayout.websiteConfig || {}) };
+  nextLayout.websiteConfig.versioning = {
+    ...((nextLayout.websiteConfig.versioning as Record<string, unknown>) || {}),
+    publishedAt: new Date().toISOString(),
+    updatedBy: options?.updatedBy ?? null,
+  };
+  return nextLayout;
+}
+
+async function fetchHomepageConfigFromCloud(storeId: string): Promise<HomepageConfig | null> {
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from(TABLE)
+    .select('*')
+    .eq('store_id', storeId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to fetch homepage config: ${error.message}`);
   }
-  return withRetry(async () => {
-    const client = getSupabaseClient();
+  if (!data) return null;
+  return mapHomepageConfigRow(data as Record<string, unknown>);
+}
+
+/** Public storefront: always load published (live) layout from Supabase — never localStorage. */
+export async function getPublishedHomepageConfig(
+  storeId: string
+): Promise<Pick<HomepageConfig, 'publishedLayout' | 'publishedAt' | 'layout'> | null> {
+  if (!isPersistedStoreId(storeId)) return null;
+
+  try {
+    return await withRetry(async () => {
+      const client = getSupabaseClient();
+      const { data, error } = await client
+        .from(TABLE)
+        .select('published_layout, published_at, layout')
+        .eq('store_id', storeId)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Failed to fetch published homepage: ${error.message}`);
+      }
+      if (!data) return null;
+
+      return {
+        publishedLayout: (data.published_layout as HomepageLayout) || undefined,
+        publishedAt: (data.published_at as string) || null,
+        layout: data.layout as HomepageLayout,
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function publishHomepageConfigToCloud(
+  storeId: string,
+  layout: HomepageLayout,
+  options?: { updatedBy?: string; note?: string }
+): Promise<HomepageConfig> {
+  const client = getSupabaseClient();
+  const { data: existing, error: fetchError } = await client
+    .from(TABLE)
+    .select('id, layout, publish_history')
+    .eq('store_id', storeId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(fetchError.message || 'Failed to publish homepage config');
+  }
+
+  const nextLayout = stampPublishedLayout(
+    layout || (existing?.layout as HomepageLayout) || ({ sections: [], theme: {} } as HomepageLayout),
+    options
+  );
+  const publishedAt = new Date().toISOString();
+  const historyEntry = {
+    id: `pub-${Date.now()}`,
+    publishedAt,
+    layout: nextLayout,
+    note: options?.note,
+  };
+  const priorHistory = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
+  const publishHistory = [historyEntry, ...priorHistory].slice(0, 20);
+
+  const patch = {
+    layout: nextLayout,
+    theme_settings: nextLayout?.theme,
+    published_layout: nextLayout,
+    published_at: publishedAt,
+    publish_history: publishHistory,
+    updated_at: publishedAt,
+  };
+
+  if (existing?.id) {
     const { data, error } = await client
       .from(TABLE)
-      .select('*')
-      .eq('store_id', storeId)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Failed to fetch homepage config: ${error.message}`);
-    }
-    if (!data) return null;
+      .update(patch)
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message || 'Failed to publish homepage config');
     return mapHomepageConfigRow(data as Record<string, unknown>);
-  });
+  }
+
+  const { data, error } = await client
+    .from(TABLE)
+    .insert({
+      store_id: storeId,
+      ...patch,
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message || 'Failed to publish homepage config');
+  return mapHomepageConfigRow(data as Record<string, unknown>);
+}
+
+async function unpublishHomepageConfigOnCloud(storeId: string): Promise<HomepageConfig> {
+  const client = getSupabaseClient();
+  const { data: existing, error: fetchError } = await client
+    .from(TABLE)
+    .select('id')
+    .eq('store_id', storeId)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message || 'Failed to unpublish homepage config');
+  if (!existing?.id) throw new Error('Homepage config not found');
+
+  const { data, error } = await client
+    .from(TABLE)
+    .update({
+      published_layout: null,
+      published_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id)
+    .select()
+    .single();
+  if (error) throw new Error(error.message || 'Failed to unpublish homepage config');
+  return mapHomepageConfigRow(data as Record<string, unknown>);
+}
+
+export async function getHomepageConfig(storeId: string): Promise<HomepageConfig | null> {
+  if (USE_LOCAL_HOMEPAGE_STORE) {
+    const local = localGetHomepageConfig(storeId);
+    if (local) return local;
+    if (isPersistedStoreId(storeId)) {
+      try {
+        return await fetchHomepageConfigFromCloud(storeId);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  return withRetry(() => fetchHomepageConfigFromCloud(storeId));
 }
 
 /** Resolve a real config row: use existing id, fetch by store, or create. */
@@ -186,72 +330,44 @@ export async function publishHomepageConfig(
   options?: { updatedBy?: string; note?: string }
 ): Promise<HomepageConfig> {
   if (USE_LOCAL_HOMEPAGE_STORE) {
-    return localPublishHomepageConfig(configId, layout, options);
+    const local = localPublishHomepageConfig(configId, layout, options);
+    if (isPersistedStoreId(local.storeId)) {
+      await publishHomepageConfigToCloud(local.storeId, layout || local.layout, options);
+    }
+    return local;
   }
+
   const client = getSupabaseClient();
-
-  const { data: existing, error: fetchError } = await client
+  const { data: row, error: rowError } = await client
     .from(TABLE)
-    .select('layout, publish_history')
+    .select('store_id')
     .eq('id', configId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message || 'Failed to publish homepage config');
-
-  const nextLayout: HomepageLayout & { websiteConfig?: any } =
-    layout || (existing?.layout as HomepageLayout) || ({} as HomepageLayout);
-  if (nextLayout && typeof nextLayout === 'object') {
-    (nextLayout as any).websiteConfig = (nextLayout as any).websiteConfig || {};
-    (nextLayout as any).websiteConfig.versioning = {
-      ...((nextLayout as any).websiteConfig.versioning || {}),
-      publishedAt: new Date().toISOString(),
-      updatedBy: options?.updatedBy ?? null,
-    };
+    .maybeSingle();
+  if (rowError || !row?.store_id) {
+    throw new Error(rowError?.message || 'Homepage config not found');
   }
-
-  const publishedAt = new Date().toISOString();
-  const historyEntry = {
-    id: `pub-${Date.now()}`,
-    publishedAt,
-    layout: nextLayout,
-    note: options?.note,
-  };
-  const priorHistory = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
-  const publishHistory = [historyEntry, ...priorHistory].slice(0, 20);
-
-  const { data, error } = await client
-    .from(TABLE)
-    .update({
-      layout: nextLayout,
-      theme_settings: nextLayout?.theme,
-      published_layout: nextLayout,
-      published_at: publishedAt,
-      publish_history: publishHistory,
-      updated_at: publishedAt,
-    })
-    .eq('id', configId)
-    .select()
-    .single();
-  if (error) throw new Error(error.message || 'Failed to publish homepage config');
-  return mapHomepageConfigRow(data as Record<string, unknown>);
+  return publishHomepageConfigToCloud(row.store_id as string, layout, options);
 }
 
 export async function unpublishHomepageConfig(configId: string): Promise<HomepageConfig> {
   if (USE_LOCAL_HOMEPAGE_STORE) {
-    return localUnpublishHomepageConfig(configId);
+    const local = localUnpublishHomepageConfig(configId);
+    if (isPersistedStoreId(local.storeId)) {
+      await unpublishHomepageConfigOnCloud(local.storeId);
+    }
+    return local;
   }
+
   const client = getSupabaseClient();
-  const { data, error } = await client
+  const { data: row, error: rowError } = await client
     .from(TABLE)
-    .update({
-      published_layout: null,
-      published_at: null,
-      updated_at: new Date().toISOString(),
-    })
+    .select('store_id')
     .eq('id', configId)
-    .select()
-    .single();
-  if (error) throw new Error(error.message || 'Failed to unpublish homepage config');
-  return mapHomepageConfigRow(data as Record<string, unknown>);
+    .maybeSingle();
+  if (rowError || !row?.store_id) {
+    throw new Error(rowError?.message || 'Homepage config not found');
+  }
+  return unpublishHomepageConfigOnCloud(row.store_id as string);
 }
 
 export async function restoreHomepageVersion(
@@ -261,13 +377,17 @@ export async function restoreHomepageVersion(
 ): Promise<HomepageConfig> {
   if (!versionId) throw new Error('versionId is required');
   if (USE_LOCAL_HOMEPAGE_STORE) {
-    return localRestoreHomepageVersion(configId, versionId, target);
+    const local = localRestoreHomepageVersion(configId, versionId, target);
+    if (target === 'live' && isPersistedStoreId(local.storeId) && local.publishedLayout) {
+      await publishHomepageConfigToCloud(local.storeId, local.publishedLayout);
+    }
+    return local;
   }
   const client = getSupabaseClient();
 
   const { data: existing, error: fetchError } = await client
     .from(TABLE)
-    .select('publish_history')
+    .select('publish_history, store_id')
     .eq('id', configId)
     .single();
   if (fetchError) throw new Error(fetchError.message || 'Failed to restore version');

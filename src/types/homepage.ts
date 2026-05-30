@@ -582,6 +582,8 @@ export interface BuilderAction {
     | 'UPDATE_SECTION_LAYOUT'
     | 'SWITCH_EDITING_PAGE'
     | 'ADD_PRESET_SECTIONS'
+    | 'INSERT_SECTION_AT'
+    | 'INSERT_PRESET_AT'
     | 'UNDO'
     | 'REDO';
   payload?: any;

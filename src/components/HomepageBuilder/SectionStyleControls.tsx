@@ -1,5 +1,6 @@
 import React from 'react';
 import { HomepageSection } from '../../types/homepage';
+import ColorPickerField from './ColorPickerField';
 
 interface SectionStyleControlsProps {
   section: HomepageSection & { id: string };
@@ -68,15 +69,11 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       )}
 
       {hasBackground && (
-        <div className="sidebar-field">
-          <label className="panel-label">Background</label>
-          <input
-            type="color"
-            className="panel-input"
-            value={(settings.backgroundColor as string) || '#ffffff'}
-            onChange={(e) => patchSettings({ backgroundColor: e.target.value })}
-          />
-        </div>
+        <ColorPickerField
+          label="Background"
+          value={(settings.backgroundColor as string) || '#ffffff'}
+          onChange={(backgroundColor) => patchSettings({ backgroundColor })}
+        />
       )}
 
       {section.type === 'banner' && (

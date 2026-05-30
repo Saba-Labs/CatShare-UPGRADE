@@ -1,6 +1,7 @@
 import React from 'react';
 import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
+import ColorPickerField from './ColorPickerField';
 import { FOOTER_VARIANT_OPTIONS, footerPresetForVariant } from '../../config/footerVariants';
 import type { WebsiteFooterVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
 
@@ -231,40 +232,27 @@ export default function FooterSettingsEditor({
       <div className="sidebar-panel-header">
         <h3>Colors</h3>
       </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Background</label>
-        <input
-          type="color"
-          className="panel-input"
+      <div className="color-picker-stack">
+        <ColorPickerField
+          label="Background"
           value={siteSettings.footerBg || '#ffffff'}
-          onChange={(e) => patch({ footerBg: e.target.value })}
+          onChange={(footerBg) => patch({ footerBg })}
         />
-      </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Text</label>
-        <input
-          type="color"
-          className="panel-input"
+        <ColorPickerField
+          label="Text"
           value={siteSettings.footerTextColor || '#1a1a1a'}
-          onChange={(e) => patch({ footerTextColor: e.target.value })}
+          onChange={(footerTextColor) => patch({ footerTextColor })}
         />
-      </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Card / column background</label>
-        <input
-          type="color"
-          className="panel-input"
+        <ColorPickerField
+          label="Card background"
           value={toHexColor(siteSettings.footerColBg) || '#f2f2f0'}
-          onChange={(e) => patch({ footerColBg: e.target.value })}
+          defaultValue="#f2f2f0"
+          onChange={(footerColBg) => patch({ footerColBg })}
         />
-      </div>
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Accent (badge & highlights)</label>
-        <input
-          type="color"
-          className="panel-input"
+        <ColorPickerField
+          label="Accent"
           value={siteSettings.footerAccentColor || '#1a6b4a'}
-          onChange={(e) => patch({ footerAccentColor: e.target.value })}
+          onChange={(footerAccentColor) => patch({ footerAccentColor })}
         />
       </div>
 

@@ -8,6 +8,7 @@ import GenericSectionEditor from './editors/GenericSectionEditor';
 import TestimonialsSectionEditor from './editors/TestimonialsSectionEditor';
 import StoreLinkPicker from './StoreLinkPicker';
 import FooterSettingsEditor from './FooterSettingsEditor';
+import ColorPickerField from './ColorPickerField';
 
 interface PropertiesPanelProps {
   selectedSectionId: string | null;
@@ -239,46 +240,30 @@ export default function PropertiesPanel({
     return (
       <div className="properties-panel">
         <div className="panel-header">Theme Settings</div>
-        <div className="panel-content">
-          <div className="panel-section">
-            <label className="panel-label">Primary Color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={theme.primaryColor || '#2563eb'}
-              onChange={(e) => onUpdateTheme({ primaryColor: e.target.value })}
-            />
-          </div>
-
-          <div className="panel-section">
-            <label className="panel-label">Text Color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={theme.textColor || '#1f2937'}
-              onChange={(e) => onUpdateTheme({ textColor: e.target.value })}
-            />
-          </div>
-
-          <div className="panel-section">
-            <label className="panel-label">Background Color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={theme.backgroundColor || '#ffffff'}
-              onChange={(e) => onUpdateTheme({ backgroundColor: e.target.value })}
-            />
-          </div>
-
-          <div className="panel-section">
-            <label className="panel-label">Accent Color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={theme.accentColor || '#dc2626'}
-              onChange={(e) => onUpdateTheme({ accentColor: e.target.value })}
-            />
-          </div>
+        <div className="panel-content color-picker-stack">
+          <ColorPickerField
+            label="Primary"
+            value={theme.primaryColor || '#2563eb'}
+            defaultValue="#2563eb"
+            onChange={(primaryColor) => onUpdateTheme({ primaryColor })}
+          />
+          <ColorPickerField
+            label="Text"
+            value={theme.textColor || '#1f2937'}
+            defaultValue="#1f2937"
+            onChange={(textColor) => onUpdateTheme({ textColor })}
+          />
+          <ColorPickerField
+            label="Background"
+            value={theme.backgroundColor || '#ffffff'}
+            onChange={(backgroundColor) => onUpdateTheme({ backgroundColor })}
+          />
+          <ColorPickerField
+            label="Accent"
+            value={theme.accentColor || '#dc2626'}
+            defaultValue="#dc2626"
+            onChange={(accentColor) => onUpdateTheme({ accentColor })}
+          />
         </div>
       </div>
     );

@@ -1,4 +1,5 @@
 import type { WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
+import ColorPickerField from './ColorPickerField';
 
 interface AnnouncementSettingsEditorProps {
   siteSettings: WebsiteSiteSettings;
@@ -37,24 +38,18 @@ export default function AnnouncementSettingsEditor({
               placeholder="e.g. Free shipping on orders over ₹999"
             />
           </div>
-          <div className="sidebar-field">
-            <label className="panel-label">Background color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={siteSettings.announcementBg || '#111827'}
-              onChange={(e) => patch({ announcementBg: e.target.value })}
-            />
-          </div>
-          <div className="sidebar-field">
-            <label className="panel-label">Text color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={siteSettings.announcementTextColor || '#ffffff'}
-              onChange={(e) => patch({ announcementTextColor: e.target.value })}
-            />
-          </div>
+          <ColorPickerField
+            label="Background"
+            value={siteSettings.announcementBg || '#111827'}
+            defaultValue="#111827"
+            onChange={(announcementBg) => patch({ announcementBg })}
+          />
+          <ColorPickerField
+            label="Text"
+            value={siteSettings.announcementTextColor || '#ffffff'}
+            defaultValue="#ffffff"
+            onChange={(announcementTextColor) => patch({ announcementTextColor })}
+          />
         </>
       )}
     </>

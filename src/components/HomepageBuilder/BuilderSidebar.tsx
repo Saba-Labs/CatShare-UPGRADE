@@ -7,12 +7,14 @@ import SectionQuickPanel from './SectionQuickPanel';
 import FooterQuickPanel from './FooterQuickPanel';
 import AnnouncementQuickPanel from './AnnouncementQuickPanel';
 import TemplateGallery from './TemplateGallery';
+import MediaLibraryPanel from './media/MediaLibraryPanel';
+import { SIDEBAR_TAB_META } from './builderSidebarIcons';
 import { SITE_ANNOUNCEMENT_SELECTION_ID, SITE_FOOTER_SELECTION_ID } from '../../config/homepageBuilderConfig';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
 import { HomepageSection, HomepageSectionType, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
 import { BlockPresetId } from '../../config/blockPresets';
 
-export type SidebarTab = 'insert' | 'templates' | 'pages' | 'theme' | 'site';
+export type SidebarTab = 'insert' | 'templates' | 'pages' | 'theme' | 'site' | 'photos';
 
 interface BuilderSidebarProps {
   activeTab: SidebarTab;
@@ -36,13 +38,7 @@ interface BuilderSidebarProps {
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
 }
 
-const TABS: Array<{ id: SidebarTab; label: string }> = [
-  { id: 'insert', label: 'Insert' },
-  { id: 'templates', label: 'Templates' },
-  { id: 'pages', label: 'Pages' },
-  { id: 'theme', label: 'Theme' },
-  { id: 'site', label: 'Site' },
-];
+const TAB_ORDER: SidebarTab[] = ['insert', 'templates', 'pages', 'photos', 'theme', 'site'];
 
 export default function BuilderSidebar({
   activeTab,
@@ -69,20 +65,41 @@ export default function BuilderSidebar({
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
 
+  const activeMeta = SIDEBAR_TAB_META[activeTab];
+  const ActiveTabIcon = activeMeta.Icon;
+
   return (
-    <aside className="builder-sidebar">
-      <div className="builder-sidebar-tabs">
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            className={`builder-sidebar-tab ${activeTab === id ? 'active' : ''}`}
-            onClick={() => onTabChange(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <aside className="builder-sidebar builder-sidebar--rail">
+      <nav className="builder-sidebar-rail" aria-label="Editor panels">
+        {TAB_ORDER.map((id) => {
+          const { label, hint, Icon } = SIDEBAR_TAB_META[id];
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`builder-sidebar-tab builder-sidebar-tab--rail${activeTab === id ? ' active' : ''}`}
+              onClick={() => onTabChange(id)}
+              aria-label={`${label}. ${hint}`}
+              aria-current={activeTab === id ? 'page' : undefined}
+            >
+              <Icon className="builder-sidebar-tab__icon" aria-hidden />
+              <span className="builder-sidebar-tab__label">{label}</span>
+              <span className="builder-sidebar-tab__tooltip" role="tooltip">
+                <span className="builder-sidebar-tab__tooltip-title">{label}</span>
+                <span className="builder-sidebar-tab__tooltip-hint">{hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="builder-sidebar-main">
+        {!selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected ? (
+          <div className="builder-sidebar-main__head">
+            <ActiveTabIcon className="builder-sidebar-main__head-icon" aria-hidden />
+            <span className="builder-sidebar-main__head-title">{activeMeta.label}</span>
+          </div>
+        ) : null}
 
       <div className="builder-sidebar-body">
         {selectedSection ? (
@@ -110,14 +127,7 @@ export default function BuilderSidebar({
           <>
             {activeTab === 'insert' && <ComponentPalette onAddSection={onAddSection} onAddPreset={onAddPreset} />}
             {activeTab === 'templates' && onApplyTemplate && (
-              <>
-                {editingPageId !== 'home' && (
-                  <p className="sidebar-top-hint" style={{ padding: '0 12px 8px' }}>
-                    Applying a template updates your whole site (you will return to Home).
-                  </p>
-                )}
-                <TemplateGallery variant="compact" onApply={onApplyTemplate} />
-              </>
+              <TemplateGallery variant="compact" onApply={onApplyTemplate} />
             )}
             {activeTab === 'pages' && (
               <PagesPanel
@@ -129,6 +139,7 @@ export default function BuilderSidebar({
                 onRemovePage={onRemovePage}
               />
             )}
+            {activeTab === 'photos' && <MediaLibraryPanel storeId={storeId} />}
             {activeTab === 'theme' && (
               <ThemePanel theme={theme} websiteConfig={websiteConfig} onUpdateTheme={onUpdateTheme} onUpdateWebsiteConfig={onUpdateWebsiteConfig} />
             )}
@@ -142,6 +153,7 @@ export default function BuilderSidebar({
             )}
           </>
         )}
+      </div>
       </div>
     </aside>
   );

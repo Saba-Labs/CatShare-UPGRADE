@@ -1,6 +1,6 @@
 import React from 'react';
 import { CTASection, ThemeSettings } from '../../../types/homepage';
-import { getThemeButtonStyles } from '../../../utils/themeButtonStyles';
+import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 
 interface CTASectionViewProps {
@@ -12,6 +12,7 @@ interface CTASectionViewProps {
 
 export default function CTASectionView({ section, theme, editMode, onUpdateSection }: CTASectionViewProps) {
   const { settings, content } = section;
+  const buttonStyles = getThemeButtonStyles(theme || {}, settings.buttonColor);
 
   const updateContent = (patch: Partial<CTASection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
@@ -44,14 +45,8 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
             {content.description || 'Description'}
           </p>
           <span
-            className="sites-inline-editable sites-inline-button"
-            style={{
-              ...getThemeButtonStyles(theme || {}, settings.buttonColor),
-              display: 'inline-block',
-              padding: '10px 24px',
-              borderRadius: '4px',
-              fontWeight: 600,
-            }}
+            className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+            style={buttonStyles}
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
@@ -67,31 +62,11 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
           )}
           {content.buttonText &&
             (content.buttonLink ? (
-              <StorefrontLink
-                href={content.buttonLink}
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 24px',
-                  borderRadius: '4px',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  textDecoration: 'none',
-                  ...getThemeButtonStyles(theme || {}, settings.buttonColor),
-                }}
-              >
+              <StorefrontLink href={content.buttonLink} className={SITES_THEME_BUTTON_CLASS} style={buttonStyles}>
                 {content.buttonText}
               </StorefrontLink>
             ) : (
-              <span
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 24px',
-                  borderRadius: '4px',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  ...getThemeButtonStyles(theme || {}, settings.buttonColor),
-                }}
-              >
+              <span className={SITES_THEME_BUTTON_CLASS} style={buttonStyles}>
                 {content.buttonText}
               </span>
             ))}

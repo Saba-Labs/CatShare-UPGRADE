@@ -14,7 +14,10 @@ interface SortableGridSectionProps {
 }
 
 export default function SortableGridSection({ id, children }: SortableGridSectionProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    data: { source: 'canvas-section', sectionId: id },
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -22,7 +25,13 @@ export default function SortableGridSection({ id, children }: SortableGridSectio
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`sites-block-row${isDragging ? ' is-dragging' : ''}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`sites-block-row${isDragging ? ' is-dragging' : ''}`}
+      {...attributes}
+      {...listeners}
+    >
       {children({ attributes, listeners, isDragging })}
     </div>
   );

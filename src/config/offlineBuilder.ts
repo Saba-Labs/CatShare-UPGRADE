@@ -1,7 +1,8 @@
 /**
  * Offline / degraded-Supabase mode for the website homepage builder.
- * Homepage config is stored in localStorage (see homepageService USE_LOCAL_HOMEPAGE_STORE).
- * Set VITE_OFFLINE_BUILDER=true in .env.local to skip cloud profile fetches while building.
+ * Set VITE_USE_LOCAL_HOMEPAGE_STORE=true to keep editor drafts in localStorage.
+ * Set VITE_OFFLINE_BUILDER=true to skip cloud profile fetches while building.
+ * Public storefronts always load published layout from Supabase.
  */
 import { USE_LOCAL_HOMEPAGE_STORE } from '../services/homepageService';
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { DividerSection } from '../../../types/homepage';
+import ColorPickerField from '../ColorPickerField';
 
 interface DividerSectionEditorProps {
   section: DividerSection & { id: string };
@@ -58,15 +59,12 @@ export default function DividerSectionEditor({ section, onUpdate }: DividerSecti
               <option value="thick">Thick</option>
             </select>
           </div>
-          <div className="panel-section">
-            <label className="panel-label">Color</label>
-            <input
-              type="color"
-              className="panel-input"
-              value={settings.color || '#dadce0'}
-              onChange={(e) => onUpdate({ settings: { ...settings, color: e.target.value } })}
-            />
-          </div>
+          <ColorPickerField
+            label="Color"
+            value={settings.color || '#dadce0'}
+            defaultValue="#dadce0"
+            onChange={(color) => onUpdate({ settings: { ...settings, color } })}
+          />
         </>
       )}
 

@@ -31,8 +31,9 @@ import {
 import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
-import { getHomepageConfig } from '../services/homepageService';
+import { getPublishedHomepageConfig } from '../services/homepageService';
 import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
+import '../components/HomepageBuilder/sites-theme-button.css';
 import { HomepageLayout } from '../types/homepage';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
@@ -1011,37 +1012,28 @@ export default function StoreView() {
     }
   }, [store?.homepageEnabled, homepageLayout]);
 
-  // Load homepage config (draft for editor preview, published for website runtime)
+  // Load published homepage config from Supabase (same data for path URL and wildcard subdomain).
   useEffect(() => {
-    console.log('Homepage effect - homepageEnabled:', store?.homepageEnabled, 'storeId:', store?.id);
-    // If homepage is disabled, immediately clear the layout
     if (!store?.homepageEnabled) {
-      console.log('Clearing layout - homepage disabled');
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
     }
 
-    if (!store?.id) {
-      console.log('No store id, skipping');
-      return;
-    }
+    if (!store?.id) return;
 
-    console.log('Loading homepage config');
     setHomepageLoading(true);
-    getHomepageConfig(store.id).then((config) => {
-      console.log('Homepage config loaded:', !!config?.layout);
+    getPublishedHomepageConfig(store.id).then((config) => {
       const nextLayout = store.websiteModeEnabled
-        ? (config?.publishedLayout || config?.layout || null)
-        : (config?.layout || null);
+        ? (config?.publishedLayout || null)
+        : (config?.layout || config?.publishedLayout || null);
       if (nextLayout) {
         setHomepageLayout(normalizeHomepageLayoutForWebsiteMode(nextLayout));
       } else {
         setHomepageLayout(null);
       }
       setHomepageLoading(false);
-    }).catch((err) => {
-      console.error('Failed to load homepage:', err);
+    }).catch(() => {
       setHomepageLayout(null);
       setHomepageLoading(false);
     });
@@ -1066,6 +1058,16 @@ export default function StoreView() {
         if (!r.success || !r.data) return;
         setStoreError(null);
         setStore(r.data);
+        if (r.data.homepageEnabled && r.data.id) {
+          void getPublishedHomepageConfig(r.data.id).then((config) => {
+            const nextLayout = r.data!.websiteModeEnabled
+              ? (config?.publishedLayout || null)
+              : (config?.layout || config?.publishedLayout || null);
+            setHomepageLayout(nextLayout ? normalizeHomepageLayoutForWebsiteMode(nextLayout) : null);
+          });
+        } else {
+          setHomepageLayout(null);
+        }
         if (r.data.sellerUserId && r.data.isLive !== false) {
           setProductsLoading(true);
 
@@ -1657,7 +1659,7 @@ export default function StoreView() {
             <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
               {homepageLayout.sections.map((section) => (
                 <div key={section.id} style={{ marginBottom: '0' }}>
-                  <SectionRenderer section={section} editMode={false} />
+                  <SectionRenderer section={section} theme={homepageLayout.theme} editMode={false} />
                 </div>
               ))}
             </div>

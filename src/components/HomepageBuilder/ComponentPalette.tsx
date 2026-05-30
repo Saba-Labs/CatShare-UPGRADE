@@ -6,6 +6,9 @@ import {
 } from '../../config/homepageBuilderConfig';
 import { BLOCK_PRESETS, BlockPresetId } from '../../config/blockPresets';
 import SidebarSection from './SidebarSection';
+import { FiLayers, FiGrid, FiShoppingBag, PRESET_ICONS, SECTION_ICONS } from './builderSidebarIcons';
+import PaletteInsertItem from './dnd/PaletteInsertItem';
+import PalettePresetItem from './dnd/PalettePresetItem';
 
 interface ComponentPaletteProps {
   onAddSection: (type: HomepageSectionType) => void;
@@ -13,61 +16,59 @@ interface ComponentPaletteProps {
 }
 
 export default function ComponentPalette({ onAddSection, onAddPreset }: ComponentPaletteProps) {
-  const handleDragStart = (e: React.DragEvent, type: HomepageSectionType) => {
-    e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('sectionType', type);
-  };
-
   return (
     <div className="sidebar-panel insert-panel">
-      <SidebarSection title="Insert" description="Add layouts or individual blocks to the page.">
-        <div className="insert-group-label">Layouts</div>
-        <div className="preset-list">
-          {BLOCK_PRESETS.map((preset) => (
-            <button key={preset.id} type="button" className="preset-row" onClick={() => onAddPreset(preset.id)}>
-              <span className="preset-row-label">{preset.label}</span>
-              <span className="preset-row-desc">{preset.description}</span>
-            </button>
-          ))}
+      <SidebarSection title="Layouts" icon={<FiLayers />} description="Drag onto page or tap to add at end">
+        <div className="preset-grid">
+          {BLOCK_PRESETS.map((preset) => {
+            const Icon = PRESET_ICONS[preset.id];
+            return (
+              <PalettePresetItem
+                key={preset.id}
+                presetId={preset.id}
+                label={preset.label}
+                description={preset.description}
+                Icon={Icon}
+                onAdd={onAddPreset}
+              />
+            );
+          })}
         </div>
+      </SidebarSection>
 
-        <div className="insert-group-label" style={{ marginTop: 14 }}>
-          Basic blocks
+      <SidebarSection title="Blocks" icon={<FiGrid />} description="Drag onto page or tap to add at end">
+        <div className="insert-chip-row">
+          <span className="insert-chip insert-chip--muted">Basic</span>
         </div>
-        <div className="insert-grid">
+        <div className="insert-grid insert-grid--labeled">
           {BASIC_SECTION_ORDERING.map((type) => (
-            <button
+            <PaletteInsertItem
               key={type}
-              type="button"
-              className="insert-block"
-              draggable
-              onDragStart={(e) => handleDragStart(e, type)}
-              onClick={() => onAddSection(type)}
-              title={SECTION_TYPE_LABELS[type]}
-            >
-              <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
-              <span className="insert-block-label">{shortLabel(type)}</span>
-            </button>
+              type={type}
+              label={shortBlockLabel(type)}
+              fullLabel={SECTION_TYPE_LABELS[type]}
+              Icon={SECTION_ICONS[type] || FiGrid}
+              onAdd={onAddSection}
+            />
           ))}
         </div>
 
-        <div className="insert-group-label" style={{ marginTop: 14 }}>
-          Store blocks
+        <div className="insert-chip-row">
+          <span className="insert-chip insert-chip--store">
+            <FiShoppingBag aria-hidden />
+            Store
+          </span>
         </div>
-        <div className="insert-grid insert-grid-compact">
+        <div className="insert-grid insert-grid--labeled">
           {STORE_SECTION_ORDERING.map((type) => (
-            <button
+            <PaletteInsertItem
               key={type}
-              type="button"
-              className="insert-block"
-              draggable
-              onDragStart={(e) => handleDragStart(e, type)}
-              onClick={() => onAddSection(type)}
-              title={SECTION_TYPE_LABELS[type]}
-            >
-              <span className="insert-block-icon">{SECTION_ICONS[type] || '▣'}</span>
-              <span className="insert-block-label">{shortLabel(type)}</span>
-            </button>
+              type={type}
+              label={shortBlockLabel(type)}
+              fullLabel={SECTION_TYPE_LABELS[type]}
+              Icon={SECTION_ICONS[type] || FiGrid}
+              onAdd={onAddSection}
+            />
           ))}
         </div>
       </SidebarSection>
@@ -75,36 +76,25 @@ export default function ComponentPalette({ onAddSection, onAddPreset }: Componen
   );
 }
 
-function shortLabel(type: HomepageSectionType): string {
-  const map: Partial<Record<HomepageSectionType, string>> = {
+function shortBlockLabel(type: HomepageSectionType): string {
+  const short: Partial<Record<HomepageSectionType, string>> = {
+    carousel: 'Carousel',
+    text: 'Text',
+    image: 'Image',
+    banner: 'Banner',
     'featured-products': 'Featured',
     'category-showcase': 'Categories',
     'product-grid': 'Products',
+    announcement: 'Alert',
+    cta: 'CTA',
+    video: 'Video',
+    testimonials: 'Reviews',
+    'feature-card': 'Feature',
     'two-column-content': '2 Columns',
     'content-grid': 'Grid',
-    'feature-card': 'Feature',
+    divider: 'Divider',
+    faq: 'FAQ',
+    embed: 'Embed',
   };
-  if (map[type]) return map[type]!;
-  const full = SECTION_TYPE_LABELS[type];
-  return full.length > 14 ? full.split(' ')[0] : full;
+  return short[type] ?? SECTION_TYPE_LABELS[type];
 }
-
-const SECTION_ICONS: Partial<Record<HomepageSectionType, string>> = {
-  carousel: '▣',
-  text: 'T',
-  image: '▢',
-  banner: '▭',
-  'featured-products': '★',
-  'category-showcase': '⊞',
-  'product-grid': '⊟',
-  announcement: '!',
-  cta: '→',
-  video: '▶',
-  testimonials: '❝',
-  'feature-card': '◫',
-  'two-column-content': '⫴',
-  'content-grid': '▦',
-  divider: '—',
-  faq: '?',
-  embed: '⊡',
-};

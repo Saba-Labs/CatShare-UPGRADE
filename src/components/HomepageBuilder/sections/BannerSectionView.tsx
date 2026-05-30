@@ -1,5 +1,5 @@
 import type { BannerSection, ThemeSettings } from '../../../types/homepage';
-import { getThemeButtonStyles } from '../../../utils/themeButtonStyles';
+import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 
@@ -96,7 +96,8 @@ export default function BannerSectionView({
               {content.subtitle || 'Subtitle'}
             </p>
             <span
-              className="sites-inline-editable sites-inline-button"
+              className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+              style={getThemeButtonStyles(theme || {})}
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
@@ -112,13 +113,13 @@ export default function BannerSectionView({
               (content.buttonLink ? (
                 <StorefrontLink
                   href={content.buttonLink}
-                  className="sites-banner-cta"
+                  className={SITES_THEME_BUTTON_CLASS}
                   style={getThemeButtonStyles(theme || {})}
                 >
                   {content.buttonText}
                 </StorefrontLink>
               ) : (
-                <span className="sites-banner-cta" style={getThemeButtonStyles(theme || {})}>
+                <span className={SITES_THEME_BUTTON_CLASS} style={getThemeButtonStyles(theme || {})}>
                   {content.buttonText}
                 </span>
               ))}

@@ -13,6 +13,7 @@ import {
   publishHomepageConfig,
   unpublishHomepageConfig,
   restoreHomepageVersion,
+  USE_LOCAL_HOMEPAGE_STORE,
 } from '../../services/homepageService';
 import { isPersistedHomepageConfigId } from '../../utils/homepageConfigId';
 import { buildStorefrontUrl } from '../../utils/storefrontDomain';
@@ -29,6 +30,7 @@ import { isOfflineBuilderMode } from '../../config/offlineBuilder';
 import BuilderMobileGate from './BuilderMobileGate';
 import BuilderToolbar, { ViewportSize } from './BuilderToolbar';
 import BuilderSidebar, { SidebarTab } from './BuilderSidebar';
+import BuilderDndProvider from './dnd/BuilderDndProvider';
 import GridCanvas from './GridCanvas';
 import PreviewPane from './PreviewPane';
 import { BuilderMediaProvider } from './media/BuilderMediaContext';
@@ -449,7 +451,7 @@ export default function HomepageBuilder({
   }
 
   return (
-    <BuilderMediaProvider storeId={storeId}>
+    <BuilderMediaProvider storeId={storeId} layout={state.layout}>
     <BuilderCatalogueProvider
       storeId={storeId}
       storeSlug={storeSlug}
@@ -462,7 +464,9 @@ export default function HomepageBuilder({
     <div className="homepage-builder sites-editor">
       {isOfflineBuilderMode() && (
         <div className="builder-offline-banner" role="status">
-          Offline mode — website layouts save on this device. Cloud sync can be enabled later when Supabase is healthy.
+          {USE_LOCAL_HOMEPAGE_STORE
+            ? 'Drafts save on this device — Publish pushes the live site to Supabase so your subdomain stays in sync.'
+            : 'Offline mode — some cloud features may be unavailable until Supabase is healthy.'}
         </div>
       )}
       <BuilderToolbar
@@ -508,54 +512,65 @@ export default function HomepageBuilder({
         />
       )}
 
-      <div className="sites-editor-body">
-        <main className="sites-canvas-area">
-          {showPreview ? (
+      {showPreview ? (
+        <div className="sites-editor-body">
+          <main className="sites-canvas-area">
             <PreviewPane layout={state.layout} />
-          ) : (
-            <div className={`sites-page-frame viewport-${viewport}`}>
-              <GridCanvas
-                layout={state.layout}
-                theme={state.layout.theme}
-                storeId={storeId}
-                editingPageId={editingPageId}
-                selectedSectionId={state.selectedSectionId}
-                onSelectSection={handleSelectSection}
-                onRemoveSection={actions.removeSection}
-                onDuplicateSection={actions.duplicateSection}
-                onUpdateSectionPosition={actions.updateSectionPosition}
-                onUpdateSectionLayout={actions.updateSectionLayout}
-                onUpdateSection={actions.updateSection}
-                onReorderSections={actions.reorderSections}
-                onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
-                onStartBlank={handleStartBlank}
-              />
-            </div>
-          )}
-        </main>
-
-        <BuilderSidebar
-          activeTab={sidebarTab}
-          onTabChange={setSidebarTab}
-          selectedSectionId={state.selectedSectionId}
+          </main>
+        </div>
+      ) : (
+        <BuilderDndProvider
           sections={state.layout.sections}
-          theme={state.layout.theme}
-          websiteConfig={state.layout.websiteConfig || createDefaultWebsiteModeConfig()}
-          editingPageId={editingPageId}
-          storeId={storeId}
-          storeSlug={storeSlug}
-          onAddSection={actions.addSection}
-          onAddPreset={actions.addBlockPreset}
-          onUpdateSection={actions.updateSection}
-          onUpdateTheme={handleUpdateTheme}
-          onUpdateWebsiteConfig={updateWebsiteConfig}
-          onSelectEditingPage={handleSelectEditingPage}
-          onAddPage={handleAddPage}
-          onRemovePage={handleRemovePage}
-          onClearSectionSelection={() => actions.selectSection(null)}
-          onApplyTemplate={handleApplyTemplate}
-        />
-      </div>
+          onInsertSectionAt={actions.insertSectionAt}
+          onInsertPresetAt={actions.insertPresetAt}
+          onReorderSections={actions.reorderSections}
+        >
+          <div className="sites-editor-body">
+            <main className="sites-canvas-area">
+              <div className={`sites-page-frame viewport-${viewport}`}>
+                <GridCanvas
+                  layout={state.layout}
+                  theme={state.layout.theme}
+                  storeId={storeId}
+                  editingPageId={editingPageId}
+                  selectedSectionId={state.selectedSectionId}
+                  onSelectSection={handleSelectSection}
+                  onRemoveSection={actions.removeSection}
+                  onDuplicateSection={actions.duplicateSection}
+                  onUpdateSectionPosition={actions.updateSectionPosition}
+                  onUpdateSectionLayout={actions.updateSectionLayout}
+                  onUpdateSection={actions.updateSection}
+                  onReorderSections={actions.reorderSections}
+                  onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
+                  onStartBlank={handleStartBlank}
+                />
+              </div>
+            </main>
+
+            <BuilderSidebar
+              activeTab={sidebarTab}
+              onTabChange={setSidebarTab}
+              selectedSectionId={state.selectedSectionId}
+              sections={state.layout.sections}
+              theme={state.layout.theme}
+              websiteConfig={state.layout.websiteConfig || createDefaultWebsiteModeConfig()}
+              editingPageId={editingPageId}
+              storeId={storeId}
+              storeSlug={storeSlug}
+              onAddSection={actions.addSection}
+              onAddPreset={actions.addBlockPreset}
+              onUpdateSection={actions.updateSection}
+              onUpdateTheme={handleUpdateTheme}
+              onUpdateWebsiteConfig={updateWebsiteConfig}
+              onSelectEditingPage={handleSelectEditingPage}
+              onAddPage={handleAddPage}
+              onRemovePage={handleRemovePage}
+              onClearSectionSelection={() => actions.selectSection(null)}
+              onApplyTemplate={handleApplyTemplate}
+            />
+          </div>
+        </BuilderDndProvider>
+      )}
     </div>
     </BuilderCatalogueProvider>
     </BuilderMediaProvider>

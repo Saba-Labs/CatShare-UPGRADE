@@ -13,7 +13,7 @@ export default function HomePageRuntime({ layout }: HomePageRuntimeProps) {
       {sections.map((section) => (
         <div key={section.id} style={getBlockRowStyle(section.blockLayout)}>
           <div style={getBlockInnerStyle(section.blockLayout)}>
-            <SectionRenderer section={section} editMode={false} />
+            <SectionRenderer section={section} theme={layout.theme} editMode={false} />
           </div>
         </div>
       ))}

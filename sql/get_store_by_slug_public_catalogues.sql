@@ -23,7 +23,9 @@ begin
     s.catalogue_id,
     s.created_at,
     coalesce(s.is_live, true) as is_live,
-    s.store_whatsapp
+    s.store_whatsapp,
+    coalesce(s.homepage_enabled, true) as homepage_enabled,
+    coalesce(s.website_mode_enabled, false) as website_mode_enabled
   into rec
   from public.stores s
   where s.store_slug = p_slug
@@ -71,6 +73,8 @@ begin
     'createdAt', rec.created_at,
     'isLive', coalesce(rec.is_live, true),
     'whatsapp', nullif(trim(rec.store_whatsapp), ''),
+    'homepageEnabled', coalesce(rec.homepage_enabled, true),
+    'websiteModeEnabled', coalesce(rec.website_mode_enabled, false),
     'cataloguesDefinitionUserSettings', us_data -> 'cataloguesDefinition',
     'cataloguesDefinitionManaged', (
       select cd.data

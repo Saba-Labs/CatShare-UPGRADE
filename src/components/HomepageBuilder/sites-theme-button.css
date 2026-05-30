@@ -1,0 +1,19 @@
+/* Shared CTA button chrome for builder canvas, storefront homepage, and website runtime */
+a.sites-theme-btn,
+button.sites-theme-btn,
+span.sites-theme-btn {
+  text-decoration: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+a.sites-theme-btn:hover,
+a.sites-theme-btn:focus-visible {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+a.sites-theme-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}

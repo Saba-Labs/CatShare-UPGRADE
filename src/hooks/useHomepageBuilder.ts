@@ -79,6 +79,29 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
       );
     }
 
+    case 'INSERT_SECTION_AT': {
+      const { sectionType, index } = action.payload as { sectionType: HomepageSectionType; index: number };
+      if (sectionType === 'footer') return state;
+      const newSection = createDefaultSection(sectionType, index);
+      const sections = [...state.layout.sections];
+      const clampedIndex = Math.max(0, Math.min(index, sections.length));
+      sections.splice(clampedIndex, 0, newSection);
+      const reordered = sections.map((s, i) => ({ ...s, order: i }));
+      return withHistory(state, { ...state.layout, sections: reordered }, newSection.id);
+    }
+
+    case 'INSERT_PRESET_AT': {
+      const { presetId, index } = action.payload as { presetId: BlockPresetId; index: number };
+      const newSections = buildBlockPresetSections(presetId, index);
+      if (!newSections.length) return state;
+      const sections = [...state.layout.sections];
+      const clampedIndex = Math.max(0, Math.min(index, sections.length));
+      sections.splice(clampedIndex, 0, ...newSections);
+      const reordered = sections.map((s, i) => ({ ...s, order: i }));
+      const lastId = newSections[newSections.length - 1].id;
+      return withHistory(state, { ...state.layout, sections: reordered }, lastId);
+    }
+
     case 'REMOVE_SECTION': {
       const sectionId: string = action.payload;
       return withHistory(
@@ -216,6 +239,10 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     dispatch({ type: 'ADD_SECTION', payload: type });
   }, []);
 
+  const insertSectionAt = useCallback((type: HomepageSectionType, index: number) => {
+    dispatch({ type: 'INSERT_SECTION_AT', payload: { sectionType: type, index } });
+  }, []);
+
   const addBlockPreset = useCallback(
     (presetId: BlockPresetId) => {
       const startOrder = state.layout.sections.length;
@@ -224,6 +251,10 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     },
     [state.layout.sections.length]
   );
+
+  const insertPresetAt = useCallback((presetId: BlockPresetId, index: number) => {
+    dispatch({ type: 'INSERT_PRESET_AT', payload: { presetId, index } });
+  }, []);
 
   const removeSection = useCallback((sectionId: string) => {
     dispatch({ type: 'REMOVE_SECTION', payload: sectionId });
@@ -308,7 +339,9 @@ export function useHomepageBuilder(initialLayout?: HomepageLayout) {
     state,
     actions: {
       addSection,
+      insertSectionAt,
       addBlockPreset,
+      insertPresetAt,
       removeSection,
       updateSection,
       reorderSections,

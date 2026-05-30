@@ -60,13 +60,19 @@ export default function StorefrontSiteHeader({
     [siteSettings.headerBg, siteSettings.headerTextColor]
   );
 
+  const brandName = siteSettings.websiteName || 'My Store';
+
   const brandContent = (
-    <>
+    <span className="storefront-site-header__brand-inner">
       {siteSettings.logoUrl ? (
-        <img src={siteSettings.logoUrl} alt="" />
+        <img
+          className="storefront-site-header__logo"
+          src={siteSettings.logoUrl}
+          alt=""
+        />
       ) : null}
-      {siteSettings.websiteName || 'My Store'}
-    </>
+      <span className="storefront-site-header__brand-name">{brandName}</span>
+    </span>
   );
 
   const renderNavLink = (item: WebsiteNavItem, className: string, onNavigate?: () => void) => {

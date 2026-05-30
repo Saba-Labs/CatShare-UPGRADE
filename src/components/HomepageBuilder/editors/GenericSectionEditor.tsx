@@ -3,6 +3,7 @@ import { HomepageSection, WebsiteModeConfig } from '../../../types/homepage';
 import MediaPickerButton from '../media/MediaPickerButton';
 import ButtonLinkField from './ButtonLinkField';
 import TestimonialsSectionEditor from './TestimonialsSectionEditor';
+import ColorPickerField from '../ColorPickerField';
 
 interface GenericSectionEditorProps {
   section: HomepageSection & { id: string };
@@ -191,19 +192,16 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
               </select>
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Background color (fallback)</label>
-              <input
-                type="color"
-                className="panel-input"
-                value={(section as any).settings.backgroundColor || '#2563eb'}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, backgroundColor: e.target.value },
-                  })
-                }
-              />
-            </div>
+            <ColorPickerField
+              label="Background"
+              value={(section as any).settings.backgroundColor || '#2563eb'}
+              defaultValue="#2563eb"
+              onChange={(backgroundColor) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, backgroundColor },
+                })
+              }
+            />
 
             <div className="panel-section">
               <label className="panel-label">
@@ -281,19 +279,16 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
               }
             />
 
-            <div className="panel-section">
-              <label className="panel-label">Button Color</label>
-              <input
-                type="color"
-                className="panel-input"
-                value={(section as any).settings.buttonColor || '#2563eb'}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, buttonColor: e.target.value },
-                  })
-                }
-              />
-            </div>
+            <ColorPickerField
+              label="Button"
+              value={(section as any).settings.buttonColor || '#2563eb'}
+              defaultValue="#2563eb"
+              onChange={(buttonColor) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, buttonColor },
+                })
+              }
+            />
           </>
         );
 
@@ -332,33 +327,27 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
               </select>
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Background Color</label>
-              <input
-                type="color"
-                className="panel-input"
-                value={(section as any).settings.backgroundColor || '#fef3c7'}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, backgroundColor: e.target.value },
-                  })
-                }
-              />
-            </div>
+            <ColorPickerField
+              label="Background"
+              value={(section as any).settings.backgroundColor || '#fef3c7'}
+              defaultValue="#fef3c7"
+              onChange={(backgroundColor) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, backgroundColor },
+                })
+              }
+            />
 
-            <div className="panel-section">
-              <label className="panel-label">Text Color</label>
-              <input
-                type="color"
-                className="panel-input"
-                value={(section as any).settings.textColor || '#92400e'}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, textColor: e.target.value },
-                  })
-                }
-              />
-            </div>
+            <ColorPickerField
+              label="Text"
+              value={(section as any).settings.textColor || '#92400e'}
+              defaultValue="#92400e"
+              onChange={(textColor) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, textColor },
+                })
+              }
+            />
 
             <div className="panel-section">
               <label className="panel-checkbox">

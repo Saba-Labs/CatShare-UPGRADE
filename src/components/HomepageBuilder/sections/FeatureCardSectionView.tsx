@@ -1,10 +1,12 @@
-import type { FeatureCardSection } from '../../../types/homepage';
+import type { FeatureCardSection, ThemeSettings } from '../../../types/homepage';
+import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './FeatureCard.css';
 
 interface FeatureCardSectionViewProps {
   section: FeatureCardSection & { id: string };
+  theme?: ThemeSettings;
   storeId?: string;
   editMode?: boolean;
   onUpdateSection?: (updates: Partial<FeatureCardSection>) => void;
@@ -12,10 +14,12 @@ interface FeatureCardSectionViewProps {
 
 export default function FeatureCardSectionView({
   section,
+  theme,
   storeId,
   editMode,
   onUpdateSection,
 }: FeatureCardSectionViewProps) {
+  const buttonStyles = getThemeButtonStyles(theme || {});
   const { settings, content } = section;
   const isImageLeft = settings.layout === 'image-left';
   const layoutClass = isImageLeft ? 'layout-image-left' : 'layout-image-right';
@@ -93,7 +97,8 @@ export default function FeatureCardSectionView({
               </p>
               {content.buttonText && (
                 <span
-                  className="sites-inline-editable feature-card-button"
+                  className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+                  style={buttonStyles}
                   contentEditable
                   suppressContentEditableWarning
                   onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
@@ -108,7 +113,11 @@ export default function FeatureCardSectionView({
               <p>{content.description}</p>
               {content.buttonText && content.buttonLink && (
                 <div className="button-group">
-                  <StorefrontLink href={content.buttonLink} className="feature-card-button">
+                  <StorefrontLink
+                    href={content.buttonLink}
+                    className={SITES_THEME_BUTTON_CLASS}
+                    style={buttonStyles}
+                  >
                     {content.buttonText}
                   </StorefrontLink>
                 </div>

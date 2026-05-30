@@ -6,6 +6,7 @@ import MediaPickerButton from '../media/MediaPickerButton';
 import StoreLinkPicker from '../StoreLinkPicker';
 import { useBuilderCatalogue } from '../catalogue/BuilderCatalogueContext';
 import { resolveCategoryShowcaseSettings } from '../../../utils/categoryShowcaseStyles';
+import ColorPickerField from '../ColorPickerField';
 
 interface CategoryShowcaseEditorProps {
   section: CategoryShowcaseSection & { id: string };
@@ -229,35 +230,24 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
         </label>
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Section background</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={settings.backgroundColor || '#ffffff'}
-          onChange={(e) => updateSettings({ backgroundColor: e.target.value })}
-        />
-      </div>
+      <ColorPickerField
+        label="Section"
+        value={settings.backgroundColor || '#ffffff'}
+        onChange={(backgroundColor) => updateSettings({ backgroundColor })}
+      />
 
-      <div className="panel-section">
-        <label className="panel-label">Card background</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={settings.cardBackground || '#ffffff'}
-          onChange={(e) => updateSettings({ cardBackground: e.target.value })}
-        />
-      </div>
+      <ColorPickerField
+        label="Cards"
+        value={settings.cardBackground || '#ffffff'}
+        onChange={(cardBackground) => updateSettings({ cardBackground })}
+      />
 
-      <div className="panel-section">
-        <label className="panel-label">Text color</label>
-        <input
-          type="color"
-          className="panel-input"
-          value={settings.labelColor || '#111827'}
-          onChange={(e) => updateSettings({ labelColor: e.target.value })}
-        />
-      </div>
+      <ColorPickerField
+        label="Text"
+        value={settings.labelColor || '#111827'}
+        defaultValue="#111827"
+        onChange={(labelColor) => updateSettings({ labelColor })}
+      />
 
       <div className="panel-section">
         <label className="panel-label">Categories from your catalogue</label>

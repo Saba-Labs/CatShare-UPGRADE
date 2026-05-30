@@ -1,14 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useDndContext } from '@dnd-kit/core';
 import { BlockAlign, BlockLayout, HomepageLayout, HomepageSection, ThemeSettings } from '../../types/homepage';
 import SortableGridSection from './SortableGridSection';
 import SectionRenderer from './sections/SectionRenderer';
@@ -36,6 +27,8 @@ import {
 } from '../../utils/blockLayout';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
+import SectionDropIndicator from './dnd/SectionDropIndicator';
+import { isPaletteDragId } from './dnd/builderDndTypes';
 import './GridCanvas.css';
 
 interface GridCanvasProps {
@@ -78,12 +71,11 @@ export default function GridCanvas({
   onStartBlank,
 }: GridCanvasProps) {
   const { openMediaPicker } = useBuilderMedia();
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
+  const { active } = useDndContext();
+  const paletteDragActive = active ? isPaletteDragId(String(active.id)) : false;
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const sectionCountRef = useRef(layout.sections.length);
   const [dragState, setDragState] = useState<{ id: string; widthPercent: number } | null>(null);
   const [heightDragState, setHeightDragState] = useState<{ id: string; heightPx: number } | null>(null);
   const [blankStarted, setBlankStarted] = useState(false);
@@ -100,6 +92,25 @@ export default function GridCanvas({
     e.stopPropagation();
     onSelectSection(id);
   };
+
+  useEffect(() => {
+    const currentCount = layout.sections.length;
+    const prevCount = sectionCountRef.current;
+    const addedSections = currentCount > prevCount;
+
+    if (addedSections && selectedSectionId) {
+      const targetId = selectedSectionId;
+      const frame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          blockRefs.current[targetId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+      sectionCountRef.current = currentCount;
+      return () => cancelAnimationFrame(frame);
+    }
+
+    sectionCountRef.current = currentCount;
+  }, [layout.sections.length, selectedSectionId]);
 
   const beginResize = (e: React.PointerEvent, sectionId: string) => {
     e.preventDefault();
@@ -179,17 +190,6 @@ export default function GridCanvas({
     onUpdateSectionLayout(sectionId, { align });
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = sortedSections.findIndex((s) => s.id === active.id);
-    const newIndex = sortedSections.findIndex((s) => s.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    onReorderSections(arrayMove(sortedSections, oldIndex, newIndex));
-  };
-
-  const sectionIds = useMemo(() => sortedSections.map((s) => s.id), [sortedSections]);
-
   return (
     <div
       className="grid-canvas-container sites-canvas"
@@ -217,6 +217,7 @@ export default function GridCanvas({
       )}
       {sortedSections.length === 0 ? (
         <div className="canvas-empty sites-canvas-empty" onClick={(e) => e.stopPropagation()}>
+          <SectionDropIndicator index={0} expanded={paletteDragActive} />
           {onApplyTemplate && editingPageId === 'home' && !blankStarted ? (
             <TemplateGallery
               variant="full"
@@ -229,16 +230,15 @@ export default function GridCanvas({
           ) : (
             <p>
               {editingPageId === 'home'
-                ? 'Click a block in Insert to start your page'
-                : 'Add blocks from Insert — this page uses your site template colors and styling'}
+                ? 'Drag a block here or click Insert to start'
+                : 'Drag blocks from Insert onto this page'}
             </p>
           )}
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
             <div className="sites-document-stack">
-              {sortedSections.map((section) => {
+              <SectionDropIndicator index={0} expanded={paletteDragActive} />
+              {sortedSections.map((section, sectionIndex) => {
                 const isSelected = selectedSectionId === section.id;
                 const liveWidth =
                   dragState && dragState.id === section.id
@@ -255,20 +255,17 @@ export default function GridCanvas({
                   ...(liveHeight ? { height: `${liveHeight}px`, overflow: 'hidden' as const } : {}),
                 };
                 return (
-                  <SortableGridSection key={section.id} id={section.id}>
-                    {({ attributes, listeners, isDragging }) => (
+                  <Fragment key={section.id}>
+                  <SortableGridSection id={section.id}>
+                    {({ isDragging }) => (
                       <>
-                        <button
-                          type="button"
+                        <div
                           className="sites-section-drag-grip"
-                          title="Drag to reorder"
-                          aria-label="Drag to reorder section"
-                          onClick={(e) => e.stopPropagation()}
-                          {...attributes}
-                          {...listeners}
+                          title="Drag to move"
+                          aria-hidden
                         >
-                          <span className="sites-drag-grip-dots" aria-hidden />
-                        </button>
+                          <span className="sites-drag-grip-dots" />
+                        </div>
                         <div
                           className="sites-block-row-body"
                           style={getBlockRowStyle(section.blockLayout)}
@@ -287,19 +284,13 @@ export default function GridCanvas({
                   onClick={(e) => handleSectionClick(e, section.id)}
                 >
                   {isSelected && (
-                    <div className="sites-floating-toolbar" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="sites-float-btn sites-float-btn-drag icon"
-                        title="Drag to reorder"
-                        aria-label="Drag to reorder section"
-                        onClick={(e) => e.stopPropagation()}
-                        {...attributes}
-                        {...listeners}
-                      >
-                        ⋮⋮
-                      </button>
+                    <div
+                      className="sites-floating-toolbar"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
                       <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
+                      <span className="sites-floating-hint">Drag block to move</span>
                       <div className="sites-align-group">
                         {ALIGN_OPTIONS.map((opt) => (
                           <button
@@ -417,11 +408,11 @@ export default function GridCanvas({
                       </>
                     )}
                   </SortableGridSection>
+                  <SectionDropIndicator index={sectionIndex + 1} expanded={paletteDragActive} />
+                  </Fragment>
                 );
               })}
             </div>
-          </SortableContext>
-        </DndContext>
       )}
       {siteSettings && (
         <div

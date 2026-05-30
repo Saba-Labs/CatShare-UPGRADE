@@ -57,21 +57,39 @@
 }
 
 .storefront-site-header__brand {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(100%, 280px);
   color: inherit;
   text-decoration: none;
-  font-weight: 700;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
   flex-shrink: 1;
 }
 
-.storefront-site-header__brand img {
-  height: 28px;
-  vertical-align: middle;
-  margin-right: 8px;
+.storefront-site-header__brand-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.storefront-site-header__logo {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: 96px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.storefront-site-header__brand-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .storefront-site-header__nav-desktop {
