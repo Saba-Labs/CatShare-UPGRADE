@@ -8,7 +8,7 @@ export const PUSH_REGISTERED_STORAGE_KEY = 'catshare_push_registered';
 
 /**
  * Register for FCM (Android/iOS), save token to `user_push_tokens`, refresh on token change.
- * No-op on web. Call when a real user session exists (not guest).
+ * No-op on web. Call when a real user session exists (not guest), e.g. right after sign-in in App.
  */
 export async function initPushTokenForLoggedInUser(userId: string): Promise<() => void> {
   if (Capacitor.getPlatform() === 'web') {

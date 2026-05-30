@@ -100,7 +100,7 @@ supabase functions deploy send-order-push --no-verify-jwt
 
 6. **Rebuild the Android app** and install from Play (or internal track): `google-services.json` must stay in `android/app/` so FCM tokens are valid.
 
-7. **On device**: open the app, sign in, **allow notifications** when prompted. A row should appear in `user_push_tokens` for your user.
+7. **On device**: sign in on the native app and **allow notifications** when prompted (registration runs at sign-in, not only on Orders). A row should appear in `user_push_tokens` for your user.
 
 8. **Test**: kill the app completely, place a test order for that seller; a system notification should appear within a few seconds.
 

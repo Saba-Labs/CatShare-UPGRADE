@@ -1348,6 +1348,7 @@ export default function StorePage() {
     if (!guardCloudWrite()) return;
     const prev = isLive;
     const next = !prev;
+    const websiteWasOn = websiteModeEnabled;
     setIsLive(next);
     setLiveTogglePending(true);
     const result = await updateStoreLiveStatus(user.uid, next);
@@ -1358,7 +1359,24 @@ export default function StorePage() {
       setWebsiteModeEnabled(result.data.websiteModeEnabled);
       setFormWhatsapp(result.data.storeWhatsapp || '');
       setFormMinimumOrder(result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '');
-      showToast(next ? 'Store is now live' : 'Store paused', next ? 'success' : 'info');
+      const updateSignal = {
+        storeId: result.data.id,
+        homepageEnabled: result.data.homepageEnabled,
+        websiteModeEnabled: result.data.websiteModeEnabled,
+        isLive: result.data.isLive,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('store-update-signal', JSON.stringify(updateSignal));
+      window.dispatchEvent(new CustomEvent('store-updated', { detail: updateSignal }));
+      const turnedWebsiteOff = !next && websiteWasOn && !result.data.websiteModeEnabled;
+      showToast(
+        turnedWebsiteOff
+          ? 'Store paused — custom website turned off'
+          : next
+            ? 'Store is now live'
+            : 'Store paused',
+        next ? 'success' : 'info'
+      );
     } else {
       setIsLive(prev);
       showToast(result.error || 'Could not update store status', 'error');
@@ -1370,6 +1388,7 @@ export default function StorePage() {
     if (!guardCloudWrite()) return;
     const prev = websiteModeEnabled;
     const next = !prev;
+    const storeWasOffline = !isLive;
     setWebsiteModeEnabled(next);
     setWebsiteTogglePending(true);
     const result = await updateStoreWebsiteStatus(user.uid, next);
@@ -1377,16 +1396,23 @@ export default function StorePage() {
     if (result.success && result.data) {
       setStore(result.data);
       setWebsiteModeEnabled(result.data.websiteModeEnabled);
+      setIsLive(result.data.isLive);
       const updateSignal = {
         storeId: result.data.id,
         homepageEnabled: result.data.homepageEnabled,
         websiteModeEnabled: result.data.websiteModeEnabled,
+        isLive: result.data.isLive,
         timestamp: Date.now(),
       };
       localStorage.setItem('store-update-signal', JSON.stringify(updateSignal));
       window.dispatchEvent(new CustomEvent('store-updated', { detail: updateSignal }));
+      const turnedLiveOn = next && storeWasOffline && result.data.isLive;
       showToast(
-        next ? 'Custom website is live for customers' : 'Classic storefront only (no custom website)',
+        turnedLiveOn
+          ? 'Custom website is on — your store is now live for customers'
+          : next
+            ? 'Custom website is live for customers'
+            : 'Classic storefront only (no custom website)',
         next ? 'success' : 'info'
       );
     } else {
@@ -1647,6 +1673,17 @@ export default function StorePage() {
                   />
                   <span className="slider" />
                 </label>
+              </div>
+
+              {/* Homepage Editor */}
+              <div className="editor-zone gap">
+                <button
+                  type="button"
+                  className="editor-trigger"
+                  onClick={() => navigate('/store/homepage')}
+                >
+                  <IconEdit /> Edit Store
+                </button>
               </div>
 
               {/* Info fields */}
@@ -1982,17 +2019,6 @@ export default function StorePage() {
                 </div>
                 </div>
                 )}
-              </div>
-
-              {/* Homepage Editor */}
-              <div className="editor-zone gap">
-                <button
-                  type="button"
-                  className="editor-trigger"
-                  onClick={() => navigate('/store/homepage')}
-                >
-                  <IconEdit /> Edit homepage
-                </button>
               </div>
 
               {/* Delete */}

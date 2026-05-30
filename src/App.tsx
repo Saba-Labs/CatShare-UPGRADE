@@ -18,6 +18,7 @@ import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigrat
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { initWebAnalyticsIfNeeded } from "./config/firebaseConfig";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
+import { initPushTokenForLoggedInUser } from "./services/pushTokenService";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { mergeProductsData } from "./utils/productMerge";
@@ -1939,6 +1940,34 @@ if (user?.uid && !authService.isOfflineGuest()) {
       cancelled = true;
       removePoll?.();
       removeRealtime?.();
+    };
+  }, [loading, user?.uid, user?.isAnonymous]);
+
+  // Register FCM token for new-order push as soon as the seller is signed in (native only).
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    if (user.isAnonymous) return;
+    if (authService.isOfflineGuest()) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    let cancelled = false;
+    let cleanupPush: (() => void) | undefined;
+
+    scheduleIdleTask(() => {
+      void (async () => {
+        const cleanup = await initPushTokenForLoggedInUser(user.uid);
+        if (cancelled) {
+          await cleanup();
+        } else {
+          cleanupPush = cleanup;
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      void cleanupPush?.();
     };
   }, [loading, user?.uid, user?.isAnonymous]);
 

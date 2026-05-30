@@ -13,8 +13,6 @@ import {
   ensureHomepageConfig,
   updateHomepageLayout,
   publishHomepageConfig,
-  unpublishHomepageConfig,
-  restoreHomepageVersion,
   USE_LOCAL_HOMEPAGE_STORE,
 } from '../../services/homepageService';
 import { isPersistedHomepageConfigId } from '../../utils/homepageConfigId';
@@ -37,7 +35,6 @@ import GridCanvas from './GridCanvas';
 import PreviewPane from './PreviewPane';
 import { BuilderMediaProvider } from './media/BuilderMediaContext';
 import { BuilderCatalogueProvider } from './catalogue/BuilderCatalogueContext';
-import PublishHistoryModal from './PublishHistoryModal';
 import './HomepageBuilder.css';
 
 interface HomepageBuilderProps {
@@ -72,8 +69,6 @@ export default function HomepageBuilder({
   const [editingPageId, setEditingPageId] = useState('home');
   const [viewport, setViewport] = useState<ViewportSize>('desktop');
   const [isPublishing, setIsPublishing] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
   const [selectedFreeformElementId, setSelectedFreeformElementId] = useState<string | null>(null);
 
   const configPersisted = isPersistedHomepageConfigId(config?.id);
@@ -200,41 +195,6 @@ export default function HomepageBuilder({
       return;
     }
     window.open(buildStorefrontUrl(storeSlug), '_blank', 'noopener,noreferrer');
-  };
-
-  const handleRestoreVersion = async (versionId: string, target: 'draft' | 'live') => {
-    try {
-      setIsRestoring(true);
-      const persisted = await resolvePersistedConfig();
-      const updated = await restoreHomepageVersion(persisted.id, versionId, target === 'live' ? 'live' : 'draft');
-      const normalized = normalizeHomepageLayoutForWebsiteMode(updated.layout);
-      setConfig({ ...updated, layout: normalized });
-      actions.setLayout(normalized);
-      actions.markSaved();
-      setShowHistory(false);
-      showToast(target === 'live' ? 'Version published to live site' : 'Version loaded into draft', 'success');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to restore version';
-      showToast(msg, 'error');
-    } finally {
-      setIsRestoring(false);
-    }
-  };
-
-  const handleUnpublish = async () => {
-    try {
-      setIsRestoring(true);
-      const persisted = await resolvePersistedConfig();
-      const updated = await unpublishHomepageConfig(persisted.id);
-      setConfig(updated);
-      setShowHistory(false);
-      showToast('Live site unpublished', 'success');
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Failed to unpublish';
-      showToast(msg, 'error');
-    } finally {
-      setIsRestoring(false);
-    }
   };
 
   const draftLayoutForCompare = useMemo(() => buildDraftLayout(), [state.layout, editingPageId]);
@@ -508,7 +468,6 @@ export default function HomepageBuilder({
         onSave={() => void handleSave()}
         onPublish={() => void handlePublish()}
         onViewLive={handleViewLive}
-        onOpenHistory={() => setShowHistory(true)}
         onPreview={() => setShowPreview(!showPreview)}
         showPreview={showPreview}
         canUndo={state.history.length > 0}
@@ -522,18 +481,6 @@ export default function HomepageBuilder({
         <div className="publish-banner" role="status">
           You have unpublished draft changes. Save draft or Publish to update the live storefront.
         </div>
-      )}
-
-      {showHistory && config && (
-        <PublishHistoryModal
-          history={config.publishHistory || []}
-          publishedAt={config.publishedAt}
-          isRestoring={isRestoring}
-          onClose={() => setShowHistory(false)}
-          onRestoreDraft={(id) => void handleRestoreVersion(id, 'draft')}
-          onRestoreLive={(id) => void handleRestoreVersion(id, 'live')}
-          onUnpublish={() => void handleUnpublish()}
-        />
       )}
 
       {showPreview ? (

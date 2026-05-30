@@ -5,7 +5,7 @@
  * USE_LOCAL_HOMEPAGE_STORE in homepageService.ts.
  */
 import { v4 as uuid } from 'uuid';
-import { HomepageConfig, HomepageLayout, PublishHistoryEntry } from '../types/homepage';
+import { HomepageConfig, HomepageLayout } from '../types/homepage';
 
 const POINTER_PREFIX = 'homepage_cfg_id::';
 const CONFIG_PREFIX = 'homepage_cfg::';
@@ -28,7 +28,10 @@ function writeJson(key: string, value: unknown): void {
 }
 
 function readConfig(configId: string): HomepageConfig | null {
-  return readJson<HomepageConfig>(`${CONFIG_PREFIX}${configId}`);
+  const raw = readJson<HomepageConfig & { publishHistory?: unknown }>(`${CONFIG_PREFIX}${configId}`);
+  if (!raw) return null;
+  const { publishHistory: _removed, ...config } = raw;
+  return config;
 }
 
 function writeConfig(config: HomepageConfig): HomepageConfig {
@@ -51,7 +54,6 @@ export function localCreateHomepageConfig(storeId: string, layout: HomepageLayou
     layout,
     publishedLayout: undefined,
     publishedAt: null,
-    publishHistory: [],
     createdAt: now,
     updatedAt: now,
     autoSavedAt: undefined,
@@ -89,25 +91,16 @@ export function localDeleteHomepageConfig(configId: string): void {
 export function localPublishHomepageConfig(
   configId: string,
   layout: HomepageLayout,
-  options?: { updatedBy?: string; note?: string }
+  _options?: { updatedBy?: string }
 ): HomepageConfig {
   const existing = readConfig(configId);
   const nextLayout = layout || existing?.layout || ({ sections: [], theme: {} } as HomepageLayout);
   const publishedAt = new Date().toISOString();
-  const entry: PublishHistoryEntry = {
-    id: `pub-${Date.now()}`,
-    publishedAt,
-    layout: nextLayout,
-    note: options?.note,
-  } as PublishHistoryEntry;
-  const priorHistory = Array.isArray(existing?.publishHistory) ? existing!.publishHistory : [];
-  const publishHistory = [entry, ...priorHistory].slice(0, 20);
 
   return patchConfig(configId, {
     layout: nextLayout,
     publishedLayout: nextLayout,
     publishedAt,
-    publishHistory,
     updatedAt: publishedAt,
   });
 }
@@ -120,24 +113,3 @@ export function localUnpublishHomepageConfig(configId: string): HomepageConfig {
   });
 }
 
-export function localRestoreHomepageVersion(
-  configId: string,
-  versionId: string,
-  target: 'draft' | 'live' = 'draft'
-): HomepageConfig {
-  const existing = readConfig(configId);
-  const history = Array.isArray(existing?.publishHistory) ? existing!.publishHistory : [];
-  const entry = history.find((h) => h?.id === versionId);
-  if (!entry?.layout) throw new Error('Version not found');
-
-  const now = new Date().toISOString();
-  if (target === 'live') {
-    return patchConfig(configId, {
-      layout: entry.layout,
-      publishedLayout: entry.layout,
-      publishedAt: entry.publishedAt || now,
-      updatedAt: now,
-    });
-  }
-  return patchConfig(configId, { layout: entry.layout, updatedAt: now });
-}

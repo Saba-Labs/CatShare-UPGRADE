@@ -301,8 +301,9 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
     minimumOrderValue,
     viewMode,
-    homepageEnabled: row.homepage_enabled !== false,
     websiteModeEnabled: row.website_mode_enabled === true,
+    homepageEnabled:
+      row.website_mode_enabled === true && row.homepage_enabled !== false,
   };
 }
 
@@ -604,8 +605,9 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       ...(parsed as StorePublic),
       id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
-      homepageEnabled: homepageEnabled ?? true,
       websiteModeEnabled: websiteModeEnabled ?? false,
+      homepageEnabled:
+        (websiteModeEnabled ?? false) && (homepageEnabled ?? true),
       sellerWebsite: firstNonEmptyString(
         row.sellerWebsite,
         row.seller_website,
@@ -1005,6 +1007,9 @@ export async function updateStoreLiveStatus(
       .from('stores')
       .update({
         is_live: isLive,
+        ...(!isLive
+          ? { website_mode_enabled: false, homepage_enabled: false }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('seller_user_id', sellerUserId)
@@ -1043,6 +1048,7 @@ export async function updateStoreWebsiteStatus(
       .update({
         website_mode_enabled: enabled,
         homepage_enabled: enabled,
+        ...(enabled ? { is_live: true } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('seller_user_id', sellerUserId)

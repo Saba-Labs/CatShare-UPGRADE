@@ -529,7 +529,7 @@ export interface WebsiteSiteSettings {
   navItems: WebsiteNavItem[];
   headerBg?: string;
   headerTextColor?: string;
-  /** Footer layout/skin — set by templates, editable in Site settings. */
+  /** Footer layout (info cards, link columns, centered, split bar) — not colors. */
   footerVariant?: WebsiteFooterVariant;
   footerBg?: string;
   footerTextColor?: string;
@@ -539,7 +539,7 @@ export interface WebsiteSiteSettings {
   footerBorderColor?: string;
   /** Short tagline under the store name in the global footer. */
   footerDescription?: string;
-  /** Bottom line; defaults to “Powered by CatShare storefront”. Use {year} for the current year. */
+  /** @deprecated Ignored — “Powered by CatShare” is fixed in the site footer. */
   footerCopyright?: string;
   footerShowOpenBadge?: boolean;
   footerOpenBadgeLabel?: string;
@@ -551,7 +551,7 @@ export interface WebsiteSiteSettings {
   footerShowContact?: boolean;
   footerShowStoreInfo?: boolean;
   footerShowFollow?: boolean;
-  /** Optional quick links row (Aurora / Classic). */
+  /** Footer link columns (e.g. Shop, Customer care, Legal) — vertical lists under each title. */
   footerColumns?: Array<{ title: string; links: WebsiteNavItem[] }>;
   /** @deprecated */
   footerLayout?: 'columns' | 'minimal' | 'centered';
@@ -601,20 +601,12 @@ export interface WebsiteModeConfig {
   };
 }
 
-export interface PublishHistoryEntry {
-  id: string;
-  publishedAt: string;
-  layout: HomepageLayout;
-  note?: string;
-}
-
 export interface HomepageConfig {
   id: string;
   storeId: string;
   layout: HomepageLayout;
   publishedLayout?: HomepageLayout;
   publishedAt?: string | null;
-  publishHistory?: PublishHistoryEntry[];
   createdAt: string;
   updatedAt: string;
   autoSavedAt?: string;

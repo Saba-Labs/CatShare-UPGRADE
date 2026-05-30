@@ -1,4 +1,4 @@
-import { HomepageConfig, HomepageLayout, PublishHistoryEntry } from '../types/homepage';
+import { HomepageConfig, HomepageLayout } from '../types/homepage';
 import { isPersistedHomepageConfigId, isPersistedStoreId } from '../utils/homepageConfigId';
 import { withRetry } from '../utils/retry';
 import { getSupabaseClient } from '../supabaseClient';
@@ -8,7 +8,6 @@ import {
   localDeleteHomepageConfig,
   localGetHomepageConfig,
   localPublishHomepageConfig,
-  localRestoreHomepageVersion,
   localUnpublishHomepageConfig,
   localUpdateHomepageLayout,
 } from './homepageLocalStore';
@@ -29,7 +28,6 @@ function mapHomepageConfigRow(data: Record<string, unknown>): HomepageConfig {
     layout: data.layout as HomepageLayout,
     publishedLayout: (data.published_layout as HomepageLayout) || undefined,
     publishedAt: (data.published_at as string) || null,
-    publishHistory: (data.publish_history as PublishHistoryEntry[]) || [],
     createdAt: data.created_at as string,
     updatedAt: data.updated_at as string,
     autoSavedAt: data.auto_saved_at as string | undefined,
@@ -106,12 +104,12 @@ export async function getPublishedHomepageConfig(
 async function publishHomepageConfigToCloud(
   storeId: string,
   layout: HomepageLayout,
-  options?: { updatedBy?: string; note?: string }
+  options?: { updatedBy?: string }
 ): Promise<HomepageConfig> {
   const client = getSupabaseClient();
   const { data: existing, error: fetchError } = await client
     .from(TABLE)
-    .select('id, layout, publish_history')
+    .select('id, layout')
     .eq('store_id', storeId)
     .maybeSingle();
 
@@ -124,21 +122,12 @@ async function publishHomepageConfigToCloud(
     options
   );
   const publishedAt = new Date().toISOString();
-  const historyEntry = {
-    id: `pub-${Date.now()}`,
-    publishedAt,
-    layout: nextLayout,
-    note: options?.note,
-  };
-  const priorHistory = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
-  const publishHistory = [historyEntry, ...priorHistory].slice(0, 20);
 
   const patch = {
     layout: nextLayout,
     theme_settings: nextLayout?.theme,
     published_layout: nextLayout,
     published_at: publishedAt,
-    publish_history: publishHistory,
     updated_at: publishedAt,
   };
 
@@ -334,7 +323,7 @@ export async function duplicateHomepageConfig(
 export async function publishHomepageConfig(
   configId: string,
   layout: HomepageLayout,
-  options?: { updatedBy?: string; note?: string }
+  options?: { updatedBy?: string }
 ): Promise<HomepageConfig> {
   if (USE_LOCAL_HOMEPAGE_STORE) {
     const local = localPublishHomepageConfig(configId, layout, options);
@@ -375,59 +364,4 @@ export async function unpublishHomepageConfig(configId: string): Promise<Homepag
     throw new Error(rowError?.message || 'Homepage config not found');
   }
   return unpublishHomepageConfigOnCloud(row.store_id as string);
-}
-
-export async function restoreHomepageVersion(
-  configId: string,
-  versionId: string,
-  target: 'draft' | 'live' = 'draft'
-): Promise<HomepageConfig> {
-  if (!versionId) throw new Error('versionId is required');
-  if (USE_LOCAL_HOMEPAGE_STORE) {
-    const local = localRestoreHomepageVersion(configId, versionId, target);
-    if (target === 'live' && isPersistedStoreId(local.storeId) && local.publishedLayout) {
-      await publishHomepageConfigToCloud(local.storeId, local.publishedLayout);
-    }
-    return local;
-  }
-  const client = getSupabaseClient();
-
-  const { data: existing, error: fetchError } = await client
-    .from(TABLE)
-    .select('publish_history, store_id')
-    .eq('id', configId)
-    .single();
-  if (fetchError) throw new Error(fetchError.message || 'Failed to restore version');
-
-  const history = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
-  const entry = history.find((h: { id?: string }) => h?.id === versionId) as
-    | { layout?: HomepageLayout; publishedAt?: string }
-    | undefined;
-  if (!entry?.layout) throw new Error('Version not found');
-
-  const now = new Date().toISOString();
-  const restoreTarget = target === 'live' ? 'live' : 'draft';
-  const patch =
-    restoreTarget === 'live'
-      ? {
-          layout: entry.layout,
-          published_layout: entry.layout,
-          published_at: entry.publishedAt || now,
-          theme_settings: entry.layout?.theme,
-          updated_at: now,
-        }
-      : {
-          layout: entry.layout,
-          theme_settings: entry.layout?.theme,
-          updated_at: now,
-        };
-
-  const { data, error } = await client
-    .from(TABLE)
-    .update(patch)
-    .eq('id', configId)
-    .select()
-    .single();
-  if (error) throw new Error(error.message || 'Failed to restore version');
-  return mapHomepageConfigRow(data as Record<string, unknown>);
 }

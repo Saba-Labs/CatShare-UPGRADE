@@ -1,15 +1,11 @@
 import { v4 as uuid } from 'uuid';
-import { footerPresetForVariant } from './footerVariants';
+import { createDefaultFooterLinkColumns, footerPresetForVariant } from './footerVariants';
 import type {
   HomepageLayout,
   HomepageSection,
   ThemeSettings,
   WebsiteModeConfig,
 } from '../types/homepage';
-
-function footerLink(label: string, href: string) {
-  return { id: uuid(), label, href };
-}
 
 export type WebsiteTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market';
 
@@ -139,24 +135,7 @@ function buildAuroraBoutique(): WebsiteModeConfig {
       headerTextColor: '#3b3026',
       ...footerPresetForVariant('aurora'),
       footerDescription: 'Curated fashion with intention. Quality pieces for every season.',
-      footerColumns: [
-        {
-          title: 'Shop',
-          links: [
-            footerLink('All products', '/collections/all'),
-            footerLink('New arrivals', '/collections/all'),
-            footerLink('Our story', '#'),
-          ],
-        },
-        {
-          title: 'Customer care',
-          links: [
-            footerLink('Shipping', '#'),
-            footerLink('Returns', '#'),
-            footerLink('Contact', '#'),
-          ],
-        },
-      ],
+      footerColumns: createDefaultFooterLinkColumns(),
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },
         { id: uuid(), label: 'Shop', href: '/collections/all' },
@@ -286,24 +265,7 @@ function buildPulseTech(): WebsiteModeConfig {
       headerTextColor: '#e2e8f0',
       ...footerPresetForVariant('pulse'),
       footerDescription: 'Premium tech gear with fast delivery and real support when you need it.',
-      footerColumns: [
-        {
-          title: 'Products',
-          links: [
-            footerLink('All gear', '/collections/all'),
-            footerLink('Deals', '/collections/all'),
-            footerLink('Warranty', '#'),
-          ],
-        },
-        {
-          title: 'Support',
-          links: [
-            footerLink('FAQ', '#'),
-            footerLink('Contact', '#'),
-            footerLink('Track order', '#'),
-          ],
-        },
-      ],
+      footerColumns: createDefaultFooterLinkColumns(),
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },
         { id: uuid(), label: 'Shop', href: '/collections/all' },
@@ -423,15 +385,7 @@ function buildCleanMarket(): WebsiteModeConfig {
       headerTextColor: '#111827',
       ...footerPresetForVariant('clean'),
       footerDescription: 'Everything you need, in one place. Simple shopping, honest prices.',
-      footerColumns: [
-        {
-          title: 'Store',
-          links: [
-            footerLink('Shop all', '/collections/all'),
-            footerLink('About', '#'),
-          ],
-        },
-      ],
+      footerColumns: createDefaultFooterLinkColumns(),
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },
         { id: uuid(), label: 'Shop', href: '/collections/all' },

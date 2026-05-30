@@ -17,12 +17,9 @@ ADD COLUMN IF NOT EXISTS published_at timestamptz;
 COMMENT ON COLUMN public.store_homepage_configs.published_layout
 IS 'Published website/homepage payload used by public storefront runtime.';
 
--- 3) Publish version history (site editor)
+-- 3) Drop legacy publish version history (draft + published_layout only)
 ALTER TABLE public.store_homepage_configs
-ADD COLUMN IF NOT EXISTS publish_history jsonb NOT NULL DEFAULT '[]'::jsonb;
-
-COMMENT ON COLUMN public.store_homepage_configs.publish_history
-IS 'Rolling publish snapshots (newest first, max ~20) for restore in the site editor.';
+DROP COLUMN IF EXISTS publish_history;
 
 -- Refresh PostgREST schema cache (Supabase API)
 NOTIFY pgrst, 'reload schema';

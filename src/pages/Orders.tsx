@@ -3,11 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
-import { initPushTokenForLoggedInUser } from '../services/pushTokenService';
 import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { productImageDisplayUrl } from '../utils/imageUrl';
@@ -709,32 +707,6 @@ export default function Orders() {
     };
     window.addEventListener('catshareNewOrder', handler);
     return () => window.removeEventListener('catshareNewOrder', handler);
-  }, [user?.uid, user?.isAnonymous]);
-
-  // Ask notification permission and register push token only after user opens Orders.
-  // Delay a bit so initial orders list render remains snappy.
-  useEffect(() => {
-    if (!user?.uid || user.isAnonymous) return;
-    if (!Capacitor.isNativePlatform()) return;
-
-    let cancelled = false;
-    let cleanupPush: (() => void) | undefined;
-    let startTimer: number | null = null;
-
-    startTimer = window.setTimeout(() => void (async () => {
-      const cleanup = await initPushTokenForLoggedInUser(user.uid);
-      if (cancelled) {
-        await cleanup();
-      } else {
-        cleanupPush = cleanup;
-      }
-    })(), 900);
-
-    return () => {
-      cancelled = true;
-      if (startTimer !== null) window.clearTimeout(startTimer);
-      void cleanupPush?.();
-    };
   }, [user?.uid, user?.isAnonymous]);
 
   useEffect(() => {

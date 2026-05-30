@@ -2,10 +2,12 @@ import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import { parseBusinessProfile } from '../../config/businessProfile';
 import type { StorePublic } from '../../services/storeService';
-import type { WebsiteFooterVariant, WebsiteSiteSettings } from '../../types/homepage';
+import { footerLayoutForVariant, type FooterLayoutMode } from '../../config/footerVariants';
+import type { WebsiteSiteSettings } from '../../types/homepage';
 import { currencySymbolFor } from '../../utils/websiteStorefront';
 import { useBuilderCatalogue } from '../HomepageBuilder/catalogue/BuilderCatalogueContext';
 import StorefrontLink from '../WebsiteBuilder/StorefrontLink';
+import CatSharePoweredBy from '../WebsiteBuilder/CatSharePoweredBy';
 import { useWebsiteStoreOptional } from '../WebsiteBuilder/WebsiteStoreContext';
 import './storefront-footer.css';
 
@@ -83,10 +85,6 @@ const IconFacebook = () => (
   </svg>
 );
 
-function resolveVariant(siteSettings: WebsiteSiteSettings): WebsiteFooterVariant {
-  return siteSettings.footerVariant || 'classic';
-}
-
 export default function StorefrontFooter({
   siteSettings,
   previewMode,
@@ -96,7 +94,7 @@ export default function StorefrontFooter({
 }: StorefrontFooterProps) {
   const webCtx = useWebsiteStoreOptional();
   const catalogue = useBuilderCatalogue();
-  const variant = resolveVariant(siteSettings);
+  const layout: FooterLayoutMode = footerLayoutForVariant(siteSettings.footerVariant || 'classic');
 
   const store = storeProp ?? webCtx?.store ?? null;
   const products = productsProp ?? webCtx?.products ?? catalogue.products;
@@ -152,15 +150,18 @@ export default function StorefrontFooter({
 
   const showOpenBadge = siteSettings.footerShowOpenBadge !== false;
   const openLabel = siteSettings.footerOpenBadgeLabel?.trim() || 'Open now';
-  const poweredBy =
-    siteSettings.footerCopyright?.trim() ||
-    'Powered by CatShare storefront';
 
   const showLocation = siteSettings.footerShowLocation !== false;
   const showContact = siteSettings.footerShowContact !== false;
   const showStoreInfo = siteSettings.footerShowStoreInfo !== false;
   const showFollow = siteSettings.footerShowFollow !== false;
-  const quickLinkColumns = siteSettings.footerColumns || [];
+  const linkColumns = siteSettings.footerColumns || [];
+  const hasLinkColumns = linkColumns.length > 0;
+  const showInfoGrid =
+    layout === 'info-cards' &&
+    (showLocation || showContact || showStoreInfo || showFollow);
+  const showFollowInMenus =
+    showFollow && (layout === 'link-columns' || layout === 'centered' || layout === 'split');
 
   const footerStyle = {
     '--sf-footer-surface': siteSettings.footerBg || '#ffffff',
@@ -190,47 +191,153 @@ export default function StorefrontFooter({
       </StorefrontLink>
     );
 
-  return (
-    <footer
-      className={`sf-footer sf-footer--${variant}${previewMode ? ' sf-footer--preview' : ''}`}
-      style={footerStyle}
-    >
-      <div className="sf-footer-head">
-        <div>
-          <div className="sf-footer-brand">{storeName}</div>
-          {tagline ? <div className="sf-footer-note">{tagline}</div> : null}
-        </div>
-        {showOpenBadge ? (
-          <div className="sf-footer-status">
-            <span className="sf-footer-open-dot" />
-            {openLabel}
-          </div>
-        ) : null}
-      </div>
+  const renderMenuLink = (link: { id: string; label: string; href: string }) =>
+    previewMode ? (
+      <span className="sf-footer-menu-link sf-footer-menu-link--static">{link.label}</span>
+    ) : (
+      <StorefrontLink href={link.href} className="sf-footer-menu-link">
+        {link.label}
+      </StorefrontLink>
+    );
 
-      {quickLinkColumns.length > 0 && (variant === 'aurora' || variant === 'classic' || variant === 'pulse') ? (
-        <div className="sf-footer-quicklinks">
-          {quickLinkColumns.map((column, index) => (
-            <div key={`${column.title}-${index}`} className="sf-footer-quicklink-col">
-              <div className="sf-footer-col-title">{column.title}</div>
-              <div className="sf-footer-quicklink-links">
-                {column.links.map((link) =>
-                  previewMode ? (
-                    <span key={link.id} className="sf-footer-quicklink">
-                      {link.label}
-                    </span>
-                  ) : (
-                    <StorefrontLink key={link.id} href={link.href} className="sf-footer-quicklink">
-                      {link.label}
-                    </StorefrontLink>
-                  )
-                )}
-              </div>
-            </div>
-          ))}
+  const footerHead = (
+    <div className="sf-footer-head">
+      <div>
+        <div className="sf-footer-brand">{storeName}</div>
+        {tagline ? <div className="sf-footer-note">{tagline}</div> : null}
+      </div>
+      {showOpenBadge ? (
+        <div className="sf-footer-status">
+          <span className="sf-footer-open-dot" />
+          {openLabel}
         </div>
       ) : null}
+    </div>
+  );
 
+  const footerSocials = socialLinks.length > 0 ? (
+    <div className="sf-footer-socials">
+      {socialLinks.map((s) =>
+        previewMode ? (
+          <span key={s.label} className="sf-footer-social-btn" title={s.label}>
+            {s.icon}
+          </span>
+        ) : (
+          <a
+            key={s.label}
+            className="sf-footer-social-btn"
+            href={s.url}
+            target="_blank"
+            rel="noreferrer"
+            title={s.label}
+          >
+            {s.icon}
+          </a>
+        )
+      )}
+    </div>
+  ) : null;
+
+  const linkColumnsNav = (opts: { includeBrandCol?: boolean; centered?: boolean }) => {
+    if (!hasLinkColumns) return null;
+    const { includeBrandCol = false, centered = false } = opts;
+    return (
+      <nav
+        className={`sf-footer-menus${centered ? ' sf-footer-menus--centered' : ''}`}
+        aria-label="Footer navigation"
+      >
+        {linkColumns.map((column, index) => (
+          <div key={`${column.title}-${index}`} className="sf-footer-menu-col">
+            <h3 className="sf-footer-menu-title">{column.title}</h3>
+            <ul className="sf-footer-menu-links">
+              {column.links.map((link) => (
+                <li key={link.id}>{renderMenuLink(link)}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {includeBrandCol ? (
+          <div className="sf-footer-menu-col sf-footer-menu-col--brand">
+            <div className="sf-footer-brand">{storeName}</div>
+            {tagline ? <p className="sf-footer-menu-tagline">{tagline}</p> : null}
+            {showOpenBadge ? (
+              <div className="sf-footer-status sf-footer-status--inline">
+                <span className="sf-footer-open-dot" />
+                {openLabel}
+              </div>
+            ) : null}
+            {showFollowInMenus ? footerSocials : null}
+          </div>
+        ) : null}
+      </nav>
+    );
+  };
+
+  const layoutBody = (() => {
+    switch (layout) {
+      case 'link-columns':
+        return (
+          <>
+            {hasLinkColumns ? linkColumnsNav({ includeBrandCol: true }) : footerHead}
+          </>
+        );
+      case 'centered':
+        return (
+          <>
+            <div className="sf-footer-centered-top">
+              <div className="sf-footer-brand">{storeName}</div>
+              {tagline ? <p className="sf-footer-menu-tagline">{tagline}</p> : null}
+              {showOpenBadge ? (
+                <div className="sf-footer-status sf-footer-status--inline">
+                  <span className="sf-footer-open-dot" />
+                  {openLabel}
+                </div>
+              ) : null}
+              {showFollowInMenus ? footerSocials : null}
+            </div>
+            {linkColumnsNav({ centered: true })}
+          </>
+        );
+      case 'split':
+        return (
+          <div className="sf-footer-split-band">
+            <div className="sf-footer-split-brand">
+              <div className="sf-footer-brand">{storeName}</div>
+              {tagline ? <p className="sf-footer-menu-tagline">{tagline}</p> : null}
+              {showOpenBadge ? (
+                <div className="sf-footer-status sf-footer-status--inline">
+                  <span className="sf-footer-open-dot" />
+                  {openLabel}
+                </div>
+              ) : null}
+            </div>
+            <div className="sf-footer-split-menus">{linkColumnsNav({})}</div>
+            <div className="sf-footer-split-social">
+              {showFollowInMenus ? footerSocials : null}
+            </div>
+          </div>
+        );
+      case 'info-cards':
+      default:
+        return (
+          <>
+            {footerHead}
+            {hasLinkColumns ? (
+              <div className="sf-footer-menus-wrap">{linkColumnsNav({})}</div>
+            ) : null}
+          </>
+        );
+    }
+  })();
+
+  return (
+    <footer
+      className={`sf-footer sf-footer--layout-${layout}${previewMode ? ' sf-footer--preview' : ''}`}
+      style={footerStyle}
+    >
+      {layoutBody}
+
+      {showInfoGrid ? (
       <div className="sf-footer-grid">
         {showLocation ? (
           <section className="sf-footer-col">
@@ -292,7 +399,7 @@ export default function StorefrontFooter({
           </section>
         ) : null}
 
-        {showFollow ? (
+        {showFollow && layout === 'info-cards' ? (
           <section className="sf-footer-col">
             <div className="sf-footer-col-title">Follow</div>
             {socialLinks.length > 0 ? (
@@ -324,8 +431,9 @@ export default function StorefrontFooter({
           </section>
         ) : null}
       </div>
+      ) : null}
 
-      <div className="sf-footer-muted">{poweredBy.replace(/\{year\}/gi, String(new Date().getFullYear()))}</div>
+      <CatSharePoweredBy previewMode={previewMode} />
     </footer>
   );
 }

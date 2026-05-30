@@ -2,7 +2,12 @@ import React from 'react';
 import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
 import ColorPickerField from './ColorPickerField';
-import { FOOTER_VARIANT_OPTIONS, footerPresetForVariant } from '../../config/footerVariants';
+import {
+  FOOTER_COLUMN_PRESETS,
+  FOOTER_VARIANT_OPTIONS,
+  footerColorPresetForVariant,
+  footerPresetForVariant,
+} from '../../config/footerVariants';
 import type { WebsiteFooterVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
 
 interface FooterSettingsEditorProps {
@@ -21,17 +26,34 @@ export default function FooterSettingsEditor({
   const columns = siteSettings.footerColumns || [];
 
   const patch = (patchSettings: Partial<WebsiteSiteSettings>) => {
-    onUpdateWebsiteConfig({ siteSettings: { ...siteSettings, ...patchSettings } });
+    onUpdateWebsiteConfig({
+      siteSettings: { ...websiteConfig.siteSettings, ...patchSettings },
+    });
   };
 
+  /** Layout/toggles only — custom colors are kept unless user resets them. */
   const applyVariant = (next: WebsiteFooterVariant) => {
-    patch({ ...footerPresetForVariant(next), footerVariant: next });
+    if (next === variant) return;
+    const preset = footerPresetForVariant(next);
+    patch({
+      footerVariant: next,
+      footerShowOpenBadge: preset.footerShowOpenBadge,
+      footerOpenBadgeLabel: preset.footerOpenBadgeLabel,
+      footerShowLocation: preset.footerShowLocation,
+      footerShowContact: preset.footerShowContact,
+      footerShowStoreInfo: preset.footerShowStoreInfo,
+      footerShowFollow: preset.footerShowFollow,
+    });
+  };
+
+  const applyPresetColors = () => {
+    patch(footerColorPresetForVariant(variant));
   };
 
   return (
     <>
       <div className="sidebar-field">
-        <label className="panel-label">Footer style</label>
+        <label className="panel-label">Footer layout</label>
         <select
           className="panel-input"
           value={variant}
@@ -43,6 +65,9 @@ export default function FooterSettingsEditor({
             </option>
           ))}
         </select>
+        <p className="panel-hint">
+          Changes the structure of your footer (columns, cards, centered, or split row). Use Colors below for background and text.
+        </p>
       </div>
 
       <div className="sidebar-field">
@@ -133,7 +158,7 @@ export default function FooterSettingsEditor({
 
       <div className="sidebar-panel-divider" />
       <div className="sidebar-panel-header">
-        <h3>Quick links</h3>
+        <h3>Link columns</h3>
         <button
           type="button"
           className="btn-text"
@@ -141,13 +166,45 @@ export default function FooterSettingsEditor({
             patch({
               footerColumns: [
                 ...columns,
-                { title: 'Links', links: [{ id: uuid(), label: 'Link', href: '/' }] },
+                { title: 'New column', links: [{ id: uuid(), label: 'Link', href: '/' }] },
               ],
             })
           }
         >
-          + Group
+          + Column
         </button>
+      </div>
+      <p className="panel-hint">
+        Add groups like Shop, Customer care, or Legal — each column shows a title and a vertical list of links in your footer.
+      </p>
+      <div className="footer-column-presets">
+        {FOOTER_COLUMN_PRESETS.map((preset) => {
+          const exists = columns.some(
+            (c) => c.title.trim().toLowerCase() === preset.title.trim().toLowerCase()
+          );
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              className="btn-secondary btn-sm"
+              disabled={exists}
+              title={exists ? 'Column already added' : undefined}
+              onClick={() =>
+                patch({
+                  footerColumns: [
+                    ...columns,
+                    {
+                      title: preset.title,
+                      links: preset.links.map((l) => ({ id: uuid(), label: l.label, href: l.href })),
+                    },
+                  ],
+                })
+              }
+            >
+              + {preset.title}
+            </button>
+          );
+        })}
       </div>
       {columns.map((column, colIndex) => (
         <div key={`footer-col-${colIndex}`} className="footer-column-editor">
@@ -231,7 +288,11 @@ export default function FooterSettingsEditor({
       <div className="sidebar-panel-divider" />
       <div className="sidebar-panel-header">
         <h3>Colors</h3>
+        <button type="button" className="btn-text" onClick={applyPresetColors}>
+          Reset to style defaults
+        </button>
       </div>
+      <p className="panel-hint">Changes apply to the site footer in the preview and on your live store after you publish.</p>
       <div className="color-picker-stack">
         <ColorPickerField
           label="Background"
@@ -245,8 +306,9 @@ export default function FooterSettingsEditor({
         />
         <ColorPickerField
           label="Card background"
-          value={toHexColor(siteSettings.footerColBg) || '#f2f2f0'}
+          value={siteSettings.footerColBg || '#f2f2f0'}
           defaultValue="#f2f2f0"
+          allowCssColor
           onChange={(footerColBg) => patch({ footerColBg })}
         />
         <ColorPickerField
@@ -254,26 +316,27 @@ export default function FooterSettingsEditor({
           value={siteSettings.footerAccentColor || '#1a6b4a'}
           onChange={(footerAccentColor) => patch({ footerAccentColor })}
         />
+        <ColorPickerField
+          label="Accent badge background"
+          value={siteSettings.footerAccentBg || '#e8f4ef'}
+          defaultValue="#e8f4ef"
+          allowCssColor
+          onChange={(footerAccentBg) => patch({ footerAccentBg })}
+        />
+        <ColorPickerField
+          label="Borders"
+          value={siteSettings.footerBorderColor || 'rgba(0, 0, 0, 0.08)'}
+          defaultValue="rgba(0, 0, 0, 0.08)"
+          allowCssColor
+          onChange={(footerBorderColor) => patch({ footerBorderColor })}
+        />
       </div>
 
-      <div className="sidebar-panel-section">
-        <label className="panel-label">Credit line</label>
-        <input
-          className="panel-input"
-          value={siteSettings.footerCopyright || ''}
-          placeholder="Powered by CatShare storefront"
-          onChange={(e) => patch({ footerCopyright: e.target.value })}
-        />
-        <p className="panel-hint">Use {'{year}'} for the current year. Leave blank for the default.</p>
-      </div>
+      <p className="panel-hint panel-hint--static">
+        “Powered by CatShare” always appears at the bottom of your site footer and links to catshare.app. It cannot be removed or edited.
+      </p>
     </>
   );
-}
-
-function toHexColor(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  if (value.startsWith('#')) return value.slice(0, 7);
-  return '#f2f2f0';
 }
 
 function sanitizeHref(value: string) {

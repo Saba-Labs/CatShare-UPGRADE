@@ -73,10 +73,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (method === 'PUT' && action === 'publish') {
-      const { note } = req.body || {};
       const { data: existing, error: fetchError } = await supabase
         .from('store_homepage_configs')
-        .select('layout, publish_history')
+        .select('layout')
         .eq('id', configId)
         .single();
       if (fetchError) return res.status(400).json({ error: fetchError.message });
@@ -92,14 +91,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const publishedAt = new Date().toISOString();
-      const historyEntry = {
-        id: `pub-${Date.now()}`,
-        publishedAt,
-        layout: nextLayout,
-        note: typeof note === 'string' ? note : undefined,
-      };
-      const priorHistory = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
-      const publishHistory = [historyEntry, ...priorHistory].slice(0, 20);
 
       const { data, error } = await supabase
         .from('store_homepage_configs')
@@ -108,7 +99,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           theme_settings: themeSettings || (nextLayout as any)?.theme,
           published_layout: nextLayout,
           published_at: publishedAt,
-          publish_history: publishHistory,
           updated_at: publishedAt,
         })
         .eq('id', configId)
@@ -126,48 +116,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           published_at: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', configId)
-        .select()
-        .single();
-      if (error) return res.status(400).json({ error: error.message });
-      return res.status(200).json({ data });
-    }
-
-    if (method === 'PUT' && action === 'restore-version') {
-      const { versionId, target } = req.body || {};
-      if (!versionId) return res.status(400).json({ error: 'versionId is required' });
-
-      const { data: existing, error: fetchError } = await supabase
-        .from('store_homepage_configs')
-        .select('publish_history')
-        .eq('id', configId)
-        .single();
-      if (fetchError) return res.status(400).json({ error: fetchError.message });
-
-      const history = Array.isArray(existing?.publish_history) ? existing.publish_history : [];
-      const entry = history.find((h: { id?: string }) => h?.id === versionId);
-      if (!entry?.layout) return res.status(404).json({ error: 'Version not found' });
-
-      const now = new Date().toISOString();
-      const restoreTarget = target === 'live' ? 'live' : 'draft';
-      const patch =
-        restoreTarget === 'live'
-          ? {
-              layout: entry.layout,
-              published_layout: entry.layout,
-              published_at: entry.publishedAt || now,
-              theme_settings: entry.layout?.theme,
-              updated_at: now,
-            }
-          : {
-              layout: entry.layout,
-              theme_settings: entry.layout?.theme,
-              updated_at: now,
-            };
-
-      const { data, error } = await supabase
-        .from('store_homepage_configs')
-        .update(patch)
         .eq('id', configId)
         .select()
         .single();

@@ -18,7 +18,6 @@ interface BuilderToolbarProps {
   onSave: () => void;
   onPublish: () => void;
   onViewLive: () => void;
-  onOpenHistory: () => void;
   onPreview: () => void;
   showPreview: boolean;
   canUndo: boolean;
@@ -49,7 +48,6 @@ export default function BuilderToolbar({
   onSave,
   onPublish,
   onViewLive,
-  onOpenHistory,
   onPreview,
   showPreview,
   canUndo,
@@ -113,9 +111,6 @@ export default function BuilderToolbar({
       </div>
 
       <div className="toolbar-right">
-        <button type="button" className="btn-secondary btn-ghost" onClick={onOpenHistory} title="Version history">
-          History
-        </button>
         {canViewLive && (
           <button type="button" className="btn-secondary btn-ghost" onClick={onViewLive} disabled={!isLive} title={isLive ? 'Open live storefront' : 'Publish first to view live'}>
             View live

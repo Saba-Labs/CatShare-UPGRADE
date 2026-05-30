@@ -1,4 +1,4 @@
-import { useId, useRef } from 'react';
+import { useId } from 'react';
 import { FiDroplet } from 'react-icons/fi';
 
 function normalizeHex(raw: string, fallback: string): string {
@@ -12,11 +12,18 @@ function normalizeHex(raw: string, fallback: string): string {
   return fallback;
 }
 
+function isCssColor(value: string): boolean {
+  const v = value.trim();
+  return /^#[0-9a-fA-F]{3,8}$/i.test(v) || /^rgba?\(/i.test(v) || /^hsla?\(/i.test(v);
+}
+
 interface ColorPickerFieldProps {
   label?: string;
   value: string;
   defaultValue?: string;
-  onChange: (hex: string) => void;
+  onChange: (color: string) => void;
+  /** Allow rgba / hsl in the text field (footer card backgrounds, etc.) */
+  allowCssColor?: boolean;
   /** Tighter layout for theme grids */
   compact?: boolean;
 }
@@ -26,48 +33,53 @@ export default function ColorPickerField({
   value,
   defaultValue = '#ffffff',
   onChange,
+  allowCssColor = false,
   compact = false,
 }: ColorPickerFieldProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
-  const hex = normalizeHex(value || defaultValue, defaultValue);
-
-  const openPicker = () => inputRef.current?.click();
+  const raw = (value || '').trim();
+  const pickerHex = normalizeHex(raw, defaultValue);
+  const textValue = allowCssColor && raw && isCssColor(raw) ? raw : pickerHex;
+  const swatchColor = allowCssColor && raw && isCssColor(raw) ? raw : pickerHex;
 
   return (
     <div className={`color-picker-field${compact ? ' color-picker-field--compact' : ''}`}>
       {label && !compact ? <span className="panel-label color-picker-field__label">{label}</span> : null}
       <div className="color-picker-field__row">
-        <button
-          type="button"
+        <label
           className="color-picker-swatch"
-          onClick={openPicker}
-          title={label ? `${label}: ${hex}` : hex}
-          aria-label={label ? `Choose ${label}` : 'Choose color'}
-          style={{ ['--swatch-color' as string]: hex }}
+          htmlFor={inputId}
+          title={label ? `${label}: ${textValue}` : textValue}
+          style={{ ['--swatch-color' as string]: swatchColor }}
         >
           <span className="color-picker-swatch__checker" aria-hidden />
-          <span className="color-picker-swatch__fill" style={{ background: hex }} aria-hidden />
+          <span className="color-picker-swatch__fill" style={{ background: swatchColor }} aria-hidden />
           <FiDroplet className="color-picker-swatch__icon" aria-hidden />
-        </button>
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="color"
-          className="color-picker-native"
-          value={hex}
-          onChange={(e) => onChange(normalizeHex(e.target.value, defaultValue))}
-          tabIndex={-1}
-          aria-hidden
-        />
+          <input
+            id={inputId}
+            type="color"
+            className="color-picker-native-in-swatch"
+            value={pickerHex}
+            onChange={(e) => onChange(normalizeHex(e.target.value, defaultValue))}
+            aria-label={label ? `Choose ${label}` : 'Choose color'}
+          />
+        </label>
         <input
           type="text"
           className="panel-input color-picker-hex"
-          value={hex}
-          onChange={(e) => onChange(normalizeHex(e.target.value, defaultValue))}
+          value={textValue}
+          onChange={(e) => {
+            const next = e.target.value.trim();
+            if (allowCssColor && isCssColor(next)) {
+              onChange(next);
+              return;
+            }
+            onChange(normalizeHex(next, defaultValue));
+          }}
           spellCheck={false}
-          maxLength={7}
-          aria-label={label ? `${label} hex` : 'Color hex'}
+          maxLength={allowCssColor ? 32 : 7}
+          placeholder={allowCssColor ? '#hex or rgba(...)' : '#000000'}
+          aria-label={label ? `${label} color` : 'Color value'}
         />
       </div>
       {label && compact ? <span className="color-picker-field__compact-label">{label}</span> : null}

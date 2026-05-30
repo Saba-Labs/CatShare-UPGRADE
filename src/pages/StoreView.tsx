@@ -32,7 +32,6 @@ import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../ut
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { getPublishedHomepageConfig } from '../services/homepageService';
-import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
 import '../components/HomepageBuilder/sites-theme-button.css';
 import { HomepageLayout } from '../types/homepage';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
@@ -1003,18 +1002,17 @@ export default function StoreView() {
     });
   }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
 
-  // Safety check: if homepage is disabled but layout exists, clear it
+  // Safety check: custom website layout only applies when website mode is on.
   useEffect(() => {
-    if (store?.homepageEnabled === false && homepageLayout) {
-      console.log('SAFETY CHECK: Clearing homepage layout because homepageEnabled is false');
+    if (!store?.websiteModeEnabled && homepageLayout) {
       setHomepageLayout(null);
       setHomepageLoading(false);
     }
-  }, [store?.homepageEnabled, homepageLayout]);
+  }, [store?.websiteModeEnabled, homepageLayout]);
 
-  // Load published homepage config from Supabase (same data for path URL and wildcard subdomain).
+  // Load published homepage config only for custom website mode (WebsiteRuntime).
   useEffect(() => {
-    if (!store?.homepageEnabled) {
+    if (!store?.websiteModeEnabled) {
       setHomepageLayout(null);
       setHomepageLoading(false);
       return;
@@ -1024,9 +1022,7 @@ export default function StoreView() {
 
     setHomepageLoading(true);
     getPublishedHomepageConfig(store.id).then((config) => {
-      const nextLayout = store.websiteModeEnabled
-        ? (config?.publishedLayout || null)
-        : (config?.layout || config?.publishedLayout || null);
+      const nextLayout = config?.publishedLayout || null;
       if (nextLayout) {
         setHomepageLayout(normalizeHomepageLayoutForWebsiteMode(nextLayout));
       } else {
@@ -1037,7 +1033,7 @@ export default function StoreView() {
       setHomepageLayout(null);
       setHomepageLoading(false);
     });
-  }, [store?.id, store?.homepageEnabled, store?.websiteModeEnabled]);
+  }, [store?.id, store?.websiteModeEnabled]);
 
   /** Temporary diagnostics: set `VITE_DEBUG_STOREFRONT=true` (or run dev) and check console for catalogue merge issues. Remove when done. */
   useEffect(() => {
@@ -1058,11 +1054,9 @@ export default function StoreView() {
         if (!r.success || !r.data) return;
         setStoreError(null);
         setStore(r.data);
-        if (r.data.homepageEnabled && r.data.id) {
+        if (r.data.websiteModeEnabled && r.data.id) {
           void getPublishedHomepageConfig(r.data.id).then((config) => {
-            const nextLayout = r.data!.websiteModeEnabled
-              ? (config?.publishedLayout || null)
-              : (config?.layout || config?.publishedLayout || null);
+            const nextLayout = config?.publishedLayout || null;
             setHomepageLayout(nextLayout ? normalizeHomepageLayoutForWebsiteMode(nextLayout) : null);
           });
         } else {
@@ -1653,18 +1647,7 @@ export default function StoreView() {
             </div>
           </div>
 
-          {/* ══ CUSTOM HOMEPAGE or PRODUCT LISTING ══ */}
-          {store?.homepageEnabled === true && homepageLayout && !homepageLoading ? (
-            // Render custom homepage
-            <div style={{ backgroundColor: homepageLayout.theme?.backgroundColor || '#ffffff', color: homepageLayout.theme?.textColor || '#1a1a1a', fontFamily: homepageLayout.theme?.fontFamily || 'DM Sans, system-ui, sans-serif' }}>
-              {homepageLayout.sections.map((section) => (
-                <div key={section.id} style={{ marginBottom: '0' }}>
-                  <SectionRenderer section={section} theme={homepageLayout.theme} editMode={false} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <>
+          {/* ══ PRODUCT LISTING (default orderform storefront) ══ */}
               {/* ══ STICKY SEARCH + FILTER NAV ══ */}
               <div className="sv-nav">
             <div className="sv-nav-row">
@@ -1865,8 +1848,6 @@ export default function StoreView() {
           </div>
             </>
           )}
-            </>
-          )}
 
           {!store?.websiteModeEnabled && hasFooterDetails && renderStoreFooter()}
 
@@ -1900,9 +1881,10 @@ export default function StoreView() {
         {/* ══ MORPHING PANEL — steps 2 & 3 ══ */}
         {(step === 'customer' || step === 'review') && (
           <div
-            className={`sv-panel${websiteCheckoutClass ? ` ${websiteCheckoutClass}` : ''}`}
+            className={`sv-panel sv-checkout-panel${websiteCheckoutClass ? ` ${websiteCheckoutClass}` : ''}`}
             style={websiteCheckoutClass ? websiteCheckoutTheme : undefined}
           >
+            <div className="sv-checkout-shell">
             <div className="sv-panel-header">
               <button type="button" className="sv-panel-back" onClick={handleBack} aria-label="Go back">
                 <IconBack />
@@ -1924,14 +1906,14 @@ export default function StoreView() {
               </button>
             </div>
 
-            <div style={{ padding: '16px 16px 0' }}>
+            <div className="sv-checkout-steps">
               <StepBar current={step} />
             </div>
 
             {step === 'customer' && (
               <div className="sv-checkout-content">
-                <div className="sv-form-body sv-checkout-grid">
-                  <section className="sv-checkout-section">
+                <div className="sv-form-body sv-checkout-grid sv-checkout-grid--details">
+                  <section className="sv-checkout-section sv-checkout-section--form">
                     {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
                       <div className="sv-checkout-alert">
                         Name and WhatsApp are required to continue.
@@ -1971,7 +1953,7 @@ export default function StoreView() {
                   </section>
 
                   {orderSummary.items.length > 0 && (
-                    <section className="sv-checkout-section">
+                    <section className="sv-checkout-section sv-checkout-section--summary">
                       <div className="sv-checkout-section-title">Your items</div>
                       <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
                         {orderSummary.items.map((item: any) => {
@@ -2026,7 +2008,7 @@ export default function StoreView() {
             {step === 'review' && (
               <div className="sv-checkout-content">
                 <div className="sv-review-layout sv-checkout-grid sv-checkout-grid--review">
-                  <section className="sv-checkout-section">
+                  <section className="sv-checkout-section sv-checkout-section--main">
                     <div className="sv-review-list" style={{ padding: 0, margin: 0 }}>
                       {reviewSummary.items.map((item: any) => {
                         const cd = fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep);
@@ -2065,7 +2047,7 @@ export default function StoreView() {
                       )}
                     </div>
                   </section>
-                  <section className="sv-checkout-section">
+                  <section className="sv-checkout-section sv-checkout-section--summary">
                     <div className="sv-review-total-bar">
                       <div>
                         <div className="sv-review-total-label">Total amount</div>
@@ -2080,6 +2062,7 @@ export default function StoreView() {
               </div>
             )}
             {!store?.websiteModeEnabled && hasFooterDetails && renderStoreFooter()}
+            </div>
           </div>
         )}
 

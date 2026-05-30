@@ -98,6 +98,12 @@ export default function GridCanvas({
     [layout.sections]
   );
   const siteSettings = layout.websiteConfig?.siteSettings;
+  const showTemplatePicker =
+    sortedSections.length === 0 &&
+    editingPageId === 'home' &&
+    !!onApplyTemplate &&
+    !blankStarted;
+  const showSiteFooter = !!siteSettings && !showTemplatePicker && sortedSections.length > 0;
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
 
@@ -229,9 +235,12 @@ export default function GridCanvas({
         </div>
       )}
       {sortedSections.length === 0 ? (
-        <div className="canvas-empty sites-canvas-empty" onClick={(e) => e.stopPropagation()}>
+        <div
+          className={`canvas-empty sites-canvas-empty${showTemplatePicker ? ' sites-canvas-empty--template-picker' : ''}`}
+          onClick={(e) => e.stopPropagation()}
+        >
           <SectionDropIndicator index={0} expanded={paletteDragActive} />
-          {onApplyTemplate && editingPageId === 'home' && !blankStarted ? (
+          {showTemplatePicker ? (
             <TemplateGallery
               variant="full"
               onApply={onApplyTemplate}
@@ -452,7 +461,7 @@ export default function GridCanvas({
               })}
             </div>
       )}
-      {siteSettings && (
+      {showSiteFooter && (
         <div
           className={`sites-editor-footer-preview${isSiteFooterSelected ? ' selected' : ''}`}
           role="button"

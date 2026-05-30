@@ -46,7 +46,7 @@ export default function PreviewPane({ layout }: PreviewPaneProps) {
             ))}
           </main>
         )}
-        {siteSettings && (
+        {siteSettings && sections.length > 0 && (
           <div className="sites-editor-footer-preview">
             <WebsiteFooter siteSettings={siteSettings} previewMode />
           </div>

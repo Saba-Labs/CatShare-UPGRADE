@@ -8,6 +8,7 @@ import {
 } from '../types/homepage';
 import { syncSiteThemeAcrossPages } from '../utils/websiteSiteTheme';
 import { v4 as uuid } from 'uuid';
+import { createDefaultFooterLinkColumns } from './footerVariants';
 import { normalizeStorefrontPath } from '../utils/storefrontHref';
 import { normalizeFreeformElementsList } from '../utils/freeformElements';
 
@@ -493,6 +494,7 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       footerShowContact: true,
       footerShowStoreInfo: true,
       footerShowFollow: true,
+      footerColumns: createDefaultFooterLinkColumns(),
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },
         { id: uuid(), label: 'Collections', href: '/collections/all' },
@@ -601,9 +603,13 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
 
   if (normalized.websiteConfig) {
     normalized.websiteConfig = syncSiteThemeAcrossPages(normalized.websiteConfig);
+    const siteSettings = normalizeSiteSettingsLinks(normalized.websiteConfig.siteSettings);
+    if (!siteSettings.footerColumns?.length) {
+      siteSettings.footerColumns = createDefaultFooterLinkColumns();
+    }
     normalized.websiteConfig = {
       ...normalized.websiteConfig,
-      siteSettings: normalizeSiteSettingsLinks(normalized.websiteConfig.siteSettings),
+      siteSettings,
     };
     normalized.theme = normalized.websiteConfig.pages.home.theme;
     normalized.websiteConfig = {

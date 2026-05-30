@@ -73,7 +73,7 @@ begin
     'createdAt', rec.created_at,
     'isLive', coalesce(rec.is_live, true),
     'whatsapp', nullif(trim(rec.store_whatsapp), ''),
-    'homepageEnabled', coalesce(rec.homepage_enabled, true),
+    'homepageEnabled', coalesce(rec.website_mode_enabled, false) and coalesce(rec.homepage_enabled, true),
     'websiteModeEnabled', coalesce(rec.website_mode_enabled, false),
     'cataloguesDefinitionUserSettings', us_data -> 'cataloguesDefinition',
     'cataloguesDefinitionManaged', (
