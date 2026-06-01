@@ -1,11 +1,10 @@
 import React from 'react';
 import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
-import ColorPickerField from './ColorPickerField';
+import FooterColorFields from './FooterColorFields';
 import {
   FOOTER_COLUMN_PRESETS,
   FOOTER_VARIANT_OPTIONS,
-  footerColorPresetForVariant,
   footerPresetForVariant,
 } from '../../config/footerVariants';
 import type { WebsiteFooterVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
@@ -15,12 +14,15 @@ interface FooterSettingsEditorProps {
   websiteConfig: WebsiteModeConfig;
   onUpdateWebsiteConfig: (updates: Partial<WebsiteModeConfig>) => void;
   embedded?: boolean;
+  /** Hide color pickers when shown in a separate Colors section (e.g. footer quick panel). */
+  hideColors?: boolean;
 }
 
 export default function FooterSettingsEditor({
   siteSettings,
   websiteConfig,
   onUpdateWebsiteConfig,
+  hideColors = false,
 }: FooterSettingsEditorProps) {
   const variant = siteSettings.footerVariant || 'classic';
   const columns = siteSettings.footerColumns || [];
@@ -46,10 +48,6 @@ export default function FooterSettingsEditor({
     });
   };
 
-  const applyPresetColors = () => {
-    patch(footerColorPresetForVariant(variant));
-  };
-
   return (
     <>
       <div className="sidebar-field">
@@ -66,9 +64,29 @@ export default function FooterSettingsEditor({
           ))}
         </select>
         <p className="panel-hint">
-          Changes the structure of your footer (columns, cards, centered, or split row). Use Colors below for background and text.
+          Changes the structure of your footer (columns, cards, centered, or split row).
         </p>
       </div>
+
+      <div className="sidebar-field">
+        <label className="panel-label">Footer width</label>
+        <select
+          className="panel-input"
+          value={siteSettings.footerWidth === 'full' ? 'full' : 'boxed'}
+          onChange={(e) => patch({ footerWidth: e.target.value as 'boxed' | 'full' })}
+        >
+          <option value="boxed">Boxed — card with side margins</option>
+          <option value="full">Full width — edge to edge</option>
+        </select>
+        <p className="panel-hint">Boxed matches the OrderForm card look; full width spans the entire page.</p>
+      </div>
+
+      {!hideColors ? (
+        <>
+          <div className="sidebar-panel-divider" />
+          <FooterColorFields siteSettings={siteSettings} variant={variant} onPatch={patch} />
+        </>
+      ) : null}
 
       <div className="sidebar-field">
         <label className="panel-label">Tagline</label>
@@ -284,53 +302,6 @@ export default function FooterSettingsEditor({
           </button>
         </div>
       ))}
-
-      <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Colors</h3>
-        <button type="button" className="btn-text" onClick={applyPresetColors}>
-          Reset to style defaults
-        </button>
-      </div>
-      <p className="panel-hint">Changes apply to the site footer in the preview and on your live store after you publish.</p>
-      <div className="color-picker-stack">
-        <ColorPickerField
-          label="Background"
-          value={siteSettings.footerBg || '#ffffff'}
-          onChange={(footerBg) => patch({ footerBg })}
-        />
-        <ColorPickerField
-          label="Text"
-          value={siteSettings.footerTextColor || '#1a1a1a'}
-          onChange={(footerTextColor) => patch({ footerTextColor })}
-        />
-        <ColorPickerField
-          label="Card background"
-          value={siteSettings.footerColBg || '#f2f2f0'}
-          defaultValue="#f2f2f0"
-          allowCssColor
-          onChange={(footerColBg) => patch({ footerColBg })}
-        />
-        <ColorPickerField
-          label="Accent"
-          value={siteSettings.footerAccentColor || '#1a6b4a'}
-          onChange={(footerAccentColor) => patch({ footerAccentColor })}
-        />
-        <ColorPickerField
-          label="Accent badge background"
-          value={siteSettings.footerAccentBg || '#e8f4ef'}
-          defaultValue="#e8f4ef"
-          allowCssColor
-          onChange={(footerAccentBg) => patch({ footerAccentBg })}
-        />
-        <ColorPickerField
-          label="Borders"
-          value={siteSettings.footerBorderColor || 'rgba(0, 0, 0, 0.08)'}
-          defaultValue="rgba(0, 0, 0, 0.08)"
-          allowCssColor
-          onChange={(footerBorderColor) => patch({ footerBorderColor })}
-        />
-      </div>
 
       <p className="panel-hint panel-hint--static">
         “Powered by CatShare” always appears at the bottom of your site footer and links to catshare.app. It cannot be removed or edited.

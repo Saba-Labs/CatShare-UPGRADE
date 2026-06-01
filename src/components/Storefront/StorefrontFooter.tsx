@@ -163,11 +163,16 @@ export default function StorefrontFooter({
   const showFollowInMenus =
     showFollow && (layout === 'link-columns' || layout === 'centered' || layout === 'split');
 
+  const footerBg = siteSettings.footerBg || '#ffffff';
+  const footerText = siteSettings.footerTextColor || '#1a1a1a';
+
   const footerStyle = {
-    '--sf-footer-surface': siteSettings.footerBg || '#ffffff',
-    '--sf-footer-text': siteSettings.footerTextColor || '#1a1a1a',
-    '--sf-footer-text-secondary': siteSettings.footerTextColor || '#555555',
-    '--sf-footer-muted': siteSettings.footerTextColor ? undefined : '#999999',
+    background: footerBg,
+    color: footerText,
+    '--sf-footer-surface': footerBg,
+    '--sf-footer-text': footerText,
+    '--sf-footer-text-secondary': footerText,
+    '--sf-footer-muted': `color-mix(in srgb, ${footerText} 62%, transparent)`,
     '--sf-footer-col-bg': siteSettings.footerColBg || '#f2f2f0',
     '--sf-footer-border': siteSettings.footerBorderColor || 'rgba(0, 0, 0, 0.08)',
     '--sf-footer-accent': siteSettings.footerAccentColor || '#1a6b4a',
@@ -310,11 +315,9 @@ export default function StorefrontFooter({
                   {openLabel}
                 </div>
               ) : null}
-            </div>
-            <div className="sf-footer-split-menus">{linkColumnsNav({})}</div>
-            <div className="sf-footer-split-social">
               {showFollowInMenus ? footerSocials : null}
             </div>
+            <div className="sf-footer-split-menus">{linkColumnsNav({})}</div>
           </div>
         );
       case 'info-cards':
@@ -330,9 +333,13 @@ export default function StorefrontFooter({
     }
   })();
 
+  const footerWidth = siteSettings.footerWidth === 'full' ? 'full' : 'boxed';
+
   return (
     <footer
-      className={`sf-footer sf-footer--layout-${layout}${previewMode ? ' sf-footer--preview' : ''}`}
+      className={`sf-footer sf-footer--layout-${layout} sf-footer--width-${footerWidth}${
+        previewMode ? ' sf-footer--preview' : ''
+      }`}
       style={footerStyle}
     >
       {layoutBody}

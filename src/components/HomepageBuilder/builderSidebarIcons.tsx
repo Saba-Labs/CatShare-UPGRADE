@@ -32,6 +32,7 @@ import {
   FiGlobe,
   FiSearch,
   FiAlignLeft,
+  FiMenu,
   FiBox,
   FiSliders,
   FiMousePointer,
@@ -49,7 +50,7 @@ export const SIDEBAR_TAB_META: Record<
   pages: { label: 'Pages', hint: 'Manage pages', Icon: FiFile },
   photos: { label: 'Photos', hint: 'Image library', Icon: FiImage },
   theme: { label: 'Theme', hint: 'Colors & fonts', Icon: FiDroplet },
-  site: { label: 'Site', hint: 'Logo, nav & SEO', Icon: FiSettings },
+  site: { label: 'Site', hint: 'SEO & tips', Icon: FiSettings },
 };
 
 export const PRESET_ICONS: Record<BlockPresetId, IconType> = {
@@ -92,6 +93,7 @@ export {
   FiShoppingBag,
   FiBell,
   FiAlignLeft,
+  FiMenu,
   FiSettings,
   FiChevronUp,
   FiChevronDown,

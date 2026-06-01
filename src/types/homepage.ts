@@ -519,6 +519,12 @@ export interface WebsiteSeoSettings {
 /** Visual style of the global storefront footer. */
 export type WebsiteFooterVariant = 'classic' | 'aurora' | 'pulse' | 'clean';
 
+/** Boxed card vs edge-to-edge footer on the page. */
+export type WebsiteFooterWidth = 'boxed' | 'full';
+
+/** Header layout on the storefront (classic bar, centered, minimal, split, orderform hero). */
+export type WebsiteHeaderVariant = 'classic' | 'centered' | 'minimal' | 'split' | 'orderform';
+
 export interface WebsiteSiteSettings {
   websiteName: string;
   logoUrl?: string;
@@ -527,10 +533,18 @@ export interface WebsiteSiteSettings {
   announcementBg?: string;
   announcementTextColor?: string;
   navItems: WebsiteNavItem[];
+  /** Header layout — classic, centered, minimal, split bar, or orderform store hero. */
+  headerVariant?: WebsiteHeaderVariant;
   headerBg?: string;
   headerTextColor?: string;
+  /** Tagline under the store name (orderform hero layout; falls back to footer description). */
+  headerTagline?: string;
+  /** Longer blurb under the tagline (orderform hero layout). */
+  headerAbout?: string;
   /** Footer layout (info cards, link columns, centered, split bar) — not colors. */
   footerVariant?: WebsiteFooterVariant;
+  /** Boxed card (default) or full-width strip edge to edge. */
+  footerWidth?: WebsiteFooterWidth;
   footerBg?: string;
   footerTextColor?: string;
   footerColBg?: string;

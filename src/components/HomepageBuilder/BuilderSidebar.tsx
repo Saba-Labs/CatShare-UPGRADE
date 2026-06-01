@@ -5,11 +5,16 @@ import ThemePanel from './ThemePanel';
 import SiteSettingsPanel from './SiteSettingsPanel';
 import SectionQuickPanel from './SectionQuickPanel';
 import FooterQuickPanel from './FooterQuickPanel';
+import HeaderQuickPanel from './HeaderQuickPanel';
 import AnnouncementQuickPanel from './AnnouncementQuickPanel';
 import TemplateGallery from './TemplateGallery';
 import MediaLibraryPanel from './media/MediaLibraryPanel';
 import { SIDEBAR_TAB_META } from './builderSidebarIcons';
-import { SITE_ANNOUNCEMENT_SELECTION_ID, SITE_FOOTER_SELECTION_ID } from '../../config/homepageBuilderConfig';
+import {
+  SITE_ANNOUNCEMENT_SELECTION_ID,
+  SITE_FOOTER_SELECTION_ID,
+  SITE_HEADER_SELECTION_ID,
+} from '../../config/homepageBuilderConfig';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
 import {
   HomepageSection,
@@ -76,6 +81,7 @@ export default function BuilderSidebar({
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
+  const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
 
   const activeMeta = SIDEBAR_TAB_META[activeTab];
   const ActiveTabIcon = activeMeta.Icon;
@@ -106,7 +112,7 @@ export default function BuilderSidebar({
       </nav>
 
       <div className="builder-sidebar-main">
-        {!selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected ? (
+        {!selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
           <div className="builder-sidebar-main__head">
             <ActiveTabIcon className="builder-sidebar-main__head-icon" aria-hidden />
             <span className="builder-sidebar-main__head-title">{activeMeta.label}</span>
@@ -123,6 +129,13 @@ export default function BuilderSidebar({
             onSelectFreeformElement={onSelectFreeformElement}
             onUpdateWebsiteConfig={onUpdateWebsiteConfig}
             onUpdate={(updates) => onUpdateSection(selectedSection.id, updates)}
+            onBack={onClearSectionSelection}
+          />
+        ) : isSiteHeaderSelected ? (
+          <HeaderQuickPanel
+            websiteConfig={websiteConfig}
+            storeId={storeId}
+            onUpdateWebsiteConfig={onUpdateWebsiteConfig}
             onBack={onClearSectionSelection}
           />
         ) : isSiteAnnouncementSelected ? (

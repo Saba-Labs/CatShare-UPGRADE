@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { createDefaultFooterLinkColumns, footerPresetForVariant } from './footerVariants';
+import { headerVariantForTemplate } from './headerVariants';
 import type {
   HomepageLayout,
   HomepageSection,
@@ -133,6 +134,7 @@ function buildAuroraBoutique(): WebsiteModeConfig {
       announcementTextColor: '#fdfaf6',
       headerBg: '#fdfaf6',
       headerTextColor: '#3b3026',
+      headerVariant: headerVariantForTemplate('aurora-boutique'),
       ...footerPresetForVariant('aurora'),
       footerDescription: 'Curated fashion with intention. Quality pieces for every season.',
       footerColumns: createDefaultFooterLinkColumns(),
@@ -263,6 +265,7 @@ function buildPulseTech(): WebsiteModeConfig {
       announcementTextColor: '#ffffff',
       headerBg: '#0b1120',
       headerTextColor: '#e2e8f0',
+      headerVariant: headerVariantForTemplate('pulse-tech'),
       ...footerPresetForVariant('pulse'),
       footerDescription: 'Premium tech gear with fast delivery and real support when you need it.',
       footerColumns: createDefaultFooterLinkColumns(),
@@ -383,6 +386,7 @@ function buildCleanMarket(): WebsiteModeConfig {
       announcementTextColor: '#ffffff',
       headerBg: '#ffffff',
       headerTextColor: '#111827',
+      headerVariant: headerVariantForTemplate('clean-market'),
       ...footerPresetForVariant('clean'),
       footerDescription: 'Everything you need, in one place. Simple shopping, honest prices.',
       footerColumns: createDefaultFooterLinkColumns(),

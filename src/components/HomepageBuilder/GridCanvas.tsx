@@ -16,6 +16,7 @@ import {
   SECTION_TYPE_LABELS,
   SITE_ANNOUNCEMENT_SELECTION_ID,
   SITE_FOOTER_SELECTION_ID,
+  SITE_HEADER_SELECTION_ID,
 } from '../../config/homepageBuilderConfig';
 import { useBuilderMedia } from './media/BuilderMediaContext';
 import {
@@ -106,6 +107,7 @@ export default function GridCanvas({
   const showSiteFooter = !!siteSettings && !showTemplatePicker && sortedSections.length > 0;
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
+  const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
 
   const handleSectionClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -220,12 +222,14 @@ export default function GridCanvas({
         ['--site-primary' as string]: theme.primaryColor || '#1a73e8',
       }}
     >
-      {siteSettings ? (
+      {siteSettings && !showTemplatePicker ? (
         <StorefrontSiteHeader
           siteSettings={siteSettings}
           preview
           onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
           isAnnouncementSelected={isSiteAnnouncementSelected}
+          onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}
+          isHeaderSelected={isSiteHeaderSelected}
         />
       ) : (
         <div className="sites-editor-header-preview">
@@ -463,7 +467,9 @@ export default function GridCanvas({
       )}
       {showSiteFooter && (
         <div
-          className={`sites-editor-footer-preview${isSiteFooterSelected ? ' selected' : ''}`}
+          className={`sites-editor-footer-preview${
+            siteSettings.footerWidth === 'full' ? ' sites-editor-footer-preview--full' : ''
+          }${isSiteFooterSelected ? ' selected' : ''}`}
           role="button"
           tabIndex={0}
           aria-label="Edit site footer"

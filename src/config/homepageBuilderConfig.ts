@@ -47,6 +47,9 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
 /** Canvas selection id for the site-wide footer chrome (not a page section uuid). */
 export const SITE_FOOTER_SELECTION_ID = '__site-footer__';
 
+/** Canvas selection id for the site-wide header chrome (not a page section uuid). */
+export const SITE_HEADER_SELECTION_ID = '__site-header__';
+
 /** Canvas selection id for the site-wide announcement bar above the header. */
 export const SITE_ANNOUNCEMENT_SELECTION_ID = '__site-announcement__';
 
@@ -482,6 +485,7 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       announcementTextColor: '#ffffff',
       headerBg: '#ffffff',
       headerTextColor: '#111827',
+      headerVariant: 'classic',
       footerVariant: 'classic',
       footerBg: '#ffffff',
       footerTextColor: '#1a1a1a',
@@ -606,6 +610,9 @@ export function normalizeHomepageLayoutForWebsiteMode(layout: HomepageLayout): H
     const siteSettings = normalizeSiteSettingsLinks(normalized.websiteConfig.siteSettings);
     if (!siteSettings.footerColumns?.length) {
       siteSettings.footerColumns = createDefaultFooterLinkColumns();
+    }
+    if (!siteSettings.headerVariant) {
+      siteSettings.headerVariant = 'classic';
     }
     normalized.websiteConfig = {
       ...normalized.websiteConfig,

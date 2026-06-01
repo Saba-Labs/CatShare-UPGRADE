@@ -1,0 +1,187 @@
+/* Orderform / classic catalog store hero (matches StoreView sv-hero) */
+.sf-of-header {
+  width: 100%;
+  background: var(--sf-of-surface, #f7f7f5);
+  color: var(--sf-of-text, #1a1a1a);
+  border-bottom: 1px solid var(--sf-of-border, rgba(0, 0, 0, 0.08));
+  font-family: var(--site-font, 'DM Sans', system-ui, sans-serif);
+}
+
+.sf-of-header__hit {
+  display: block;
+  width: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.sf-of-header__hit--editable {
+  transition: box-shadow 0.15s ease, outline 0.15s ease;
+}
+
+.sf-of-header__hit--editable:hover:not(.is-selected) {
+  outline: 2px solid rgba(26, 115, 232, 0.35);
+  outline-offset: -2px;
+}
+
+.sf-of-header__hit--editable.is-selected {
+  outline: 2px solid #1a73e8;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 1px #1a73e8;
+}
+
+.sf-of-header__selection-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  z-index: 1;
+}
+
+.sf-of-header__inner {
+  padding: 24px 20px 22px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.sf-of-header__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sf-of-header__logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sf-of-surface, #f7f7f5) 90%, var(--sf-of-text, #1a1a1a) 10%);
+  border: 1px solid var(--sf-of-border, rgba(0, 0, 0, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+.sf-of-header__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sf-of-header__logo-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sf-of-text3, #999);
+}
+
+.sf-of-header__open-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sf-of-accent-light, #e8f4ef);
+  border: 1px solid color-mix(in srgb, var(--sf-of-accent, #1a6b4a) 35%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sf-of-accent, #1a6b4a);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sf-of-header__open-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sf-of-accent, #1a6b4a);
+  animation: sf-of-header-pulse 2.5s infinite;
+}
+
+@keyframes sf-of-header-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+}
+
+.sf-of-header__name {
+  margin: 0 0 5px;
+  font-family: var(--site-font-head, 'DM Serif Display', Georgia, serif);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+  color: var(--sf-of-text, #1a1a1a);
+}
+
+.sf-of-header__tagline {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  max-width: 300px;
+  color: var(--sf-of-text2, #555);
+  font-weight: 400;
+}
+
+.sf-of-header__desc {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 320px;
+  color: var(--sf-of-text3, #999);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .sf-of-header {
+    border: 1px solid var(--sf-of-border, rgba(0, 0, 0, 0.08));
+    border-radius: 22px;
+    overflow: hidden;
+    margin: 12px auto 0;
+    max-width: 1200px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  }
+
+  .sf-of-header__inner {
+    padding: 28px 30px 24px;
+  }
+
+  .sf-of-header__name {
+    font-size: 34px;
+  }
+
+  .sf-of-header__tagline,
+  .sf-of-header__desc {
+    max-width: 760px;
+  }
+}
+
+.website-runtime-root .sf-of-header {
+  margin-left: auto;
+  margin-right: auto;
+}
