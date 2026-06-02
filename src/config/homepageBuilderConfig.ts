@@ -158,9 +158,11 @@ export function createDefaultSection(
         order,
         settings: {
           title: 'Featured Products',
-          displayMode: 'grid',
+          displayMode: 'carousel',
           columns: 3,
-          itemsPerPage: 6,
+          cardStyle: 'boxed',
+          cardSize: 'md',
+          itemsPerPage: 10,
           showPrice: true,
           showDescription: false,
         },
@@ -202,9 +204,11 @@ export function createDefaultSection(
         settings: {
           title: 'All Products',
           columns: 3,
-          displayMode: 'grid',
+          displayMode: 'carousel',
+          cardStyle: 'boxed',
+          cardSize: 'md',
           sortBy: 'default',
-          itemsToShow: 12,
+          itemsToShow: 10,
           showFilters: true,
           showSearch: true,
         },
@@ -527,6 +531,11 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       product: {
         galleryLayout: 'left-thumbs',
         showRecommendations: true,
+        imageLook: 'clean',
+        fieldsLook: 'plain',
+        colorTheme: 'brand',
+        suggestedProductsLayout: 'cards',
+        suggestedProductsCount: 4,
         showTrustBadges: true,
         ctaStyle: 'solid',
       },
@@ -539,13 +548,18 @@ function normalizeSiteLinkHref(href: string): string {
   return normalizeStorefrontPath(href);
 }
 
+function normalizeNavItem(item: import('../types/homepage').WebsiteNavItem): import('../types/homepage').WebsiteNavItem {
+  return {
+    ...item,
+    href: normalizeSiteLinkHref(item.href),
+    children: (item.children || []).map(normalizeNavItem),
+  };
+}
+
 function normalizeSiteSettingsLinks(site: WebsiteSiteSettings): WebsiteSiteSettings {
   return {
     ...site,
-    navItems: (site.navItems || []).map((item) => ({
-      ...item,
-      href: normalizeSiteLinkHref(item.href),
-    })),
+    navItems: (site.navItems || []).map(normalizeNavItem),
     footerColumns: (site.footerColumns || []).map((column) => ({
       ...column,
       links: (column.links || []).map((link) => ({

@@ -16,6 +16,7 @@ import {
   SITE_HEADER_SELECTION_ID,
 } from '../../config/homepageBuilderConfig';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
+import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import {
   HomepageSection,
   HomepageSectionType,
@@ -23,6 +24,7 @@ import {
   WebsiteModeConfig,
   FreeformElementType,
 } from '../../types/homepage';
+import ProductTemplateQuickPanel from './ProductTemplateQuickPanel';
 import { BlockPresetId } from '../../config/blockPresets';
 
 export type SidebarTab = 'insert' | 'templates' | 'pages' | 'theme' | 'site' | 'photos';
@@ -50,6 +52,8 @@ interface BuilderSidebarProps {
   onRemovePage: (pageId: string) => void;
   onClearSectionSelection: () => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
+  previewProduct?: ProductWithCatalogueData | null;
+  onCloseProductPreview?: () => void;
 }
 
 const TAB_ORDER: SidebarTab[] = ['insert', 'templates', 'pages', 'photos', 'theme', 'site'];
@@ -77,6 +81,8 @@ export default function BuilderSidebar({
   onRemovePage,
   onClearSectionSelection,
   onApplyTemplate,
+  previewProduct = null,
+  onCloseProductPreview,
 }: BuilderSidebarProps) {
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
@@ -112,7 +118,7 @@ export default function BuilderSidebar({
       </nav>
 
       <div className="builder-sidebar-main">
-        {!selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
+        {!previewProduct && !selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
           <div className="builder-sidebar-main__head">
             <ActiveTabIcon className="builder-sidebar-main__head-icon" aria-hidden />
             <span className="builder-sidebar-main__head-title">{activeMeta.label}</span>
@@ -120,7 +126,18 @@ export default function BuilderSidebar({
         ) : null}
 
       <div className="builder-sidebar-body">
-        {selectedSection ? (
+        {previewProduct &&
+        !isSiteFooterSelected &&
+        !isSiteHeaderSelected &&
+        !isSiteAnnouncementSelected &&
+        onCloseProductPreview ? (
+          <ProductTemplateQuickPanel
+            productName={previewProduct.name}
+            websiteConfig={websiteConfig}
+            onUpdateWebsiteConfig={onUpdateWebsiteConfig}
+            onBack={onCloseProductPreview}
+          />
+        ) : selectedSection ? (
           <SectionQuickPanel
             section={selectedSection}
             storeId={storeId}

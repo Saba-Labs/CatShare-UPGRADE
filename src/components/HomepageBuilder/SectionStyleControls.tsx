@@ -1,6 +1,7 @@
 import React from 'react';
 import { HomepageSection } from '../../types/homepage';
 import ColorPickerField from './ColorPickerField';
+import SidebarDropdownField from './SidebarDropdownField';
 
 interface SectionStyleControlsProps {
   section: HomepageSection & { id: string };
@@ -41,30 +42,32 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       {hasAlignment && (
         <div className="sidebar-field">
           <label className="panel-label">Alignment</label>
-          <select
-            className="panel-select"
+          <SidebarDropdownField
+            ariaLabel="Section alignment"
             value={(settings[alignmentKey] as string) || 'center'}
-            onChange={(e) => patchSettings({ [alignmentKey]: e.target.value })}
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
+            options={[
+              { value: 'left', label: 'Left' },
+              { value: 'center', label: 'Center' },
+              { value: 'right', label: 'Right' },
+            ]}
+            onChange={(next) => patchSettings({ [alignmentKey]: next })}
+          />
         </div>
       )}
 
       {hasPadding && (
         <div className="sidebar-field">
           <label className="panel-label">Padding</label>
-          <select
-            className="panel-select"
+          <SidebarDropdownField
+            ariaLabel="Section padding"
             value={(settings.padding as string) || 'medium'}
-            onChange={(e) => patchSettings({ padding: e.target.value })}
-          >
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
+            options={[
+              { value: 'small', label: 'Small' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'large', label: 'Large' },
+            ]}
+            onChange={(next) => patchSettings({ padding: next })}
+          />
         </div>
       )}
 
@@ -79,31 +82,33 @@ export default function SectionStyleControls({ section, onUpdate }: SectionStyle
       {section.type === 'banner' && (
         <div className="sidebar-field">
           <label className="panel-label">Height</label>
-          <select
-            className="panel-select"
+          <SidebarDropdownField
+            ariaLabel="Banner height"
             value={(settings.height as string) || 'large'}
-            onChange={(e) => patchSettings({ height: e.target.value })}
-          >
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
+            options={[
+              { value: 'small', label: 'Small' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'large', label: 'Large' },
+            ]}
+            onChange={(next) => patchSettings({ height: next })}
+          />
         </div>
       )}
 
       {section.type === 'text' && (
         <div className="sidebar-field">
           <label className="panel-label">Text size</label>
-          <select
-            className="panel-select"
+          <SidebarDropdownField
+            ariaLabel="Text size"
             value={(settings.fontSize as string) || 'medium'}
-            onChange={(e) => patchSettings({ fontSize: e.target.value })}
-          >
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-            <option value="xlarge">Extra large</option>
-          </select>
+            options={[
+              { value: 'small', label: 'Small' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'large', label: 'Large' },
+              { value: 'xlarge', label: 'Extra large' },
+            ]}
+            onChange={(next) => patchSettings({ fontSize: next })}
+          />
         </div>
       )}
     </div>

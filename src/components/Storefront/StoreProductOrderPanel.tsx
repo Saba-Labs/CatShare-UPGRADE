@@ -12,7 +12,6 @@ import {
   buildStorefrontDetailFields,
   fmt,
   fmtCalc,
-  getCats,
   getStorefrontPriceAndUnit,
   getStoreProductGalleryProps,
   isDisplayableProductImage,
@@ -73,6 +72,9 @@ export interface StoreProductOrderPanelProps {
   onDone: () => void;
   layout?: 'page' | 'drawer';
   layoutVariant?: 'editorial' | 'tech' | 'minimal';
+  orderCtaLabel?: string;
+  ctaStyle?: 'solid' | 'outline';
+  showQuantitySelector?: boolean;
 }
 
 export default function StoreProductOrderPanel({
@@ -89,6 +91,9 @@ export default function StoreProductOrderPanel({
   onDone,
   layout = 'page',
   layoutVariant = 'minimal',
+  orderCtaLabel = 'Done',
+  ctaStyle = 'solid',
+  showQuantitySelector = true,
 }: StoreProductOrderPanelProps) {
   const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
   const variantData = getVariantCombinationData(product, variantSelection);
@@ -150,15 +155,6 @@ export default function StoreProductOrderPanel({
         <div className="sv-drawer-name">{product.name}</div>
         {product.subtitle ? <div className="sv-drawer-sub">{product.subtitle}</div> : null}
         {variantSummary ? <VariantPills summary={variantSummary} /> : null}
-        {getCats(product).length > 0 ? (
-          <div className="sv-drawer-cats">
-            {getCats(product).map((c) => (
-              <span key={c} className="sv-drawer-cat">
-                {c}
-              </span>
-            ))}
-          </div>
-        ) : null}
 
         <div className="sv-drawer-price">
           {Number.isFinite(price) ? (
@@ -195,22 +191,37 @@ export default function StoreProductOrderPanel({
           />
         ) : null}
 
-        <div className="sv-drawer-qty-section">
-          <div className="sv-drawer-qty-label">Quantity</div>
-          <div className="sv-drawer-qty-row">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
-              {qstep > 1 ? <PackHint step={qstep} /> : null}
+        {showQuantitySelector ? (
+          <div className="sv-drawer-qty-section">
+            <div className="sv-drawer-qty-label">Quantity</div>
+            <div className="sv-drawer-qty-row">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
+                {qstep > 1 ? <PackHint step={qstep} /> : null}
+              </div>
+              <div className="sv-drawer-total-wrap">
+                {calcDetail ? <div className="sv-drawer-calc">{calcDetail}</div> : null}
+                <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
+              </div>
             </div>
-            <div className="sv-drawer-total-wrap">
-              {calcDetail ? <div className="sv-drawer-calc">{calcDetail}</div> : null}
-              <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
-            </div>
+            <button
+              type="button"
+              className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
+              onClick={onDone}
+            >
+              {orderCtaLabel}
+            </button>
           </div>
-          <button type="button" className="sv-drawer-done" onClick={onDone}>
-            Done
+        ) : (
+          <button
+            type="button"
+            className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
+            onClick={onDone}
+            style={{ marginTop: 20 }}
+          >
+            {orderCtaLabel}
           </button>
-        </div>
+        )}
       </div>
   );
 

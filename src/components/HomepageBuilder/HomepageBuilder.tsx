@@ -23,7 +23,10 @@ import {
   createDefaultWebsiteModeConfig,
   normalizeHomepageLayoutForWebsiteMode,
 } from '../../config/homepageBuilderConfig';
+import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import { HomepageConfig, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
+import { getSymbolForCurrencyCode } from '../../utils/currencyUtils';
+import BuilderProductPageOverlay from './BuilderProductPageOverlay';
 import { getWebsiteTemplate, type WebsiteTemplateId } from '../../config/websiteTemplates';
 import { getSiteTheme, syncSiteThemeAcrossPages } from '../../utils/websiteSiteTheme';
 import { isOfflineBuilderMode } from '../../config/offlineBuilder';
@@ -70,6 +73,7 @@ export default function HomepageBuilder({
   const [viewport, setViewport] = useState<ViewportSize>('desktop');
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedFreeformElementId, setSelectedFreeformElementId] = useState<string | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<ProductWithCatalogueData | null>(null);
 
   const configPersisted = isPersistedHomepageConfigId(config?.id);
 
@@ -382,7 +386,27 @@ export default function HomepageBuilder({
   const handleSelectSection = (id: string | null) => {
     actions.selectSection(id);
     setSelectedFreeformElementId(null);
+    setPreviewProduct(null);
   };
+
+  const handleProductPreview = useCallback((product: ProductWithCatalogueData) => {
+    setPreviewProduct(product);
+    actions.selectSection(null);
+    setSelectedFreeformElementId(null);
+  }, [actions]);
+
+  const previewCatalogue = useMemo(() => {
+    if (!catalogues?.length) return null;
+    if (catalogueId) {
+      return catalogues.find((c) => c.id === catalogueId) ?? catalogues[0];
+    }
+    return catalogues[0];
+  }, [catalogues, catalogueId]);
+
+  const currencySymbol = useMemo(
+    () => getSymbolForCurrencyCode(currencyCode || 'INR'),
+    [currencyCode]
+  );
 
   const addFreeformElement = useCallback(
     (elementType: FreeformElementType) => {
@@ -498,32 +522,53 @@ export default function HomepageBuilder({
         >
           <div className="sites-editor-body">
             <main className="sites-canvas-area">
-              <div className={`sites-page-frame viewport-${viewport}`}>
-                <GridCanvas
-                  layout={state.layout}
+              {previewProduct ? (
+                <BuilderProductPageOverlay
+                  product={previewProduct}
+                  template={
+                    state.layout.websiteConfig?.templates.product ||
+                    createDefaultWebsiteModeConfig().templates.product
+                  }
                   theme={state.layout.theme}
-                  storeId={storeId}
-                  editingPageId={editingPageId}
+                  siteSettings={state.layout.websiteConfig?.siteSettings}
+                  currencySymbol={currencySymbol}
+                  catalogue={previewCatalogue}
+                  viewport={viewport}
                   selectedSectionId={state.selectedSectionId}
-                  selectedFreeformElementId={selectedFreeformElementId}
-                  onSelectFreeformElement={setSelectedFreeformElementId}
-                  onAddFreeformLayer={addFreeformElement}
                   onSelectSection={handleSelectSection}
-                  onRemoveSection={actions.removeSection}
-                  onDuplicateSection={actions.duplicateSection}
-                  onUpdateSectionPosition={actions.updateSectionPosition}
-                  onUpdateSectionLayout={actions.updateSectionLayout}
-                  onUpdateSection={actions.updateSection}
-                  onReorderSections={actions.reorderSections}
-                  onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
-                  onStartBlank={handleStartBlank}
+                  onClose={() => setPreviewProduct(null)}
                 />
-              </div>
+              ) : (
+                <div className={`sites-page-frame viewport-${viewport}`}>
+                  <GridCanvas
+                    layout={state.layout}
+                    theme={state.layout.theme}
+                    storeId={storeId}
+                    editingPageId={editingPageId}
+                    selectedSectionId={state.selectedSectionId}
+                    selectedFreeformElementId={selectedFreeformElementId}
+                    onSelectFreeformElement={setSelectedFreeformElementId}
+                    onAddFreeformLayer={addFreeformElement}
+                    onSelectSection={handleSelectSection}
+                    onRemoveSection={actions.removeSection}
+                    onDuplicateSection={actions.duplicateSection}
+                    onUpdateSectionPosition={actions.updateSectionPosition}
+                    onUpdateSectionLayout={actions.updateSectionLayout}
+                    onUpdateSection={actions.updateSection}
+                    onReorderSections={actions.reorderSections}
+                    onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
+                    onStartBlank={handleStartBlank}
+                    onProductPreview={handleProductPreview}
+                  />
+                </div>
+              )}
             </main>
 
             <BuilderSidebar
               activeTab={sidebarTab}
               onTabChange={setSidebarTab}
+              previewProduct={previewProduct}
+              onCloseProductPreview={() => setPreviewProduct(null)}
               selectedSectionId={state.selectedSectionId}
               selectedFreeformElementId={selectedFreeformElementId}
               onSelectFreeformElement={setSelectedFreeformElementId}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FeaturedProductsSection, HomepageSection } from '../../../types/homepage';
 import ProductPicker from './catalogue/ProductPicker';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface FeaturedProductsEditorProps {
   section: FeaturedProductsSection & { id: string };
@@ -26,16 +27,43 @@ export default function FeaturedProductsEditor({ section, onUpdate }: FeaturedPr
       </div>
 
       <div className="panel-section">
-        <label className="panel-label">Columns</label>
-        <select
-          className="panel-select"
-          value={settings.columns}
-          onChange={(e) => updateSettings({ columns: parseInt(e.target.value, 10) as 1 | 2 | 3 | 4 })}
-        >
-          <option value="2">2 Columns</option>
-          <option value="3">3 Columns</option>
-          <option value="4">4 Columns</option>
-        </select>
+        <label className="panel-label">Product view</label>
+        <SidebarDropdownField
+          ariaLabel="Featured product view mode"
+          value={settings.displayMode || 'grid'}
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'carousel', label: 'Carousel' },
+          ]}
+          onChange={(next) => updateSettings({ displayMode: next as FeaturedProductsSection['settings']['displayMode'] })}
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card style</label>
+        <SidebarDropdownField
+          ariaLabel="Featured product card style"
+          value={settings.cardStyle || 'boxed'}
+          options={[
+            { value: 'boxed', label: 'Boxed' },
+            { value: 'minimal', label: 'Minimal' },
+          ]}
+          onChange={(next) => updateSettings({ cardStyle: next as NonNullable<FeaturedProductsSection['settings']['cardStyle']> })}
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card size</label>
+        <SidebarDropdownField
+          ariaLabel="Featured product card size"
+          value={settings.cardSize || 'md'}
+          options={[
+            { value: 'sm', label: 'Small' },
+            { value: 'md', label: 'Medium' },
+            { value: 'lg', label: 'Large' },
+          ]}
+          onChange={(next) => updateSettings({ cardSize: next as NonNullable<FeaturedProductsSection['settings']['cardSize']> })}
+        />
       </div>
 
       <div className="panel-section">

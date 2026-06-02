@@ -2,6 +2,7 @@ import React from 'react';
 import { HomepageSection, ProductGridSection } from '../../../types/homepage';
 import CategoryPicker from './catalogue/CategoryPicker';
 import ProductPicker from './catalogue/ProductPicker';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 type GridSource = 'all' | 'category' | 'specific';
 
@@ -51,15 +52,16 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
 
       <div className="panel-section">
         <label className="panel-label">Show products from</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Product source"
           value={source}
-          onChange={(e) => setSource(e.target.value as GridSource)}
-        >
-          <option value="all">All products</option>
-          <option value="category">A category</option>
-          <option value="specific">Specific products</option>
-        </select>
+          options={[
+            { value: 'all', label: 'All products' },
+            { value: 'category', label: 'A category' },
+            { value: 'specific', label: 'Specific products' },
+          ]}
+          onChange={(next) => setSource(next as GridSource)}
+        />
       </div>
 
       {source === 'category' && (
@@ -84,16 +86,43 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
       )}
 
       <div className="panel-section">
-        <label className="panel-label">Columns</label>
-        <select
-          className="panel-select"
-          value={settings.columns}
-          onChange={(e) => updateSettings({ columns: parseInt(e.target.value, 10) as 1 | 2 | 3 | 4 })}
-        >
-          <option value="2">2 Columns</option>
-          <option value="3">3 Columns</option>
-          <option value="4">4 Columns</option>
-        </select>
+        <label className="panel-label">Product view</label>
+        <SidebarDropdownField
+          ariaLabel="Product view mode"
+          value={settings.displayMode || 'grid'}
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'carousel', label: 'Carousel' },
+          ]}
+          onChange={(next) => updateSettings({ displayMode: next as ProductGridSection['settings']['displayMode'] })}
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card style</label>
+        <SidebarDropdownField
+          ariaLabel="Product card style"
+          value={settings.cardStyle || 'boxed'}
+          options={[
+            { value: 'boxed', label: 'Boxed' },
+            { value: 'minimal', label: 'Minimal' },
+          ]}
+          onChange={(next) => updateSettings({ cardStyle: next as NonNullable<ProductGridSection['settings']['cardStyle']> })}
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card size</label>
+        <SidebarDropdownField
+          ariaLabel="Product grid card size"
+          value={settings.cardSize || 'md'}
+          options={[
+            { value: 'sm', label: 'Small' },
+            { value: 'md', label: 'Medium' },
+            { value: 'lg', label: 'Large' },
+          ]}
+          onChange={(next) => updateSettings({ cardSize: next as NonNullable<ProductGridSection['settings']['cardSize']> })}
+        />
       </div>
 
       <div className="panel-section">
@@ -110,17 +139,18 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
 
       <div className="panel-section">
         <label className="panel-label">Sort by</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Sort products"
           value={settings.sortBy}
-          onChange={(e) => updateSettings({ sortBy: e.target.value as ProductGridSection['settings']['sortBy'] })}
-        >
-          <option value="default">Default</option>
-          <option value="alphabetical">Alphabetical</option>
-          <option value="price-low">Price: Low to High</option>
-          <option value="price-high">Price: High to Low</option>
-          <option value="newest">Newest</option>
-        </select>
+          options={[
+            { value: 'default', label: 'Default' },
+            { value: 'alphabetical', label: 'Alphabetical' },
+            { value: 'price-low', label: 'Price: Low to High' },
+            { value: 'price-high', label: 'Price: High to Low' },
+            { value: 'newest', label: 'Newest' },
+          ]}
+          onChange={(next) => updateSettings({ sortBy: next as ProductGridSection['settings']['sortBy'] })}
+        />
       </div>
 
       <div className="panel-section">

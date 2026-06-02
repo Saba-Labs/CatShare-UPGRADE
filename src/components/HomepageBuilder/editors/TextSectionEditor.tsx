@@ -1,6 +1,7 @@
 import React from 'react';
 import { TextSection } from '../../../types/homepage';
 import ColorPickerField from '../ColorPickerField';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface TextSectionEditorProps {
   section: TextSection & { id: string };
@@ -27,54 +28,57 @@ export default function TextSectionEditor({ section, onUpdate }: TextSectionEdit
 
       <div className="panel-section">
         <label className="panel-label">Alignment</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Text alignment"
           value={section.settings.alignment}
-          onChange={(e) =>
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Center' },
+            { value: 'right', label: 'Right' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, alignment: e.target.value as any },
+              settings: { ...section.settings, alignment: next as any },
             })
           }
-        >
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Font Size</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Text font size"
           value={section.settings.fontSize}
-          onChange={(e) =>
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+            { value: 'xlarge', label: 'Extra Large' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, fontSize: e.target.value as any },
+              settings: { ...section.settings, fontSize: next as any },
             })
           }
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-          <option value="xlarge">Extra Large</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Padding</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Text padding"
           value={section.settings.padding}
-          onChange={(e) =>
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, padding: e.target.value as any },
+              settings: { ...section.settings, padding: next as any },
             })
           }
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
+        />
       </div>
 
       <ColorPickerField

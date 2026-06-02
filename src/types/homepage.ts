@@ -94,8 +94,12 @@ export interface FeaturedProductsSection {
   type: 'featured-products';
   settings: {
     title: string;
-    displayMode: 'grid' | 'slider' | 'carousel';
-    columns: 1 | 2 | 3 | 4;
+    /** list/slider are legacy values kept for backward compatibility. */
+    displayMode: 'grid' | 'carousel' | 'list' | 'slider';
+    columns: 1 | 2 | 3 | 4 | 5 | 6;
+    cardStyle?: 'minimal' | 'boxed';
+    /** Responsive card density; layout auto-fits by viewport width. */
+    cardSize?: 'sm' | 'md' | 'lg';
     itemsPerPage: number;
     showPrice: boolean;
     showDescription: boolean;
@@ -152,8 +156,12 @@ export interface ProductGridSection {
   type: 'product-grid';
   settings: {
     title: string;
-    columns: 1 | 2 | 3 | 4;
-    displayMode: 'grid' | 'list';
+    columns: 1 | 2 | 3 | 4 | 5 | 6;
+    /** list is a legacy value kept for backward compatibility. */
+    displayMode: 'grid' | 'carousel' | 'list';
+    cardStyle?: 'minimal' | 'boxed';
+    /** Responsive card density; layout auto-fits by viewport width. */
+    cardSize?: 'sm' | 'md' | 'lg';
     sortBy: 'default' | 'alphabetical' | 'price-low' | 'price-high' | 'newest';
     itemsToShow: number;
     showFilters: boolean;
@@ -495,6 +503,7 @@ export interface WebsiteNavItem {
   id: string;
   label: string;
   href: string;
+  children?: WebsiteNavItem[];
 }
 
 export interface WebsiteCustomPage {
@@ -583,6 +592,27 @@ export interface WebsiteProductTemplate {
   layoutVariant?: 'editorial' | 'tech' | 'minimal';
   galleryLayout: 'left-thumbs' | 'stacked';
   showRecommendations: boolean;
+  /** Image panel treatment on product pages. */
+  imageLook?: 'clean' | 'soft' | 'framed';
+  /** Details/fields area styling. */
+  fieldsLook?: 'plain' | 'card' | 'striped';
+  /** Product-page color treatment while preserving site theme intent. */
+  colorTheme?: 'brand' | 'neutral' | 'warm' | 'dark';
+  /** Fine-grained color overrides for product page surfaces/text/actions. */
+  customColors?: {
+    pageBackground?: string;
+    surfaceBackground?: string;
+    textPrimary?: string;
+    textMuted?: string;
+    borderColor?: string;
+    accentColor?: string;
+    buttonBackground?: string;
+    buttonText?: string;
+  };
+  /** Suggested product section layout. */
+  suggestedProductsLayout?: 'cards' | 'list' | 'carousel';
+  /** Number of suggested products to render. */
+  suggestedProductsCount?: number;
   showTrustBadges: boolean;
   ctaStyle: 'solid' | 'outline';
   /** Show a quantity selector in the ordering UI (defaults to true). */

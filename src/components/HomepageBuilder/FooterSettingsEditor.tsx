@@ -2,6 +2,7 @@ import React from 'react';
 import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
 import FooterColorFields from './FooterColorFields';
+import SidebarDropdownField from './SidebarDropdownField';
 import {
   FOOTER_COLUMN_PRESETS,
   FOOTER_VARIANT_OPTIONS,
@@ -52,17 +53,12 @@ export default function FooterSettingsEditor({
     <>
       <div className="sidebar-field">
         <label className="panel-label">Footer layout</label>
-        <select
-          className="panel-input"
+        <SidebarDropdownField
+          ariaLabel="Footer layout"
           value={variant}
-          onChange={(e) => applyVariant(e.target.value as WebsiteFooterVariant)}
-        >
-          {FOOTER_VARIANT_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label} — {opt.description}
-            </option>
-          ))}
-        </select>
+          options={FOOTER_VARIANT_OPTIONS.map((opt) => ({ value: opt.id, label: opt.label }))}
+          onChange={applyVariant}
+        />
         <p className="panel-hint">
           Changes the structure of your footer (columns, cards, centered, or split row).
         </p>
@@ -70,14 +66,15 @@ export default function FooterSettingsEditor({
 
       <div className="sidebar-field">
         <label className="panel-label">Footer width</label>
-        <select
-          className="panel-input"
+        <SidebarDropdownField
+          ariaLabel="Footer width"
           value={siteSettings.footerWidth === 'full' ? 'full' : 'boxed'}
-          onChange={(e) => patch({ footerWidth: e.target.value as 'boxed' | 'full' })}
-        >
-          <option value="boxed">Boxed — card with side margins</option>
-          <option value="full">Full width — edge to edge</option>
-        </select>
+          options={[
+            { value: 'boxed', label: 'Boxed', hint: 'Card with side margins' },
+            { value: 'full', label: 'Full width', hint: 'Edge to edge' },
+          ]}
+          onChange={(next) => patch({ footerWidth: next })}
+        />
         <p className="panel-hint">Boxed matches the OrderForm card look; full width spans the entire page.</p>
       </div>
 

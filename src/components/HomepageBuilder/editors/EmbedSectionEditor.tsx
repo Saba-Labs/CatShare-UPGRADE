@@ -1,6 +1,7 @@
 import React from 'react';
 import { EmbedSection } from '../../../types/homepage';
 import { normalizeEmbedUrl } from '../../../utils/embedUrl';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface EmbedSectionEditorProps {
   section: EmbedSection & { id: string };
@@ -41,36 +42,38 @@ export default function EmbedSectionEditor({ section, onUpdate }: EmbedSectionEd
 
       <div className="panel-section">
         <label className="panel-label">Aspect ratio</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Embed aspect ratio"
           value={section.settings.aspectRatio}
-          onChange={(e) =>
+          options={[
+            { value: '16:9', label: '16:9' },
+            { value: '4:3', label: '4:3' },
+            { value: 'auto', label: 'Auto height' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, aspectRatio: e.target.value as EmbedSection['settings']['aspectRatio'] },
+              settings: { ...section.settings, aspectRatio: next as EmbedSection['settings']['aspectRatio'] },
             })
           }
-        >
-          <option value="16:9">16:9</option>
-          <option value="4:3">4:3</option>
-          <option value="auto">Auto height</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Max width</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Embed max width"
           value={section.settings.maxWidth}
-          onChange={(e) =>
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'full', label: 'Full' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, maxWidth: e.target.value as EmbedSection['settings']['maxWidth'] },
+              settings: { ...section.settings, maxWidth: next as EmbedSection['settings']['maxWidth'] },
             })
           }
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="full">Full</option>
-        </select>
+        />
       </div>
     </>
   );

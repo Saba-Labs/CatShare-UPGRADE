@@ -87,6 +87,7 @@ const CSS = `
 
 .sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; position: relative; }
 .sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
+.sv-page.website-mode-full { max-width: none; width: 100%; margin: 0; padding: 0; }
 
 /* ── Hero ── */
 .sv-hero { position: relative; background: var(--c-surface); border-bottom: 1px solid var(--c-border); }
@@ -351,6 +352,13 @@ body { background: var(--c-bg); }
   .sv-page {
     max-width: 1200px;
     padding: 20px 20px 36px;
+  }
+
+  .sv-page.website-mode-full {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   .sv-hero {
@@ -1413,7 +1421,7 @@ export default function StoreView() {
     return (
       <>
         <style>{CSS}</style>
-        <div className="sv"><div className="sv-page">
+        <div className="sv"><div className={`sv-page${store?.websiteModeEnabled ? ' website-mode-full' : ''}`}>
           <div className="sv-hero"><div className="sv-hero-bg" /><div className="sv-hero-inner">
             <div className="sv-hero-top">
               <div className="sv-skel" style={{ width: 54, height: 54, borderRadius: 12 }} />
@@ -1601,7 +1609,7 @@ export default function StoreView() {
     <>
       <style>{CSS}</style>
       <div className="sv">
-        <div className="sv-page">
+        <div className={`sv-page${store?.websiteModeEnabled ? ' website-mode-full' : ''}`}>
 
           {store?.websiteModeEnabled && websiteOrderBridge ? (
             <WebsiteOrderBridgeProvider value={websiteOrderBridge}>
@@ -2176,9 +2184,6 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                     const summary = formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id]);
                     return summary ? <VariantPills summary={summary} /> : null;
                   })()}
-                  {getCats(drawerProduct).length > 0 && (
-                    <div className="sv-drawer-cats">{getCats(drawerProduct).map((c) => <span key={c} className="sv-drawer-cat">{c}</span>)}</div>
-                  )}
                   <div className="sv-drawer-price">
                     {Number.isFinite(price) ? (
                       <>

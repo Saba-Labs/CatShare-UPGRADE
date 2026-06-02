@@ -3,6 +3,7 @@ import type { WebsiteModeConfig } from '../../types/homepage';
 import { buildStoreLinkOptions, groupStoreLinkOptions } from '../../utils/storeLinkOptions';
 import { normalizeStorefrontPath } from '../../utils/storefrontHref';
 import { useBuilderCatalogue } from './catalogue/BuilderCatalogueContext';
+import SidebarDropdownField, { type SidebarDropdownOption } from './SidebarDropdownField';
 
 interface StoreLinkPickerProps {
   value: string;
@@ -35,28 +36,31 @@ export default function StoreLinkPicker({
   const grouped = useMemo(() => groupStoreLinkOptions(options), [options]);
 
   const matchedOption = options.find((o) => o.href === value);
+  const dropdownOptions = useMemo(
+    () =>
+      grouped.flatMap((group) =>
+        group.items.map(
+          (item): SidebarDropdownOption<string> => ({
+            value: item.href,
+            label: item.label,
+            groupLabel: group.label,
+          })
+        )
+      ),
+    [grouped]
+  );
 
   return (
     <div className="store-link-picker">
-      <select
-        className="panel-select"
+      <SidebarDropdownField
+        ariaLabel="Choose a store link"
         value={matchedOption?.href || ''}
-        onChange={(e) => {
-          if (e.target.value) onChange(normalizeStorefrontPath(e.target.value));
+        options={dropdownOptions}
+        placeholder={loading ? 'Loading store links…' : 'Choose store link…'}
+        onChange={(next) => {
+          if (next) onChange(normalizeStorefrontPath(next));
         }}
-        aria-label="Choose a store link"
-      >
-        <option value="">{loading ? 'Loading store links…' : 'Choose store link…'}</option>
-        {grouped.map((group) => (
-          <optgroup key={group.group} label={group.label}>
-            {group.items.map((item) => (
-              <option key={item.id} value={item.href}>
-                {item.label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+      />
       {allowCustom && (
         <input
           type="text"

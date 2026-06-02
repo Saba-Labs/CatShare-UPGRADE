@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import type { ContentGridSection } from '../../../types/homepage';
 import MediaPickerButton from '../media/MediaPickerButton';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface ContentGridSectionEditorProps {
   section: ContentGridSection & { id: string };
@@ -36,19 +37,20 @@ export default function ContentGridSectionEditor({ section, storeId, onUpdate }:
 
       <div className="sidebar-field">
         <label className="panel-label">Columns</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Content grid columns"
           value={String(settings.columns)}
-          onChange={(e) =>
+          options={[
+            { value: '2', label: '2' },
+            { value: '3', label: '3' },
+            { value: '4', label: '4' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...settings, columns: parseInt(e.target.value, 10) as 2 | 3 | 4 },
+              settings: { ...settings, columns: parseInt(next, 10) as 2 | 3 | 4 },
             })
           }
-        >
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-        </select>
+        />
       </div>
 
       <div className="sidebar-field">

@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
 import ColorPickerField from './ColorPickerField';
 import MediaPickerButton from './media/MediaPickerButton';
+import SidebarDropdownField from './SidebarDropdownField';
 import {
   HEADER_VARIANT_OPTIONS,
   headerColorPresetForVariant,
@@ -42,17 +43,12 @@ export default function HeaderSettingsEditor({
     <>
       <div className="sidebar-field">
         <label className="panel-label">Header layout</label>
-        <select
-          className="panel-input"
+        <SidebarDropdownField
+          ariaLabel="Header layout"
           value={variant}
-          onChange={(e) => applyVariant(e.target.value as WebsiteHeaderVariant)}
-        >
-          {HEADER_VARIANT_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label} — {opt.description}
-            </option>
-          ))}
-        </select>
+          options={HEADER_VARIANT_OPTIONS.map((opt) => ({ value: opt.id, label: opt.label }))}
+          onChange={applyVariant}
+        />
         <p className="panel-hint">
           Changes how your logo and menu are arranged. Use Colors below for background and text. Click the announcement strip in the preview to edit the top banner.
         </p>
@@ -154,6 +150,14 @@ export default function HeaderSettingsEditor({
                 <button
                   type="button"
                   className="btn-icon-sm"
+                  onClick={() => addNavChild(websiteConfig, item.id, onUpdateWebsiteConfig)}
+                  title="Add dropdown option"
+                >
+                  <FiPlus aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className="btn-icon-sm"
                   disabled={index === 0}
                   onClick={() => moveNav(websiteConfig, item.id, -1, onUpdateWebsiteConfig)}
                   title="Move up"
@@ -178,6 +182,51 @@ export default function HeaderSettingsEditor({
                   <FiTrash2 aria-hidden />
                 </button>
               </div>
+              {(item.children || []).length > 0 ? (
+                <div className="nav-items-list" style={{ marginTop: 8, paddingLeft: 10 }}>
+                  {(item.children || []).map((child) => (
+                    <div key={child.id} className="sidebar-list-item">
+                      <input
+                        className="panel-input"
+                        value={child.label}
+                        placeholder="Dropdown label"
+                        onChange={(e) =>
+                          updateNavChild(
+                            websiteConfig,
+                            item.id,
+                            child.id,
+                            { label: e.target.value },
+                            onUpdateWebsiteConfig
+                          )
+                        }
+                      />
+                      <StoreLinkPicker
+                        value={child.href}
+                        websiteConfig={websiteConfig}
+                        onChange={(href) =>
+                          updateNavChild(
+                            websiteConfig,
+                            item.id,
+                            child.id,
+                            { href: sanitizeHref(href) },
+                            onUpdateWebsiteConfig
+                          )
+                        }
+                      />
+                      <div className="sidebar-list-item__actions">
+                        <button
+                          type="button"
+                          className="btn-icon-sm danger"
+                          onClick={() => removeNavChild(websiteConfig, item.id, child.id, onUpdateWebsiteConfig)}
+                          title="Remove dropdown option"
+                        >
+                          <FiTrash2 aria-hidden />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -216,7 +265,7 @@ function sanitizeHref(value: string) {
 function updateNav(
   websiteConfig: WebsiteModeConfig,
   id: string,
-  updates: Partial<{ label: string; href: string }>,
+  updates: Partial<{ label: string; href: string; children: WebsiteSiteSettings['navItems'][number]['children'] }>,
   onUpdate: (u: Partial<WebsiteModeConfig>) => void
 ) {
   onUpdate({
@@ -224,6 +273,71 @@ function updateNav(
       ...websiteConfig.siteSettings,
       navItems: (websiteConfig.siteSettings.navItems || []).map((item) =>
         item.id === id ? { ...item, ...updates } : item
+      ),
+    },
+  });
+}
+
+function addNavChild(
+  websiteConfig: WebsiteModeConfig,
+  parentId: string,
+  onUpdate: (u: Partial<WebsiteModeConfig>) => void
+) {
+  onUpdate({
+    siteSettings: {
+      ...websiteConfig.siteSettings,
+      navItems: (websiteConfig.siteSettings.navItems || []).map((item) =>
+        item.id === parentId
+          ? {
+              ...item,
+              children: [...(item.children || []), { id: uuid(), label: 'Option', href: '/' }],
+            }
+          : item
+      ),
+    },
+  });
+}
+
+function updateNavChild(
+  websiteConfig: WebsiteModeConfig,
+  parentId: string,
+  childId: string,
+  updates: Partial<{ label: string; href: string }>,
+  onUpdate: (u: Partial<WebsiteModeConfig>) => void
+) {
+  onUpdate({
+    siteSettings: {
+      ...websiteConfig.siteSettings,
+      navItems: (websiteConfig.siteSettings.navItems || []).map((item) =>
+        item.id === parentId
+          ? {
+              ...item,
+              children: (item.children || []).map((child) =>
+                child.id === childId ? { ...child, ...updates } : child
+              ),
+            }
+          : item
+      ),
+    },
+  });
+}
+
+function removeNavChild(
+  websiteConfig: WebsiteModeConfig,
+  parentId: string,
+  childId: string,
+  onUpdate: (u: Partial<WebsiteModeConfig>) => void
+) {
+  onUpdate({
+    siteSettings: {
+      ...websiteConfig.siteSettings,
+      navItems: (websiteConfig.siteSettings.navItems || []).map((item) =>
+        item.id === parentId
+          ? {
+              ...item,
+              children: (item.children || []).filter((child) => child.id !== childId),
+            }
+          : item
       ),
     },
   });

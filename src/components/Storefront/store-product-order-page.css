@@ -1,8 +1,211 @@
-/* Website-mode product order — template theme + responsive layout */
+/* Website-mode product order — self-contained (builder preview + live storefront) */
 
 .website-product-runtime {
   background: var(--site-bg, #fff);
   padding-bottom: 32px;
+  font-family: var(--site-font, 'DM Sans', system-ui, sans-serif);
+  color: var(--site-text, #202124);
+  --site-page-bg: var(--site-bg, #fff);
+  --site-page-surface: #ffffff;
+  --site-page-text: var(--site-text, #202124);
+  --site-page-muted: color-mix(in srgb, var(--site-page-text) 58%, transparent);
+  --site-page-border: color-mix(in srgb, var(--site-page-text) 12%, transparent);
+  --site-page-primary: var(--site-primary, #1a73e8);
+  --site-page-btn-bg: var(--site-page-primary);
+  --site-page-btn-text: var(--site-on-primary, #fff);
+}
+
+/* Base panel chrome (mirrors StoreView drawer styles, themed with --site-*) */
+.website-product-runtime .sv-drawer-body {
+  padding: 4px 0 24px;
+}
+
+.website-product-runtime .sv-drawer-name {
+  font-family: var(--site-font-head, var(--site-font, 'DM Sans', system-ui, sans-serif));
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  font-weight: 600;
+  color: var(--site-page-text, var(--site-text, #202124));
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.website-product-runtime .sv-drawer-sub {
+  font-size: 0.8125rem;
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 62%, transparent));
+  margin-top: 4px;
+}
+
+.website-product-runtime .sv-variant-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.website-product-runtime .sv-drawer-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.website-product-runtime .sv-drawer-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-top: 14px;
+  line-height: 1.2;
+}
+
+.website-product-runtime .sv-drawer-price span {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 55%, transparent));
+  margin-left: 4px;
+}
+
+.website-product-runtime .sv-price-strike {
+  text-decoration: line-through;
+  font-size: 0.75em;
+  opacity: 0.75;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.website-product-runtime .sv-detail-table {
+  margin-top: 18px;
+  border: 1px solid var(--site-page-border, color-mix(in srgb, var(--site-page-text, #202124) 12%, transparent));
+  border-radius: var(--site-radius, 10px);
+  overflow: hidden;
+  background: var(--site-page-surface, #fff);
+}
+
+.website-product-runtime .sv-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  gap: 16px;
+}
+
+.website-product-runtime .sv-detail-row:not(:last-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--site-page-border, #d1d5db) 85%, transparent);
+}
+
+.website-product-runtime .sv-detail-row:nth-child(even) {
+  background: color-mix(in srgb, var(--site-page-text, #202124) 4%, var(--site-page-surface, #fff));
+}
+
+.website-product-runtime .sv-detail-lbl {
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 58%, transparent));
+  font-weight: 500;
+}
+
+.website-product-runtime .sv-detail-val {
+  color: var(--site-page-text, var(--site-text, #202124));
+  font-weight: 600;
+  text-align: right;
+}
+
+.website-product-runtime .sv-drawer-qty-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--site-page-border, color-mix(in srgb, var(--site-page-text, #202124) 12%, transparent));
+}
+
+.website-product-runtime .sv-drawer-qty-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 58%, transparent));
+  margin-bottom: 12px;
+}
+
+.website-product-runtime .sv-drawer-qty-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.website-product-runtime .sv-drawer-total-wrap {
+  text-align: right;
+}
+
+.website-product-runtime .sv-drawer-calc {
+  font-size: 0.75rem;
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 58%, transparent));
+  margin-bottom: 3px;
+}
+
+.website-product-runtime .sv-qty {
+  display: inline-flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--site-page-text, #202124) 6%, var(--site-page-surface, #fff));
+  border: 1px solid color-mix(in srgb, var(--site-page-border, #d1d5db) 90%, transparent);
+  border-radius: var(--site-radius, 10px);
+  overflow: hidden;
+}
+
+.website-product-runtime .sv-qty-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: color-mix(in srgb, var(--site-page-text, #202124) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.website-product-runtime .sv-qty-btn:hover {
+  background: color-mix(in srgb, var(--site-page-text, #202124) 8%, transparent);
+  color: var(--site-page-text, #202124);
+}
+
+.website-product-runtime .sv-qty-val {
+  min-width: 40px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--site-page-text, #202124);
+}
+
+.website-product-runtime .website-breadcrumbs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px 0;
+  font-size: 0.8rem;
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #202124) 55%, transparent));
+}
+
+.website-product-runtime .website-breadcrumbs a {
+  color: var(--site-primary, #1a73e8);
+  text-decoration: none;
+}
+
+.website-product-runtime .website-breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.website-product-runtime .website-breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.website-product-runtime .website-breadcrumbs li:not(:last-child)::after {
+  content: '/';
+  margin-left: 6px;
+  color: color-mix(in srgb, var(--site-page-muted, #6b7280) 82%, transparent);
 }
 
 .website-product-runtime .website-breadcrumbs a {
@@ -37,7 +240,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: color-mix(in srgb, var(--site-text, #202124) 6%, var(--site-bg, #fff));
+  background: color-mix(in srgb, var(--site-page-text, #202124) 6%, var(--site-page-surface, #fff));
 }
 
 .website-product-runtime .sv-product-order-media .sv-drawer-img-wrap--gallery {
@@ -49,7 +252,7 @@
   min-height: 280px;
   height: 100%;
   font-size: 3rem;
-  background: color-mix(in srgb, var(--site-text, #202124) 8%, var(--site-bg, #fff));
+  background: color-mix(in srgb, var(--site-page-text, #202124) 8%, var(--site-page-surface, #fff));
 }
 
 .website-product-runtime .sv-product-order-details .sv-drawer-body {
@@ -77,32 +280,32 @@
 
 /* Theme-colored accents (override StoreView green --c-accent) */
 .website-product-runtime .sv-drawer-price {
-  color: var(--site-text, #202124);
+  color: var(--site-page-text, #202124);
 }
 
 .website-product-runtime .sv-drawer-total {
-  color: var(--site-primary, #1a73e8);
+  color: var(--site-page-primary, var(--site-primary, #1a73e8));
 }
 
 .website-product-runtime .sv-variant-pill {
-  background: color-mix(in srgb, var(--site-primary, #1a73e8) 12%, var(--site-bg, #fff));
-  border: 1px solid color-mix(in srgb, var(--site-primary, #1a73e8) 28%, transparent);
-  color: var(--site-primary, #1a73e8);
+  background: color-mix(in srgb, var(--site-page-primary, #1a73e8) 12%, var(--site-page-surface, #fff));
+  border: 1px solid color-mix(in srgb, var(--site-page-primary, #1a73e8) 28%, transparent);
+  color: var(--site-page-primary, #1a73e8);
 }
 
 .website-product-runtime .sv-drawer-cat {
-  background: color-mix(in srgb, var(--site-text, #202124) 8%, var(--site-bg, #fff));
-  border-color: color-mix(in srgb, var(--site-text, #202124) 14%, transparent);
-  color: var(--site-text, #202124);
+  background: color-mix(in srgb, var(--site-page-text, #202124) 8%, var(--site-page-surface, #fff));
+  border-color: color-mix(in srgb, var(--site-page-border, #d1d5db) 90%, transparent);
+  color: var(--site-page-text, #202124);
 }
 
 .website-product-runtime .sv-detail-table {
-  border-color: color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
+  border-color: var(--site-page-border, color-mix(in srgb, var(--site-page-text, #202124) 12%, transparent));
 }
 
 .website-product-runtime .sv-qty.accent {
-  background: var(--site-primary, #1a73e8);
-  border-color: var(--site-primary, #1a73e8);
+  background: var(--site-page-primary, var(--site-primary, #1a73e8));
+  border-color: var(--site-page-primary, var(--site-primary, #1a73e8));
 }
 
 .website-product-runtime .sv-qty.accent .sv-qty-btn {
@@ -122,53 +325,216 @@
   width: 100%;
   height: 50px;
   border-radius: var(--site-radius, 10px);
-  background: var(--site-primary, #1a73e8);
-  color: var(--site-on-primary, #fff);
-  border: none;
+  background: var(--site-page-btn-bg, var(--site-page-primary, #1a73e8));
+  color: var(--site-page-btn-text, var(--site-on-primary, #fff));
+  border: 2px solid var(--site-page-btn-bg, var(--site-page-primary, #1a73e8));
   font-size: 15px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   margin-top: 20px;
-  transition: filter 0.15s ease, opacity 0.15s ease;
-  box-shadow: 0 2px 14px color-mix(in srgb, var(--site-primary, #1a73e8) 35%, transparent);
+  transition: filter 0.15s ease, background 0.15s ease, color 0.15s ease;
+  box-shadow: 0 2px 14px color-mix(in srgb, var(--site-page-btn-bg, #1a73e8) 35%, transparent);
 }
 
 .website-product-runtime .sv-drawer-done:hover {
   filter: brightness(0.93);
-  opacity: 1;
+}
+
+.website-product-runtime .sv-drawer-done--outline {
+  background: transparent;
+  color: var(--site-page-btn-bg, var(--site-page-primary, #1a73e8));
+  box-shadow: none;
+}
+
+.website-product-runtime .sv-drawer-done--outline:hover {
+  background: var(--site-page-btn-bg, var(--site-page-primary, #1a73e8));
+  color: var(--site-page-btn-text, var(--site-on-primary, #fff));
+  filter: none;
 }
 
 .website-product-runtime .pvd-group-name {
-  color: color-mix(in srgb, var(--site-text, #202124) 65%, transparent);
+  color: color-mix(in srgb, var(--site-page-text, #202124) 65%, transparent);
 }
 
 .website-product-runtime .pvd-chip {
-  border-color: color-mix(in srgb, var(--site-text, #202124) 18%, transparent);
-  background: color-mix(in srgb, var(--site-text, #202124) 6%, var(--site-bg, #fff));
-  color: var(--site-text, #202124);
+  border-color: color-mix(in srgb, var(--site-page-border, #d1d5db) 92%, transparent);
+  background: color-mix(in srgb, var(--site-page-text, #202124) 6%, var(--site-page-surface, #fff));
+  color: var(--site-page-text, #202124);
   border-radius: var(--site-radius, 10px);
 }
 
 .website-product-runtime .pvd-chip--btn:hover {
-  border-color: var(--site-primary, #1a73e8);
-  background: color-mix(in srgb, var(--site-primary, #1a73e8) 10%, var(--site-bg, #fff));
-  color: var(--site-primary, #1a73e8);
+  border-color: var(--site-page-primary, #1a73e8);
+  background: color-mix(in srgb, var(--site-page-primary, #1a73e8) 10%, var(--site-page-surface, #fff));
+  color: var(--site-page-primary, #1a73e8);
 }
 
 .website-product-runtime .pvd-chip--active {
-  background: var(--site-primary, #1a73e8);
-  border-color: var(--site-primary, #1a73e8);
-  color: var(--site-on-primary, #fff);
+  background: var(--site-page-primary, #1a73e8);
+  border-color: var(--site-page-primary, #1a73e8);
+  color: var(--site-page-btn-text, var(--site-on-primary, #fff));
+}
+
+/* ── Product editor look controls ──────────────────────────────── */
+
+/* Image look */
+.website-product-runtime.wp-image-clean .sv-product-order-media .sv-drawer-img-wrap {
+  border-radius: 10px;
+  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--site-text, #202124) 10%, transparent);
+}
+
+.website-product-runtime.wp-image-soft .sv-product-order-media .sv-drawer-img-wrap {
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border: none;
+}
+
+.website-product-runtime.wp-image-framed .sv-product-order-media .sv-drawer-img-wrap {
+  border-radius: 6px;
+  border: 6px solid color-mix(in srgb, var(--site-text, #202124) 8%, var(--site-bg, #fff));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* Fields area look */
+.website-product-runtime.wp-fields-plain .sv-detail-table {
+  border-radius: 10px;
+}
+
+.website-product-runtime.wp-fields-card .sv-detail-table {
+  border: none;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--site-bg, #fff) 94%, var(--site-text, #202124));
+  box-shadow: 0 6px 18px rgba(60, 64, 67, 0.12);
+}
+
+.website-product-runtime.wp-fields-card .sv-detail-row:not(:last-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--site-text, #202124) 8%, transparent);
+}
+
+.website-product-runtime.wp-fields-striped .sv-detail-row:nth-child(odd) {
+  background: color-mix(in srgb, var(--site-primary, #1a73e8) 6%, var(--site-bg, #fff));
+}
+
+/* Color themes (scoped to product page runtime only) */
+.website-product-runtime.wp-color-brand {
+  --site-page-primary: var(--site-primary, #1a73e8);
+  --site-page-bg: var(--site-bg, #fff);
+  --site-page-text: var(--site-text, #202124);
+}
+
+.website-product-runtime.wp-color-neutral {
+  --site-page-primary: #4b5563;
+  --site-page-bg: #f8fafc;
+  --site-page-text: #111827;
+}
+
+.website-product-runtime.wp-color-warm {
+  --site-page-primary: #9a633f;
+  --site-page-bg: #fffaf5;
+  --site-page-text: #3f2d1f;
+}
+
+.website-product-runtime.wp-color-dark {
+  --site-page-primary: #93c5fd;
+  --site-page-bg: #0f172a;
+  --site-page-text: #e5e7eb;
+}
+
+.website-product-runtime[class*='wp-color-'] {
+  background: var(--site-page-bg, var(--site-bg, #fff));
+  color: var(--site-page-text, var(--site-text, #202124));
+}
+
+.website-product-runtime[class*='wp-color-'] .sv-drawer-price,
+.website-product-runtime[class*='wp-color-'] .sv-drawer-total,
+.website-product-runtime[class*='wp-color-'] .website-product-card-price {
+  color: var(--site-page-primary, var(--site-primary, #1a73e8));
+}
+
+.website-product-runtime[class*='wp-color-'] .sv-drawer-done {
+  background: var(--site-page-btn-bg, var(--site-page-primary, var(--site-primary, #1a73e8)));
+  border-color: var(--site-page-btn-bg, var(--site-page-primary, var(--site-primary, #1a73e8)));
+  color: var(--site-page-btn-text, var(--site-on-primary, #fff));
+}
+
+.website-product-runtime[class*='wp-color-'] .sv-drawer-done--outline {
+  background: transparent;
+  color: var(--site-page-btn-bg, var(--site-page-primary, var(--site-primary, #1a73e8)));
+}
+
+.website-product-runtime.wp-color-dark .sv-drawer-sub,
+.website-product-runtime.wp-color-dark .sv-drawer-qty-label,
+.website-product-runtime.wp-color-dark .sv-drawer-calc,
+.website-product-runtime.wp-color-dark .sv-detail-lbl,
+.website-product-runtime.wp-color-dark .website-breadcrumbs {
+  color: var(--site-page-muted, color-mix(in srgb, var(--site-page-text, #e5e7eb) 72%, transparent));
+}
+
+.website-product-runtime.wp-color-dark .sv-detail-table,
+.website-product-runtime.wp-color-dark .sv-qty,
+.website-product-runtime.wp-color-dark .website-product-card {
+  border-color: color-mix(in srgb, var(--site-page-text, #e5e7eb) 16%, transparent);
+  background: var(--site-page-surface, color-mix(in srgb, var(--site-page-bg, #0f172a) 86%, #000));
+}
+
+/* Suggested products layout controls */
+.website-suggested-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 220px));
+  gap: 14px;
+  justify-content: start;
+}
+
+.website-suggested-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  max-width: 560px;
+}
+
+.website-suggested-carousel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(170px, 210px);
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+
+.website-suggested-carousel > * {
+  scroll-snap-align: start;
+}
+
+.website-product-recommendations .website-product-card {
+  max-width: 220px;
+}
+
+.website-product-recommendations .website-suggested-list .website-product-card {
+  max-width: none;
 }
 
 /* ── Layout variants (desktop) ─────────────────────────────────── */
 
 @media (min-width: 769px) {
+  .website-product-runtime .website-product-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+
   .website-product-runtime.wp-editorial .website-product-page {
     max-width: 1100px;
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     gap: 48px;
     align-items: start;
+  }
+
+  .website-product-runtime.wp-editorial .website-product-gallery {
+    aspect-ratio: 3 / 4;
   }
 
   .website-product-runtime.wp-editorial .website-product-gallery {

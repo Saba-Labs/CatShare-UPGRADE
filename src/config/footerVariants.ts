@@ -69,7 +69,7 @@ export type FooterLayoutMode = 'info-cards' | 'link-columns' | 'centered' | 'spl
 export const FOOTER_VARIANT_OPTIONS: Array<{ id: WebsiteFooterVariant; label: string; description: string }> = [
   {
     id: 'classic',
-    label: 'Info cards',
+    label: 'Classic bar',
     description: 'Store name on top, then Location / Contact / Store info in cards',
   },
   {
@@ -79,7 +79,7 @@ export const FOOTER_VARIANT_OPTIONS: Array<{ id: WebsiteFooterVariant; label: st
   },
   {
     id: 'aurora',
-    label: 'Centered',
+    label: 'Centered bar',
     description: 'Centered store name and tagline, link columns below',
   },
   {

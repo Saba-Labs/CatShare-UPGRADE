@@ -4,6 +4,7 @@ import { CategoryShowcaseSection, CustomCategoryItem, HomepageSection, WebsiteMo
 import CategoryPicker from './catalogue/CategoryPicker';
 import MediaPickerButton from '../media/MediaPickerButton';
 import StoreLinkPicker from '../StoreLinkPicker';
+import SidebarDropdownField from '../SidebarDropdownField';
 import { useBuilderCatalogue } from '../catalogue/BuilderCatalogueContext';
 import { resolveCategoryShowcaseSettings } from '../../../utils/categoryShowcaseStyles';
 import ColorPickerField from '../ColorPickerField';
@@ -64,118 +65,120 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
 
       <div className="panel-section">
         <label className="panel-label">Heading alignment</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Heading alignment"
           value={resolved.titleAlign}
-          onChange={(e) => updateSettings({ titleAlign: e.target.value as CategoryShowcaseSection['settings']['titleAlign'] })}
-        >
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-        </select>
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Center' },
+            { value: 'right', label: 'Right' },
+          ]}
+          onChange={(next) => updateSettings({ titleAlign: next as CategoryShowcaseSection['settings']['titleAlign'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Layout</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Category layout"
           value={resolved.layout}
-          onChange={(e) => updateSettings({ layout: e.target.value as CategoryShowcaseSection['settings']['layout'] })}
-        >
-          <option value="grid">Grid</option>
-          <option value="list">List (wide rows)</option>
-          <option value="carousel">Carousel (scroll row)</option>
-        </select>
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'list', label: 'List (wide rows)' },
+            { value: 'carousel', label: 'Carousel (scroll row)' },
+          ]}
+          onChange={(next) => updateSettings({ layout: next as CategoryShowcaseSection['settings']['layout'] })}
+        />
       </div>
 
       {showColumnControl && (
         <div className="panel-section">
           <label className="panel-label">{resolved.layout === 'carousel' ? 'Visible tiles' : 'Columns'}</label>
-          <select
-            className="panel-select"
-            value={settings.columns}
-            onChange={(e) =>
-              updateSettings({ columns: parseInt(e.target.value, 10) as CategoryShowcaseSection['settings']['columns'] })
+          <SidebarDropdownField
+            ariaLabel={resolved.layout === 'carousel' ? 'Visible tiles' : 'Columns'}
+            value={String(settings.columns)}
+            options={['2', '3', '4', '5', '6'].map((v) => ({ value: v, label: v }))}
+            onChange={(next) =>
+              updateSettings({ columns: parseInt(next, 10) as CategoryShowcaseSection['settings']['columns'] })
             }
-          >
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-          </select>
+          />
         </div>
       )}
 
       <div className="panel-section">
         <label className="panel-label">Spacing between tiles</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Tile gap"
           value={resolved.gap}
-          onChange={(e) => updateSettings({ gap: e.target.value as CategoryShowcaseSection['settings']['gap'] })}
-        >
-          <option value="sm">Compact</option>
-          <option value="md">Comfortable</option>
-          <option value="lg">Airy</option>
-        </select>
+          options={[
+            { value: 'sm', label: 'Compact' },
+            { value: 'md', label: 'Comfortable' },
+            { value: 'lg', label: 'Airy' },
+          ]}
+          onChange={(next) => updateSettings({ gap: next as CategoryShowcaseSection['settings']['gap'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Card style</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Card style"
           value={resolved.cardStyle}
-          onChange={(e) => updateSettings({ cardStyle: e.target.value as CategoryShowcaseSection['settings']['cardStyle'] })}
-        >
-          <option value="minimal">Minimal (no frame)</option>
-          <option value="card">Card (shadow)</option>
-          <option value="bordered">Bordered</option>
-          <option value="overlay">Image focus</option>
-        </select>
+          options={[
+            { value: 'minimal', label: 'Minimal (no frame)' },
+            { value: 'card', label: 'Card (shadow)' },
+            { value: 'bordered', label: 'Bordered' },
+            { value: 'overlay', label: 'Image focus' },
+          ]}
+          onChange={(next) => updateSettings({ cardStyle: next as CategoryShowcaseSection['settings']['cardStyle'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Tile shape</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Tile shape"
           value={resolved.cardShape}
-          onChange={(e) => updateSettings({ cardShape: e.target.value as CategoryShowcaseSection['settings']['cardShape'] })}
-        >
-          <option value="rounded">Rounded corners</option>
-          <option value="sharp">Square corners</option>
-          <option value="pill">Pill / capsule</option>
-          <option value="circle">Circle image</option>
-        </select>
+          options={[
+            { value: 'rounded', label: 'Rounded corners' },
+            { value: 'sharp', label: 'Square corners' },
+            { value: 'pill', label: 'Pill / capsule' },
+            { value: 'circle', label: 'Circle image' },
+          ]}
+          onChange={(next) => updateSettings({ cardShape: next as CategoryShowcaseSection['settings']['cardShape'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Tile size</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Tile size"
           value={resolved.cardSize}
-          onChange={(e) => updateSettings({ cardSize: e.target.value as CategoryShowcaseSection['settings']['cardSize'] })}
-        >
-          <option value="sm">Small</option>
-          <option value="md">Medium</option>
-          <option value="lg">Large</option>
-          <option value="xl">Extra large</option>
-        </select>
+          options={[
+            { value: 'sm', label: 'Small' },
+            { value: 'md', label: 'Medium' },
+            { value: 'lg', label: 'Large' },
+            { value: 'xl', label: 'Extra large' },
+          ]}
+          onChange={(next) => updateSettings({ cardSize: next as CategoryShowcaseSection['settings']['cardSize'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Image proportions</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Image proportions"
           value={resolved.imageRatio}
-          onChange={(e) => updateSettings({ imageRatio: e.target.value as CategoryShowcaseSection['settings']['imageRatio'] })}
+          options={[
+            { value: '1:1', label: 'Square (1:1)' },
+            { value: '4:3', label: 'Landscape (4:3)' },
+            { value: '3:4', label: 'Portrait (3:4)' },
+            { value: '16:9', label: 'Wide (16:9)' },
+            { value: '2:3', label: 'Tall (2:3)' },
+          ]}
+          onChange={(next) => updateSettings({ imageRatio: next as CategoryShowcaseSection['settings']['imageRatio'] })}
           disabled={resolved.cardShape === 'circle' && resolved.layout !== 'list'}
-        >
-          <option value="1:1">Square (1:1)</option>
-          <option value="4:3">Landscape (4:3)</option>
-          <option value="3:4">Portrait (3:4)</option>
-          <option value="16:9">Wide (16:9)</option>
-          <option value="2:3">Tall (2:3)</option>
-        </select>
+        />
         {resolved.cardShape === 'circle' && resolved.layout !== 'list' && (
           <p className="catalogue-picker-hint">Circle tiles always use a square image frame.</p>
         )}
@@ -183,40 +186,43 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
 
       <div className="panel-section">
         <label className="panel-label">Image fit</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Image fit"
           value={resolved.imageFit}
-          onChange={(e) => updateSettings({ imageFit: e.target.value as CategoryShowcaseSection['settings']['imageFit'] })}
-        >
-          <option value="cover">Fill frame (crop)</option>
-          <option value="contain">Fit inside frame</option>
-        </select>
+          options={[
+            { value: 'cover', label: 'Fill frame (crop)' },
+            { value: 'contain', label: 'Fit inside frame' },
+          ]}
+          onChange={(next) => updateSettings({ imageFit: next as CategoryShowcaseSection['settings']['imageFit'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Category name</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Category name style"
           value={resolved.labelStyle}
-          onChange={(e) => updateSettings({ labelStyle: e.target.value as CategoryShowcaseSection['settings']['labelStyle'] })}
-        >
-          <option value="below">Below image</option>
-          <option value="overlay">On image (gradient)</option>
-        </select>
+          options={[
+            { value: 'below', label: 'Below image' },
+            { value: 'overlay', label: 'On image (gradient)' },
+          ]}
+          onChange={(next) => updateSettings({ labelStyle: next as CategoryShowcaseSection['settings']['labelStyle'] })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Hover effect</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Hover effect"
           value={resolved.hoverEffect}
-          onChange={(e) => updateSettings({ hoverEffect: e.target.value as CategoryShowcaseSection['settings']['hoverEffect'] })}
-        >
-          <option value="lift">Lift up</option>
-          <option value="zoom">Zoom image</option>
-          <option value="border">Highlight border</option>
-          <option value="none">None</option>
-        </select>
+          options={[
+            { value: 'lift', label: 'Lift up' },
+            { value: 'zoom', label: 'Zoom image' },
+            { value: 'border', label: 'Highlight border' },
+            { value: 'none', label: 'None' },
+          ]}
+          onChange={(next) => updateSettings({ hoverEffect: next as CategoryShowcaseSection['settings']['hoverEffect'] })}
+        />
       </div>
 
       <div className="panel-section">

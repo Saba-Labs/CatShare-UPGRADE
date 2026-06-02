@@ -11,17 +11,17 @@ export const HEADER_VARIANT_OPTIONS: Array<{ id: WebsiteHeaderVariant; label: st
   },
   {
     id: 'centered',
-    label: 'Centered',
+    label: 'Centered bar',
     description: 'Logo centered on top, navigation links in a row below',
   },
   {
     id: 'minimal',
-    label: 'Minimal',
+    label: 'Minimal bar',
     description: 'Logo only in the bar — links open from the menu button',
   },
   {
     id: 'split',
-    label: 'Split',
+    label: 'Split bar',
     description: 'Logo left, links centered in the middle, menu button on the right',
   },
   {

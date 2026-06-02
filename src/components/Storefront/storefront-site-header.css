@@ -237,6 +237,65 @@
   opacity: 0.85;
 }
 
+.storefront-site-header__nav-group {
+  position: relative;
+}
+
+.storefront-site-header__nav-link--group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.storefront-site-header__nav-caret {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  opacity: 0.72;
+  margin-left: 0;
+}
+
+.storefront-site-header__nav-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  min-width: 180px;
+  display: none;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+  z-index: 20;
+}
+
+.storefront-site-header__nav-group.is-open .storefront-site-header__nav-dropdown {
+  display: flex;
+}
+
+.storefront-site-header__nav-dropdown-link {
+  color: inherit;
+  text-decoration: none;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.storefront-site-header__nav-dropdown-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .storefront-site-header__menu-btn {
   display: none;
   align-items: center;
@@ -333,6 +392,38 @@
 
 .storefront-nav-drawer__link:hover,
 .storefront-nav-drawer__link:focus-visible {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.storefront-nav-drawer__group {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.storefront-nav-drawer__link--group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.storefront-nav-drawer__subnav {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 8px;
+}
+
+.storefront-nav-drawer__sublink {
+  display: block;
+  padding: 10px 30px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 14px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+
+.storefront-nav-drawer__sublink:hover,
+.storefront-nav-drawer__sublink:focus-visible {
   background: rgba(0, 0, 0, 0.04);
 }
 

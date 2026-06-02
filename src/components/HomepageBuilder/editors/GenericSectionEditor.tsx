@@ -4,6 +4,7 @@ import MediaPickerButton from '../media/MediaPickerButton';
 import ButtonLinkField from './ButtonLinkField';
 import TestimonialsSectionEditor from './TestimonialsSectionEditor';
 import ColorPickerField from '../ColorPickerField';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface GenericSectionEditorProps {
   section: HomepageSection & { id: string };
@@ -62,20 +63,21 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
 
             <div className="panel-section">
               <label className="panel-label">Width</label>
-              <select
-                className="panel-select"
+              <SidebarDropdownField
+                ariaLabel="Image width"
                 value={(section as any).settings.width}
-                onChange={(e) =>
+                options={[
+                  { value: 'small', label: '30%' },
+                  { value: 'medium', label: '50%' },
+                  { value: 'large', label: '80%' },
+                  { value: 'full', label: '100%' },
+                ]}
+                onChange={(next) =>
                   onUpdate({
-                    settings: { ...(section as any).settings, width: e.target.value },
+                    settings: { ...(section as any).settings, width: next },
                   })
                 }
-              >
-                <option value="small">30%</option>
-                <option value="medium">50%</option>
-                <option value="large">80%</option>
-                <option value="full">100%</option>
-              </select>
+              />
             </div>
 
             <div className="panel-section">
@@ -177,19 +179,20 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
 
             <div className="panel-section">
               <label className="panel-label">Height</label>
-              <select
-                className="panel-select"
+              <SidebarDropdownField
+                ariaLabel="Banner height"
                 value={(section as any).settings.height}
-                onChange={(e) =>
+                options={[
+                  { value: 'small', label: 'Small' },
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'large', label: 'Large' },
+                ]}
+                onChange={(next) =>
                   onUpdate({
-                    settings: { ...(section as any).settings, height: e.target.value },
+                    settings: { ...(section as any).settings, height: next },
                   })
                 }
-              >
-                <option value="small">Small</option>
-                <option value="medium">Medium</option>
-                <option value="large">Large</option>
-              </select>
+              />
             </div>
 
             <ColorPickerField
@@ -311,20 +314,21 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
 
             <div className="panel-section">
               <label className="panel-label">Icon</label>
-              <select
-                className="panel-select"
+              <SidebarDropdownField
+                ariaLabel="Announcement icon"
                 value={(section as any).settings.icon}
-                onChange={(e) =>
+                options={[
+                  { value: 'info', label: 'Info' },
+                  { value: 'warning', label: 'Warning' },
+                  { value: 'success', label: 'Success' },
+                  { value: 'none', label: 'None' },
+                ]}
+                onChange={(next) =>
                   onUpdate({
-                    settings: { ...(section as any).settings, icon: e.target.value },
+                    settings: { ...(section as any).settings, icon: next },
                   })
                 }
-              >
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="success">Success</option>
-                <option value="none">None</option>
-              </select>
+              />
             </div>
 
             <ColorPickerField
@@ -433,18 +437,19 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
 
             <div className="panel-section">
               <label className="panel-label">Layout</label>
-              <select
-                className="panel-select"
+              <SidebarDropdownField
+                ariaLabel="Feature card layout"
                 value={(section as any).settings.layout}
-                onChange={(e) =>
+                options={[
+                  { value: 'image-left', label: 'Image Left' },
+                  { value: 'image-right', label: 'Image Right' },
+                ]}
+                onChange={(next) =>
                   onUpdate({
-                    settings: { ...(section as any).settings, layout: e.target.value },
+                    settings: { ...(section as any).settings, layout: next },
                   })
                 }
-              >
-                <option value="image-left">Image Left</option>
-                <option value="image-right">Image Right</option>
-              </select>
+              />
             </div>
           </>
         );

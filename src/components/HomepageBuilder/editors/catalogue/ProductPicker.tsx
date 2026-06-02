@@ -107,12 +107,8 @@ export default function ProductPicker({ selectedIds, onChange }: ProductPickerPr
 
   const summary = useMemo(() => {
     if (selectedIds.length === 0) return 'Choose products…';
-    if (selectedIds.length === 1) {
-      const p = products.find((x) => x.id === selectedIds[0]);
-      return p?.name || '1 product';
-    }
     return `${selectedIds.length} products selected`;
-  }, [selectedIds, products]);
+  }, [selectedIds]);
 
   if (loading) {
     return <p className="catalogue-picker-hint">Loading products…</p>;
@@ -137,26 +133,13 @@ export default function ProductPicker({ selectedIds, onChange }: ProductPickerPr
 
   return (
     <div className="catalogue-picker-field">
-      <button type="button" className="btn-secondary catalogue-picker-trigger" onClick={openModal}>
+      <button
+        type="button"
+        className="btn-secondary catalogue-picker-trigger catalogue-picker-trigger--highlight"
+        onClick={openModal}
+      >
         {summary}
       </button>
-      {selectedIds.length > 0 ? (
-        <div className="catalogue-picker-summary-chips">
-          {selectedIds.slice(0, 4).map((id) => {
-            const p = products.find((x) => x.id === id);
-            return (
-              <span key={id} className="catalogue-picker-chip">
-                {p?.name || 'Product'}
-              </span>
-            );
-          })}
-          {selectedIds.length > 4 ? (
-            <span className="catalogue-picker-chip catalogue-picker-chip--more">
-              +{selectedIds.length - 4} more
-            </span>
-          ) : null}
-        </div>
-      ) : null}
 
       {open ? (
         <CataloguePickerModal title="Select products" onClose={closeModal} onDone={apply}>

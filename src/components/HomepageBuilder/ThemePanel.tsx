@@ -3,6 +3,7 @@ import { THEME_PRESETS, FONT_FAMILY_OPTIONS, BUTTON_STYLE_OPTIONS } from '../../
 import SidebarSection from './SidebarSection';
 import ColorPickerField from './ColorPickerField';
 import { FiDroplet, FiGrid, FiLayers, FiType } from './builderSidebarIcons';
+import SidebarDropdownField from './SidebarDropdownField';
 
 interface ThemePanelProps {
   theme: ThemeSettings;
@@ -48,35 +49,27 @@ export default function ThemePanel({
           <span className="field-icon" title="Font">
             <FiType aria-hidden />
           </span>
-          <select
-            className="panel-select panel-select--grow"
-            value={theme.fontFamily || FONT_FAMILY_OPTIONS[0].value}
-            onChange={(e) => onUpdateTheme({ fontFamily: e.target.value })}
-            aria-label="Font"
-          >
-            {FONT_FAMILY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="panel-select--grow">
+            <SidebarDropdownField
+              ariaLabel="Font"
+              value={theme.fontFamily || FONT_FAMILY_OPTIONS[0].value}
+              options={FONT_FAMILY_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              onChange={(next) => onUpdateTheme({ fontFamily: next })}
+            />
+          </div>
         </div>
         <div className="sidebar-field sidebar-field--inline">
           <span className="field-icon" title="Button style">
             <FiGrid aria-hidden />
           </span>
-          <select
-            className="panel-select panel-select--grow"
-            value={theme.buttonStyle || 'solid'}
-            onChange={(e) => onUpdateTheme({ buttonStyle: e.target.value as ThemeSettings['buttonStyle'] })}
-            aria-label="Button style"
-          >
-            {BUTTON_STYLE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="panel-select--grow">
+            <SidebarDropdownField
+              ariaLabel="Button style"
+              value={theme.buttonStyle || 'solid'}
+              options={BUTTON_STYLE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              onChange={(next) => onUpdateTheme({ buttonStyle: next as ThemeSettings['buttonStyle'] })}
+            />
+          </div>
         </div>
       </SidebarSection>
 

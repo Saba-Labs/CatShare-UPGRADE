@@ -12,6 +12,7 @@ import { normalizeStorefrontPath } from '../../../utils/storefrontHref';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
 import MediaPickerButton from '../media/MediaPickerButton';
 import StoreLinkPicker from '../StoreLinkPicker';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface FreeformSectionEditorProps {
   section: FreeformSection & { id: string };
@@ -238,22 +239,23 @@ export default function FreeformSectionEditor({
               </div>
               <div className="sidebar-field">
                 <label className="panel-label">Fit</label>
-                <select
-                  className="panel-select"
+                <SidebarDropdownField
+                  ariaLabel="Image fit"
                   value={selected.content.objectFit || 'cover'}
-                  onChange={(e) =>
+                  options={[
+                    { value: 'cover', label: 'Cover' },
+                    { value: 'contain', label: 'Contain' },
+                    { value: 'fill', label: 'Fill' },
+                  ]}
+                  onChange={(next) =>
                     updateElement(selected.id, {
                       content: {
                         ...selected.content,
-                        objectFit: e.target.value as 'cover' | 'contain' | 'fill',
+                        objectFit: next as 'cover' | 'contain' | 'fill',
                       },
                     } as Partial<FreeformElement>)
                   }
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                  <option value="fill">Fill</option>
-                </select>
+                />
               </div>
               <div className="sidebar-field-row freeform-editor__toggles">
                 <label className="panel-checkbox">
@@ -329,22 +331,23 @@ export default function FreeformSectionEditor({
               </div>
               <div className="sidebar-field">
                 <label className="panel-label">Align</label>
-                <select
-                  className="panel-select"
+                <SidebarDropdownField
+                  ariaLabel="Text align"
                   value={selected.content.textAlign || 'left'}
-                  onChange={(e) =>
+                  options={[
+                    { value: 'left', label: 'Left' },
+                    { value: 'center', label: 'Center' },
+                    { value: 'right', label: 'Right' },
+                  ]}
+                  onChange={(next) =>
                     updateElement(selected.id, {
                       content: {
                         ...selected.content,
-                        textAlign: e.target.value as 'left' | 'center' | 'right',
+                        textAlign: next as 'left' | 'center' | 'right',
                       },
                     } as Partial<FreeformElement>)
                   }
-                >
-                  <option value="left">Left</option>
-                  <option value="center">Center</option>
-                  <option value="right">Right</option>
-                </select>
+                />
               </div>
             </>
           )}

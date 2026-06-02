@@ -32,6 +32,8 @@ export default function StorefrontSiteHeader({
   isHeaderSelected = false,
 }: StorefrontSiteHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openMobileGroupId, setOpenMobileGroupId] = useState<string | null>(null);
+  const [openDesktopGroupId, setOpenDesktopGroupId] = useState<string | null>(null);
   const navItems = siteSettings.navItems?.length ? siteSettings.navItems : DEFAULT_NAV;
   const layout = headerLayoutForVariant(siteSettings.headerVariant || 'classic');
 
@@ -50,6 +52,20 @@ export default function StorefrontSiteHeader({
       document.body.style.overflow = prevOverflow;
     };
   }, [menuOpen, preview, closeMenu]);
+
+  useEffect(() => {
+    if (!openDesktopGroupId || preview) return;
+    const onPointerDown = () => setOpenDesktopGroupId(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenDesktopGroupId(null);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openDesktopGroupId, preview]);
 
   const headerStyle = useMemo(
     () => ({
@@ -95,6 +111,43 @@ export default function StorefrontSiteHeader({
       <Link key={item.id} to={to} className={className} onClick={onNavigate}>
         {item.label}
       </Link>
+    );
+  };
+
+  const renderDesktopNavItem = (item: WebsiteNavItem) => {
+    const children = item.children || [];
+    if (children.length === 0) {
+      return renderNavLink(item, 'storefront-site-header__nav-link');
+    }
+    return (
+      <div
+        key={item.id}
+        className={`storefront-site-header__nav-group${openDesktopGroupId === item.id ? ' is-open' : ''}`}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {preview ? (
+          <span className="storefront-site-header__nav-link storefront-site-header__nav-link--group">
+            {item.label}
+            <span className="storefront-site-header__nav-caret" aria-hidden />
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="storefront-site-header__nav-link storefront-site-header__nav-link--group"
+            aria-expanded={openDesktopGroupId === item.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenDesktopGroupId((prev) => (prev === item.id ? null : item.id));
+            }}
+          >
+            {item.label}
+            <span className="storefront-site-header__nav-caret" aria-hidden />
+          </button>
+        )}
+        <div className="storefront-site-header__nav-dropdown" role="menu" aria-label={item.label}>
+          {children.map((child) => renderNavLink(child, 'storefront-site-header__nav-dropdown-link'))}
+        </div>
+      </div>
     );
   };
 
@@ -187,7 +240,7 @@ export default function StorefrontSiteHeader({
         )}
 
         <nav className="storefront-site-header__nav-desktop" aria-label="Main">
-          {navItems.map((item) => renderNavLink(item, 'storefront-site-header__nav-link'))}
+          {navItems.map(renderDesktopNavItem)}
         </nav>
 
         <button
@@ -250,7 +303,38 @@ export default function StorefrontSiteHeader({
             </div>
             <nav className="storefront-nav-drawer__nav" aria-label="Main">
               {navItems.map((item) =>
-                preview ? (
+                (item.children || []).length > 0 ? (
+                  <div key={item.id} className="storefront-nav-drawer__group">
+                    <button
+                      type="button"
+                      className="storefront-nav-drawer__link storefront-nav-drawer__link--group"
+                      onClick={() =>
+                        setOpenMobileGroupId((prev) => (prev === item.id ? null : item.id))
+                      }
+                    >
+                      <span>{item.label}</span>
+                      <span aria-hidden>{openMobileGroupId === item.id ? '−' : '+'}</span>
+                    </button>
+                    {openMobileGroupId === item.id ? (
+                      <div className="storefront-nav-drawer__subnav">
+                        {(item.children || []).map((child) =>
+                          preview ? (
+                            <button
+                              key={child.id}
+                              type="button"
+                              className="storefront-nav-drawer__sublink"
+                              onClick={closeMenu}
+                            >
+                              {child.label}
+                            </button>
+                          ) : (
+                            renderNavLink(child, 'storefront-nav-drawer__sublink', closeMenu)
+                          )
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : preview ? (
                   <button
                     key={item.id}
                     type="button"

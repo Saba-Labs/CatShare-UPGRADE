@@ -128,12 +128,8 @@ export default function CategoryPicker({ selectedIds, onChange, single = false }
     if (selectedIds.length === 0) {
       return single ? 'Choose category…' : 'Choose categories…';
     }
-    if (selectedIds.length === 1) {
-      const c = categories.find((x) => x.id === selectedIds[0]);
-      return c?.label || '1 category';
-    }
     return `${selectedIds.length} categories selected`;
-  }, [selectedIds, categories, single]);
+  }, [selectedIds, single]);
 
   if (loading) {
     return <p className="catalogue-picker-hint">Loading categories…</p>;
@@ -158,26 +154,13 @@ export default function CategoryPicker({ selectedIds, onChange, single = false }
 
   return (
     <div className="catalogue-picker-field">
-      <button type="button" className="btn-secondary catalogue-picker-trigger" onClick={openModal}>
+      <button
+        type="button"
+        className="btn-secondary catalogue-picker-trigger catalogue-picker-trigger--highlight"
+        onClick={openModal}
+      >
         {summary}
       </button>
-      {selectedIds.length > 0 && !single ? (
-        <div className="catalogue-picker-summary-chips">
-          {selectedIds.slice(0, 4).map((id) => {
-            const c = categories.find((x) => x.id === id);
-            return (
-              <span key={id} className="catalogue-picker-chip">
-                {c?.label || 'Category'}
-              </span>
-            );
-          })}
-          {selectedIds.length > 4 ? (
-            <span className="catalogue-picker-chip catalogue-picker-chip--more">
-              +{selectedIds.length - 4} more
-            </span>
-          ) : null}
-        </div>
-      ) : null}
 
       {open ? (
         <CataloguePickerModal

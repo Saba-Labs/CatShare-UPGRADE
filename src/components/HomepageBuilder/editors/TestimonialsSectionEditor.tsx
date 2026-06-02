@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import type { TestimonialsSection } from '../../../types/homepage';
 import TestimonialStarRating from '../sections/TestimonialStarRating';
+import SidebarDropdownField from '../SidebarDropdownField';
 import '../sections/testimonials-section.css';
 
 interface TestimonialsSectionEditorProps {
@@ -65,29 +66,29 @@ export default function TestimonialsSectionEditor({ section, onUpdate }: Testimo
 
       <div className="panel-section">
         <label className="panel-label">Layout</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Testimonials layout"
           value={settings.displayMode}
-          onChange={(e) => updateSettings({ displayMode: e.target.value as 'carousel' | 'grid' })}
-        >
-          <option value="grid">Grid</option>
-          <option value="carousel">Carousel (single row)</option>
-        </select>
+          options={[
+            { value: 'grid', label: 'Grid' },
+            { value: 'carousel', label: 'Carousel (single row)' },
+          ]}
+          onChange={(next) => updateSettings({ displayMode: next as 'carousel' | 'grid' })}
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Columns (grid)</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Testimonials grid columns"
           value={String(settings.columns)}
-          onChange={(e) =>
-            updateSettings({ columns: parseInt(e.target.value, 10) as 1 | 2 | 3 })
-          }
-        >
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-        </select>
+          options={[
+            { value: '1', label: '1' },
+            { value: '2', label: '2' },
+            { value: '3', label: '3' },
+          ]}
+          onChange={(next) => updateSettings({ columns: parseInt(next, 10) as 1 | 2 | 3 })}
+        />
       </div>
 
       <div className="panel-section">

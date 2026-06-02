@@ -1,5 +1,6 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
+import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import {
   BlockAlign,
   BlockLayout,
@@ -56,6 +57,7 @@ interface GridCanvasProps {
   onReorderSections: (sections: HomepageSection[]) => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
   onStartBlank?: () => void;
+  onProductPreview?: (product: ProductWithCatalogueData) => void;
   /** @deprecated Grid resize kept for API compat; editor uses document stack layout. */
   onUpdateSectionPosition?: (id: string, position: unknown) => void;
 }
@@ -83,6 +85,7 @@ export default function GridCanvas({
   onReorderSections,
   onApplyTemplate,
   onStartBlank,
+  onProductPreview,
 }: GridCanvasProps) {
   const { openMediaPicker } = useBuilderMedia();
   const { active } = useDndContext();
@@ -411,6 +414,8 @@ export default function GridCanvas({
                     theme={theme}
                     storeId={storeId}
                     editMode={isSelected}
+                    builderCanvas
+                    onProductPreview={onProductPreview}
                     selectedFreeformElementId={
                       isFreeform && isSelected ? selectedFreeformElementId : null
                     }

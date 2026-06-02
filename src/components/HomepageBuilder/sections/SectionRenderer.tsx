@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import { HomepageSection, ThemeSettings } from '../../../types/homepage';
 import CarouselSectionView from './CarouselSectionView';
 import TextSectionView from './TextSectionView';
@@ -31,6 +32,8 @@ interface SectionRendererProps {
   onAddFreeformLayer?: (type: FreeformElementType) => void;
   onActivateFreeform?: () => void;
   onUpdateSection?: (updates: Partial<HomepageSection>) => void;
+  builderCanvas?: boolean;
+  onProductPreview?: (product: ProductWithCatalogueData) => void;
 }
 
 export default function SectionRenderer({
@@ -43,8 +46,10 @@ export default function SectionRenderer({
   onAddFreeformLayer,
   onActivateFreeform,
   onUpdateSection,
+  builderCanvas = false,
+  onProductPreview,
 }: SectionRendererProps) {
-  const commonProps = { section, theme, storeId, editMode, onUpdateSection };
+  const commonProps = { section, theme, storeId, editMode, onUpdateSection, builderCanvas, onProductPreview };
 
   switch (section.type) {
     case 'carousel':

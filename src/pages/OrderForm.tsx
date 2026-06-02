@@ -982,16 +982,6 @@ export default function OrderForm() {
                   <div className="of-drawer-sub">({drawerItem.subtitle})</div>
                 )}
 
-                {getItemCategories(drawerItem).length > 0 && (
-                  <div className="of-category-row">
-                    {getItemCategories(drawerItem).map((category) => (
-                      <span key={category} className="of-category-pill">
-                        {category}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
                 {drawerItem.price !== undefined && drawerItem.price !== '' && (
                   <div className="of-drawer-price-row">
                     <div className="of-drawer-price">

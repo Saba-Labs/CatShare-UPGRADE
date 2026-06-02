@@ -2,6 +2,7 @@ import React from 'react';
 import { CarouselSection } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
+import SidebarDropdownField from '../SidebarDropdownField';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
@@ -61,52 +62,55 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
 
       <div className="panel-section">
         <label className="panel-label">Height</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Carousel height"
           value={section.settings.height}
-          onChange={(e) =>
+          options={[
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, height: e.target.value as CarouselSection['settings']['height'] },
+              settings: { ...section.settings, height: next as CarouselSection['settings']['height'] },
             })
           }
-        >
-          <option value="small">Small</option>
-          <option value="medium">Medium</option>
-          <option value="large">Large</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Aspect Ratio</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Carousel aspect ratio"
           value={section.settings.aspectRatio}
-          onChange={(e) =>
+          options={[
+            { value: '16:9', label: '16:9 Widescreen' },
+            { value: '4:3', label: '4:3 Standard' },
+            { value: 'square', label: 'Square' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, aspectRatio: e.target.value as CarouselSection['settings']['aspectRatio'] },
+              settings: { ...section.settings, aspectRatio: next as CarouselSection['settings']['aspectRatio'] },
             })
           }
-        >
-          <option value="16:9">16:9 Widescreen</option>
-          <option value="4:3">4:3 Standard</option>
-          <option value="square">Square</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
         <label className="panel-label">Animation</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Carousel animation"
           value={section.settings.animation}
-          onChange={(e) =>
+          options={[
+            { value: 'fade', label: 'Fade' },
+            { value: 'slide', label: 'Slide' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, animation: e.target.value as CarouselSection['settings']['animation'] },
+              settings: { ...section.settings, animation: next as CarouselSection['settings']['animation'] },
             })
           }
-        >
-          <option value="fade">Fade</option>
-          <option value="slide">Slide</option>
-        </select>
+        />
       </div>
 
       <div className="panel-section">
@@ -144,20 +148,21 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
 
       <div className="panel-section">
         <label className="panel-label">Navigation</label>
-        <select
-          className="panel-select"
+        <SidebarDropdownField
+          ariaLabel="Carousel navigation"
           value={section.settings.navigation}
-          onChange={(e) =>
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'dots', label: 'Dots' },
+            { value: 'arrows', label: 'Arrows' },
+            { value: 'both', label: 'Dots + Arrows' },
+          ]}
+          onChange={(next) =>
             onUpdate({
-              settings: { ...section.settings, navigation: e.target.value as CarouselSection['settings']['navigation'] },
+              settings: { ...section.settings, navigation: next as CarouselSection['settings']['navigation'] },
             })
           }
-        >
-          <option value="none">None</option>
-          <option value="dots">Dots</option>
-          <option value="arrows">Arrows</option>
-          <option value="both">Dots + Arrows</option>
-        </select>
+        />
       </div>
     </>
   );
