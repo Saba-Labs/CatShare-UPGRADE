@@ -68,15 +68,23 @@ const CSS = `
     font-family: var(--font);
     display: flex;
     flex-direction: column;
+    padding-top: 40px;
     padding-bottom: 72px;
   }
 
-  .cd-status-bar { height: 40px; background: #0F172A; flex-shrink: 0; }
+  .cd-status-bar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 40px;
+    background: #0F172A;
+    z-index: 60;
+  }
 
   .cd-header {
     position: sticky;
     top: 40px;
     z-index: 50;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 8px;
