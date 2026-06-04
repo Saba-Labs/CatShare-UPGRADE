@@ -407,7 +407,7 @@ export default function StoreCustomDomainPage() {
 
   const handleConnect = async () => {
     const validation = validateStoreHostnameInput(hostnameInput);
-    if (!validation.ok) {
+    if (validation.ok === false) {
       setLocalError(validation.error);
       return;
     }
@@ -488,22 +488,45 @@ export default function StoreCustomDomainPage() {
       <div className="cd-root">
         <div className="cd-status-bar" />
         <header className="cd-header">
-          <button type="button" className="cd-back" onClick={() => navigate('/store')}>
-            ← Store
+          <button
+            type="button"
+            className="cd-back"
+            aria-label="Back to My Store"
+            onClick={() => navigate('/store')}
+          >
+            <IconBack />
           </button>
-          <span className="cd-title">Custom domain</span>
+          <h1 className="cd-title">Custom domain</h1>
+          <div className="cd-header-spacer" aria-hidden />
         </header>
 
         <main className="cd-main">
-          {loading ? (
+          {authLoading && !effectiveUid ? (
             <div className="cd-loader">
               <div className="cd-spinner" />
+            </div>
+          ) : pageLoading ? (
+            <div className="cd-loader">
+              <div className="cd-spinner" />
+            </div>
+          ) : !effectiveUid ? (
+            <div className="cd-card">
+              <p className="cd-lead">Sign in to connect a custom domain.</p>
+              <button type="button" className="cd-btn cd-btn-primary" onClick={() => navigate('/login')}>
+                Log in
+              </button>
             </div>
           ) : localError && !store ? (
             <div className="cd-error-box">{localError}</div>
           ) : (
             <>
               {localError && <div className="cd-error-box">{localError}</div>}
+              {domainApiLoading && (
+                <p className="cd-hint" style={{ marginBottom: 12 }}>Loading domain settings…</p>
+              )}
+              {domainApiError && !domainApiLoading && (
+                <div className="cd-error-box">{domainApiError}</div>
+              )}
 
               <div className="cd-card">
                 <p className="cd-lead">

@@ -26,6 +26,8 @@ function buildLocalFallbackStore(uid: string): Store {
     viewMode: 'grid',
     homepageEnabled: true,
     websiteModeEnabled: true,
+    customHostname: null,
+    customDomainStatus: null,
   };
 }
 
