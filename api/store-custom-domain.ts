@@ -5,11 +5,13 @@ import { getSupabaseUserFromRequest } from '../lib/supabaseAuthRequest.js';
 import { validateStoreHostname } from '../lib/normalizeStoreHostname.js';
 import {
   addProjectDomain,
+  getDomainConfiguration,
   getProjectDomain,
   isVercelDomainsConfigured,
   removeProjectDomain,
   type VercelDomainVerificationRecord,
 } from '../lib/vercelDomains.js';
+import { mergeDnsRecordsForDisplay } from '../lib/vercelDnsInstructions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
@@ -27,6 +29,19 @@ function platformRootHost(): string {
 function mapStatus(verified: boolean, hasError: boolean): DomainStatus {
   if (hasError) return 'error';
   return verified ? 'active' : 'pending';
+}
+
+async function resolveDnsRecordsForHostname(
+  hostname: string,
+  apiVerification: VercelDomainVerificationRecord[] | undefined
+): Promise<VercelDomainVerificationRecord[]> {
+  let config = null;
+  try {
+    config = await getDomainConfiguration(hostname);
+  } catch (e) {
+    console.error('store-custom-domain: getDomainConfiguration', e);
+  }
+  return mergeDnsRecordsForDisplay(hostname, apiVerification, config);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -97,12 +112,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .eq('id', storeRow.id);
       }
 
+      const dnsRecords = await resolveDnsRecordsForHostname(
+        hostname,
+        vercelDomain?.verification
+      );
+
       return res.status(200).json({
         configured: true,
         hostname,
         status,
         verified,
         verification: vercelDomain?.verification || [],
+        dnsRecords,
         vercelError: vercelDomain?.error?.message || null,
         storeSlug: storeRow.store_slug,
         publicUrl: verified ? `https://${hostname}` : null,
@@ -135,11 +156,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           })
           .eq('id', storeRow.id);
 
+        const dnsRecords = await resolveDnsRecordsForHostname(
+          hostname,
+          vercelDomain.verification
+        );
+
         return res.status(200).json({
           hostname,
           status,
           verified,
           verification: vercelDomain.verification || [],
+          dnsRecords,
           vercelError: vercelDomain.error?.message || null,
           publicUrl: verified ? `https://${hostname}` : null,
         });
@@ -200,11 +227,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Domain added on Vercel but could not save to database.' });
       }
 
+      const dnsRecords = await resolveDnsRecordsForHostname(
+        hostname,
+        vercelDomain.verification
+      );
+
       return res.status(200).json({
         hostname,
         status,
         verified,
         verification: vercelDomain.verification || [],
+        dnsRecords,
         vercelError: vercelDomain.error?.message || null,
         publicUrl: verified ? `https://${hostname}` : null,
       });

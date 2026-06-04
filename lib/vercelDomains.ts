@@ -3,6 +3,8 @@
  * @see https://vercel.com/docs/rest-api/reference/endpoints/projects/add-a-domain-to-a-project
  */
 
+import type { VercelDomainConfigResponse } from './vercelDnsInstructions.js';
+
 export type VercelDomainVerificationRecord = {
   type: string;
   domain: string;
@@ -55,9 +57,9 @@ function mapVerification(
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const o = item as Record<string, unknown>;
-    const type = String(o.type || '');
-    const domain = String(o.domain || '');
-    const value = String(o.value || '');
+    const type = String(o.type || o.recordType || '').trim();
+    const domain = String(o.domain || o.name || o.host || '').trim();
+    const value = String(o.value || o.target || '').trim();
     if (!type || !domain || !value) continue;
     out.push({
       type,
@@ -129,6 +131,26 @@ export async function getProjectDomain(hostname: string): Promise<VercelProjectD
     throw new Error(msg);
   }
   return mapDomainPayload(body);
+}
+
+export async function getDomainConfiguration(
+  hostname: string
+): Promise<VercelDomainConfigResponse | null> {
+  const cfg = vercelApiConfig();
+  if (!cfg) return null;
+
+  const res = await vercelFetch(
+    `/v6/domains/${encodeURIComponent(hostname)}/config${teamQuery(cfg.teamId)}`
+  );
+
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return {
+    misconfigured: body.misconfigured === true,
+    configuredBy: body.configuredBy != null ? String(body.configuredBy) : null,
+    recommendedCNAME: body.recommendedCNAME as VercelDomainConfigResponse['recommendedCNAME'],
+    recommendedIPv4: body.recommendedIPv4 as VercelDomainConfigResponse['recommendedIPv4'],
+  };
 }
 
 export async function removeProjectDomain(hostname: string): Promise<void> {

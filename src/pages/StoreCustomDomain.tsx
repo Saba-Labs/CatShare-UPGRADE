@@ -281,6 +281,17 @@ const CSS = `
     align-items: center;
     justify-content: center;
   }
+
+  .cd-success-box {
+    background: var(--green-bg);
+    border: 1px solid var(--green-border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--green);
+    line-height: 1.5;
+  }
 `;
 
 function statusLabel(status: CustomDomainState['status'], verified: boolean): string {
@@ -290,49 +301,87 @@ function statusLabel(status: CustomDomainState['status'], verified: boolean): st
   return 'Not connected';
 }
 
-function DnsRecordsTable({ records }: { records: CustomDomainVerificationRecord[] }) {
+function DnsSetupGuide({
+  hostname,
+  verified,
+  records,
+}: {
+  hostname: string;
+  verified: boolean;
+  records: CustomDomainVerificationRecord[];
+}) {
   const { showToast } = useToast();
-  if (!records.length) {
-    return (
-      <p className="cd-hint">
-        After you connect, DNS records from Vercel will appear here. Add them at your domain registrar,
-        then tap &quot;Check status&quot;.
-      </p>
-    );
-  }
+
   return (
-    <table className="cd-dns-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Name / Host</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {records.map((r, i) => (
-          <tr key={`${r.type}-${r.domain}-${i}`}>
-            <td>{r.type}</td>
-            <td className="cd-dns-val">{r.domain}</td>
-            <td>
-              <div className="cd-copy-row">
-                <span className="cd-dns-val">{r.value}</span>
-                <button
-                  type="button"
-                  className="cd-copy-btn"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(r.value);
-                    showToast('Copied', 'success');
-                  }}
-                >
-                  Copy
-                </button>
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      {verified ? (
+        <div className="cd-success-box">
+          <strong>Your domain is connected.</strong> Customers can use your store at the link above.
+          If the site does not open, confirm the DNS records below still match what your registrar shows.
+        </div>
+      ) : (
+        <ol className="cd-steps">
+          <li>Open DNS settings for <strong>{hostname}</strong> at GoDaddy, Namecheap, Cloudflare, etc.</li>
+          <li>Add each record in the table below (Type, Name/Host, Value).</li>
+          <li>Save, wait a few minutes (up to 48 hours), then tap <strong>Check status</strong>.</li>
+        </ol>
+      )}
+
+      {records.length > 0 ? (
+        <>
+          <p className="cd-hint" style={{ marginBottom: 8 }}>
+            {verified
+              ? 'Reference DNS (Vercel):'
+              : 'Add these records at your domain provider:'}
+          </p>
+          <table className="cd-dns-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Name / Host</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r, i) => (
+                <tr key={`${r.type}-${r.domain}-${i}`}>
+                  <td>{r.type}</td>
+                  <td className="cd-dns-val">{r.domain}</td>
+                  <td>
+                    <div className="cd-copy-row">
+                      <span className="cd-dns-val">{r.value}</span>
+                      <button
+                        type="button"
+                        className="cd-copy-btn"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(r.value);
+                          showToast('Copied', 'success');
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {records.some((r) => r.reason) && (
+            <ul className="cd-hint" style={{ marginTop: 10, paddingLeft: 18 }}>
+              {records.map((r, i) =>
+                r.reason ? (
+                  <li key={`reason-${i}`}>
+                    <strong>{r.type}</strong> ({r.domain}): {r.reason}
+                  </li>
+                ) : null
+              )}
+            </ul>
+          )}
+        </>
+      ) : (
+        <p className="cd-hint">Could not load DNS rows. Tap Reload or Check status to try again.</p>
+      )}
+    </>
   );
 }
 
@@ -479,6 +528,10 @@ export default function StoreCustomDomainPage() {
     : '';
   const hasHostname = Boolean(domainState?.hostname);
   const verified = domainState?.verified === true || domainState?.status === 'active';
+  const dnsRecords =
+    domainState?.dnsRecords?.length
+      ? domainState.dnsRecords
+      : domainState?.verification ?? [];
   const pillClass =
     verified ? 'active' : domainState?.status === 'error' ? 'error' : hasHostname ? 'pending' : 'pending';
 
@@ -595,13 +648,12 @@ export default function StoreCustomDomainPage() {
               ) : (
                 <>
                   <div className="cd-card">
-                    <div className="cd-label">DNS records (at your registrar)</div>
-                    <ol className="cd-steps">
-                      <li>Open DNS settings for your domain at GoDaddy, Namecheap, Cloudflare, etc.</li>
-                      <li>Add each record below exactly as shown.</li>
-                      <li>Wait a few minutes (up to 48 hours), then tap Check status.</li>
-                    </ol>
-                    <DnsRecordsTable records={domainState?.verification ?? []} />
+                    <div className="cd-label">DNS setup (at your registrar)</div>
+                    <DnsSetupGuide
+                      hostname={domainState?.hostname || hostnameInput}
+                      verified={verified}
+                      records={dnsRecords}
+                    />
                     <button
                       type="button"
                       className="cd-btn cd-btn-primary"

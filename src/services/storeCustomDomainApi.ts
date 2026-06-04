@@ -33,6 +33,8 @@ export type CustomDomainState = {
   status: CustomDomainStatus;
   verified: boolean;
   verification: CustomDomainVerificationRecord[];
+  /** Rows to show in the DNS table (includes fallbacks when Vercel omits verification). */
+  dnsRecords?: CustomDomainVerificationRecord[];
   vercelError?: string | null;
   publicUrl?: string | null;
   storeSlug?: string;
@@ -119,6 +121,13 @@ async function apiFetch(
     };
   }
 
+  const verification = Array.isArray(body.verification)
+    ? (body.verification as CustomDomainVerificationRecord[])
+    : [];
+  const dnsRecords = Array.isArray(body.dnsRecords)
+    ? (body.dnsRecords as CustomDomainVerificationRecord[])
+    : verification;
+
   return {
     ok: true,
     httpStatus: res.status,
@@ -126,9 +135,8 @@ async function apiFetch(
     hostname: typeof body.hostname === 'string' ? body.hostname : null,
     status: (body.status as CustomDomainStatus) ?? null,
     verified: body.verified === true,
-    verification: Array.isArray(body.verification)
-      ? (body.verification as CustomDomainVerificationRecord[])
-      : [],
+    verification,
+    dnsRecords,
     vercelError: typeof body.vercelError === 'string' ? body.vercelError : null,
     publicUrl: typeof body.publicUrl === 'string' ? body.publicUrl : null,
     storeSlug: typeof body.storeSlug === 'string' ? body.storeSlug : undefined,
