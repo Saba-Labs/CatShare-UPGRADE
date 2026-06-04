@@ -126,7 +126,7 @@ export default function StoreProductOrderPanel({
 
   const imageBlock = (
     <div
-      className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery' : ''}`}
+      className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery sv-drawer-img-wrap--thumbs' : ''}`}
     >
       {variantImageUrl ? (
         <img src={variantImageUrl} alt={product.name} />
@@ -138,6 +138,7 @@ export default function StoreProductOrderPanel({
           fillContainer
           objectFit="contain"
           showPrimaryBadge={false}
+          showThumbnails
           className="sv-store-gallery"
         />
       ) : isDisplayableProductImage(imageSrc) ? (
@@ -150,79 +151,90 @@ export default function StoreProductOrderPanel({
     </div>
   );
 
-  const detailsBlock = (
-      <div className="sv-drawer-body">
-        <div className="sv-drawer-name">{product.name}</div>
-        {product.subtitle ? <div className="sv-drawer-sub">{product.subtitle}</div> : null}
-        {variantSummary ? <VariantPills summary={variantSummary} /> : null}
+  const fieldsTable =
+    fields.length > 0 ? (
+      <div className="sv-detail-table">
+        {fields.map((f) => (
+          <div key={`${f.label}-${f.value}`} className="sv-detail-row">
+            <span className="sv-detail-lbl">{f.label}</span>
+            <span className="sv-detail-val">{f.value}</span>
+          </div>
+        ))}
+      </div>
+    ) : null;
 
-        <div className="sv-drawer-price">
-          {Number.isFinite(price) ? (
-            <>
-              {fmt(price, currencySymbol)}
-              {showOffer && listPrice != null && listPrice > 0 ? (
-                <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
-              ) : null}
-              {priceUnit ? <span>/ {unitLabel(priceUnit)}</span> : null}
-            </>
-          ) : (
-            <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
-          )}
+  const orderSection = showQuantitySelector ? (
+    <div className="sv-drawer-qty-section">
+      <div className="sv-drawer-qty-header">
+        <div className="sv-drawer-qty-label">Quantity</div>
+        {qstep > 1 ? <PackHint step={qstep} className="website-product-pack-hint" /> : null}
+      </div>
+      <div className="sv-drawer-qty-row">
+        <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
+        <div className="sv-drawer-total-wrap">
+          {calcDetail ? <div className="sv-drawer-calc">{calcDetail}</div> : null}
+          <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
         </div>
+      </div>
+      <button
+        type="button"
+        className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
+        onClick={onDone}
+      >
+        {orderCtaLabel}
+      </button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
+      onClick={onDone}
+      style={{ marginTop: 20 }}
+    >
+      {orderCtaLabel}
+    </button>
+  );
 
-        {fields.length > 0 ? (
-          <div className="sv-detail-table">
-            {fields.map((f) => (
-              <div key={`${f.label}-${f.value}`} className="sv-detail-row">
-                <span className="sv-detail-lbl">{f.label}</span>
-                <span className="sv-detail-val">{f.value}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
+  const fieldsAfterOrder = layout === 'page';
 
-        {groups.length > 0 ? (
-          <ProductVariantsDisplay
-            groups={groups}
-            mode="select"
-            selection={variantSelection}
-            error={variantError}
-            onSelect={onVariantSelect}
-          />
-        ) : null}
+  const detailsBlock = (
+    <div className="sv-drawer-body">
+      <div className="sv-drawer-name">{product.name}</div>
+      {product.subtitle ? <div className="sv-drawer-sub">{product.subtitle}</div> : null}
+      {variantSummary ? <VariantPills summary={variantSummary} /> : null}
 
-        {showQuantitySelector ? (
-          <div className="sv-drawer-qty-section">
-            <div className="sv-drawer-qty-label">Quantity</div>
-            <div className="sv-drawer-qty-row">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
-                {qstep > 1 ? <PackHint step={qstep} /> : null}
-              </div>
-              <div className="sv-drawer-total-wrap">
-                {calcDetail ? <div className="sv-drawer-calc">{calcDetail}</div> : null}
-                <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
-              </div>
-            </div>
-            <button
-              type="button"
-              className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
-              onClick={onDone}
-            >
-              {orderCtaLabel}
-            </button>
-          </div>
+      <div className="sv-drawer-price">
+        {Number.isFinite(price) ? (
+          <>
+            {fmt(price, currencySymbol)}
+            {showOffer && listPrice != null && listPrice > 0 ? (
+              <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
+            ) : null}
+            {priceUnit ? <span>/ {unitLabel(priceUnit)}</span> : null}
+          </>
         ) : (
-          <button
-            type="button"
-            className={`sv-drawer-done${ctaStyle === 'outline' ? ' sv-drawer-done--outline' : ''}`}
-            onClick={onDone}
-            style={{ marginTop: 20 }}
-          >
-            {orderCtaLabel}
-          </button>
+          <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
         )}
       </div>
+
+      {!fieldsAfterOrder ? fieldsTable : null}
+
+      {groups.length > 0 ? (
+        <ProductVariantsDisplay
+          groups={groups}
+          mode="select"
+          selection={variantSelection}
+          error={variantError}
+          onSelect={onVariantSelect}
+        />
+      ) : null}
+
+      {orderSection}
+
+      {fieldsAfterOrder && fieldsTable ? (
+        <div className="sv-detail-table-after-order">{fieldsTable}</div>
+      ) : null}
+    </div>
   );
 
   if (layout === 'drawer') {

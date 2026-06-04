@@ -28,7 +28,12 @@ import {
   isVariantSelectionComplete,
   getVariantCombinationData,
 } from '../utils/productVariants';
-import { getStorePathFallbackBaseUrl, resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
+import {
+  getStorePathFallbackBaseUrl,
+  isPlatformAppHostname,
+  resolveStoreSlugFromHostname,
+} from '../utils/storefrontDomain';
+import { getStoreSlugByCustomHostname } from '../services/storeService';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { getPublishedHomepageConfig } from '../services/homepageService';
@@ -290,6 +295,9 @@ body { background: var(--c-bg); }
 .sv-drawer-img-wrap img { display: block; width: 100%; height: auto; }
 .sv-drawer-img-wrap--gallery { aspect-ratio: 1; max-height: min(72vh, 440px); }
 .sv-drawer-img-wrap--gallery .sv-store-gallery { height: 100%; }
+.sv-drawer-img-wrap--thumbs { display: flex; flex-direction: column; }
+.sv-drawer-img-wrap--thumbs.sv-drawer-img-wrap--gallery { aspect-ratio: unset; max-height: min(78vh, 520px); }
+.sv-drawer-img-wrap--thumbs .sv-store-gallery { flex: 1; min-height: 0; }
 .sv-drawer-img-ph { width: 100%; min-height: 180px; display: flex; align-items: center; justify-content: center; }
 .sv-pcard-img-wrap .sv-store-gallery,
 .of-img-wrap .sv-store-gallery { position: absolute; inset: 0; height: 100%; }
@@ -551,6 +559,7 @@ function StoreProductImageArea({
         fillContainer
         objectFit={variant === 'card' ? 'cover' : 'contain'}
         showPrimaryBadge={false}
+        showThumbnails={variant === 'drawer'}
         className="sv-store-gallery"
       />
     );
@@ -852,7 +861,36 @@ export default function StoreView() {
   const { guardOnline } = useCloudWriteGate();
   const { slug } = useParams<{ slug: string }>();
   const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
-  const effectiveSlug = slug || hostSlug || null;
+  const [customHostSlug, setCustomHostSlug] = useState<string | null>(null);
+  const [customHostResolved, setCustomHostResolved] = useState(!hostSlug);
+
+  useEffect(() => {
+    if (hostSlug) {
+      setCustomHostSlug(null);
+      setCustomHostResolved(true);
+      return;
+    }
+    const host =
+      typeof window !== 'undefined' ? window.location.hostname.trim().toLowerCase() : '';
+    if (!host || isPlatformAppHostname(host)) {
+      setCustomHostSlug(null);
+      setCustomHostResolved(true);
+      return;
+    }
+    let cancelled = false;
+    setCustomHostResolved(false);
+    getStoreSlugByCustomHostname(host).then((r) => {
+      if (cancelled) return;
+      setCustomHostSlug(r.success && r.slug ? r.slug : null);
+      setCustomHostResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hostSlug]);
+
+  const dedicatedHost = !!hostSlug || !!customHostSlug;
+  const effectiveSlug = slug || hostSlug || customHostSlug || null;
 
   // Canonical URL: when subdomain already identifies the store, keep path at "/".
   useEffect(() => {
@@ -908,9 +946,9 @@ export default function StoreView() {
     setDrawerProduct(null);
     if (store?.websiteModeEnabled && /\/products\//i.test(location.pathname)) {
       const slugForPath = effectiveSlug || store.storeSlug || '';
-      navigate(collectionPagePath(slugForPath, !!hostSlug));
+      navigate(collectionPagePath(slugForPath, dedicatedHost));
     }
-  }, [store?.websiteModeEnabled, store?.storeSlug, location.pathname, effectiveSlug, hostSlug, navigate]);
+  }, [store?.websiteModeEnabled, store?.storeSlug, location.pathname, effectiveSlug, dedicatedHost, navigate]);
 
   const openProductDrawer = useCallback((product: ProductWithCatalogueData) => {
     setDrawerProduct(product);
@@ -967,14 +1005,16 @@ export default function StoreView() {
   }, []);
 
   useEffect(() => {
+    if (!customHostResolved) return;
     if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
     setStoreLoading(true);
     getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
-  }, [effectiveSlug]);
+  }, [effectiveSlug, customHostResolved]);
 
   /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
   useEffect(() => {
-    if (storeLoading || !storeError || !hostSlug || slug) return;
+    const fallbackSlug = hostSlug || customHostSlug;
+    if (storeLoading || !storeError || !fallbackSlug || slug) return;
     if (pathFallbackSentRef.current) return;
     const base = getStorePathFallbackBaseUrl();
     const normalizeHost = (h: string) => h.trim().toLowerCase().replace(/\.+$/, '');
@@ -986,8 +1026,8 @@ export default function StoreView() {
     }
     if (!targetHost || targetHost === normalizeHost(window.location.hostname)) return;
     pathFallbackSentRef.current = true;
-    window.location.replace(`${base}/store/${encodeURIComponent(hostSlug)}${window.location.search || ''}`);
-  }, [storeLoading, storeError, hostSlug, slug]);
+    window.location.replace(`${base}/store/${encodeURIComponent(fallbackSlug)}${window.location.search || ''}`);
+  }, [storeLoading, storeError, hostSlug, customHostSlug, slug]);
 
   useEffect(() => {
     setLogoFailed(false);
@@ -1310,7 +1350,7 @@ export default function StoreView() {
         alert(`Please choose all variants for "${item.name}" before placing the order.`);
         if (store.websiteModeEnabled) {
           const slugForPath = effectiveSlug || store.storeSlug || '';
-          navigate(productPagePath(slugForPath, product, !!hostSlug));
+          navigate(productPagePath(slugForPath, product, dedicatedHost));
         } else {
           setDrawerProduct(product);
           setStep('products');
@@ -1619,7 +1659,7 @@ export default function StoreView() {
                 homepageLayout={homepageLayout}
                 products={storeProducts}
                 store={store}
-                onSubdomain={!!hostSlug}
+                onSubdomain={dedicatedHost}
               />
             </WebsiteOrderBridgeProvider>
           ) : store?.websiteModeEnabled ? (
@@ -1629,7 +1669,7 @@ export default function StoreView() {
               homepageLayout={homepageLayout}
               products={storeProducts}
               store={store}
-              onSubdomain={!!hostSlug}
+              onSubdomain={dedicatedHost}
             />
           ) : (
             <>
@@ -2167,7 +2207,7 @@ const label = productRowLabel || cloudLabel || defaultLabel;
             <div ref={overlayRef} className="sv-overlay" onClick={(e) => { if (e.target === overlayRef.current) closeProductDrawer(); }}>
               <div ref={drawerRef} className="sv-drawer">
                 <div className="sv-drawer-handle" />
-                <div className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery' : ''}`}>
+                <div className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery sv-drawer-img-wrap--thumbs' : ''}`}>
                   {variantImageUrl ? (
                     <img src={variantImageUrl} alt={drawerProduct.name} style={{ display: 'block', width: '100%', height: 'auto' }} />
                   ) : (

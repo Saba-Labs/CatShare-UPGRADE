@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import type { WebsiteProductTemplate } from '../../../types/homepage';
@@ -9,6 +8,7 @@ import StoreProductOrderPanel from '../../Storefront/StoreProductOrderPanel';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import { useWebsiteStore } from '../WebsiteStoreContext';
 import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
+import WebsiteCarousel from '../WebsiteCarousel';
 import WebsiteProductCard from '../WebsiteProductCard';
 import '../../Storefront/store-product-order-page.css';
 import '../../ProductVariantsDisplay.css';
@@ -33,8 +33,8 @@ export default function ProductPageRuntime({
 
   const layoutVariant = template?.layoutVariant || 'minimal';
   const imageLook = template?.imageLook || 'clean';
-  const fieldsLook = template?.fieldsLook || 'plain';
-  const colorTheme = template?.colorTheme || 'brand';
+  const fieldsInBox = template?.fieldsInBox !== false;
+  const fieldsStriped = template?.fieldsLook === 'striped';
   const suggestedLayout = template?.suggestedProductsLayout || 'cards';
   const suggestedCount = Math.max(2, Math.min(12, template?.suggestedProductsCount || 4));
 
@@ -103,22 +103,10 @@ export default function ProductPageRuntime({
       ];
 
   const suggestedProducts = (products || []).filter((p) => p.id !== product.id).slice(0, suggestedCount);
-  const customColors = template?.customColors || {};
-  const colorVars = {
-    ['--site-page-bg' as string]: customColors.pageBackground,
-    ['--site-page-surface' as string]: customColors.surfaceBackground,
-    ['--site-page-text' as string]: customColors.textPrimary,
-    ['--site-page-muted' as string]: customColors.textMuted,
-    ['--site-page-border' as string]: customColors.borderColor,
-    ['--site-page-primary' as string]: customColors.accentColor,
-    ['--site-page-btn-bg' as string]: customColors.buttonBackground,
-    ['--site-page-btn-text' as string]: customColors.buttonText,
-  } as CSSProperties;
 
   return (
     <main
-      className={`website-product-runtime wp-${layoutVariant} wp-image-${imageLook} wp-fields-${fieldsLook} wp-color-${colorTheme}`}
-      style={colorVars}
+      className={`website-product-runtime wp-${layoutVariant} wp-image-${imageLook} wp-fields-${fieldsInBox ? 'boxed' : 'open'}${fieldsStriped ? ' wp-fields-striped' : ''}`}
     >
       <WebsiteBreadcrumbs items={breadcrumbItems} />
       <StoreProductOrderPanel
@@ -142,24 +130,34 @@ export default function ProductPageRuntime({
       {template?.showRecommendations && suggestedProducts.length > 0 ? (
         <section className="website-product-recommendations">
           <h2>You may also like</h2>
-          <div
-            className={
-              suggestedLayout === 'carousel'
-                ? 'website-suggested-carousel'
-                : suggestedLayout === 'list'
-                  ? 'website-suggested-list'
-                  : 'website-suggested-grid'
-            }
-          >
-            {suggestedProducts.map((p) => (
-              <WebsiteProductCard
-                key={p.id}
-                product={p}
-                cardsStyle={suggestedLayout === 'cards' ? 'boxed' : 'minimal'}
-                viewMode={suggestedLayout === 'list' ? 'list' : 'grid'}
-              />
-            ))}
-          </div>
+          {suggestedLayout === 'carousel' ? (
+            <WebsiteCarousel
+              className="website-suggested-carousel-wrap"
+              trackClassName="website-suggested-carousel"
+              prevLabel="Previous suggested products"
+              nextLabel="Next suggested products"
+            >
+              {suggestedProducts.map((p) => (
+                <WebsiteProductCard
+                  key={p.id}
+                  product={p}
+                  cardsStyle="minimal"
+                  viewMode="grid"
+                />
+              ))}
+            </WebsiteCarousel>
+          ) : (
+            <div className={suggestedLayout === 'list' ? 'website-suggested-list' : 'website-suggested-grid'}>
+              {suggestedProducts.map((p) => (
+                <WebsiteProductCard
+                  key={p.id}
+                  product={p}
+                  cardsStyle={suggestedLayout === 'cards' ? 'boxed' : 'minimal'}
+                  viewMode={suggestedLayout === 'list' ? 'list' : 'grid'}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
     </main>

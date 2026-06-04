@@ -3,13 +3,9 @@ import { SUPABASE_SESSION_TIMEOUT_MS } from '../config/offlineBuilder';
 
 type SessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
 
-/**
- * getSession() can hang when Supabase is unhealthy (disk IO budget, etc.).
- * Always race with a timeout so the UI can fall back to cached auth / offline mode.
- */
-export async function getSessionWithTimeout(
-  timeoutMs: number = SUPABASE_SESSION_TIMEOUT_MS
-): Promise<SessionResult> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function getSessionOnce(timeoutMs: number): Promise<SessionResult> {
   return Promise.race([
     supabase.auth.getSession(),
     new Promise<SessionResult>((resolve) =>
@@ -23,4 +19,23 @@ export async function getSessionWithTimeout(
       )
     ),
   ]);
+}
+
+/**
+ * getSession() can hang when Supabase is unhealthy. Race with a timeout and retry
+ * so slow mobile networks are less likely to be treated as "logged out".
+ */
+export async function getSessionWithTimeout(
+  timeoutMs: number = SUPABASE_SESSION_TIMEOUT_MS,
+  retries: number = 2
+): Promise<SessionResult> {
+  let last: SessionResult = { data: { session: null }, error: null };
+  const attempts = Math.max(1, retries + 1);
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await sleep(250 * i);
+    last = await getSessionOnce(timeoutMs);
+    if (last.data.session?.user) return last;
+    if (last.error) return last;
+  }
+  return last;
 }

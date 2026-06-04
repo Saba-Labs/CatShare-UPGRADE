@@ -7,7 +7,10 @@ import {
   clearAuthUserIdsFromStorage,
   setSupabaseRlsUserId,
   recoverSupabaseSession,
+  hydrateAuthSessionFromLocalStorage,
+  getAuthUserFromLocalStorage,
   CATSHARE_AUTH_RESTORED_EVENT,
+  CATSHARE_CLOUD_FETCH_OK_EVENT,
 } from '../supabaseClient';
 import { fetchAllUserData } from '../services/supabaseSync';
 import { persistCatalogueSnapshotForUser } from '../utils/catalogueCachePersist';
@@ -24,9 +27,13 @@ import {
 import {
   AUTH_INIT_MAX_MS,
   isOfflineBuilderMode,
+  SESSION_RECOVERY_INTERVAL_MS,
   SUPABASE_PROFILE_FETCH_TIMEOUT_MS,
+  SUPABASE_SESSION_TIMEOUT_MS,
 } from '../config/offlineBuilder';
 import { getSessionWithTimeout } from '../utils/supabaseSession';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 
 /** App user shape from Supabase session (components use .uid, .email, .displayName). */
 export type AppAuthUser = {
@@ -39,7 +46,7 @@ export type AppAuthUser = {
   emailVerified?: boolean;
   /** True when we only restored cached UID and session may not be valid yet. */
   isSessionFallback?: boolean;
-  /** True when fallback recovery timed out while online; user should re-login. */
+  /** True only when refresh token is invalid — user must sign in again (not slow network). */
   sessionExpired?: boolean;
 };
 
@@ -105,8 +112,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const intentionalLogoutRef = useRef(false);
   const intentionalLogoutResetTimerRef = useRef<number | null>(null);
   const authNullRecoveryTimerRef = useRef<number | null>(null);
-  const fallbackRecoveryTimerRef = useRef<number | null>(null);
   const fallbackRecoveryIntervalRef = useRef<number | null>(null);
+  const userRef = useRef<AppAuthUser | null>(null);
+  /** Prevents init deadline from forcing fallback after auth already confirmed. */
+  const sessionConfirmedRef = useRef(false);
   const clearIntentionalLogoutResetTimer = useCallback(() => {
     if (intentionalLogoutResetTimerRef.current !== null) {
       window.clearTimeout(intentionalLogoutResetTimerRef.current);
@@ -120,15 +129,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
   const clearFallbackRecoveryTimers = useCallback(() => {
-    if (fallbackRecoveryTimerRef.current !== null) {
-      window.clearTimeout(fallbackRecoveryTimerRef.current);
-      fallbackRecoveryTimerRef.current = null;
-    }
     if (fallbackRecoveryIntervalRef.current !== null) {
       window.clearInterval(fallbackRecoveryIntervalRef.current);
       fallbackRecoveryIntervalRef.current = null;
     }
   }, []);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const markSessionExpired = useCallback((uid: string) => {
     try {
       localStorage.setItem(sessionExpiredStorageKey(uid), 'true');
@@ -143,14 +152,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       /* ignore */
     }
   }, []);
-  const hasSessionExpiredMark = useCallback((uid: string): boolean => {
-    try {
-      return localStorage.getItem(sessionExpiredStorageKey(uid)) === 'true';
-    } catch {
-      return false;
-    }
-  }, []);
-
   const refreshSupabaseData = useCallback(async (opts?: { skipLoadingIndicator?: boolean }): Promise<SupabaseUserData | null> => {
     if (authService.isOfflineGuest()) return null;
     if (isOfflineBuilderMode()) return null;
@@ -268,8 +269,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ),
           ]);
           if (cancelled) return;
-          const { data: { session: latest } } = await getSessionWithTimeout();
-          if (!latest?.user || latest.user.id !== uid) return;
 
           if (result.success && result.data) {
             const snapshot = result.data as SupabaseUserData;
@@ -280,6 +279,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               snapshot.deletedProducts
             );
             console.log('✅ Fetched Supabase data for user:', uid);
+            void confirmSessionAfterSuccessfulCloudFetch(uid);
           } else {
             console.warn('⚠️ Failed to fetch Supabase data:', result.error);
             setSupabaseData(defaultSupabaseData);
@@ -313,6 +313,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const applySignedInSession = (sessionUser: SupabaseUser) => {
+      sessionConfirmedRef.current = true;
       clearFallbackRecoveryTimers();
       clearSessionExpiredMark(sessionUser.id);
       const appUser = mapSupabaseUserToApp(sessionUser);
@@ -320,6 +321,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       persistAuthUserIdsForStorage(sessionUser.id);
       setSupabaseRlsUserId(sessionUser.id);
     };
+
+    /** Instant exit from reconnecting when sb-*-auth-token exists (no getSession/setSession wait). */
+    const promoteFromStoredAuth = (expectedUid?: string): boolean => {
+      if (cancelled || hasLiveSession()) return false;
+      const storedUser = getAuthUserFromLocalStorage(expectedUid);
+      if (!storedUser) return false;
+      applySignedInSession(storedUser);
+      void hydrateAuthSessionFromLocalStorage();
+      return true;
+    };
+
+    /** Cloud fetch succeeded (200) but getSession() may still hang — promote out of reconnecting. */
+    const confirmSessionAfterSuccessfulCloudFetch = async (uid: string) => {
+      if (cancelled || hasLiveSession()) return;
+      if (promoteFromStoredAuth(uid)) return;
+      try {
+        const {
+          data: { session: latest },
+        } = await getSessionWithTimeout(SUPABASE_SESSION_TIMEOUT_MS, 1);
+        if (latest?.user?.id === uid) {
+          applySignedInSession(latest.user);
+          return;
+        }
+        const recovered = await recoverSupabaseSession();
+        if (recovered.session?.user?.id === uid) {
+          applySignedInSession(recovered.session.user);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const hasLiveSession = (): boolean =>
+      sessionConfirmedRef.current || (userRef.current != null && userRef.current.isSessionFallback !== true);
 
     const clearSignedOutState = () => {
       setUser(null);
@@ -332,29 +367,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearFallbackRecoveryTimers();
     };
 
+    const markAuthInvalidForUid = (cachedUid: string) => {
+      markSessionExpired(cachedUid);
+      setUser((prev) => {
+        if (!prev || prev.uid !== cachedUid) return prev;
+        return { ...prev, sessionExpired: true, isSessionFallback: true };
+      });
+    };
+
+    const attemptSessionRecovery = async (expectedUid?: string) => {
+      if (cancelled || authService.isOfflineGuest()) return;
+      if (!isBrowserOnline()) return;
+      if (hasLiveSession()) return;
+
+      const cachedUid = (expectedUid || userRef.current?.uid || getPersistedAuthUserId() || '').trim();
+
+      if (promoteFromStoredAuth(cachedUid || undefined)) {
+        const uid = getAuthUserFromLocalStorage(cachedUid || undefined)?.id || cachedUid;
+        if (uid) void loadUserData(uid);
+        return;
+      }
+
+      const { session, authInvalid } = await recoverSupabaseSession();
+      if (cancelled) return;
+
+      if (session?.user) {
+        applySignedInSession(session.user);
+        void loadUserData(session.user.id);
+        return;
+      }
+
+      if (authInvalid && cachedUid) {
+        markAuthInvalidForUid(cachedUid);
+      }
+    };
+
     const startFallbackRecoveryMonitor = (cachedUid: string) => {
       clearFallbackRecoveryTimers();
       if (!isBrowserOnline()) return;
 
-      fallbackRecoveryTimerRef.current = window.setTimeout(() => {
-        fallbackRecoveryTimerRef.current = null;
-        if (cancelled) return;
-        markSessionExpired(cachedUid);
-        setUser((prev) => {
-          if (!prev || prev.uid !== cachedUid) return prev;
-          return { ...prev, sessionExpired: true };
-        });
-      }, 20000);
+      void attemptSessionRecovery(cachedUid);
 
-      fallbackRecoveryIntervalRef.current = window.setInterval(async () => {
-        if (cancelled) return;
-        if (!isBrowserOnline()) return;
-        const recovered = await recoverSupabaseSession();
-        if (!recovered?.user) return;
-        if (recovered.user.id !== cachedUid) return;
-        applySignedInSession(recovered.user);
-        void loadUserData(recovered.user.id);
-      }, 4000);
+      fallbackRecoveryIntervalRef.current = window.setInterval(() => {
+        void attemptSessionRecovery(cachedUid);
+      }, SESSION_RECOVERY_INTERVAL_MS);
     };
 
     /**
@@ -363,6 +419,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
      * true while the network/session is dead); the old `!online` guard left user null and wiped UI state.
      */
     const applyOfflineCachedIdentity = (): boolean => {
+      if (hasLiveSession()) {
+        return false;
+      }
+
       let cachedUid = (getPersistedAuthUserId() || '').trim();
       if (!cachedUid) {
         const fromSessionBlob = (tryGetSupabaseUserIdFromAuthToken() || '').trim();
@@ -380,15 +440,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       if (!cachedUid) return false;
 
+      if (promoteFromStoredAuth(cachedUid)) {
+        if (isBrowserOnline()) void loadUserData(cachedUid);
+        return false;
+      }
+
+      clearSessionExpiredMark(cachedUid);
+
       setUser((prev) => {
         const fallbackName = `User ${cachedUid.slice(0, 8)}`;
-        const alreadyExpired = hasSessionExpiredMark(cachedUid);
         if (prev?.uid === cachedUid) {
           return {
             ...prev,
             displayName: prev.displayName || fallbackName,
             isSessionFallback: true,
-            sessionExpired: alreadyExpired,
+            sessionExpired: false,
           };
         }
         return {
@@ -398,22 +464,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           photoURL: prev?.photoURL ?? null,
           emailVerified: prev?.emailVerified ?? false,
           isSessionFallback: true,
-          sessionExpired: alreadyExpired,
+          sessionExpired: false,
         };
       });
       setSupabaseRlsUserId(cachedUid);
       setSupabaseData((prev) => prev ?? defaultSupabaseData);
       setSupabaseDataLoading(false);
       persistAuthUserIdsForStorage(cachedUid);
-      if (!hasSessionExpiredMark(cachedUid)) {
-        startFallbackRecoveryMonitor(cachedUid);
-      }
+      startFallbackRecoveryMonitor(cachedUid);
+      if (isBrowserOnline()) void loadUserData(cachedUid);
       return true;
     };
 
     const initSession = async () => {
       const initDeadline = window.setTimeout(() => {
         if (cancelled) return;
+        if (hasLiveSession()) {
+          setLoading(false);
+          return;
+        }
         if (applyOfflineCachedIdentity()) {
           setLoading(false);
           return;
@@ -451,6 +520,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+      const promotedUid = promoteFromStoredAuth()
+        ? getAuthUserFromLocalStorage()?.id || getPersistedAuthUserId()
+        : null;
+      if (promotedUid) {
+        setLoading(false);
+        clearTimeout(initDeadline);
+        void loadUserData(promotedUid);
+        return;
+      }
+
       for (let attempt = 0; attempt < 3; attempt++) {
         if (cancelled) return;
         if (attempt > 0) await sleep(120 * attempt);
@@ -474,14 +553,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (cancelled) return;
       const recovered = await Promise.race([
         recoverSupabaseSession(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), SUPABASE_PROFILE_FETCH_TIMEOUT_MS)),
+        new Promise<{ session: null; authInvalid: false }>((resolve) =>
+          setTimeout(() => resolve({ session: null, authInvalid: false }), SUPABASE_SESSION_TIMEOUT_MS)
+        ),
       ]);
       if (cancelled) return;
-      if (recovered?.user) {
-        applySignedInSession(recovered.user);
+      if (recovered.session?.user) {
+        applySignedInSession(recovered.session.user);
         setLoading(false);
         clearTimeout(initDeadline);
-        void loadUserData(recovered.user.id);
+        void loadUserData(recovered.session.user.id);
+        return;
+      }
+
+      if (recovered.authInvalid) {
+        const cachedUid = (getPersistedAuthUserId() || '').trim();
+        if (cachedUid && applyOfflineCachedIdentity()) {
+          markAuthInvalidForUid(cachedUid);
+          setLoading(false);
+          clearTimeout(initDeadline);
+          return;
+        }
+        clearSignedOutState();
+        setLoading(false);
+        clearTimeout(initDeadline);
         return;
       }
 
@@ -496,14 +591,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       clearTimeout(initDeadline);
     };
 
-    void initSession();
-
     const syncAfterLocalAuthRestore = () => {
+      if (authService.isOfflineGuest() || cancelled) return;
+      const uid = userRef.current?.uid || getPersistedAuthUserId() || undefined;
+      const restoredUid = promoteFromStoredAuth(uid || undefined)
+        ? getAuthUserFromLocalStorage(uid || undefined)?.id || uid
+        : null;
+      if (restoredUid) {
+        void loadUserData(restoredUid);
+        return;
+      }
       void (async () => {
-        if (authService.isOfflineGuest() || cancelled) return;
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+        } = await getSessionWithTimeout(SUPABASE_SESSION_TIMEOUT_MS, 0);
         if (session?.user) {
           applySignedInSession(session.user);
           void loadUserData(session.user.id);
@@ -513,21 +614,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     window.addEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
 
+    const onCloudFetchOk = (ev: Event) => {
+      const uid = (ev as CustomEvent<{ userId?: string }>).detail?.userId;
+      if (!uid || cancelled) return;
+      if (userRef.current?.isSessionFallback !== true) return;
+      void confirmSessionAfterSuccessfulCloudFetch(uid);
+    };
+    window.addEventListener(CATSHARE_CLOUD_FETCH_OK_EVENT, onCloudFetchOk);
+
+    const onReconnect = () => {
+      void attemptSessionRecovery();
+    };
+    window.addEventListener('online', onReconnect);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void attemptSessionRecovery();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    let capacitorAppListener: { remove: () => void } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) void attemptSessionRecovery();
+      }).then((handle) => {
+        capacitorAppListener = handle;
+      });
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (authService.isOfflineGuest()) return;
 
       if (session?.user) {
         clearAuthNullRecoveryTimer();
-        const appUser = mapSupabaseUserToApp(session.user);
-        setUser(appUser);
-        persistAuthUserIdsForStorage(session.user.id);
-        setSupabaseRlsUserId(session.user.id);
-        // Avoid duplicate full sync: initSession already loads on cold start.
-        // TOKEN_REFRESHED fires often — refetching all tables every ~hour is unnecessary.
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        const wasFallback = userRef.current?.isSessionFallback === true;
+        applySignedInSession(session.user);
+        setLoading(false);
+        // Avoid duplicate full sync on TOKEN_REFRESHED; do load when coming out of fallback.
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || wasFallback) {
           void loadUserData(session.user.id);
         }
-      } else {
+      } else if (event !== 'INITIAL_SESSION') {
         // If logout was intentional, don't try to recover — clear immediately
         if (intentionalLogoutRef.current) {
           clearAuthNullRecoveryTimer();
@@ -544,15 +669,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         authNullRecoveryTimerRef.current = window.setTimeout(async () => {
           authNullRecoveryTimerRef.current = null;
           const recovered = await recoverSupabaseSession();
-          if (recovered?.user) {
-            const appUser = mapSupabaseUserToApp(recovered.user);
-            setUser(appUser);
-            persistAuthUserIdsForStorage(recovered.user.id);
-            setSupabaseRlsUserId(recovered.user.id);
+          if (recovered.session?.user) {
+            applySignedInSession(recovered.session.user);
             if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-              void loadUserData(recovered.user.id);
+              void loadUserData(recovered.session.user.id);
             }
             return;
+          }
+          if (recovered.authInvalid) {
+            const cachedUid = (getPersistedAuthUserId() || '').trim();
+            if (cachedUid) {
+              markAuthInvalidForUid(cachedUid);
+              return;
+            }
           }
           if (applyOfflineCachedIdentity()) {
             return;
@@ -562,6 +691,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
+    void (async () => {
+      if (!authService.isOfflineGuest()) {
+        const bootUid = promoteFromStoredAuth()
+          ? getAuthUserFromLocalStorage()?.id || getPersistedAuthUserId()
+          : null;
+        if (!cancelled && bootUid) {
+          setLoading(false);
+          void loadUserData(bootUid);
+          return;
+        }
+      }
+      if (!cancelled && !sessionConfirmedRef.current) {
+        await initSession();
+      } else if (!cancelled) {
+        setLoading(false);
+      }
+    })();
+
     return () => {
       cancelled = true;
       clearAuthNullRecoveryTimer();
@@ -570,8 +717,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       sub.subscription.unsubscribe();
       window.removeEventListener('guestModeActivated', handleGuestModeActivated);
       window.removeEventListener(CATSHARE_AUTH_RESTORED_EVENT, syncAfterLocalAuthRestore);
+      window.removeEventListener(CATSHARE_CLOUD_FETCH_OK_EVENT, onCloudFetchOk);
+      window.removeEventListener('online', onReconnect);
+      document.removeEventListener('visibilitychange', onVisible);
+      capacitorAppListener?.remove();
     };
-  }, [clearAuthNullRecoveryTimer, clearIntentionalLogoutResetTimer, clearFallbackRecoveryTimers, clearSessionExpiredMark, hasSessionExpiredMark, markSessionExpired]);
+  }, [clearAuthNullRecoveryTimer, clearIntentionalLogoutResetTimer, clearFallbackRecoveryTimers, clearSessionExpiredMark, markSessionExpired]);
 
   const logout = async () => {
     try {

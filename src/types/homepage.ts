@@ -594,11 +594,13 @@ export interface WebsiteProductTemplate {
   showRecommendations: boolean;
   /** Image panel treatment on product pages. */
   imageLook?: 'clean' | 'soft' | 'framed';
-  /** Details/fields area styling. */
+  /** Show product detail fields inside a bordered box (default) or as plain rows. */
+  fieldsInBox?: boolean;
+  /** @deprecated Use fieldsInBox. Kept for saved configs (striped row backgrounds). */
   fieldsLook?: 'plain' | 'card' | 'striped';
-  /** Product-page color treatment while preserving site theme intent. */
+  /** @deprecated Product pages inherit the store theme. Ignored if present. */
   colorTheme?: 'brand' | 'neutral' | 'warm' | 'dark';
-  /** Fine-grained color overrides for product page surfaces/text/actions. */
+  /** @deprecated Product pages inherit the store theme. Ignored if present. */
   customColors?: {
     pageBackground?: string;
     surfaceBackground?: string;

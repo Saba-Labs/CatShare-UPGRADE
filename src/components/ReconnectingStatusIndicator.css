@@ -1,0 +1,99 @@
+/* Matches app-wide black status bar (h-[40px] in CatalogueApp, etc.) */
+.reconnecting-status-banner {
+  --catshare-status-bar-height: 40px;
+  display: flex;
+  height: var(--catshare-status-bar-height);
+  min-height: var(--catshare-status-bar-height);
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family:
+    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+}
+
+.reconnecting-status-banner__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: rgb(254 243 199 / 0.9);
+  animation: reconnecting-dot-pulse 1.4s ease-in-out infinite;
+}
+
+.reconnecting-status-banner__marquee {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow-x: clip;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+.reconnecting-status-banner__track {
+  display: inline-flex;
+  align-items: center;
+  gap: 3rem;
+  width: max-content;
+  line-height: 1.4;
+  animation: reconnecting-marquee 28s linear infinite;
+  will-change: transform;
+}
+
+.reconnecting-status-banner__track span {
+  flex-shrink: 0;
+  line-height: 1.4;
+  padding-block: 1px;
+}
+
+@keyframes reconnecting-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes reconnecting-dot-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reconnecting-status-banner__track {
+    animation: none;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .reconnecting-status-banner__track span[aria-hidden='true'] {
+    display: none;
+  }
+
+  .reconnecting-status-banner__marquee {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}

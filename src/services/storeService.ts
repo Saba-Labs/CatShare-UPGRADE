@@ -218,6 +218,10 @@ export interface Store {
   homepageEnabled: boolean;
   /** Whether full website-mode runtime is enabled on storefront. */
   websiteModeEnabled: boolean;
+  /** Seller custom domain hostname (e.g. shop.brand.com), when connected. */
+  customHostname: string | null;
+  /** `pending` | `active` | `error` — from Vercel DNS verification. */
+  customDomainStatus: string | null;
 }
 
 export interface StorePublic {
@@ -304,6 +308,14 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     websiteModeEnabled: row.website_mode_enabled === true,
     homepageEnabled:
       row.website_mode_enabled === true && row.homepage_enabled !== false,
+    customHostname:
+      typeof row.custom_hostname === 'string' && row.custom_hostname.trim() !== ''
+        ? row.custom_hostname.trim().toLowerCase()
+        : null,
+    customDomainStatus:
+      typeof row.custom_domain_status === 'string' && row.custom_domain_status.trim() !== ''
+        ? row.custom_domain_status.trim().toLowerCase()
+        : null,
   };
 }
 
@@ -477,6 +489,44 @@ export async function createStore(
  * Get a store by its slug (public, no auth required)
  * Called by unauthenticated users to view a store
  */
+/**
+ * Resolve store slug from an active custom hostname (public storefront).
+ */
+export async function getStoreSlugByCustomHostname(
+  hostname: string
+): Promise<{ success: boolean; slug?: string; error?: string }> {
+  const normalized = hostname.trim().toLowerCase().replace(/\.+$/, '');
+  if (!normalized) return { success: false, error: 'Invalid hostname' };
+
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client.rpc('get_store_slug_by_hostname', {
+      p_hostname: normalized,
+    });
+
+    if (error) {
+      const { data: row, error: rowErr } = await client
+        .from('stores')
+        .select('store_slug')
+        .eq('custom_hostname', normalized)
+        .eq('custom_domain_status', 'active')
+        .maybeSingle();
+
+      if (rowErr || !row?.store_slug) {
+        return { success: false, error: error.message || rowErr?.message || 'Store not found' };
+      }
+      return { success: true, slug: String(row.store_slug) };
+    }
+
+    const slug = typeof data === 'string' ? data.trim() : '';
+    if (!slug) return { success: false, error: 'Store not found' };
+    return { success: true, slug };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+}
+
 export async function getStoreBySlug(slug: string): Promise<{ success: boolean; data?: StorePublic; error?: string }> {
   try {
     const client = getSupabaseClient();

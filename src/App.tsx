@@ -36,6 +36,7 @@ import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { useAuth } from "./context/AuthContext";
 import { useSync, applyUserSettingsFromCloud, CATALOGUE_LOCAL_IMAGES_READY_EVENT } from "./context/SyncContext";
 import SyncStatusIndicator from "./components/SyncStatusIndicator";
+import ReconnectingStatusIndicator from "./components/ReconnectingStatusIndicator";
 import OfflineStatusIndicator from "./components/OfflineStatusIndicator";
 import { supabase } from "./supabaseClient";
 /** Eager import: home shell must not depend on a lazy chunk fetch (breaks offline reload on web). */
@@ -71,6 +72,7 @@ const TermsOfService = lazy(() => import("./TermsOfService"));
 const Website = lazy(() => import("./Website"));
 const Tutorial = lazy(() => import("./Tutorial"));
 const HomepageEditorPage = lazy(() => import("./pages/HomepageEditorPage"));
+const StoreCustomDomain = lazy(() => import("./pages/StoreCustomDomain"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
@@ -2280,6 +2282,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
       <ToastContainer />
       <SyncStatusIndicator />
       <OfflineStatusIndicator />
+      <ReconnectingStatusIndicator />
 
       {/* Detailed sync (e.g. backup restore → cloud): same popup as offline→cloud — ring, %, status text */}
       {isSyncContextSyncing && syncStatusDetail != null && (
@@ -2301,9 +2304,9 @@ if (user?.uid && !authService.isOfflineGuest()) {
         />
       )}
 
-      {/* Session expired guard: block edits until user re-authenticates */}
+      {/* Auth invalid: refresh token revoked — re-login required (not slow network) */}
       {user?.sessionExpired === true && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center px-4 py-6" role="dialog" aria-label="Session expired">
+        <div className="fixed inset-0 z-[140] flex items-center justify-center px-4 py-6" role="dialog" aria-label="Sign in required">
           <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" aria-hidden="true" />
           <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 sm:p-7">
             <div className="flex justify-center mb-4">
@@ -2311,9 +2314,9 @@ if (user?.uid && !authService.isOfflineGuest()) {
                 <FiAlertCircle className="w-6 h-6 text-red-600" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Session expired</h2>
+            <h2 className="text-xl font-bold text-gray-900 text-center mb-2">Sign-in required</h2>
             <p className="text-sm text-gray-600 text-center mb-6">
-              We could not reconnect your account session. Please log in again to continue syncing safely.
+              Your sign-in is no longer valid on this device. Please log in again to sync changes to the cloud.
             </p>
             <button
               type="button"
@@ -2580,6 +2583,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <HomepageEditorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/custom-domain"
+          element={
+            <ProtectedRoute>
+              <StoreCustomDomain />
             </ProtectedRoute>
           }
         />

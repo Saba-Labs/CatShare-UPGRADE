@@ -4,9 +4,9 @@ import { authService } from '../services/authService';
 export const OFFLINE_CLOUD_WRITE_TOAST =
   'Connect to the internet to make changes.';
 export const SESSION_RESTORING_CLOUD_WRITE_TOAST =
-  'Session is restoring. Please wait a moment.';
+  'Reconnecting… Editing will resume when your connection is stable.';
 export const SESSION_EXPIRED_CLOUD_WRITE_TOAST =
-  'Session expired. Please log in again.';
+  'Sign-in required. Please log in again to sync changes.';
 
 export function isBrowserOnline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine;
@@ -23,7 +23,14 @@ export function isCloudSyncedAccount(
   );
 }
 
-/** True when this user must not perform cloud-backed writes while offline. */
+/** View-only / no cloud writes: offline, reconnecting, or auth invalid. */
+export function isSessionReconnecting(
+  user: { isSessionFallback?: boolean; sessionExpired?: boolean } | null | undefined
+): boolean {
+  return user?.isSessionFallback === true && user?.sessionExpired !== true;
+}
+
+/** True when this user must not perform cloud-backed writes. */
 export function cloudWriteWouldBeBlocked(
   user: { uid?: string; isAnonymous?: boolean; isSessionFallback?: boolean; sessionExpired?: boolean } | null | undefined,
   online: boolean = isBrowserOnline()

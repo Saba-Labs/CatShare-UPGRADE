@@ -14,9 +14,13 @@ export function isOfflineBuilderMode(): boolean {
   return String(import.meta.env.VITE_OFFLINE_BUILDER || '').toLowerCase() === 'true';
 }
 
-export const SUPABASE_SESSION_TIMEOUT_MS = 5_000;
-export const SUPABASE_PROFILE_FETCH_TIMEOUT_MS = 8_000;
-export const AUTH_INIT_MAX_MS = 6_500;
+/** Per-attempt cap for getSession(); retried in getSessionWithTimeout. */
+export const SUPABASE_SESSION_TIMEOUT_MS = 12_000;
+export const SUPABASE_PROFILE_FETCH_TIMEOUT_MS = 18_000;
+/** Cold-start budget before showing cached identity while session retries continue. */
+export const AUTH_INIT_MAX_MS = 18_000;
+/** Background retry while restoring session after fallback identity. */
+export const SESSION_RECOVERY_INTERVAL_MS = 4_000;
 
 export function isHomepageEditorPath(pathname: string): boolean {
   return pathname === '/store/homepage' || pathname.startsWith('/store/homepage/');

@@ -3,7 +3,7 @@
  * Handles all data synchronization between local state and Supabase
  */
 
-import { getSupabaseClient } from '../supabaseClient';
+import { getSupabaseClient, CATSHARE_CLOUD_FETCH_OK_EVENT } from '../supabaseClient';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { getAllProductImageUrlsForDeletion, normalizeProductImageFields } from '../utils/productImages';
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
@@ -716,6 +716,11 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       productsCount: userData.products.length,
       deletedProductsCount: userData.deletedProducts.length,
     });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(CATSHARE_CLOUD_FETCH_OK_EVENT, { detail: { userId } })
+      );
+    }
     return { success: true, data: userData };
   } catch (err) {
     const errorMessage = getErrorMessage(err);

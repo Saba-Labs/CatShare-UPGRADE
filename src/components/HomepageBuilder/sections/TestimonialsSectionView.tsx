@@ -33,7 +33,7 @@ function TestimonialCard({ testimonial, showRating, editMode, onUpdateSection, c
   return (
     <div className="testimonial-card">
       {showRating && rating > 0 && (
-        <div style={{ marginBottom: '12px' }}>
+        <div className="testimonial-card__stars">
           {editMode && onUpdateSection ? (
             <TestimonialStarRating
               rating={rating}
@@ -48,8 +48,7 @@ function TestimonialCard({ testimonial, showRating, editMode, onUpdateSection, c
       {editMode && onUpdateSection ? (
         <>
           <p
-            className="sites-inline-editable"
-            style={{ margin: '0 0 12px 0', fontStyle: 'italic', color: '#6b7280', minHeight: '1.5em' }}
+            className="testimonial-card__quote sites-inline-editable"
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => patchTestimonial({ text: e.currentTarget.textContent || '' })}
@@ -57,8 +56,7 @@ function TestimonialCard({ testimonial, showRating, editMode, onUpdateSection, c
             {testimonial.text}
           </p>
           <p
-            className="sites-inline-editable"
-            style={{ margin: '0 0 4px 0', fontWeight: 600, minHeight: '1.25em' }}
+            className="testimonial-card__author sites-inline-editable"
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => patchTestimonial({ author: e.currentTarget.textContent || '' })}
@@ -66,8 +64,7 @@ function TestimonialCard({ testimonial, showRating, editMode, onUpdateSection, c
             {testimonial.author}
           </p>
           <p
-            className="sites-inline-editable"
-            style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280', minHeight: '1.1em' }}
+            className="testimonial-card__role sites-inline-editable"
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => patchTestimonial({ role: e.currentTarget.textContent || '' })}
@@ -77,13 +74,9 @@ function TestimonialCard({ testimonial, showRating, editMode, onUpdateSection, c
         </>
       ) : (
         <>
-          <p style={{ margin: '0 0 12px 0', fontStyle: 'italic', color: '#6b7280' }}>
-            &ldquo;{testimonial.text}&rdquo;
-          </p>
-          <p style={{ margin: '0 0 4px 0', fontWeight: 600 }}>{testimonial.author}</p>
-          {testimonial.role ? (
-            <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>{testimonial.role}</p>
-          ) : null}
+          <p className="testimonial-card__quote">&ldquo;{testimonial.text}&rdquo;</p>
+          <p className="testimonial-card__author">{testimonial.author}</p>
+          {testimonial.role ? <p className="testimonial-card__role">{testimonial.role}</p> : null}
         </>
       )}
     </div>
@@ -118,7 +111,10 @@ export default function TestimonialsSectionView({ section, editMode, onUpdateSec
       : undefined;
 
   return (
-    <div style={{ background: settings.backgroundColor || 'transparent', padding: '20px', borderRadius: '8px' }}>
+    <div
+      className="testimonials-section"
+      style={{ background: settings.backgroundColor || 'transparent', padding: '20px', borderRadius: '8px' }}
+    >
       {editMode && onUpdateSection ? (
         <h2
           className="sites-inline-editable sites-inline-heading"

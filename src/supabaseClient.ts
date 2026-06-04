@@ -2,10 +2,24 @@
  * Single Supabase browser client. Session JWT is sent automatically on requests
  * so RLS policies using auth.uid() work when user_id matches auth.users(id).
  */
-import { createClient, SupabaseClient, type Session } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, type Session, type User } from '@supabase/supabase-js';
+import { SUPABASE_SESSION_TIMEOUT_MS } from './config/offlineBuilder';
+import { isSupabaseAuthFatalError } from './utils/sessionAuthErrors';
+import { getSessionWithTimeout } from './utils/supabaseSession';
+import {
+  getStoredAuthUserFromLocalStorage,
+  parseSupabaseAuthBlobFromLocalStorage,
+  sessionFromAuthBlob,
+} from './utils/supabaseAuthStorage';
+
+const HYDRATE_SET_SESSION_MS = 6_000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Dispatched after backup restore re-applies Supabase auth keys so AuthContext can re-sync. */
 export const CATSHARE_AUTH_RESTORED_EVENT = 'catshare:supabase-auth-restored';
+/** Dispatched when a full cloud profile fetch succeeds — clears reconnecting without getSession(). */
+export const CATSHARE_CLOUD_FETCH_OK_EVENT = 'catshare:cloud-fetch-ok';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -148,11 +162,63 @@ export function restoreSupabaseAuthToLocalStorage(snapshot: Record<string, strin
  * Re-read session from storage into the client after manual localStorage writes.
  * Returns whether a user access token is available for REST calls.
  */
-export async function refreshSupabaseSessionFromStorage(): Promise<boolean> {
+/**
+ * Load tokens from localStorage into the Supabase client (avoids getSession() hangs).
+ * Returns the active session when hydration succeeds.
+ */
+/** User from localStorage auth blob — never blocks on Supabase client. */
+export function getAuthUserFromLocalStorage(expectedUid?: string): User | null {
+  return getStoredAuthUserFromLocalStorage(expectedUid);
+}
+
+export async function hydrateAuthSessionFromLocalStorage(): Promise<Session | null> {
+  const blob = parseSupabaseAuthBlobFromLocalStorage();
+  if (!blob) return null;
+
+  const fallbackSession = sessionFromAuthBlob(blob);
+
+  try {
+    if (!blob.refresh_token) {
+      return fallbackSession;
+    }
+    const { data, error } = await Promise.race([
+      supabase.auth.setSession({
+        access_token: blob.access_token,
+        refresh_token: blob.refresh_token,
+      }),
+      sleep(HYDRATE_SET_SESSION_MS).then(() => ({
+        data: { session: null as Session | null, user: null as User | null },
+        error: null,
+      })),
+    ]);
+    if (!error && data.session?.user) return data.session;
+    if (error && isSupabaseAuthFatalError(error)) return null;
+  } catch (err) {
+    if (isSupabaseAuthFatalError(err)) return null;
+  }
+
   try {
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await Promise.race([
+      supabase.auth.getSession(),
+      sleep(2_000).then(() => ({ data: { session: null as Session | null } })),
+    ]);
+    if (session?.user) return session;
+  } catch {
+    /* ignore */
+  }
+
+  return fallbackSession;
+}
+
+export async function refreshSupabaseSessionFromStorage(): Promise<boolean> {
+  try {
+    const hydrated = await hydrateAuthSessionFromLocalStorage();
+    if (hydrated?.access_token) return true;
+    const {
+      data: { session },
+    } = await getSessionWithTimeout(SUPABASE_SESSION_TIMEOUT_MS, 0);
     if (session?.access_token) return true;
     const { data: refreshed } = await supabase.auth.refreshSession();
     return !!refreshed.session?.access_token;
@@ -161,35 +227,58 @@ export async function refreshSupabaseSessionFromStorage(): Promise<boolean> {
   }
 }
 
+export type SessionRecoveryResult = {
+  session: Session | null;
+  /** True only when refresh token is invalid — user must sign in again. */
+  authInvalid: boolean;
+};
+
 /**
  * Re-resolve session after transient null (storage race, backup restore, token refresh timing).
- * If tokens are revoked or the user signed out, returns null.
+ * Distinguishes network/timeouts (authInvalid=false) from revoked refresh tokens.
  */
-export async function recoverSupabaseSession(): Promise<Session | null> {
-  const tryOnce = async (): Promise<Session | null> => {
+export async function recoverSupabaseSession(): Promise<SessionRecoveryResult> {
+  const tryOnce = async (): Promise<SessionRecoveryResult> => {
+    const blob = parseSupabaseAuthBlobFromLocalStorage();
+    if (blob?.user) {
+      return { session: sessionFromAuthBlob(blob), authInvalid: false };
+    }
+    try {
+      const hydrated = await hydrateAuthSessionFromLocalStorage();
+      if (hydrated?.user) return { session: hydrated, authInvalid: false };
+    } catch {
+      /* ignore */
+    }
     try {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) return session;
+      } = await getSessionWithTimeout(SUPABASE_SESSION_TIMEOUT_MS, 1);
+      if (session?.user) return { session, authInvalid: false };
     } catch {
       /* ignore */
     }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return null;
+      return { session: null, authInvalid: false };
     }
     try {
       const { data, error } = await supabase.auth.refreshSession();
-      if (!error && data.session?.user) return data.session;
-    } catch {
-      /* ignore */
+      if (!error && data.session?.user) {
+        return { session: data.session, authInvalid: false };
+      }
+      if (error && isSupabaseAuthFatalError(error)) {
+        return { session: null, authInvalid: true };
+      }
+    } catch (err) {
+      if (isSupabaseAuthFatalError(err)) {
+        return { session: null, authInvalid: true };
+      }
     }
-    return null;
+    return { session: null, authInvalid: false };
   };
 
   const first = await tryOnce();
-  if (first) return first;
-  await new Promise((r) => setTimeout(r, 120));
+  if (first.session || first.authInvalid) return first;
+  await new Promise((r) => setTimeout(r, 200));
   return tryOnce();
 }
 

@@ -74,6 +74,19 @@ export function buildStorefrontUrl(slug: string): string {
   return `https://${normalizedSlug}.${rootHost}`;
 }
 
+/** Public store URL: active custom domain, else `{slug}.{root}`. */
+export function buildStorefrontPublicUrl(
+  slug: string,
+  custom?: { hostname?: string | null; status?: string | null }
+): string {
+  const host =
+    typeof custom?.hostname === 'string' && custom.hostname.trim() !== '' ? normalizeHost(custom.hostname) : '';
+  if (host && custom?.status === 'active') {
+    return `https://${host}`;
+  }
+  return buildStorefrontUrl(slug);
+}
+
 /**
  * Base URL for path-based store links when leaving a seller subdomain (e.g. client fallback after a failed fetch).
  * Prefer `VITE_PUBLIC_WEB_BASE_URL` / `VITE_APP_URL`; otherwise `https://my.<storefront root>`.
@@ -85,6 +98,21 @@ export function getStorePathFallbackBaseUrl(): string {
     .replace(/\/$/, '');
   if (env) return env;
   return `https://my.${getStorefrontRootHost()}`;
+}
+
+/** Host is the platform app / marketing site — not a seller custom domain candidate. */
+export function isPlatformAppHostname(hostname?: string | null): boolean {
+  const host = normalizeHost(
+    typeof hostname === 'string' ? hostname : typeof window !== 'undefined' ? window.location.hostname : ''
+  );
+  if (!host) return true;
+  if (/^(localhost|127\.0\.0\.1)$/i.test(host)) return true;
+  if (looksLikeHostingPreviewHostname(host)) return true;
+
+  const rootHost = getStorefrontRootHost();
+  if (host === rootHost) return true;
+  if (host === `my.${rootHost}` || host === `www.${rootHost}` || host === `app.${rootHost}`) return true;
+  return false;
 }
 
 export function resolveStoreSlugFromHostname(hostname?: string | null): string | null {

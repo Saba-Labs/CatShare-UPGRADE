@@ -465,34 +465,52 @@
   gap: 10px;
 }
 
+/* Shared carousel: track + centered nav row below (< >) */
+.website-carousel-block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  --carousel-item-width: minmax(170px, 210px);
+}
+
+.website-carousel-track,
 .website-products-carousel {
   display: grid;
   grid-auto-flow: column;
+  grid-auto-columns: var(--carousel-item-width);
   gap: 12px;
+  width: 100%;
   overflow-x: auto;
-  padding-bottom: 6px;
+  padding-bottom: 0;
   scroll-snap-type: x proximity;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge legacy */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
+.website-carousel-track > *,
 .website-products-carousel > * {
   scroll-snap-align: start;
+  min-width: 0;
 }
 
+.website-carousel-track::-webkit-scrollbar,
 .website-products-carousel::-webkit-scrollbar {
-  display: none; /* Chromium/Safari */
+  display: none;
 }
 
-.website-products-carousel-wrap {
+.website-carousel-nav-row {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
 }
 
+.website-carousel-nav-btn,
 .website-products-carousel-nav {
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid #e5e7eb;
   background: #f3f4f6;
@@ -502,29 +520,45 @@
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
 }
 
+.website-carousel-nav-btn:hover,
 .website-products-carousel-nav:hover {
   background: #e5e7eb;
 }
 
 .website-carousel-chevron {
-  width: 12px;
-  height: 12px;
-  border-right: 2.5px solid #6b7280;
-  border-bottom: 2.5px solid #6b7280;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #6b7280;
+  border-bottom: 2px solid #6b7280;
   display: inline-block;
 }
 
 .website-carousel-chevron--left {
   transform: rotate(135deg);
-  margin-left: 2px;
+  margin-left: 1px;
 }
 
 .website-carousel-chevron--right {
   transform: rotate(-45deg);
-  margin-right: 2px;
+  margin-right: 1px;
+}
+
+@media (max-width: 768px) {
+  .website-carousel-block:not(.testimonials-carousel) {
+    --carousel-item-width: calc((100% - 12px) / 2);
+  }
+}
+
+/* Legacy wrap: stack track + nav (side nav removed) */
+.website-products-carousel-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
 }
 
 .website-view-all-btn {

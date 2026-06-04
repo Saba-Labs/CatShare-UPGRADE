@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import { ProductGridSection } from '../../../types/homepage';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
+import WebsiteCarousel from '../../WebsiteBuilder/WebsiteCarousel';
 import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
 import { IconImage } from '../../Storefront/StorefrontIcons';
 import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
@@ -30,15 +31,6 @@ export default function ProductGridSectionView({
   const carouselItemWidth = `${cardMinWidth}px`;
   // Keep "grid" truly grid-like: cards wrap to next line on smaller widths.
   const gridMinCardWidth = `${cardMinWidth}px`;
-  const carouselRef = React.useRef<HTMLDivElement | null>(null);
-
-  const scrollCarousel = (direction: -1 | 1) => {
-    const node = carouselRef.current;
-    if (!node) return;
-    const step = cardMinWidth + 12;
-    node.scrollBy({ left: step * direction, behavior: 'smooth' });
-  };
-
   const source =
     content.productSource ||
     (content.productIds?.length ? 'specific' : content.categoryId ? 'category' : 'all');
@@ -75,40 +67,22 @@ export default function ProductGridSectionView({
       {storeCtx && limited.length > 0 ? (
         <>
           {displayMode === 'carousel' ? (
-            <div className="website-products-carousel-wrap">
-              <button
-                type="button"
-                className="website-products-carousel-nav"
-                aria-label="Scroll products left"
-                onClick={() => scrollCarousel(-1)}
-              >
-                <span className="website-carousel-chevron website-carousel-chevron--left" aria-hidden />
-              </button>
-              <div
-                ref={carouselRef}
-                className="website-products-carousel"
-                style={{ gridAutoColumns: `minmax(${carouselItemWidth}, ${carouselItemWidth})` }}
-              >
-                {limited.map((product) => (
-                  <WebsiteProductCard
-                    key={product.id}
-                    product={product}
-                    cardsStyle={cardsStyle}
-                    viewMode="grid"
-                    builderPreview={builderCanvas}
-                    onBuilderProductClick={onProductPreview}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                className="website-products-carousel-nav"
-                aria-label="Scroll products right"
-                onClick={() => scrollCarousel(1)}
-              >
-                <span className="website-carousel-chevron website-carousel-chevron--right" aria-hidden />
-              </button>
-            </div>
+            <WebsiteCarousel
+              style={{ ['--carousel-item-width' as string]: `minmax(${carouselItemWidth}, ${carouselItemWidth})` }}
+              prevLabel="Scroll products left"
+              nextLabel="Scroll products right"
+            >
+              {limited.map((product) => (
+                <WebsiteProductCard
+                  key={product.id}
+                  product={product}
+                  cardsStyle={cardsStyle}
+                  viewMode="grid"
+                  builderPreview={builderCanvas}
+                  onBuilderProductClick={onProductPreview}
+                />
+              ))}
+            </WebsiteCarousel>
           ) : (
             <div
               className="website-products-grid"

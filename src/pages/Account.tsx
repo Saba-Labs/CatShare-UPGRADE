@@ -293,8 +293,8 @@ export default function Account() {
                       className={`text-xs mt-1 ${isSessionExpired ? 'text-red-700 font-medium' : 'text-amber-700'}`}
                     >
                       {isSessionExpired
-                        ? 'Session expired. Please log out and log in again to sync changes.'
-                        : 'Restoring cloud session... avoid editing until this completes.'}
+                        ? 'Sign-in required. Log in again to sync changes.'
+                        : 'Reconnecting… You can view your data. Avoid editing until sync resumes.'}
                     </p>
                   ) : null}
                   <div className="mt-2 flex items-center gap-2">

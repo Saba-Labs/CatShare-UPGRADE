@@ -1,9 +1,7 @@
 import { WebsiteModeConfig, WebsiteProductTemplate } from '../../types/homepage';
-import { getWebsiteTemplate } from '../../config/websiteTemplates';
 import SidebarSection from './SidebarSection';
 import SidebarDropdownField from './SidebarDropdownField';
 import { FiArrowLeft, FiGrid } from './builderSidebarIcons';
-import ColorPickerField from './ColorPickerField';
 
 interface ProductTemplateQuickPanelProps {
   productName?: string;
@@ -32,21 +30,6 @@ export default function ProductTemplateQuickPanel({
   onBack,
 }: ProductTemplateQuickPanelProps) {
   const product = websiteConfig.templates.product;
-  const selectedTemplateTheme = websiteConfig.activeTemplateId
-    ? getWebsiteTemplate(websiteConfig.activeTemplateId)?.build().pages.home.theme
-    : undefined;
-  const baseTheme = selectedTemplateTheme || websiteConfig.pages?.home?.theme || {};
-  const paletteDefaults = {
-    pageBackground: baseTheme.backgroundColor || '#ffffff',
-    surfaceBackground: '#ffffff',
-    textPrimary: baseTheme.textColor || '#202124',
-    textMuted: '#5f6368',
-    borderColor: '#e5e7eb',
-    accentColor: baseTheme.primaryColor || '#1a73e8',
-    buttonBackground: baseTheme.primaryColor || '#1a73e8',
-    buttonText: '#ffffff',
-  };
-  const colors = { ...paletteDefaults, ...(product.customColors || {}) };
 
   return (
     <div className="sidebar-panel">
@@ -88,40 +71,18 @@ export default function ProductTemplateQuickPanel({
         </div>
 
         <div className="panel-section">
-          <label className="panel-label">Fields area look</label>
+          <label className="panel-label">Product details</label>
           <SidebarDropdownField
-            ariaLabel="Product details fields look"
-            value={product.fieldsLook || 'plain'}
+            ariaLabel="Product details display style"
+            value={product.fieldsInBox === false ? 'open' : 'boxed'}
             options={[
-              { value: 'plain', label: 'Plain' },
-              { value: 'card', label: 'Card' },
-              { value: 'striped', label: 'Striped' },
+              { value: 'boxed', label: 'In a box' },
+              { value: 'open', label: 'No box' },
             ]}
             onChange={(next) =>
               updateProductTemplate(
                 websiteConfig,
-                { fieldsLook: next as NonNullable<WebsiteProductTemplate['fieldsLook']> },
-                onUpdateWebsiteConfig
-              )
-            }
-          />
-        </div>
-
-        <div className="panel-section">
-          <label className="panel-label">Color theme</label>
-          <SidebarDropdownField
-            ariaLabel="Product page color theme"
-            value={product.colorTheme || 'brand'}
-            options={[
-              { value: 'brand', label: 'Brand' },
-              { value: 'neutral', label: 'Neutral' },
-              { value: 'warm', label: 'Warm' },
-              { value: 'dark', label: 'Dark' },
-            ]}
-            onChange={(next) =>
-              updateProductTemplate(
-                websiteConfig,
-                { colorTheme: next as NonNullable<WebsiteProductTemplate['colorTheme']> },
+                { fieldsInBox: next === 'boxed' },
                 onUpdateWebsiteConfig
               )
             }
@@ -179,109 +140,6 @@ export default function ProductTemplateQuickPanel({
             </div>
           </>
         ) : null}
-      </SidebarSection>
-
-      <SidebarSection title="Colors" icon={<FiGrid />} description="Adjust each product-page color area">
-        <div className="color-picker-grid">
-          <ColorPickerField
-            compact
-            label="Page background"
-            value={colors.pageBackground}
-            defaultValue={paletteDefaults.pageBackground}
-            onChange={(pageBackground) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), pageBackground } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Surface background"
-            value={colors.surfaceBackground}
-            defaultValue={paletteDefaults.surfaceBackground}
-            onChange={(surfaceBackground) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), surfaceBackground } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Text primary"
-            value={colors.textPrimary}
-            defaultValue={paletteDefaults.textPrimary}
-            onChange={(textPrimary) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), textPrimary } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Text muted"
-            value={colors.textMuted}
-            defaultValue={paletteDefaults.textMuted}
-            onChange={(textMuted) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), textMuted } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Border"
-            value={colors.borderColor}
-            defaultValue={paletteDefaults.borderColor}
-            onChange={(borderColor) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), borderColor } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Accent"
-            value={colors.accentColor}
-            defaultValue={paletteDefaults.accentColor}
-            onChange={(accentColor) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), accentColor } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Button background"
-            value={colors.buttonBackground}
-            defaultValue={paletteDefaults.buttonBackground}
-            onChange={(buttonBackground) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), buttonBackground } }, onUpdateWebsiteConfig)
-            }
-          />
-          <ColorPickerField
-            compact
-            label="Button text"
-            value={colors.buttonText}
-            defaultValue={paletteDefaults.buttonText}
-            onChange={(buttonText) =>
-              updateProductTemplate(websiteConfig, { customColors: { ...(product.customColors || {}), buttonText } }, onUpdateWebsiteConfig)
-            }
-          />
-        </div>
-        <div className="panel-section" style={{ marginTop: 12 }}>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() =>
-              updateProductTemplate(
-                websiteConfig,
-                {
-                  customColors: {
-                    pageBackground: paletteDefaults.pageBackground,
-                    surfaceBackground: paletteDefaults.surfaceBackground,
-                    textPrimary: paletteDefaults.textPrimary,
-                    textMuted: paletteDefaults.textMuted,
-                    borderColor: paletteDefaults.borderColor,
-                    accentColor: paletteDefaults.accentColor,
-                    buttonBackground: paletteDefaults.buttonBackground,
-                    buttonText: paletteDefaults.buttonText,
-                  },
-                },
-                onUpdateWebsiteConfig
-              )
-            }
-          >
-            Reset to selected template colors
-          </button>
-        </div>
       </SidebarSection>
     </div>
   );

@@ -54,7 +54,7 @@ import syncAnimationData from "./loading.json";
 
 const PRODUCT_SCROLL_KEY = "productScroll";
 /** Lie-fi / hung Supabase: never block Products tab longer than this (Orders-style UX). */
-const CATALOGUE_FETCH_TIMEOUT_MS = 14_000;
+const CATALOGUE_FETCH_TIMEOUT_MS = 22_000;
 const SELLER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { productImageDisplayUrl } from "../utils/imageUrl";
+import "./ProductImageGallery.css";
 
 type Props = {
   urls: string[];
@@ -16,7 +17,19 @@ type Props = {
   objectFit?: "contain" | "cover";
   showPrimaryBadge?: boolean;
   enableTouchSwipe?: boolean;
+  /** Thumbnail strip below main preview (store product page). */
+  showThumbnails?: boolean;
 };
+
+function thumbSrc(
+  url: string,
+  index: number,
+  primarySlot: number,
+  primaryImageVersion?: number | string | null
+) {
+  const v = index === primarySlot && primaryImageVersion != null ? primaryImageVersion : null;
+  return productImageDisplayUrl(url, v);
+}
 
 /**
  * Simple swipe gallery for product images (used in preview, store, and public views).
@@ -32,6 +45,7 @@ export default function ProductImageGallery({
   objectFit = "contain",
   showPrimaryBadge = true,
   enableTouchSwipe = true,
+  showThumbnails = false,
 }: Props) {
   const touchStartX = useRef<number | null>(null);
   const safeUrls = (urls || []).map((u) => String(u || "").trim()).filter(Boolean);
@@ -76,23 +90,22 @@ export default function ProductImageGallery({
   if (n === 0) return null;
 
   const primarySlot = Math.min(Math.max(0, primaryIndex ?? 0), Math.max(0, n - 1));
-  const src =
-    safeIx === primarySlot && primaryImageVersion != null
-      ? productImageDisplayUrl(current, primaryImageVersion)
-      : productImageDisplayUrl(current, null);
+  const src = thumbSrc(current, safeIx, primarySlot, primaryImageVersion);
 
-  const frameClass = fillContainer
-    ? "relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-800"
-    : "relative aspect-square w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800";
+  const mainBgClass = fillContainer
+    ? "bg-gray-100 dark:bg-gray-800"
+    : "rounded-lg bg-gray-100 dark:bg-gray-800";
+  const mainSizeClass = fillContainer ? "h-full w-full" : "aspect-square w-full";
   const imgFitClass = objectFit === "cover" ? "object-cover" : "object-contain";
+  const multi = n > 1;
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!enableTouchSwipe || n <= 1) return;
+    if (!enableTouchSwipe || !multi) return;
     touchStartX.current = e.touches[0]?.clientX ?? null;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!enableTouchSwipe || n <= 1 || touchStartX.current == null) return;
+    if (!enableTouchSwipe || !multi || touchStartX.current == null) return;
     const endX = e.changedTouches[0]?.clientX;
     if (endX == null) return;
     const dx = endX - touchStartX.current;
@@ -101,10 +114,26 @@ export default function ProductImageGallery({
     go(dx > 0 ? -1 : 1);
   };
 
+  const rootClass = [
+    "product-image-gallery",
+    fillContainer ? "product-image-gallery--fill" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const mainFrameClass = [
+    "product-image-gallery__main",
+    mainBgClass,
+    !fillContainer ? "product-image-gallery__main--square" : mainSizeClass,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={`relative w-full ${fillContainer ? "h-full" : ""} ${className}`.trim()}>
+    <div className={rootClass}>
       <div
-        className={frameClass}
+        className={mainFrameClass}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -115,12 +144,12 @@ export default function ProductImageGallery({
           className={`h-full w-full ${imgFitClass}`}
           draggable={false}
         />
-        {n > 1 && (
+        {multi && (
           <>
             <button
               type="button"
               aria-label="Previous image"
-              className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-2 py-1 text-sm text-white"
+              className="product-image-gallery__nav product-image-gallery__nav--prev"
               onClick={(e) => {
                 e.stopPropagation();
                 go(-1);
@@ -131,7 +160,7 @@ export default function ProductImageGallery({
             <button
               type="button"
               aria-label="Next image"
-              className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 px-2 py-1 text-sm text-white"
+              className="product-image-gallery__nav product-image-gallery__nav--next"
               onClick={(e) => {
                 e.stopPropagation();
                 go(1);
@@ -139,31 +168,53 @@ export default function ProductImageGallery({
             >
               ›
             </button>
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-              {safeUrls.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  aria-label={`Image ${i + 1}`}
-                  className={`h-1.5 rounded-full ${i === safeIx ? "w-4 bg-white" : "w-1.5 bg-white/50"}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSlide(i);
-                  }}
-                />
-              ))}
-            </div>
+            {!showThumbnails && (
+              <div className="product-image-gallery__dots">
+                {safeUrls.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Image ${i + 1}`}
+                    className={`product-image-gallery__dot${i === safeIx ? " product-image-gallery__dot--active" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSlide(i);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
         {showPrimaryBadge &&
           typeof primaryIndex === "number" &&
           primaryIndex === safeIx &&
-          n > 1 && (
-            <span className="absolute left-2 top-2 rounded bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-              Primary
-            </span>
+          multi && (
+            <span className="product-image-gallery__primary-badge">Primary</span>
           )}
       </div>
+      {showThumbnails && multi && (
+        <div className="product-image-gallery__thumbs">
+          <div className="product-image-gallery__thumbs-track" role="tablist" aria-label="Product images">
+            {safeUrls.map((url, i) => (
+              <button
+                key={`${url}-${i}`}
+                type="button"
+                role="tab"
+                aria-selected={i === safeIx}
+                aria-label={`View image ${i + 1}`}
+                className={`product-image-gallery__thumb${i === safeIx ? " product-image-gallery__thumb--active" : ""}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSlide(i);
+                }}
+              >
+                <img src={thumbSrc(url, i, primarySlot, primaryImageVersion)} alt="" draggable={false} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

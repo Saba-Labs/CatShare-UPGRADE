@@ -19,7 +19,7 @@ import {
   type Store,
 } from '../services/storeService';
 import { getAllCatalogues } from '../config/catalogueConfig';
-import { buildStorefrontUrl, getStorefrontRootHost } from '../utils/storefrontDomain';
+import { buildStorefrontPublicUrl, buildStorefrontUrl, getStorefrontRootHost } from '../utils/storefrontDomain';
 import { syncUserSettings } from '../services/supabaseSync';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { uploadProductImageToR2 } from '../services/r2Upload';
@@ -815,6 +815,40 @@ const CSS = `
     border-color: #B5BFD0;
     color: #0a0e1f;
   }
+  .domain-nav-trigger {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    font-family: var(--font);
+    box-shadow: var(--shadow);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .domain-nav-trigger:hover {
+    background: #F8FAFC;
+    border-color: #CBD5E1;
+  }
+  .domain-nav-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .domain-nav-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+  .domain-nav-chevron {
+    flex-shrink: 0;
+    color: var(--text-muted);
+  }
   .confirm-yes {
     flex: 1;
     padding: 11px;
@@ -1481,7 +1515,12 @@ export default function StorePage() {
   };
 
   const storefrontRootHost = getStorefrontRootHost();
-  const storeUrl = store ? buildStorefrontUrl(store.storeSlug) : '';
+  const storeUrl = store
+    ? buildStorefrontPublicUrl(store.storeSlug, {
+        hostname: store.customHostname,
+        status: store.customDomainStatus,
+      })
+    : '';
   const getCatName = (id: string) => catalogues.find(c => c.id === id)?.label || id;
 
   /* ── Helper: render a single info row ── */
@@ -1683,6 +1722,28 @@ export default function StorePage() {
                   onClick={() => navigate('/store/homepage')}
                 >
                   <IconEdit /> Edit Store
+                </button>
+              </div>
+
+              <div className="gap">
+                <button
+                  type="button"
+                  className="domain-nav-trigger"
+                  onClick={() => navigate('/store/custom-domain')}
+                >
+                  <div>
+                    <div className="domain-nav-title">Custom domain</div>
+                    <div className="domain-nav-sub">
+                      {store.customDomainStatus === 'active' && store.customHostname
+                        ? store.customHostname
+                        : store.customHostname
+                          ? `${store.customHostname} — finish DNS setup`
+                          : 'Use your own domain on Vercel'}
+                    </div>
+                  </div>
+                  <span className="domain-nav-chevron" aria-hidden>
+                    <IconChevron />
+                  </span>
                 </button>
               </div>
 
