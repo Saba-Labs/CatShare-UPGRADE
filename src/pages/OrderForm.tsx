@@ -1,7 +1,13 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchShareLinkForCustomer, fetchSellerUserIdForToken, type ShareLinkItem } from '../services/shareLinks';
+import {
+  fetchShareLinkForCustomer,
+  fetchSellerUserIdForToken,
+  getShareLinkItemUnitPrice,
+  type ShareLinkItem,
+} from '../services/shareLinks';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
+import { applyQuantityDelta, getEffectiveMinimumOrderQuantity } from '../utils/quantityPricingUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import ProductImageGallery from '../components/ProductImageGallery';
@@ -24,6 +30,10 @@ type VariantSelectionMap = Record<string, Record<string, string>>;
 
 function getQuantityStep(item: ShareLinkItem): number {
   return normalizeOrderQuantityStep(item.quantityStep);
+}
+
+function getItemMinimumOrderQuantity(item: ShareLinkItem): number {
+  return getEffectiveMinimumOrderQuantity(item.minimumOrderQuantity, getQuantityStep(item));
 }
 
 function parseItemPriceNumeric(price: ShareLinkItem['price']): number {
@@ -63,10 +73,10 @@ function formatLineCalculationDetail(
   currencySymbol: string
 ): string | null {
   if (q <= 0) return null;
-  const unit = parseItemPriceNumeric(item.price);
+  const unit = getShareLinkItemUnitPrice(item, q);
   if (!Number.isFinite(unit)) return null;
   const label = getOrderUnitLabel(item.priceUnit);
-  const priceStr = formatUnitPrice(item.price, currencySymbol);
+  const priceStr = `${currencySymbol}${unit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   const qstep = normalizeOrderQuantityStep(item.quantityStep);
   return `${q} ${label} × ${priceStr}`;
 }
@@ -342,7 +352,17 @@ export default function OrderForm() {
   }, [sellerLogoUrl]);
 
   const changeQty = (id: string, delta: number) => {
-    setQty((prev) => ({ ...prev, [id]: Math.max(0, (prev[id] ?? 0) + delta) }));
+    const item = items.find((i) => i.productId === id);
+    if (!item) return;
+    setQty((prev) => ({
+      ...prev,
+      [id]: applyQuantityDelta(
+        prev[id] ?? 0,
+        delta,
+        getQuantityStep(item),
+        item.minimumOrderQuantity
+      ),
+    }));
   };
 
   // Persist qty to sessionStorage whenever it changes
@@ -386,7 +406,7 @@ export default function OrderForm() {
     const map: Record<string, number> = {};
     items.forEach((i) => {
       const q = qty[i.productId] ?? 0;
-      const unit = parseItemPriceNumeric(i.price);
+      const unit = getShareLinkItemUnitPrice(i, q);
       map[i.productId] = q > 0 && Number.isFinite(unit) ? q * unit : 0;
     });
     return map;
@@ -400,7 +420,7 @@ export default function OrderForm() {
   const selectionIncludesUnpricedLines = useMemo(
     () => items.some((i) => {
       const q = qty[i.productId] ?? 0;
-      return q > 0 && !Number.isFinite(parseItemPriceNumeric(i.price));
+      return q > 0 && !Number.isFinite(getShareLinkItemUnitPrice(i, q));
     }),
     [items, qty]
   );
@@ -424,7 +444,7 @@ export default function OrderForm() {
     let total = 0;
     selectedItems.forEach((i, idx) => {
       const q = qty[i.productId] ?? 0;
-      const unit = parseItemPriceNumeric(i.price);
+      const unit = getShareLinkItemUnitPrice(i, q);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
       total += itemTotal;
 
@@ -836,6 +856,12 @@ export default function OrderForm() {
                           <div className="of-step-hint of-step-hint--next-to-qty">
                             <AlertIcon />
                             Pack of {getQuantityStep(item)}
+                          </div>
+                        ) : null}
+                        {getItemMinimumOrderQuantity(item) > 1 ? (
+                          <div className="of-step-hint of-step-hint--next-to-qty">
+                            <AlertIcon />
+                            Min {getItemMinimumOrderQuantity(item)}
                           </div>
                         ) : null}
                       </div>

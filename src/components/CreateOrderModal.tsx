@@ -7,7 +7,13 @@ import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalo
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
-import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
+import { STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
+import {
+  applyQuantityDelta,
+  getProductOrderQuantityRules,
+  resolveQuantityAwarePricing,
+  roundQuantityToRules,
+} from '../utils/quantityPricingUtils';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
 
@@ -129,10 +135,11 @@ export default function CreateOrderModal({
       const product = products.find(p => p.id === productId);
       if (product) {
         const catData = getCatalogueData(product, selectedCatalogueId);
-        const unitPrice = resolveListOfferEffective(
+        const unitPrice = resolveQuantityAwarePricing(
           catData,
           catalogue.priceField,
-          product as Record<string, unknown>
+          product as Record<string, unknown>,
+          quantity
         ).effectiveUnitPrice;
         const rowTotal = unitPrice * quantity;
         const priceUnit = catData[catalogue.priceUnitField];
@@ -163,12 +170,31 @@ export default function CreateOrderModal({
     setStep('products');
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const changeProductQty = (productId: string, delta: number) => {
+    if (!selectedCatalogueId) return;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const rules = getProductOrderQuantityRules(catData);
+    const current = selectedProducts.get(productId) || 0;
+    const next = applyQuantityDelta(current, delta, rules.step, rules.moq);
     const newSelected = new Map(selectedProducts);
-    if (quantity <= 0) {
+    newSelected.set(productId, next);
+    setSelectedProducts(newSelected);
+  };
+
+  const handleUpdateQuantity = (productId: string, quantity: number) => {
+    if (!selectedCatalogueId) return;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const rules = getProductOrderQuantityRules(catData);
+    const next = roundQuantityToRules(quantity, rules.step, rules.moq);
+    const newSelected = new Map(selectedProducts);
+    if (next <= 0) {
       newSelected.delete(productId);
     } else {
-      newSelected.set(productId, quantity);
+      newSelected.set(productId, next);
     }
     setSelectedProducts(newSelected);
   };
@@ -448,7 +474,12 @@ export default function CreateOrderModal({
                     const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                     const pricing =
                       catalogue && catData
-                        ? resolveListOfferEffective(catData, catalogue.priceField, product as Record<string, unknown>)
+                        ? resolveQuantityAwarePricing(
+                            catData,
+                            catalogue.priceField,
+                            product as Record<string, unknown>,
+                            quantity
+                          )
                         : null;
                     const price = pricing ? pricing.effectiveUnitPrice : 0;
                     const hasImage = product.image && /^https?:\/\//i.test(product.image);
@@ -526,7 +557,7 @@ export default function CreateOrderModal({
                           flexShrink: 0,
                         }}>
                           <button
-                            onClick={() => handleUpdateQuantity(product.id, quantity - 1)}
+                            onClick={() => changeProductQty(product.id, -1)}
                             style={{
                               width: 32,
                               height: 32,
@@ -554,7 +585,7 @@ export default function CreateOrderModal({
                             {quantity}
                           </span>
                           <button
-                            onClick={() => handleUpdateQuantity(product.id, quantity + 1)}
+                            onClick={() => changeProductQty(product.id, 1)}
                             style={{
                               width: 32,
                               height: 32,

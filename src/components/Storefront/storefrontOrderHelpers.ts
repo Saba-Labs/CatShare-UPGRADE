@@ -7,7 +7,15 @@ import type { Catalogue } from '../../config/catalogueConfig';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../../config/fieldConfig';
 import { productImageDisplayUrl } from '../../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../../utils/productImages';
-import { resolveListOfferEffective } from '../../utils/offerPriceUtils';
+import {
+  formatQuantitySlabRange,
+  getEffectiveQuantitySlabs,
+  hasQuantitySlabs,
+  normalizeQuantitySlabs,
+  resolveQuantityAwarePricing,
+  resolveVariantQuantityAwarePricing,
+  type VariantSlabContext,
+} from '../../utils/quantityPricingUtils';
 import { getVariantCombinationData } from '../../utils/productVariants';
 
 export function unitLabel(u?: string): string {
@@ -120,15 +128,19 @@ export function getStorefrontPriceAndUnit(
   catData: CatalogueData | null | undefined,
   catalogue: Catalogue | null,
   product?: ProductWithCatalogueData | null,
-  variantSelection?: Record<string, string> | null
-): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } {
+  variantSelection?: Record<string, string> | null,
+  quantity: number = 0
+): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean; hasSlabs?: boolean; priceFrom?: boolean } {
   const pr = product as Record<string, unknown> | null | undefined;
   let variantOverride: ReturnType<typeof getVariantCombinationData> | null = null;
   if (product && variantSelection) {
     variantOverride = getVariantCombinationData(product, variantSelection);
   }
 
-  const pack = (res: ReturnType<typeof resolveListOfferEffective>, priceUnit: string | undefined) => {
+  const pack = (
+    res: ReturnType<typeof resolveQuantityAwarePricing>,
+    priceUnit: string | undefined
+  ) => {
     const unit = Number.isFinite(res.effectiveUnitPrice) ? res.effectiveUnitPrice : 0;
     const pay = unit > 0 ? unit : res.listPrice;
     return {
@@ -136,31 +148,46 @@ export function getStorefrontPriceAndUnit(
       priceUnit,
       listPrice: res.showStrikeout ? res.listPrice : undefined,
       showOffer: res.showStrikeout,
+      hasSlabs: res.hasSlabs,
+      priceFrom: res.hasSlabs && quantity <= 0,
     };
   };
 
-  if (variantOverride?.price != null && typeof variantOverride.price === 'number') {
-    const rawOffer = variantOverride.customFields?.offer;
-    const offerPrice =
-      typeof rawOffer === 'number' ? rawOffer : rawOffer != null ? Number(rawOffer) : NaN;
-    const hasOffer = Number.isFinite(offerPrice) && offerPrice < variantOverride.price;
-    const priceUnit = catalogue
-      ? (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined)
-      : undefined;
-    const result: { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } = {
-      price: variantOverride.price,
-      priceUnit,
-      showOffer: hasOffer,
-    };
-    if (hasOffer) {
-      result.listPrice = variantOverride.price;
-      result.price = offerPrice;
+  const priceUnit = catalogue
+    ? (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined)
+    : undefined;
+
+  if (variantOverride) {
+    const variantSlabRes = resolveVariantQuantityAwarePricing(variantOverride, quantity);
+    if (variantSlabRes?.hasSlabs) {
+      return pack(variantSlabRes, priceUnit);
     }
-    return result;
+
+    if (variantOverride.price != null && typeof variantOverride.price === 'number') {
+      const rawOffer = variantOverride.customFields?.offer;
+      const offerPrice =
+        typeof rawOffer === 'number' ? rawOffer : rawOffer != null ? Number(rawOffer) : NaN;
+      const hasOffer = Number.isFinite(offerPrice) && offerPrice < variantOverride.price;
+      const result: {
+        price: number;
+        priceUnit?: string;
+        listPrice?: number;
+        showOffer: boolean;
+      } = {
+        price: variantOverride.price,
+        priceUnit,
+        showOffer: hasOffer,
+      };
+      if (hasOffer) {
+        result.listPrice = variantOverride.price;
+        result.price = offerPrice;
+      }
+      return result;
+    }
   }
 
   if (catalogue && catData) {
-    const res = resolveListOfferEffective(catData, catalogue.priceField, pr ?? null);
+    const res = resolveQuantityAwarePricing(catData, catalogue.priceField, pr ?? null, quantity);
     const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
     return pack(res, priceUnit);
   }
@@ -168,7 +195,7 @@ export function getStorefrontPriceAndUnit(
   if (catData && !catalogue) {
     for (let n = 1; n <= 10; n++) {
       const pf = `price${n}`;
-      const res = resolveListOfferEffective(catData, pf, pr ?? null);
+      const res = resolveQuantityAwarePricing(catData, pf, pr ?? null, quantity);
       if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
         const uk = `price${n}Unit` as keyof CatalogueData;
         return pack(res, catData[uk] as string | undefined);
@@ -178,6 +205,29 @@ export function getStorefrontPriceAndUnit(
 
   return { price: 0, priceUnit: undefined, showOffer: false };
 }
+
+export function formatQuantitySlabLines(slabsRaw: unknown, currencySymbol: string): string[] {
+  const slabs = normalizeQuantitySlabs(slabsRaw);
+  if (!slabs.length) return [];
+  return slabs.map((slab) => {
+    const range = formatQuantitySlabRange(slab);
+    const price = `${currencySymbol}${slab.price.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
+    return `${range}: ${price}`;
+  });
+}
+
+export function formatQuantitySlabTable(
+  catData: CatalogueData | null | undefined,
+  currencySymbol: string,
+  variant?: VariantSlabContext
+): string[] {
+  return formatQuantitySlabLines(getEffectiveQuantitySlabs(catData, variant), currencySymbol);
+}
+
+export { getEffectiveQuantitySlabs, hasQuantitySlabs };
 
 export function buildStorefrontDetailFields(
   product: ProductWithCatalogueData,

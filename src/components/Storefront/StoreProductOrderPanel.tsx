@@ -5,19 +5,21 @@ import {
   getProductVariantGroups,
   getVariantCombinationData,
 } from '../../utils/productVariants';
-import { getCatalogueData, normalizeOrderQuantityStep } from '../../config/catalogueProductUtils';
+import { getCatalogueData } from '../../config/catalogueProductUtils';
+import { getProductOrderQuantityRules } from '../../utils/quantityPricingUtils';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StorePublic } from '../../services/storeService';
 import {
   buildStorefrontDetailFields,
   fmt,
   fmtCalc,
+  formatQuantitySlabTable,
   getStorefrontPriceAndUnit,
   getStoreProductGalleryProps,
   isDisplayableProductImage,
   unitLabel,
 } from './storefrontOrderHelpers';
-import { IconImage, PackHint } from './StorefrontIcons';
+import { IconImage, MoqHint, PackHint } from './StorefrontIcons';
 import './store-product-order-page.css';
 
 function QtyControl({
@@ -31,7 +33,7 @@ function QtyControl({
   onChange: (d: number) => void;
   accent?: boolean;
 }) {
-  const s = normalizeOrderQuantityStep(step);
+  const s = Math.max(1, Math.floor(step) || 1);
   return (
     <div className={`sv-qty${accent ? ' accent' : ''}`}>
       <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>
@@ -97,14 +99,16 @@ export default function StoreProductOrderPanel({
 }: StoreProductOrderPanelProps) {
   const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
   const variantData = getVariantCombinationData(product, variantSelection);
-  const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(
+  const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+  const qstep = rules.step;
+  const minQty = rules.minQty;
+  const slabLines = formatQuantitySlabTable(catData, currencySymbol, variantData ?? undefined);
+  const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
     catData,
     catalogue,
     product,
-    variantSelection
-  );
-  const qstep = normalizeOrderQuantityStep(
-    variantData?.customFields?.orderQuantityStep ?? catData?.orderQuantityStep
+    variantSelection,
+    quantity
   );
   const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
   const fields = buildStorefrontDetailFields(
@@ -168,6 +172,7 @@ export default function StoreProductOrderPanel({
       <div className="sv-drawer-qty-header">
         <div className="sv-drawer-qty-label">Quantity</div>
         {qstep > 1 ? <PackHint step={qstep} className="website-product-pack-hint" /> : null}
+        {minQty > 1 ? <MoqHint minQty={minQty} className="website-product-pack-hint" /> : null}
       </div>
       <div className="sv-drawer-qty-row">
         <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
@@ -206,6 +211,7 @@ export default function StoreProductOrderPanel({
       <div className="sv-drawer-price">
         {Number.isFinite(price) ? (
           <>
+            {priceFrom ? 'From ' : ''}
             {fmt(price, currencySymbol)}
             {showOffer && listPrice != null && listPrice > 0 ? (
               <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
@@ -216,6 +222,13 @@ export default function StoreProductOrderPanel({
           <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
         )}
       </div>
+      {slabLines.length > 0 ? (
+        <div className="sv-drawer-sub" style={{ marginTop: 4 }}>
+          {slabLines.map((line) => (
+            <div key={line}>{line}</div>
+          ))}
+        </div>
+      ) : null}
 
       {!fieldsAfterOrder ? fieldsTable : null}
 

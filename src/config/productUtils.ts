@@ -314,12 +314,16 @@ export function saveProducts(products: Product[], userId?: string): void {
       const catalogueDataSnapshot = p.catalogueData
         ? JSON.parse(JSON.stringify(p.catalogueData))
         : null;
+      const preservedUpdatedAt = p.updatedAt;
 
       const n = normalizeProduct(p);
 
       // Restore full catalogueData from snapshot, overriding whatever normalizeProduct did
       if (catalogueDataSnapshot) {
         n.catalogueData = catalogueDataSnapshot;
+      }
+      if (preservedUpdatedAt) {
+        n.updatedAt = preservedUpdatedAt;
       }
 
       return n;

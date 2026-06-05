@@ -7,6 +7,8 @@
 
 import { getAllCatalogues, type Catalogue } from './catalogueConfig';
 import { offerPriceFieldFor } from '../utils/offerPriceUtils';
+import type { QuantityPriceSlab } from '../utils/quantityPricingUtils';
+import { normalizeMinimumOrderQuantity } from '../utils/quantityPricingUtils';
 
 /**
  * Keep `product.catalogueData[catId]` in sync with top-level **price/stock** columns (`price1`, `wholesaleStock`, …).
@@ -62,6 +64,7 @@ export function syncTopLevelFieldsIntoCatalogueData(
         field8: product?.field8 || '',
         field9: product?.field9 || '',
         field10: product?.field10 || '',
+        field1Unit: product?.field1Unit || 'None',
         field2Unit: product?.field2Unit || product?.packageUnit || 'None',
         field3Unit: product?.field3Unit || product?.ageUnit || 'None',
         field4Unit: product?.field4Unit || 'None',
@@ -75,38 +78,19 @@ export function syncTopLevelFieldsIntoCatalogueData(
         orderQuantityStep: normalizeOrderQuantityStep(
           product?.orderQuantityStep ?? prev.orderQuantityStep
         ),
+        minimumOrderQuantity: normalizeMinimumOrderQuantity(
+          product?.minimumOrderQuantity ?? prev.minimumOrderQuantity
+        ),
         stock: product?.stock !== false,
         wholesaleStock: product?.wholesaleStock !== false,
         resellStock: product?.resellStock !== false,
       };
     } else {
-      // For non-master catalogues, preserve catalogue-specific data but don't inherit from top-level fields
-      // This ensures each catalogue maintains independent badge, field1-10 values
+      // Non-master: catalogue row is source of truth — do not overwrite from top-level price/fields.
       nextCd[cat.id] = {
-        ...base,
-        // Keep the badge from the catalogue data, don't override with master's badge
-        badge: prev.badge || '',
-        // Keep field data from catalogue data, don't inherit from product top-level
-        field1: prev.field1 || '',
-        field2: prev.field2 || '',
-        field3: prev.field3 || '',
-        field4: prev.field4 || '',
-        field5: prev.field5 || '',
-        field6: prev.field6 || '',
-        field7: prev.field7 || '',
-        field8: prev.field8 || '',
-        field9: prev.field9 || '',
-        field10: prev.field10 || '',
-        field2Unit: prev.field2Unit || 'None',
-        field3Unit: prev.field3Unit || 'None',
-        field4Unit: prev.field4Unit || 'None',
-        field5Unit: prev.field5Unit || 'None',
-        field6Unit: prev.field6Unit || 'None',
-        field7Unit: prev.field7Unit || 'None',
-        field8Unit: prev.field8Unit || 'None',
-        field9Unit: prev.field9Unit || 'None',
-        field10Unit: prev.field10Unit || 'None',
-        orderQuantityStep: normalizeOrderQuantityStep(prev.orderQuantityStep),
+        ...getDefaultCatalogueData(cat.id),
+        ...prev,
+        enabled: prev.enabled !== undefined ? prev.enabled : false,
       };
     }
   }
@@ -149,6 +133,10 @@ export interface CatalogueData {
   badge?: string;
   /** Order quantity must be 0 or a multiple of this (e.g. 12 = 12, 24, 36…). Default 1 = any quantity. */
   orderQuantityStep?: number;
+  /** Minimum qty per line (1 = no extra minimum beyond qty step). Rounded up to step multiples. */
+  minimumOrderQuantity?: number;
+  /** Tiered unit prices by order quantity. When set, overrides single Price/Offer for matching qty. */
+  quantitySlabs?: QuantityPriceSlab[];
   stock?: boolean;
   wholesaleStock?: boolean;
   resellStock?: boolean;
@@ -233,6 +221,8 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
         field10Unit: product?.field10Unit || "None",
         badge: product?.badge || "",
         orderQuantityStep: 1,
+        minimumOrderQuantity: 1,
+        quantitySlabs: [],
         stock: product?.stock !== false,
         wholesaleStock: product?.wholesaleStock !== false,
         resellStock: product?.resellStock !== false,
@@ -242,6 +232,8 @@ export function initializeCatalogueData(product?: ProductWithCatalogueData): Rec
         ...getDefaultCatalogueData(cat.id),
         ...common,
         orderQuantityStep: 1,
+        minimumOrderQuantity: 1,
+        quantitySlabs: [],
         stock: product?.stock !== false,
         wholesaleStock: product?.wholesaleStock !== false,
         resellStock: product?.resellStock !== false,
@@ -305,6 +297,8 @@ export function getDefaultCatalogueData(catalogueId: string): CatalogueData {
     field10Unit: "None",
     badge: "",
     orderQuantityStep: 1,
+    minimumOrderQuantity: 1,
+    quantitySlabs: [],
     stock: true,
     wholesaleStock: true,
     resellStock: true,
@@ -410,8 +404,10 @@ export function setProductEnabledForCatalogue(
   const catalogueData = product.catalogueData ? { ...product.catalogueData } : initializeCatalogueData(product);
 
   if (!catalogueData[catalogueId]) {
-    // Initialize with full default structure
-    catalogueData[catalogueId] = getDefaultCatalogueData(catalogueId);
+    catalogueData[catalogueId] = {
+      ...getDefaultCatalogueData(catalogueId),
+      enabled,
+    };
   } else {
     // Create a new object for this catalogue to ensure React detects the change
     catalogueData[catalogueId] = {

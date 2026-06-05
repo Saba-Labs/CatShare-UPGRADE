@@ -127,7 +127,10 @@ useEffect(() => {
       const updated = products.map((p) => {
         if (p.id === productId) {
           const enabled = isProductEnabledForCatalogue(p, catalogueId);
-          return setProductEnabledForCatalogue(p, catalogueId, !enabled);
+          return {
+            ...setProductEnabledForCatalogue(p, catalogueId, !enabled),
+            updatedAt: new Date().toISOString(),
+          };
         }
         return p;
       });
@@ -148,9 +151,13 @@ useEffect(() => {
     const allEnabled =
       filtered.length > 0 && filtered.every((p) => isProductEnabledForCatalogue(p, catalogueId));
 
+    const toggledAt = new Date().toISOString();
     const updated = products.map((p) => {
       if (filtered.some((fp) => fp.id === p.id)) {
-        return setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true);
+        return {
+          ...setProductEnabledForCatalogue(p, catalogueId, allEnabled ? false : true),
+          updatedAt: toggledAt,
+        };
       }
       return p;
     });

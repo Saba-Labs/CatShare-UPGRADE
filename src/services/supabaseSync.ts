@@ -60,13 +60,9 @@ export async function syncProducts(
       );
       const clean = { ...reconciled };
 
-      // Restore enabled flags from snapshot
-      if (catalogueDataSnapshot && clean.catalogueData) {
-        for (const catId in catalogueDataSnapshot) {
-          if (clean.catalogueData[catId] && catalogueDataSnapshot[catId]) {
-            clean.catalogueData[catId].enabled = catalogueDataSnapshot[catId].enabled;
-          }
-        }
+      // Restore full catalogueData from snapshot — reconcile must not drop bulk-edited rows/fields.
+      if (catalogueDataSnapshot) {
+        clean.catalogueData = JSON.parse(JSON.stringify(catalogueDataSnapshot));
       }
 
       clean.updatedAt = new Date().toISOString();

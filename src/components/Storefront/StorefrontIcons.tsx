@@ -159,6 +159,16 @@ export function PackHint({ step, className }: { step: number; className?: string
   );
 }
 
+export function MoqHint({ minQty, className }: { minQty: number; className?: string }) {
+  if (minQty <= 1) return null;
+  return (
+    <div className={className ?? 'sv-pack-hint'}>
+      <IconPackage size={12} aria-hidden />
+      <span>Min order {minQty}</span>
+    </div>
+  );
+}
+
 export function ProductImagePlaceholder({
   size = 48,
   className,

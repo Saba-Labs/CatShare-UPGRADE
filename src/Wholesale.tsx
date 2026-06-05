@@ -10,7 +10,8 @@ import { renderElementToCanvas, canvasToBlob } from "./utils/canvasRenderer";
 import { AnimatePresence, motion } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { App } from "@capacitor/app";
-import { getCatalogueData, isProductEnabledForCatalogue } from "./config/catalogueProductUtils";
+import { getCatalogueData, isProductEnabledForCatalogue, setCatalogueData } from "./config/catalogueProductUtils";
+import { saveProducts } from "./config/productUtils";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
@@ -709,12 +710,29 @@ const handleTouchEnd = () => {
               <button
                 onClick={() => {
                   if (!guardCloudWrite()) return;
-                  const allProds = allProducts;
-                  const updated = allProds.map((p) =>
-                    selected.includes(p.id) ? { ...p, [stockField]: true } : p
-                  );
+                  const savedAt = new Date().toISOString();
+                  const updated = allProducts.map((p) => {
+                    if (!selected.includes(p.id)) return p;
+                    const copy = {
+                      ...p,
+                      catalogueData: p.catalogueData
+                        ? JSON.parse(JSON.stringify(p.catalogueData))
+                        : undefined,
+                      [stockField]: true,
+                      updatedAt: savedAt,
+                    };
+                    return setCatalogueData(copy, catalogueId, { [stockField]: true });
+                  });
+                  saveProducts(updated);
                   setProducts(updated);
-                  window.dispatchEvent(new CustomEvent("product-added"));
+                  window.dispatchEvent(
+                    new CustomEvent("product-added", {
+                      detail: {
+                        onlyProductIds: selected.map(String),
+                        forceCloudSync: true,
+                      },
+                    })
+                  );
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -729,12 +747,29 @@ const handleTouchEnd = () => {
               <button
                 onClick={() => {
                   if (!guardCloudWrite()) return;
-                  const allProds = allProducts;
-                  const updated = allProds.map((p) =>
-                    selected.includes(p.id) ? { ...p, [stockField]: false } : p
-                  );
+                  const savedAt = new Date().toISOString();
+                  const updated = allProducts.map((p) => {
+                    if (!selected.includes(p.id)) return p;
+                    const copy = {
+                      ...p,
+                      catalogueData: p.catalogueData
+                        ? JSON.parse(JSON.stringify(p.catalogueData))
+                        : undefined,
+                      [stockField]: false,
+                      updatedAt: savedAt,
+                    };
+                    return setCatalogueData(copy, catalogueId, { [stockField]: false });
+                  });
+                  saveProducts(updated);
                   setProducts(updated);
-                  window.dispatchEvent(new CustomEvent("product-added"));
+                  window.dispatchEvent(
+                    new CustomEvent("product-added", {
+                      detail: {
+                        onlyProductIds: selected.map(String),
+                        forceCloudSync: true,
+                      },
+                    })
+                  );
                   setShowToolsMenu(false);
                 }}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

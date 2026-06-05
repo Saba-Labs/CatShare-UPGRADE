@@ -3,13 +3,15 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import { useToast } from "./context/ToastContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue, normalizeOrderQuantityStep } from "./config/catalogueProductUtils";
+import { normalizeMinimumOrderQuantity } from "./utils/quantityPricingUtils";
 import { offerPriceFieldFor } from "./utils/offerPriceUtils";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBulkEdit } from "./config/analyticsEvents";
-import { saveProducts } from "./config/productUtils";
+import { saveProducts, setFieldValue, setUnitValue } from "./config/productUtils";
 import OrderQuantityStepInput from "./components/OrderQuantityStepInput";
+import MinimumOrderQuantityInput from "./components/MinimumOrderQuantityInput";
 import { FiEdit2, FiGrid, FiX } from "react-icons/fi";
 
 const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
@@ -37,6 +39,7 @@ const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
 
   baseFields.push({ key: "stock", label: "Stock Update" });
   baseFields.push({ key: "orderQuantityStep", label: "Qty step" });
+  baseFields.push({ key: "minimumOrderQuantity", label: "MOQ" });
   return baseFields;
 };
 
@@ -198,6 +201,11 @@ useEffect(() => {
     normalized.wholesaleUnit = p.wholesaleUnit || "/ piece";
     normalized.stock = p.stock || "";
     normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
+    normalized.minimumOrderQuantity = normalizeMinimumOrderQuantity(catData.minimumOrderQuantity);
+
+    const masterCatData = getCatalogueData(p, "cat1");
+    normalized.masterOrderQuantityStep = normalizeOrderQuantityStep(masterCatData.orderQuantityStep);
+    normalized.masterMinimumOrderQuantity = normalizeMinimumOrderQuantity(masterCatData.minimumOrderQuantity);
 
     // Store master values for fallback/fill from master
     normalized.masterName = p.name || "";
@@ -264,6 +272,7 @@ useEffect(() => {
       defaults[stockField] = item[stockField] ?? "";
     }
     defaults.orderQuantityStep = normalizeOrderQuantityStep(item.orderQuantityStep);
+    defaults.minimumOrderQuantity = normalizeMinimumOrderQuantity(item.minimumOrderQuantity);
 
     // Merge with item, ensuring all values are defined
     const result = { ...defaults };
@@ -325,6 +334,8 @@ useEffect(() => {
             updates[stockField] = "out";
           } else if (fieldKey === "orderQuantityStep") {
             updates.orderQuantityStep = 1;
+          } else if (fieldKey === "minimumOrderQuantity") {
+            updates.minimumOrderQuantity = 1;
           }
 
           return ensureFieldDefaults({ ...item, ...updates });
@@ -377,6 +388,8 @@ useEffect(() => {
             : (masterStockVal || "in");
         } else if (fieldKey === "orderQuantityStep") {
           updates.orderQuantityStep = normalizeOrderQuantityStep(masterData.orderQuantityStep);
+        } else if (fieldKey === "minimumOrderQuantity") {
+          updates.minimumOrderQuantity = normalizeMinimumOrderQuantity(masterData.minimumOrderQuantity);
         }
 
         return ensureFieldDefaults({ ...item, ...updates });
@@ -406,12 +419,23 @@ useEffect(() => {
   try {
     if (!guardCloudWrite()) return;
     const isMasterCatalogue = catalogueId === "cat1";
+    const savedAt = new Date().toISOString();
     const cleanData = editedData.map((p) => {
-  let copy = { ...p };
+  let copy = {
+    ...p,
+    catalogueData: p.catalogueData
+      ? JSON.parse(JSON.stringify(p.catalogueData))
+      : undefined,
+  };
 
   if (typeof copy.wholesaleStock === "string") {
     copy.wholesaleStock = copy.wholesaleStock === "in";
   }
+
+  const resolvedStock =
+    stockField && typeof p[stockField] === "string"
+      ? p[stockField] === "in"
+      : p[stockField];
 
   if (stockField && stockField !== 'wholesaleStock' && stockField !== 'resellStock') {
     if (typeof copy[stockField] === "string") {
@@ -426,8 +450,9 @@ useEffect(() => {
     ...(priceField
       ? { [offerPriceFieldFor(priceField)]: p[offerPriceFieldFor(priceField)] ?? "" }
       : {}),
-    [stockField]: stockField ? (typeof p[stockField] === "string" ? p[stockField] === "in" : p[stockField]) : undefined,
+    [stockField]: stockField ? resolvedStock : undefined,
     orderQuantityStep: normalizeOrderQuantityStep(p.orderQuantityStep),
+    minimumOrderQuantity: normalizeMinimumOrderQuantity(p.minimumOrderQuantity),
   };
 
   for (let i = 1; i <= 10; i++) {
@@ -437,24 +462,51 @@ useEffect(() => {
 
       copy = setCatalogueData(copy, catalogueId, catUpdates);
 
-  // Only update top-level fields when editing the master catalogue (cat1)
+  // Product-level fields (shared across catalogues)
+  copy.name = p.name ?? "";
+  copy.subtitle = p.subtitle ?? "";
+  copy.privateNotes = p.privateNotes ?? "";
+  copy.category = Array.isArray(p.category) ? p.category : [];
+
   if (isMasterCatalogue) {
     for (let i = 1; i <= 10; i++) {
-      copy[`field${i}`] = p[`field${i}`] ?? "";
-      copy[`field${i}Unit`] = p[`field${i}Unit`] ?? "None";
+      setFieldValue(copy, `field${i}`, p[`field${i}`] ?? "");
+      setUnitValue(copy, `field${i}`, p[`field${i}Unit`] ?? "None");
     }
 
+    if (priceField) {
+      copy[priceField] = p[priceField] ?? "";
+      copy[priceUnitField] = p[priceUnitField] ?? "/ piece";
+      if (offerField) {
+        copy[offerField] = p[offerField] ?? "";
+      }
+    }
     copy.price1 = p[priceField] ?? p.price1 ?? "";
     copy.price1Unit = p[priceUnitField] ?? p.price1Unit ?? "/ piece";
     copy.wholesale = p[priceField] ?? p.wholesale ?? "";
     copy.wholesaleUnit = p[priceUnitField] ?? p.wholesaleUnit ?? "/ piece";
     copy.badge = p.badge ?? "";
     copy.orderQuantityStep = normalizeOrderQuantityStep(p.orderQuantityStep);
+    copy.minimumOrderQuantity = normalizeMinimumOrderQuantity(p.minimumOrderQuantity);
+    if (stockField) {
+      copy[stockField] = resolvedStock;
+    }
   } else {
+    // Keep master top-level fields intact; catalogue-specific values live in catalogueData only.
+    const masterRow = getCatalogueData(copy, "cat1");
+    for (let i = 1; i <= 10; i++) {
+      setFieldValue(copy, `field${i}`, masterRow[`field${i}`] ?? "");
+      setUnitValue(copy, `field${i}`, masterRow[`field${i}Unit`] ?? "None");
+    }
     copy.badge = p.masterBadge ?? "";
     copy.orderQuantityStep = normalizeOrderQuantityStep(p.masterOrderQuantityStep);
+    copy.minimumOrderQuantity = normalizeMinimumOrderQuantity(p.masterMinimumOrderQuantity);
+    if (stockField) {
+      copy[stockField] = masterRow[stockField] !== undefined ? masterRow[stockField] : copy[stockField];
+    }
   }
 
+  copy.updatedAt = savedAt;
   return copy;
 });
 
@@ -470,13 +522,17 @@ useEffect(() => {
     } catch (jsonErr) {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
-const productToCheck = mergedData.find(p => p.field1);
-  console.log("mergedData field1:", productToCheck?.field1, "cat1:", productToCheck?.catalogueData?.cat1?.field1);
-  saveProducts(mergedData);
-    // Save products (this will sync to Supabase and localStorage)
+
     saveProducts(mergedData);
     setProducts(mergedData);
-    window.dispatchEvent(new CustomEvent("product-added"));
+    window.dispatchEvent(
+      new CustomEvent("product-added", {
+        detail: {
+          onlyProductIds: cleanData.map((p) => String(p.id)),
+          forceCloudSync: true,
+        },
+      })
+    );
     logBulkEdit(cleanData.length, selectedFields.length);
     setShowRenderPopup(true);
   } catch (err) {
@@ -729,6 +785,18 @@ const productToCheck = mergedData.find(p => p.field1);
       );
     }
 
+    if (field === "minimumOrderQuantity") {
+      return (
+        <MinimumOrderQuantityInput
+          value={item.minimumOrderQuantity ?? 1}
+          onCommit={(next) => handleFieldChange(item.id, "minimumOrderQuantity", next)}
+          className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+          title="Minimum order quantity (1 = no extra minimum beyond qty step)"
+          aria-label="MOQ"
+        />
+      );
+    }
+
     return null;
   };
 
@@ -804,6 +872,11 @@ const productToCheck = mergedData.find(p => p.field1);
                   }
 
                   normalized.orderQuantityStep = normalizeOrderQuantityStep(catData.orderQuantityStep);
+                  normalized.minimumOrderQuantity = normalizeMinimumOrderQuantity(catData.minimumOrderQuantity);
+
+                  const masterRow = getCatalogueData(p, "cat1");
+                  normalized.masterOrderQuantityStep = normalizeOrderQuantityStep(masterRow.orderQuantityStep);
+                  normalized.masterMinimumOrderQuantity = normalizeMinimumOrderQuantity(masterRow.minimumOrderQuantity);
 
                   return normalized;
                 });

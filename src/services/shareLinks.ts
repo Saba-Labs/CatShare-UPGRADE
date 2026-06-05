@@ -1,7 +1,13 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
 import { getAllFields, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
-import { resolveListOfferEffective } from '../utils/offerPriceUtils';
+import {
+  getSlabUnitPrice,
+  normalizeMinimumOrderQuantity,
+  normalizeQuantitySlabs,
+  resolveQuantityAwarePricing,
+  type QuantityPriceSlab,
+} from '../utils/quantityPricingUtils';
 import { getCurrencyData } from '../utils/currencyUtils';
 import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
 import {
@@ -82,9 +88,33 @@ export type ShareLinkItem = {
   field10?: string; field10Label?: string; field10Unit?: string;
   /** When >1, order qty must be multiples (e.g. 12 for dozens). Omitted = 1 (any qty). */
   quantityStep?: number;
+  /** Minimum order qty per line (1 = no extra minimum beyond qty step). */
+  minimumOrderQuantity?: number;
+  /** Tiered unit prices by quantity. Overrides base price when qty matches a slab. */
+  quantitySlabs?: QuantityPriceSlab[];
   /** Size / colour / custom option groups for this product. */
   variantGroups?: ProductVariantGroup[];
 };
+
+function parseShareLinkItemPrice(price: ShareLinkItem['price']): number {
+  if (price === undefined || price === null || price === '') return NaN;
+  const n = parseFloat(String(price).replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/** Unit price for a line item at the given quantity (slab-aware). */
+export function getShareLinkItemUnitPrice(item: ShareLinkItem, quantity: number): number {
+  const slabs = normalizeQuantitySlabs(item.quantitySlabs);
+  if (slabs.length > 0 && quantity > 0) {
+    const slabPrice = getSlabUnitPrice(slabs, quantity);
+    if (slabPrice != null) return slabPrice;
+  }
+  if (slabs.length > 0 && quantity <= 0) {
+    const display = slabs[0]?.price;
+    if (display != null && display > 0) return display;
+  }
+  return parseShareLinkItemPrice(item.price);
+}
 
 // Converts a raw product object into a ShareLinkItem, pulling all enabled fields
 export function productToShareLinkItem(
@@ -109,7 +139,7 @@ export function productToShareLinkItem(
   const priceUnitField = priceUnitFieldMap[catalogueId] || 'price1Unit';
 
   const catRow = getCatalogueData(product as never, catalogueId);
-  const pricing = resolveListOfferEffective(catRow, priceField, product);
+  const pricing = resolveQuantityAwarePricing(catRow, priceField, product, 0);
   const effectivePrice =
     pricing.effectiveUnitPrice > 0 ? pricing.effectiveUnitPrice : undefined;
 
@@ -121,6 +151,8 @@ export function productToShareLinkItem(
     undefined;
 
   const step = normalizeOrderQuantityStep(catData.orderQuantityStep);
+  const moq = normalizeMinimumOrderQuantity(catData.minimumOrderQuantity);
+  const slabs = normalizeQuantitySlabs(catData.quantitySlabs);
 
   const categories = normalizeShareLinkCategories(catData.category ?? product.category);
   const subtitleRaw = catData.subtitle ?? product.subtitle;
@@ -149,6 +181,8 @@ export function productToShareLinkItem(
     price: effectivePrice !== undefined ? String(effectivePrice) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,
     ...(step > 1 ? { quantityStep: step } : {}),
+    ...(moq > 1 ? { minimumOrderQuantity: moq } : {}),
+    ...(slabs.length > 0 ? { quantitySlabs: slabs } : {}),
     ...(variantGroups.length > 0 ? { variantGroups } : {}),
   };
 

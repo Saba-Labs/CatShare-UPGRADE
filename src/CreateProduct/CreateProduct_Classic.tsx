@@ -32,6 +32,7 @@ import {
 import {
   initializeCatalogueData,
   getCatalogueData,
+  getDefaultCatalogueData,
   setCatalogueData,
   isProductEnabledForCatalogue,
   setProductEnabledForCatalogue,
@@ -48,6 +49,9 @@ import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
+import MinimumOrderQuantityInput from "../components/MinimumOrderQuantityInput";
+import QuantitySlabEditor from "../components/QuantitySlabEditor";
+import { normalizeQuantitySlabs } from "../utils/quantityPricingUtils";
 import ProductVariantsEditor from "../components/ProductVariantsEditor";
 import VariantCombinationEditor from "../components/VariantCombinationEditor";
 import {
@@ -787,9 +791,18 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
   const updateCatalogueData = (updates: Partial<CatalogueData>) => {
     setFormData((prev) => {
-      const updated = { ...prev };
-      setCatalogueData(updated, selectedCatalogue, updates);
-      return updated;
+      const catId = selectedCatalogue;
+      const prevRow = prev.catalogueData?.[catId] ?? getDefaultCatalogueData(catId);
+      return {
+        ...prev,
+        catalogueData: {
+          ...(prev.catalogueData ?? {}),
+          [catId]: {
+            ...prevRow,
+            ...updates,
+          },
+        },
+      };
     });
   };
 
@@ -859,6 +872,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
         [selectedCat.priceUnitField]: "/ piece",
         [offerPriceFieldFor(selectedCat.priceField)]: "",
         orderQuantityStep: 1,
+        minimumOrderQuantity: 1,
+        quantitySlabs: [],
       };
       updateCatalogueData(updates);
       return;
@@ -1332,6 +1347,18 @@ if (migratedProduct.suggestedColors?.length > 0) {
       cropAspectRatio: appliedAspectRatio,
       renderingType: "classic",
     };
+
+    if (newItem.catalogueData) {
+      for (const cat of allCatalogues) {
+        const row = newItem.catalogueData[cat.id];
+        if (!row) continue;
+        const slabs = normalizeQuantitySlabs(row.quantitySlabs);
+        newItem.catalogueData[cat.id] = {
+          ...row,
+          quantitySlabs: slabs.length > 0 ? slabs : undefined,
+        };
+      }
+    }
 
     const savedVariants = pruneVariantGroupsForSave(variantGroups);
     if (variantConfig.combinations && variantConfig.combinations.length > 0) {
@@ -2427,6 +2454,37 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
                         1 = any quantity. E.g. 12 → only 12, 24, 36… on the order form (per catalogue).
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 items-start">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                      MOQ
+                    </label>
+                    <div className="flex-1 min-w-0">
+                      <MinimumOrderQuantityInput
+                        name="minimumOrderQuantity"
+                        value={getCatalogueFormData().minimumOrderQuantity ?? 1}
+                        onCommit={(n) => updateCatalogueData({ minimumOrderQuantity: n })}
+                        className="border border-gray-300 dark:border-gray-700 p-2 w-full max-w-[120px] rounded text-xs bg-white dark:bg-gray-800"
+                      />
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                        1 = no extra minimum. E.g. 50 → buyers must order at least 50 (rounded to qty step).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 items-start">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                      Slab pricing
+                    </label>
+                    <div className="flex-1 min-w-0">
+                      <QuantitySlabEditor
+                        key={selectedCatalogue}
+                        theme="classic"
+                        value={getCatalogueFormData().quantitySlabs}
+                        onChange={(slabs) => updateCatalogueData({ quantitySlabs: slabs })}
+                      />
                     </div>
                   </div>
 

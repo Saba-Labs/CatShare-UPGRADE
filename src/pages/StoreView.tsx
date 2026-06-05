@@ -34,7 +34,14 @@ import {
   resolveStoreSlugFromHostname,
 } from '../utils/storefrontDomain';
 import { getStoreSlugByCustomHostname } from '../services/storeService';
-import { resolveListOfferEffective } from '../utils/offerPriceUtils';
+import {
+  applyQuantityDelta,
+  getProductOrderQuantityRules,
+} from '../utils/quantityPricingUtils';
+import {
+  formatQuantitySlabTable,
+  getStorefrontPriceAndUnit,
+} from '../components/Storefront/storefrontOrderHelpers';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { getPublishedHomepageConfig } from '../services/homepageService';
 import '../components/HomepageBuilder/sites-theme-button.css';
@@ -52,6 +59,7 @@ import {
   IconShoppingBag,
   IconX,
   PackHint,
+  MoqHint,
 } from '../components/Storefront/StorefrontIcons';
 import './OrderForm.css';
 
@@ -587,97 +595,6 @@ function StoreProductImageArea({
   );
 }
 
-/**
- * Public store visitors may not have the seller's custom catalogue in localStorage.
- * When catalogue config is missing, still read price from product.catalogueData using price1…price10.
- * If merged catalogue row has empty prices but the product still has top-level price fields (legacy), use those.
- * `price` is always the unit price buyers pay (sale price when offer is set). `listPrice` + `showOffer` drive UI.
- */
-function getStorefrontPriceAndUnit(
-  catData: CatalogueData | null | undefined,
-  catalogue: Catalogue | null,
-  product?: ProductWithCatalogueData | null,
-  variantSelection?: Record<string, string> | null
-): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } {
-  const pr = product as Record<string, unknown> | null | undefined;
-
-  // Check if variant has override price/offer
-  let variantOverride: any = null;
-  if (product && variantSelection) {
-    variantOverride = getVariantCombinationData(product, variantSelection);
-  }
-
-  const pack = (
-    res: ReturnType<typeof resolveListOfferEffective>,
-    priceUnit: string | undefined
-  ): { price: number; priceUnit?: string; listPrice?: number; showOffer: boolean } => {
-    const unit = Number.isFinite(res.effectiveUnitPrice) ? res.effectiveUnitPrice : 0;
-    const pay = unit > 0 ? unit : res.listPrice;
-    return {
-      price: pay,
-      priceUnit,
-      listPrice: res.showStrikeout ? res.listPrice : undefined,
-      showOffer: res.showStrikeout,
-    };
-  };
-
-  // If variant has price override, use it
-  if (variantOverride?.price != null && typeof variantOverride.price === 'number') {
-    const listPrice = variantOverride.customFields?.offer ?? (catData ? (catData as any)[catalogue?.priceField || 'price1'] : null);
-    const offerPrice = variantOverride.customFields?.offer;
-    const priceUnit = catalogue ? (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined) : undefined;
-
-    const result: any = {
-      price: variantOverride.price,
-      priceUnit,
-      showOffer: offerPrice ? offerPrice < variantOverride.price : false,
-    };
-    if (offerPrice && offerPrice < variantOverride.price) {
-      result.listPrice = variantOverride.price;
-      result.price = offerPrice;
-    }
-    return result;
-  }
-
-  // Linked catalogue row is the source of truth for the store: empty price → 0 (do not fall through to legacy top-level prices).
-  if (catalogue && catData) {
-    const res = resolveListOfferEffective(catData, catalogue.priceField, pr ?? null);
-    const priceUnit = catData[catalogue.priceUnitField as keyof CatalogueData] as string | undefined;
-    return pack(res, priceUnit);
-  }
-
-  if (catData && !catalogue) {
-    for (let n = 1; n <= 10; n++) {
-      const pf = `price${n}`;
-      const res = resolveListOfferEffective(catData, pf, pr ?? null);
-      if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
-        const uk = `price${n}Unit` as keyof CatalogueData;
-        return pack(res, catData[uk] as string | undefined);
-      }
-    }
-  }
-
-  if (catalogue && pr) {
-    const res = resolveListOfferEffective(catData ?? ({} as CatalogueData), catalogue.priceField, pr);
-    const priceUnit =
-      (catData?.[catalogue.priceUnitField as keyof CatalogueData] as string | undefined) ??
-      (pr[catalogue.priceUnitField] as string | undefined);
-    if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
-      return pack(res, priceUnit);
-    }
-  }
-
-  if (pr) {
-    for (let n = 1; n <= 10; n++) {
-      const res = resolveListOfferEffective(catData ?? ({} as CatalogueData), `price${n}`, pr);
-      if (res.effectiveUnitPrice > 0 || res.listPrice > 0) {
-        return pack(res, pr[`price${n}Unit`] as string | undefined);
-      }
-    }
-  }
-
-  return { price: 0, priceUnit: undefined, showOffer: false };
-}
 function getCats(p: ProductWithCatalogueData): string[] {
   return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
 }
@@ -1213,10 +1130,15 @@ export default function StoreView() {
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const catData = getCatalogueData(product, store.catalogueId);
       const variantData = variantSelections[productId] ? getVariantCombinationData(product, variantSelections[productId]) : undefined;
-      const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[productId]);
-      const variantQtyStep = variantData?.customFields?.orderQuantityStep;
-      const baseQtyStep = catData?.orderQuantityStep;
-      const quantityStep = normalizeOrderQuantityStep(variantQtyStep ?? baseQtyStep);
+      const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
+        catData,
+        catalogue,
+        product,
+        variantSelections[productId],
+        quantity
+      );
+      const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+      const quantityStep = rules.step;
       const rowTotal = unitPrice * quantity;
       const pr = product as Record<string, unknown>;
       const iv = pr.imageVersion ?? pr.image_version;
@@ -1257,7 +1179,7 @@ export default function StoreView() {
     return resolveStoreWhatsapp(store);
   }, [store]);
 
-  const changeQty = (productId: string, delta: number, qstep: number) => {
+  const changeQty = (productId: string, delta: number, _qstep?: number) => {
     const product = drawerProduct || allProducts.find(p => p.id === productId);
     if (!product) return;
 
@@ -1270,9 +1192,13 @@ export default function StoreView() {
       return;
     }
 
-    const s = normalizeOrderQuantityStep(qstep);
+    const catData = store?.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+    const variantData = variantSelections[productId]
+      ? getVariantCombinationData(product, variantSelections[productId])
+      : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
     const current = selectedProducts.get(productId) || 0;
-    const rounded = Math.round(Math.max(0, current + delta) / s) * s;
+    const rounded = applyQuantityDelta(current, delta, rules.step, rules.moq);
     const map = new Map(selectedProducts);
     map.set(productId, rounded);
     setSelectedProducts(map);
@@ -1740,8 +1666,20 @@ export default function StoreView() {
               const quantity = selectedProducts.get(product.id) || 0;
               const isSelected = quantity > 0;
               const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-              const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[product.id]);
-              const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+              const variantData = variantSelections[product.id]
+                ? getVariantCombinationData(product, variantSelections[product.id])
+                : undefined;
+              const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+              const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
+                catData,
+                catalogue,
+                product,
+                variantSelections[product.id],
+                quantity
+              );
+              const qstep = rules.step;
+              const minQty = rules.minQty;
+              const slabLines = formatQuantitySlabTable(catData, currencySymbol, variantData ?? undefined);
               const imgUrl = displayStoreProductImage(product);
               const hasParsedPrice = Number.isFinite(price);
               const lineAmt = quantity > 0 && hasParsedPrice ? quantity * price : 0;
@@ -1773,6 +1711,7 @@ export default function StoreView() {
                           <div className="of-item-price-row">
                             {Number.isFinite(price) ? (
                               <div className="of-price-tag">
+                                {priceFrom ? 'From ' : ''}
                                 {fmt(price, currencySymbol)}
                                 {showOffer && listPrice != null && listPrice > 0 ? (
                                   <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
@@ -1796,6 +1735,12 @@ export default function StoreView() {
                               <div className="of-step-hint of-step-hint--next-to-qty">
                                 <AlertIcon />
                                 Pack of {qstep}
+                              </div>
+                            ) : null}
+                            {minQty > 1 ? (
+                              <div className="of-step-hint of-step-hint--next-to-qty">
+                                <AlertIcon />
+                                Min {minQty}
                               </div>
                             ) : null}
                           </div>
@@ -1856,11 +1801,17 @@ export default function StoreView() {
                     })()}
                     {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
+                        {priceFrom ? 'From ' : ''}
                         {fmt(price, currencySymbol)}
                         {showOffer && listPrice != null && listPrice > 0 ? (
                           <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
                         ) : null}
                         {priceUnit && <span className="sv-pcard-price-unit">/{unitLabel(priceUnit)}</span>}
+                      </div>
+                    )}
+                    {slabLines.length > 0 && (
+                      <div className="sv-pcard-sub" style={{ fontSize: '10px', lineHeight: 1.4 }}>
+                        {slabLines.join(' · ')}
                       </div>
                     )}
                   </div>
@@ -1883,6 +1834,7 @@ export default function StoreView() {
                       <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
                     {qstep > 1 && <PackHint step={qstep} />}
+                    {minQty > 1 && <MoqHint minQty={minQty} />}
                   </div>
                   {isSelected && (
                     <div className="sv-pcard-subtotal">
@@ -2161,11 +2113,18 @@ const fieldDefinition = { fields: resolvedFields };
               .map((f) => Number(String(f.key).replace('field', '')))
               .filter((n) => Number.isFinite(n))
           );
-          const { price, priceUnit, listPrice, showOffer } = getStorefrontPriceAndUnit(catData, catalogue, drawerProduct, variantSelections[drawerProduct.id]);
-          const variantQtyStep = variantData?.customFields?.orderQuantityStep;
-          const baseQtyStep = catData?.orderQuantityStep;
-          const qstep = normalizeOrderQuantityStep(variantQtyStep ?? baseQtyStep);
           const quantity = selectedProducts.get(drawerProduct.id) || 0;
+          const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+          const qstep = rules.step;
+          const minQty = rules.minQty;
+          const slabLines = formatQuantitySlabTable(catData, currencySymbol, variantData ?? undefined);
+          const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
+            catData,
+            catalogue,
+            drawerProduct,
+            variantSelections[drawerProduct.id],
+            quantity
+          );
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
           // ══ CORRECTED FIELDS LOOKUP: Use product context directly to bypass RLS table limits ══
 const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
@@ -2227,6 +2186,7 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                   <div className="sv-drawer-price">
                     {Number.isFinite(price) ? (
                       <>
+                        {priceFrom ? 'From ' : ''}
                         {fmt(price, currencySymbol)}
                         {showOffer && listPrice != null && listPrice > 0 ? (
                           <span className="sv-price-strike">{fmt(listPrice, currencySymbol)}</span>
@@ -2237,6 +2197,13 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                       <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
                     )}
                   </div>
+                  {slabLines.length > 0 && (
+                    <div className="sv-drawer-sub" style={{ marginTop: 4 }}>
+                      {slabLines.map((line) => (
+                        <div key={line}>{line}</div>
+                      ))}
+                    </div>
+                  )}
                   {fields.length > 0 && (
                     <div className="sv-detail-table">
                       {fields.map((f) => <div key={`${f.label}-${f.value}`} className="sv-detail-row"><span className="sv-detail-lbl">{f.label}</span><span className="sv-detail-val">{f.value}</span></div>)}
@@ -2265,6 +2232,7 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
                         {qstep > 1 && <PackHint step={qstep} />}
+                        {minQty > 1 && <MoqHint minQty={minQty} />}
                       </div>
                       <div className="sv-drawer-total-wrap">
                         {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}

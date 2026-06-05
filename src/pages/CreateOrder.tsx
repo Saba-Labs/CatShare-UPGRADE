@@ -8,7 +8,13 @@ import { useToast } from '../context/ToastContext';
 import { createOrderDirectly, type OrderItem } from '../services/orderService';
 import { getAllCatalogues } from '../config/catalogueConfig';
 import { isProductEnabledForCatalogue, getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
-import { resolveListOfferEffective, STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
+import { STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
+import {
+  applyQuantityDelta,
+  getProductOrderQuantityRules,
+  resolveQuantityAwarePricing,
+  roundQuantityToRules,
+} from '../utils/quantityPricingUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
@@ -317,15 +323,17 @@ export default function CreateOrder() {
       const product = products.find(p => p.id === productId);
       if (product) {
         const catData = getCatalogueData(product, selectedCatalogueId);
-        const unitPrice = resolveListOfferEffective(
+        const pricing = resolveQuantityAwarePricing(
           catData,
           catalogue.priceField,
-          product as Record<string, unknown>
-        ).effectiveUnitPrice;
+          product as Record<string, unknown>,
+          quantity
+        );
+        const unitPrice = pricing.effectiveUnitPrice;
         const rowTotal = unitPrice * quantity;
 
         const priceUnit = catData[catalogue.priceUnitField];
-        const quantityStep = (catData as any).orderQuantityStep || 1;
+        const quantityStep = getProductOrderQuantityRules(catData).step;
         const productImage = imageMap[product.id] || product.image || product.imageUrl;
         items.push({
           productId,
@@ -360,9 +368,28 @@ export default function CreateOrder() {
     setStepSync('products');
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const changeProductQty = (productId: string, delta: number) => {
+    if (!selectedCatalogueId) return;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const rules = getProductOrderQuantityRules(catData);
+    const current = selectedProducts.get(productId) || 0;
+    const next = applyQuantityDelta(current, delta, rules.step, rules.moq);
     const newSelected = new Map(selectedProducts);
-    newSelected.set(productId, Math.max(0, quantity));
+    newSelected.set(productId, next);
+    setSelectedProducts(newSelected);
+  };
+
+  const setProductQty = (productId: string, raw: number) => {
+    if (!selectedCatalogueId) return;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const rules = getProductOrderQuantityRules(catData);
+    const next = roundQuantityToRules(raw, rules.step, rules.moq);
+    const newSelected = new Map(selectedProducts);
+    newSelected.set(productId, next);
     setSelectedProducts(newSelected);
   };
 
@@ -813,11 +840,18 @@ export default function CreateOrder() {
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
                   const pricing =
                     catalogue && catData
-                      ? resolveListOfferEffective(catData, catalogue.priceField, product as Record<string, unknown>)
+                      ? resolveQuantityAwarePricing(
+                          catData,
+                          catalogue.priceField,
+                          product as Record<string, unknown>,
+                          quantity
+                        )
                       : null;
                   const price = pricing ? pricing.effectiveUnitPrice : 0;
                   const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                  const quantityStep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
+                  const rules = getProductOrderQuantityRules(catData);
+                  const quantityStep = rules.step;
+                  const minQty = rules.minQty;
                   const productImage = imageMap[product.id] || product.image;
                   const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
                   const isSelected = quantity > 0;
@@ -957,7 +991,7 @@ export default function CreateOrder() {
                           width: 'fit-content',
                         }}>
                           <button
-                            onClick={() => handleUpdateQuantity(product.id, quantity - quantityStep)}
+                            onClick={() => changeProductQty(product.id, -quantityStep)}
                             style={{
                               width: 32,
                               height: 32,
@@ -981,10 +1015,7 @@ export default function CreateOrder() {
                             value={quantity > 0 ? String(quantity) : ''}
                             onChange={(e) => {
                               const digits = e.target.value.replace(/\D/g, '');
-                              handleUpdateQuantity(
-                                product.id,
-                                digits ? parseInt(digits, 10) : 0
-                              );
+                              setProductQty(product.id, digits ? parseInt(digits, 10) : 0);
                             }}
                             aria-label={`Quantity for ${product.name}`}
                             style={{
@@ -1001,7 +1032,7 @@ export default function CreateOrder() {
                             }}
                           />
                           <button
-                            onClick={() => handleUpdateQuantity(product.id, quantity + quantityStep)}
+                            onClick={() => changeProductQty(product.id, quantityStep)}
                             style={{
                               width: 32,
                               height: 32,
@@ -1173,7 +1204,7 @@ export default function CreateOrder() {
                         <QtyStepper
                           value={item.quantity}
                           step={item.quantityStep ?? 1}
-                          onChange={qty => handleUpdateQuantity(item.productId, qty)}
+                          onChange={(qty) => setProductQty(item.productId, qty)}
                         />
                       </div>
                     </div>

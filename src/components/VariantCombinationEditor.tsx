@@ -13,6 +13,11 @@ import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
 import { deleteImageFromR2 } from "../services/cloudflareService";
 import { uploadProductImageToR2 } from "../services/r2Upload";
+import QuantitySlabEditor from "./QuantitySlabEditor";
+import {
+  normalizeQuantitySlabs,
+  type QuantityPriceSlab,
+} from "../utils/quantityPricingUtils";
 
 interface VariantCombinationEditorProps {
   variantConfig: ProductVariantsConfig;
@@ -50,7 +55,15 @@ export default function VariantCombinationEditor({
 
   const handleSaveData = useCallback(() => {
     if (!selectedCombination) return;
-    const updated = upsertVariantCombination(variantConfig, selectedCombination.id, editingData);
+    const slabs = normalizeQuantitySlabs(editingData.customFields?.quantitySlabs);
+    const payload: Partial<VariantCombination> = {
+      ...editingData,
+      customFields: {
+        ...editingData.customFields,
+        quantitySlabs: slabs.length > 0 ? slabs : undefined,
+      },
+    };
+    const updated = upsertVariantCombination(variantConfig, selectedCombination.id, payload);
     onChange(updated);
     showToast("Variant details saved and syncing to cloud...", "success");
     onSave?.(updated);
@@ -363,6 +376,54 @@ export default function VariantCombinationEditor({
               </p>
             </div>
           </div>
+
+          <div className="flex gap-3 items-start">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+              MOQ
+            </label>
+            <div className="flex-1 min-w-0">
+              <input
+                type="number"
+                min="1"
+                value={(editingData.customFields?.minimumOrderQuantity as number) ?? 1}
+                onChange={(e) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: {
+                      ...editingData.customFields,
+                      minimumOrderQuantity: e.target.value ? parseInt(e.target.value) : undefined,
+                    },
+                  })
+                }
+                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
+              />
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                1 = no extra minimum for this variant.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 items-start">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+              Slab pricing
+            </label>
+            <div className="flex-1 min-w-0">
+              <QuantitySlabEditor
+                key={selectedCombinationId ?? "variant-slab"}
+                theme={theme}
+                value={(editingData.customFields?.quantitySlabs as QuantityPriceSlab[] | undefined) ?? undefined}
+                onChange={(slabs) =>
+                  setEditingData({
+                    ...editingData,
+                    customFields: { ...editingData.customFields, quantitySlabs: slabs },
+                  })
+                }
+              />
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                Overrides this variant&apos;s Price/Offer when qty matches a slab. Leave empty to use catalogue slabs or single price.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
@@ -480,6 +541,16 @@ export default function VariantCombinationEditor({
                           <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
                         </svg>
                         <span>Pack: {String(existing.customFields.orderQuantityStep)}</span>
+                      </div>
+                    )}
+                    {normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length > 0 && (
+                      <div className="flex items-center gap-1 col-span-2">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                        </svg>
+                        <span>
+                          Slabs: {normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length} tier(s)
+                        </span>
                       </div>
                     )}
                   </div>
