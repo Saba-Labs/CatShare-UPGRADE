@@ -72,8 +72,10 @@ export default function ManageCategories() {
 
   return (
     <div className="fixed inset-0 bg-white z-50 overflow-auto flex flex-col">
-      {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center gap-3">
+      <div className="relative -mx-4">
+        <div className="sticky top-0 h-[40px] bg-black z-50"></div>
+        {/* Header */}
+        <div className="sticky top-[40px] bg-white border-b border-gray-200 p-4 flex items-center gap-3 z-40">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center justify-center w-8 h-8 text-gray-700 hover:text-gray-900"
@@ -82,6 +84,7 @@ export default function ManageCategories() {
           <FiArrowLeft size={20} />
         </button>
         <h1 className="text-xl font-bold">Manage Categories</h1>
+        </div>
       </div>
 
       {/* Content */}
