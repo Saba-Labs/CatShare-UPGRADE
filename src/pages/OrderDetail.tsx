@@ -2064,9 +2064,11 @@ useEffect(() => {
                               );
                             }}
                           />
-                          <div style={{ fontSize: 11, color: COLORS.muted }}>
-                            ({Math.round(it.quantity / (it.quantityStep ?? 1))} sets)
-                          </div>
+                          {(it.quantityStep ?? 1) !== 1 && (
+                            <div style={{ fontSize: 11, color: COLORS.muted }}>
+                              ({Math.round(it.quantity / (it.quantityStep ?? 1))} sets)
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
