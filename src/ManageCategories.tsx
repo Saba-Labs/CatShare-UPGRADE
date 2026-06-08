@@ -75,129 +75,147 @@ export default function ManageCategories() {
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
-        <div className="sticky top-[40px] bg-white border-b border-gray-200 p-4 flex items-center gap-3 z-40">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center justify-center w-8 h-8 text-gray-700 hover:text-gray-900"
-          title="Back"
-        >
-          <FiArrowLeft size={20} />
-        </button>
-        <h1 className="text-xl font-bold">Manage Categories</h1>
+        <div className="sticky top-[40px] bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center gap-3 z-40">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center justify-center w-9 h-9 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Back"
+          >
+            <FiArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 p-4 max-w-2xl mx-auto w-full">
-        {/* Add new category */}
-        <div className="flex gap-2 mb-4">
-          <input
-            value={newCat}
-            onChange={(e) => setNewCat(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="New category"
-            className="flex-1 border px-3 py-2 rounded text-sm"
-          />
-          <button
-            type="button"
-            onClick={add}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
-          >
-            <FiPlus size={16} className="inline mr-1" />
-            Add
-          </button>
-        </div>
+      <div className="flex-1 overflow-auto">
+        <div className="p-6 max-w-2xl mx-auto w-full">
+          {/* Add new category section */}
+          <div className="mb-8">
+            <label className="block text-sm font-semibold text-gray-700 mb-3">Add New Category</label>
+            <div className="flex gap-2">
+              <input
+                value={newCat}
+                onChange={(e) => setNewCat(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && add()}
+                placeholder="Enter category name..."
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={add}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <FiPlus size={18} />
+                Add
+              </button>
+            </div>
+          </div>
 
-        {/* Category list with drag-and-drop */}
-        {categories.length === 0 ? (
-          <p className="text-center text-gray-400 italic py-8">No categories yet</p>
-        ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="category-list">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="space-y-2"
-                >
-                  {categories.map((cat, i) => (
-                    <Draggable key={cat} draggableId={cat} index={i}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className="flex items-center justify-between bg-gray-100 p-3 rounded text-sm shadow"
-                        >
-                          <div className="flex items-center gap-2 flex-grow min-w-0">
-                            <span
-                              {...provided.dragHandleProps}
-                              className="cursor-move text-gray-500 shrink-0"
-                              title="Drag"
+          {/* Categories list section */}
+          <div>
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">
+              {categories.length > 0 && `${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`}
+            </h2>
+            {categories.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-2 text-4xl">📁</div>
+                <p className="text-gray-500 font-medium">No categories yet</p>
+                <p className="text-gray-400 text-sm">Add your first category above</p>
+              </div>
+            ) : (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="category-list">
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-2.5"
+                    >
+                      {categories.map((cat, i) => (
+                        <Draggable key={cat} draggableId={cat} index={i}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                                snapshot.isDragging
+                                  ? 'bg-blue-50 border-blue-300 shadow-lg'
+                                  : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md'
+                              }`}
                             >
-                              ☰
-                            </span>
-                            {editIndex === i ? (
-                              <input
-                                value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
-                                className="flex-1 min-w-0 border px-2 py-1 rounded"
-                                autoFocus
-                              />
-                            ) : (
-                              <span className="flex-1 min-w-0 truncate">{cat}</span>
-                            )}
-                          </div>
+                              <div className="flex items-center gap-3 flex-grow min-w-0">
+                                <span
+                                  {...provided.dragHandleProps}
+                                  className="cursor-move text-gray-400 hover:text-gray-600 shrink-0 text-lg transition-colors"
+                                  title="Drag to reorder"
+                                >
+                                  ☰
+                                </span>
+                                {editIndex === i ? (
+                                  <input
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="flex-1 min-w-0 px-3 py-1.5 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <span className="flex-1 min-w-0 truncate text-sm text-gray-900 font-medium">{cat}</span>
+                                )}
+                              </div>
 
-                          <div className="flex gap-2 shrink-0">
-                            {editIndex === i ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={update}
-                                  className="text-blue-600 hover:underline text-sm font-medium"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditIndex(null)}
-                                  className="text-gray-500 hover:underline text-sm font-medium"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditIndex(i);
-                                    setEditText(cat);
-                                  }}
-                                  className="text-blue-600 hover:underline text-sm font-medium"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => remove(i)}
-                                  className="text-red-600 hover:underline text-sm font-medium"
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        )}
+                              <div className="flex gap-1.5 shrink-0 ml-3">
+                                {editIndex === i ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={update}
+                                      className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-xs font-medium transition-colors"
+                                    >
+                                      Save
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditIndex(null)}
+                                      className="px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-medium transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditIndex(i);
+                                        setEditText(cat);
+                                      }}
+                                      className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => remove(i)}
+                                      className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium transition-colors"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
