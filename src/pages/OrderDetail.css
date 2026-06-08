@@ -1,6 +1,15 @@
 * { box-sizing: border-box; }
 input, textarea { font-family: inherit; }
 input:focus { outline: none; border-color: #16A34A !important; box-shadow: 0 0 0 3px rgba(22,163,74,0.08) !important; }
+/* Hide number input spinners */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
 ::-webkit-scrollbar { display: none; }
 @keyframes spin { to { transform: rotate(360deg) } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
