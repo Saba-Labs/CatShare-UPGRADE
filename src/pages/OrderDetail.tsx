@@ -2435,7 +2435,7 @@ useEffect(() => {
                           >
                             {hasCost && (
                               <div style={{ fontSize: 12, color: COLORS.muted }}>
-                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} ({Math.round(item.quantity / (item.quantityStep ?? 1))}) × {symbol}{item.unitPrice}
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} {(item.quantityStep ?? 1) !== 1 && `(${Math.round(item.quantity / (item.quantityStep ?? 1))})`} × {symbol}{item.unitPrice}
                               </div>
                             )}
                             {!hasCost && (
