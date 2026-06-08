@@ -2290,7 +2290,9 @@ useEffect(() => {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleSavePriceEdit();
                             if (e.key === 'Escape') handleCancelPriceEdit();
+                            if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
                           }}
+                          onWheel={(e) => e.currentTarget.blur()}
                         />
                       </div>
                     </div>
