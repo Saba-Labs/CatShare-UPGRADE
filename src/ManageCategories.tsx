@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { FiArrowLeft, FiPlus } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import { syncCategories } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -170,16 +170,18 @@ export default function ManageCategories() {
                                     <button
                                       type="button"
                                       onClick={update}
-                                      className="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg text-xs font-medium transition-colors"
+                                      className="p-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-colors"
+                                      title="Save"
                                     >
-                                      Save
+                                      <FiCheck size={16} />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditIndex(null)}
-                                      className="px-3 py-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-medium transition-colors"
+                                      className="p-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+                                      title="Cancel"
                                     >
-                                      Cancel
+                                      <FiX size={16} />
                                     </button>
                                   </>
                                 ) : (
@@ -190,16 +192,18 @@ export default function ManageCategories() {
                                         setEditIndex(i);
                                         setEditText(cat);
                                       }}
-                                      className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-medium transition-colors"
+                                      className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                      title="Edit category"
                                     >
-                                      Edit
+                                      <FiEdit2 size={16} />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => remove(i)}
-                                      className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-medium transition-colors"
+                                      className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                      title="Delete category"
                                     >
-                                      Delete
+                                      <FiTrash2 size={16} />
                                     </button>
                                   </>
                                 )}
