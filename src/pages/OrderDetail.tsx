@@ -1213,6 +1213,8 @@ export default function OrderDetail() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [addItemsOpen, setAddItemsOpen] = useState(false);
   const [addItemsSearch, setAddItemsSearch] = useState('');
+  const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null);
+  const [priceEditValue, setPriceEditValue] = useState('');
   const isSwipeProcessingRef = useRef(false);
   const pdfProcessingRef = useRef(false);
   const shareImageProcessingRef = useRef(false);
@@ -1437,6 +1439,31 @@ useEffect(() => {
     } finally {
       setSaveLoading(false);
     }
+  };
+
+  const handleOpenPriceEdit = (itemKey: string, currentPrice: number) => {
+    setEditingPriceKey(itemKey);
+    setPriceEditValue(String(currentPrice));
+  };
+
+  const handleSavePriceEdit = () => {
+    if (editingPriceKey === null) return;
+    const newPrice = parseFloat(priceEditValue) || 0;
+    if (newPrice < 0) {
+      showToast('Price cannot be negative', 'error');
+      return;
+    }
+    setEditItems((prev) =>
+      prev.map((x) => (x._key === editingPriceKey ? { ...x, unitPrice: newPrice } : x))
+    );
+    setEditingPriceKey(null);
+    setPriceEditValue('');
+    showToast('Price updated', 'success');
+  };
+
+  const handleCancelPriceEdit = () => {
+    setEditingPriceKey(null);
+    setPriceEditValue('');
   };
 
   const handleOpenPDF = async () => {
@@ -2004,7 +2031,27 @@ useEffect(() => {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
                           {it.unitPrice ? (
-                            <div style={{ fontSize: 12, color: COLORS.muted }}>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: COLORS.muted }}>
+                              <span>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</span>
+                              <button
+                                onClick={() => handleOpenPriceEdit(it._key, it.unitPrice || 0)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  width: 20, height: 20, borderRadius: 4,
+                                  background: 'rgba(10, 132, 255, 0.08)',
+                                  border: 'none', cursor: 'pointer',
+                                  color: COLORS.blue, padding: 0,
+                                  transition: 'background 0.15s',
+                                  fontSize: 12,
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(10, 132, 255, 0.15)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(10, 132, 255, 0.08)'}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 12, height: 12 }}>
+                                  <Ic.Edit />
+                                </div>
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
@@ -2194,6 +2241,87 @@ useEffect(() => {
                   </div>
                 ) : null}
               </Card>
+
+              {/* Price Edit Modal */}
+              {editingPriceKey !== null && (
+                <div style={{
+                  position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.4)',
+                  display: 'flex', alignItems: 'flex-end', zIndex: 1000,
+                }}>
+                  <div style={{
+                    width: '100%', background: COLORS.surface,
+                    borderRadius: '20px 20px 0 0', padding: '24px 16px 32px',
+                    boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.1)',
+                    animation: 'slideUp 0.3s ease',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.text }}>Edit Price</div>
+                      <button
+                        onClick={handleCancelPriceEdit}
+                        style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          background: 'transparent', border: 'none',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: COLORS.muted,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div style={{ marginBottom: 24 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: COLORS.muted, display: 'block', marginBottom: 8 }}>
+                        Enter new price
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 16, fontWeight: 600, color: COLORS.text }}>{symbol}</span>
+                        <input
+                          type="number"
+                          value={priceEditValue}
+                          onChange={(e) => setPriceEditValue(e.target.value)}
+                          placeholder="0"
+                          autoFocus
+                          style={{
+                            flex: 1, padding: '12px 14px', borderRadius: 10,
+                            border: `1.5px solid ${COLORS.border}`, fontSize: 16,
+                            background: '#FAFAFA', fontFamily: FONT,
+                            boxSizing: 'border-box',
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSavePriceEdit();
+                            if (e.key === 'Escape') handleCancelPriceEdit();
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={handleCancelPriceEdit}
+                        style={{
+                          flex: 1, padding: '12px', borderRadius: 10,
+                          border: `1.5px solid ${COLORS.border}`, background: '#fff',
+                          cursor: 'pointer', fontFamily: FONT, fontSize: 14,
+                          fontWeight: 600, color: COLORS.muted, transition: 'background 0.15s',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSavePriceEdit}
+                        style={{
+                          flex: 1, padding: '12px', borderRadius: 10,
+                          border: 'none', background: COLORS.blue,
+                          cursor: 'pointer', fontFamily: FONT, fontSize: 14,
+                          fontWeight: 600, color: '#fff', transition: 'opacity 0.15s',
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div
