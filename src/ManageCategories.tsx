@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FiArrowLeft, FiPlus } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import { syncCategories } from './services/supabaseSync';
