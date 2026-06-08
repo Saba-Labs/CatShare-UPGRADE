@@ -52,6 +52,7 @@ const ThemesSettings = lazy(() => import("./pages/ThemesSettings"));
 const WatermarkSettings = lazy(() => import("./pages/WatermarkSettings"));
 const FieldsSettings = lazy(() => import("./pages/FieldsSettings"));
 const CurrencySettings = lazy(() => import("./pages/CurrencySettings"));
+const ManageCategories = lazy(() => import("./ManageCategories"));
 const ProInfo = lazy(() => import("./pages/ProInfo"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
@@ -2551,6 +2552,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <ProInfo />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/manage-categories"
+          element={
+            <ProtectedRoute>
+              <ManageCategories />
             </ProtectedRoute>
           }
         />
