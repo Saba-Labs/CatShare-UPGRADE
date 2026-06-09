@@ -139,7 +139,7 @@ export default function ManageCategories() {
         <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent("toggle-menu"))}
+            onClick={() => window.dispatchEvent(new Event("toggle-menu"))}
             className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-md transition"
             aria-label="Menu"
             title="Menu"
