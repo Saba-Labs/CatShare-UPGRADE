@@ -5,7 +5,7 @@ import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from '
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
-import { readProductsWithLegacyFallback } from './utils/safeStorage';
+import { readProductsWithLegacyFallback, safeSetProductsCache } from './utils/safeStorage';
 import { productImageDisplayUrl } from './utils/imageUrl';
 
 export default function ManageCategories() {
@@ -93,7 +93,6 @@ export default function ManageCategories() {
     setProducts(updatedProducts);
 
     if (user?.uid) {
-      const { safeSetProductsCache } = require('./utils/safeStorage');
       safeSetProductsCache(user.uid, updatedProducts);
 
       syncProducts(user.uid, updatedProducts, { skipImageUrlAssertion: true }).catch((err) => {
