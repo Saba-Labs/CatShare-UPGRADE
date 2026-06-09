@@ -1807,7 +1807,10 @@ setShowBrowseForBackup(false);
 </button>
 
 <button
-  onClick={() => setShowCategories(true)}
+  onClick={() => {
+    navigate('/manage-categories');
+    onClose();
+  }}
   className="w-full flex items-center gap-3 px-5 py-3 mb-3 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition shadow-sm"
 >
   <MdCategory className="text-gray-500 text-[18px]" />
@@ -2311,10 +2314,6 @@ setShowBrowseForBackup(false);
         />
       )}
 
-      {showCategories && (
-        <CategoryModal onClose={() => setShowCategories(false)} />
-      )}
-
     </>
   );
 }
@@ -2340,206 +2339,5 @@ function DragWrapper({ children, provided }) {
       {children}
     </div>,
     document.body
-  );
-}
-
-
-// 🔁 Updated Category Modal with drag & drop
-function CategoryModal({ onClose }) {
-  const { user } = useAuth();
-  const [categories, setCategories] = useState([]);
-  const [newCat, setNewCat] = useState("");
-  const [editIndex, setEditIndex] = useState(null);
-  const [editText, setEditText] = useState("");
-
-
-  useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("categories") || "[]");
-    setCategories(stored);
-  }, []);
-
-
-  const save = (list) => {
-    setCategories(list);
-    localStorage.setItem("categories", JSON.stringify(list));
-
-    // Sync categories to Supabase
-    if (user?.uid) {
-      // Convert simple category strings to objects with id and name for Supabase sync
-      const categoriesForSync = list.map((cat, index) => ({
-        id: cat, // Use the category name as the ID
-        name: cat,
-      }));
-
-      syncCategories(user.uid, categoriesForSync).catch(err => {
-        console.warn('⚠️ Failed to sync categories to Supabase:', err);
-      });
-    }
-  };
-
-  const add = () => {
-    const c = newCat.trim();
-    if (c && !categories.includes(c)) {
-      save([...categories, c]);
-      logCategoryManaged("added", c);
-      setNewCat("");
-    }
-  };
-
-  const update = () => {
-    const list = [...categories];
-    const oldName = categories[editIndex];
-    list[editIndex] = editText.trim();
-    save(list);
-    logCategoryManaged("edited", { oldName, newName: editText.trim() });
-    setEditIndex(null);
-    setEditText("");
-  };
-
-  const remove = (i) => {
-    const removedCat = categories[i];
-    const list = categories.filter((_, idx) => idx !== i);
-    save(list);
-    logCategoryManaged("deleted", removedCat);
-  };
-
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    const reordered = [...categories];
-    const [moved] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, moved);
-    save(reordered);
-    logCategoryManaged("reordered", { count: reordered.length });
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full max-w-md p-5 rounded-xl shadow-lg relative animate-fadeIn"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-xl font-bold mb-4 text-center">Manage Categories</h3>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-2 right-4 text-2xl text-gray-500 hover:text-red-500"
-          aria-label="Close"
-        >
-          &times;
-        </button>
-
-        {/* Add new category */}
-        <div className="flex gap-2 mb-4">
-          <input
-            value={newCat}
-            onChange={(e) => setNewCat(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="New category"
-            className="flex-1 border px-3 py-2 rounded text-sm"
-          />
-          <button
-            type="button"
-            onClick={add}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
-          >
-            Add
-          </button>
-        </div>
-
-        {/* Category list with drag-and-drop */}
-        {categories.length === 0 ? (
-          <p className="text-center text-gray-400 italic">No categories yet</p>
-        ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="category-list">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="space-y-2 max-h-[420px] overflow-y-auto pr-1"
-                >
-                  {categories.map((cat, i) => (
-                    <Draggable key={cat} draggableId={cat} index={i}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className="flex items-center justify-between bg-gray-100 p-2 rounded text-sm shadow"
-                        >
-                          <div className="flex items-center gap-2 flex-grow min-w-0">
-                            <span
-                              {...provided.dragHandleProps}
-                              className="cursor-move text-gray-500 shrink-0"
-                              title="Drag"
-                            >
-                              ☰
-                            </span>
-                            {editIndex === i ? (
-                              <input
-                                value={editText}
-                                onChange={(e) => setEditText(e.target.value)}
-                                className="flex-1 min-w-0 border px-2 py-1 rounded"
-                              />
-                            ) : (
-                              <span className="flex-1 min-w-0 truncate">{cat}</span>
-                            )}
-                          </div>
-
-                          <div className="flex gap-2 shrink-0">
-                            {editIndex === i ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={update}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditIndex(null)}
-                                  className="text-gray-500 hover:underline"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditIndex(i);
-                                    setEditText(cat);
-                                  }}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => remove(i)}
-                                  className="text-red-600 hover:underline"
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        )}
-      </div>
-    </div>
   );
 }

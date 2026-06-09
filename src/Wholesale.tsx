@@ -1245,7 +1245,7 @@ onMouseLeave={handleTouchEnd}
     <button
       onClick={() => setShowAddProductsModal(true)}
       className="fixed right-4 z-40 flex items-center gap-2 px-4 py-2.5 rounded-lg border border-blue-300 bg-white text-blue-600 hover:bg-blue-50 hover:border-blue-400 shadow-sm hover:shadow-md transition-all"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 64px)' }}
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
       title="Add products to this catalogue"
     >
       <FiPlus size={20} />

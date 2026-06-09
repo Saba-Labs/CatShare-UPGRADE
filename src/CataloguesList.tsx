@@ -239,7 +239,8 @@ export default React.memo(function CataloguesList({
           await Haptics.impact({ style: ImpactStyle.Light });
           onManageCatalogues();
         }}
-        className="fixed bottom-[calc(3.5rem+1rem)] right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 active:scale-95 z-20"
+        className="fixed right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 active:scale-95 z-20"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
         title="Add new catalogue"
       >
         <FiPlus size={20} />
