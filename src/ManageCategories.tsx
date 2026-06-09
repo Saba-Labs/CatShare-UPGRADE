@@ -319,7 +319,8 @@ export default function ManageCategories() {
                       return (
                         <div
                           key={product.id}
-                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                          onClick={() => toggleProductCategory(product.id, selectedCategory)}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
                         >
                           <input
                             type="checkbox"
