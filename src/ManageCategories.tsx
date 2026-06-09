@@ -6,6 +6,7 @@ import { useAuth } from './context/AuthContext';
 import { syncCategories } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
 import { readProductsWithLegacyFallback } from './utils/safeStorage';
+import { productImageDisplayUrl } from './utils/imageUrl';
 
 export default function ManageCategories() {
   const navigate = useNavigate();
@@ -310,29 +311,42 @@ export default function ManageCategories() {
 
                 return (
                   <div className="divide-y">
-                    {filtered.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isProductInCategory(product, selectedCategory)}
-                          onChange={() => toggleProductCategory(product.id, selectedCategory)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {product.name || 'Unnamed'}
-                          </p>
-                          {product.subtitle && (
-                            <p className="text-xs text-gray-500 truncate">
-                              {product.subtitle}
+                    {filtered.map((product) => {
+                      const imageSrc = product.image || product.imageUrl;
+                      const displaySrc = imageSrc
+                        ? productImageDisplayUrl(imageSrc, product.imageVersion)
+                        : "";
+                      return (
+                        <div
+                          key={product.id}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isProductInCategory(product, selectedCategory)}
+                            onChange={() => toggleProductCategory(product.id, selectedCategory)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
+                          />
+                          <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {displaySrc ? (
+                              <img key={displaySrc} src={displaySrc} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                              <span className="text-[9px] text-gray-400">No img</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {product.name || 'Unnamed'}
                             </p>
-                          )}
+                            {product.subtitle && (
+                              <p className="text-xs text-gray-500 truncate">
+                                {product.subtitle}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
