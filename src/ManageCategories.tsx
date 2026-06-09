@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { FiHome, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
+import { FiHome, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiMenu } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -135,22 +135,26 @@ export default function ManageCategories() {
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
-        <div className="sticky top-[40px] bg-white border-b border-gray-200 z-40">
-          <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                navigate("/");
-                window.dispatchEvent(new CustomEvent("toggle-menu"));
-              }}
-              className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
-              title="Go to dashboard"
-            >
-              <FiHome className="text-gray-700 w-5 h-5" />
-            </button>
-            <h1 className="text-lg font-semibold text-gray-900 truncate">Categories</h1>
-          </div>
-        </div>
+        <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("toggle-menu"))}
+            className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-md transition"
+            aria-label="Menu"
+            title="Menu"
+          >
+            <FiMenu className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Categories</h1>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-100 transition"
+            title="Go to Home"
+          >
+            <FiHome className="w-5 h-5" />
+          </button>
+        </header>
       </div>
 
       {/* Content */}
