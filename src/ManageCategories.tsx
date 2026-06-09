@@ -198,14 +198,16 @@ export default function ManageCategories() {
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
+                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
                                 snapshot.isDragging
                                   ? 'bg-blue-50 border-blue-300 shadow-lg'
                                   : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md'
                               }`}
-                              onClick={() => !editIndex && setSelectedCategory(cat)}
                             >
-                              <div className="flex items-center gap-3 flex-grow min-w-0">
+                              <div
+                                className="flex items-center gap-3 flex-grow min-w-0 cursor-pointer"
+                                onClick={() => !editIndex && setSelectedCategory(cat)}
+                              >
                                 <span
                                   {...provided.dragHandleProps}
                                   className="cursor-move text-gray-400 hover:text-gray-600 shrink-0 text-lg transition-colors"
