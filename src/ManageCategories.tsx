@@ -46,10 +46,9 @@ export default function ManageCategories() {
 
   const update = () => {
     const list = [...categories];
-    const oldName = categories[editIndex!];
     list[editIndex!] = editText.trim();
     save(list);
-    logCategoryManaged('edited', { oldName, newName: editText.trim() });
+    logCategoryManaged('edited', editText.trim());
     setEditIndex(null);
     setEditText('');
   };
@@ -67,7 +66,6 @@ export default function ManageCategories() {
     const [moved] = reordered.splice(result.source.index, 1);
     reordered.splice(result.destination.index, 0, moved);
     save(reordered);
-    logCategoryManaged('reordered', { count: reordered.length });
   };
 
   return (
