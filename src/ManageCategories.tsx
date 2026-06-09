@@ -325,9 +325,9 @@ export default function ManageCategories() {
                           <p className="text-sm font-medium text-gray-900 truncate">
                             {product.name || 'Unnamed'}
                           </p>
-                          {(product.description || product.sku) && (
+                          {product.subtitle && (
                             <p className="text-xs text-gray-500 truncate">
-                              {product.description || product.sku}
+                              {product.subtitle}
                             </p>
                           )}
                         </div>
