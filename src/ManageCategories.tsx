@@ -20,6 +20,7 @@ export default function ManageCategories() {
   const [products, setProducts] = useState<any[]>([]);
   const [pendingProducts, setPendingProducts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('categories') || '[]');
@@ -259,7 +260,7 @@ export default function ManageCategories() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => remove(i)}
+                                      onClick={() => setDeleteConfirm(i)}
                                       className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                                       title="Delete category"
                                     >
@@ -281,6 +282,37 @@ export default function ManageCategories() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm !== null && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Category?</h3>
+            <p className="text-gray-600 text-sm mb-6">
+              Are you sure you want to delete "<strong>{categories[deleteConfirm]}</strong>"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  remove(deleteConfirm);
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Detail Modal */}
       {selectedCategory && (
