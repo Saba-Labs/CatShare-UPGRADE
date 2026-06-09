@@ -210,6 +210,7 @@ export default function ManageCategories() {
                               >
                                 <span
                                   {...provided.dragHandleProps}
+                                  onClick={(e) => e.stopPropagation()}
                                   className="cursor-move text-gray-400 hover:text-gray-600 shrink-0 text-lg transition-colors"
                                   title="Drag to reorder"
                                 >
