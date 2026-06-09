@@ -132,7 +132,7 @@ export default function ManageCategories() {
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-50 overflow-auto flex flex-col">
+    <div className="min-h-screen bg-white overflow-auto flex flex-col">
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
