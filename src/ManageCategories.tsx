@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import { syncCategories } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -13,10 +13,18 @@ export default function ManageCategories() {
   const [newCat, setNewCat] = useState('');
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('categories') || '[]');
     setCategories(stored);
+  }, []);
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('products') || '[]');
+    setProducts(stored);
   }, []);
 
   const save = (list: string[]) => {
@@ -66,6 +74,30 @@ export default function ManageCategories() {
     const [moved] = reordered.splice(result.source.index, 1);
     reordered.splice(result.destination.index, 0, moved);
     save(reordered);
+  };
+
+  const toggleProductCategory = (productId: string, categoryName: string) => {
+    const updatedProducts = products.map((p) => {
+      if (p.id === productId) {
+        const currentCategories = (p.category || '').split(',').map((c: string) => c.trim()).filter(Boolean);
+        if (currentCategories.includes(categoryName)) {
+          return { ...p, category: currentCategories.filter((c: string) => c !== categoryName).join(', ') };
+        } else {
+          return { ...p, category: [...currentCategories, categoryName].join(', ') };
+        }
+      }
+      return p;
+    });
+    setProducts(updatedProducts);
+    localStorage.setItem('products', JSON.stringify(updatedProducts));
+  };
+
+  const getProductCategoriesArray = (product: any) => {
+    return (product.category || '').split(',').map((c: string) => c.trim()).filter(Boolean);
+  };
+
+  const isProductInCategory = (product: any, categoryName: string) => {
+    return getProductCategoriesArray(product).includes(categoryName);
   };
 
   return (
@@ -136,11 +168,12 @@ export default function ManageCategories() {
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
                                 snapshot.isDragging
                                   ? 'bg-blue-50 border-blue-300 shadow-lg'
                                   : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md'
                               }`}
+                              onClick={() => !editIndex && setSelectedCategory(cat)}
                             >
                               <div className="flex items-center gap-3 flex-grow min-w-0">
                                 <span
@@ -219,6 +252,78 @@ export default function ManageCategories() {
           </div>
         </div>
       </div>
+
+      {/* Category Detail Modal */}
+      {selectedCategory && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end">
+          <div className="bg-white w-full rounded-t-2xl h-[90vh] flex flex-col">
+            {/* Detail Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-40">
+              <h2 className="text-xl font-bold text-gray-900">{selectedCategory}</h2>
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Close"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-3 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Product List */}
+            <div className="flex-1 overflow-auto">
+              {(() => {
+                const filtered = products.filter((p) =>
+                  (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex items-center justify-center h-full text-gray-500">
+                      <p>{searchTerm ? 'No products found' : 'No products yet'}</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="divide-y">
+                    {filtered.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isProductInCategory(product, selectedCategory)}
+                          onChange={() => toggleProductCategory(product.id, selectedCategory)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{product.name || 'Unnamed'}</p>
+                          {product.sku && <p className="text-xs text-gray-500">SKU: {product.sku}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
