@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
+import { FiHome, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -135,15 +135,21 @@ export default function ManageCategories() {
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
-        <div className="sticky top-[40px] bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center gap-3 z-40">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-9 h-9 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Back"
-          >
-            <FiArrowLeft size={20} />
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
+        <div className="sticky top-[40px] bg-white border-b border-gray-200 z-40">
+          <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigate("/");
+                window.dispatchEvent(new CustomEvent("toggle-menu"));
+              }}
+              className="p-2 -ml-2 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors touch-manipulation"
+              title="Go to dashboard"
+            >
+              <FiHome className="text-gray-700 w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-semibold text-gray-900 truncate">Categories</h1>
+          </div>
         </div>
       </div>
 
