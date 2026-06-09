@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
-import { syncCategories } from './services/supabaseSync';
+import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
-import { readProductsWithLegacyFallback } from './utils/safeStorage';
+import { readProductsWithLegacyFallback, safeSetProductsCache, safeSetInStorage, getStorageKey } from './utils/safeStorage';
+import { productImageDisplayUrl } from './utils/imageUrl';
 
 export default function ManageCategories() {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ export default function ManageCategories() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState<any[]>([]);
+  const [pendingProducts, setPendingProducts] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('categories') || '[]');
@@ -78,7 +81,8 @@ export default function ManageCategories() {
   };
 
   const toggleProductCategory = (productId: string, categoryName: string) => {
-    const updatedProducts = products.map((p) => {
+    const basedOnProducts = pendingProducts.length > 0 ? pendingProducts : products;
+    const updatedProducts = basedOnProducts.map((p) => {
       if (p.id === productId) {
         const currentCategories = getProductCategoriesArray(p);
         if (currentCategories.includes(categoryName)) {
@@ -89,11 +93,26 @@ export default function ManageCategories() {
       }
       return p;
     });
-    setProducts(updatedProducts);
+    setPendingProducts(updatedProducts);
+  };
 
-    if (user?.uid) {
-      const { safeSetProductsCache } = require('./utils/safeStorage');
-      safeSetProductsCache(user.uid, updatedProducts);
+  const saveChanges = async () => {
+    if (!user?.uid || pendingProducts.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      safeSetProductsCache(user.uid, pendingProducts);
+      safeSetInStorage(getStorageKey('products', user.uid), pendingProducts);
+
+      await syncProducts(user.uid, pendingProducts, { skipImageUrlAssertion: true });
+
+      setProducts(pendingProducts);
+      setPendingProducts([]);
+      setSelectedCategory(null);
+    } catch (err) {
+      console.warn('⚠️ Failed to save products:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -270,13 +289,27 @@ export default function ManageCategories() {
             {/* Detail Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between z-40">
               <h2 className="text-xl font-bold text-gray-900">{selectedCategory}</h2>
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Close"
-              >
-                <FiX size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveChanges}
+                  disabled={isSaving || pendingProducts.length === 0}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                  title="Save changes"
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setPendingProducts([]);
+                    setSelectedCategory(null);
+                  }}
+                  disabled={isSaving}
+                  className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                  title="Close"
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Search */}
@@ -296,7 +329,8 @@ export default function ManageCategories() {
             {/* Product List */}
             <div className="flex-1 overflow-auto">
               {(() => {
-                const filtered = products.filter((p) =>
+                const displayProducts = pendingProducts.length > 0 ? pendingProducts : products;
+                const filtered = displayProducts.filter((p) =>
                   (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
                 );
 
@@ -310,25 +344,43 @@ export default function ManageCategories() {
 
                 return (
                   <div className="divide-y">
-                    {filtered.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isProductInCategory(product, selectedCategory)}
-                          onChange={() => toggleProductCategory(product.id, selectedCategory)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {product.name || 'Unnamed'}
-                            {product.sku && <span className="text-gray-400 ml-1">({product.sku})</span>}
-                          </p>
+                    {filtered.map((product) => {
+                      const imageSrc = product.image || product.imageUrl;
+                      const displaySrc = imageSrc
+                        ? productImageDisplayUrl(imageSrc, product.imageVersion)
+                        : "";
+                      return (
+                        <div
+                          key={product.id}
+                          onClick={() => toggleProductCategory(product.id, selectedCategory)}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isProductInCategory(product, selectedCategory)}
+                            onChange={() => toggleProductCategory(product.id, selectedCategory)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
+                          />
+                          <div className="w-12 h-12 rounded border border-gray-300 bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {displaySrc ? (
+                              <img key={displaySrc} src={displaySrc} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                              <span className="text-[9px] text-gray-400">No img</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {product.name || 'Unnamed'}
+                            </p>
+                            {product.subtitle && (
+                              <p className="text-xs text-gray-500 truncate">
+                                {product.subtitle}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
