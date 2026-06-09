@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiMenu } from 'react-icons/fi';
+import { MdOutlineHome } from 'react-icons/md';
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -20,6 +21,7 @@ export default function ManageCategories() {
   const [products, setProducts] = useState<any[]>([]);
   const [pendingProducts, setPendingProducts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem('categories') || '[]');
@@ -130,20 +132,40 @@ export default function ManageCategories() {
   };
 
   return (
-    <div className="fixed inset-0 bg-white z-50 overflow-auto flex flex-col">
+    <div className="min-h-screen bg-white overflow-auto flex flex-col">
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
-        <div className="sticky top-[40px] bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center gap-3 z-40">
+        <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
           <button
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-9 h-9 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Back"
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new Event("toggle-menu"));
+            }}
+            className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-md transition"
+            aria-label="Menu"
+            title="Menu"
           >
-            <FiArrowLeft size={20} />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-        </div>
+          <h1 className="text-xl font-bold flex-1 text-center truncate whitespace-nowrap">Categories</h1>
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-100 transition"
+            title="Go to Home"
+          >
+            <MdOutlineHome size={24} />
+          </button>
+        </header>
       </div>
 
       {/* Content */}
@@ -197,16 +219,19 @@ export default function ManageCategories() {
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
+                              className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
                                 snapshot.isDragging
                                   ? 'bg-blue-50 border-blue-300 shadow-lg'
                                   : 'bg-white border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md'
                               }`}
-                              onClick={() => !editIndex && setSelectedCategory(cat)}
                             >
-                              <div className="flex items-center gap-3 flex-grow min-w-0">
+                              <div
+                                className="flex items-center gap-3 flex-grow min-w-0 cursor-pointer"
+                                onClick={() => !editIndex && setSelectedCategory(cat)}
+                              >
                                 <span
                                   {...provided.dragHandleProps}
+                                  onClick={(e) => e.stopPropagation()}
                                   className="cursor-move text-gray-400 hover:text-gray-600 shrink-0 text-lg transition-colors"
                                   title="Drag to reorder"
                                 >
@@ -259,7 +284,7 @@ export default function ManageCategories() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => remove(i)}
+                                      onClick={() => setDeleteConfirm(i)}
                                       className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                                       title="Delete category"
                                     >
@@ -281,6 +306,37 @@ export default function ManageCategories() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm !== null && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Category?</h3>
+            <p className="text-gray-600 text-sm mb-6">
+              Are you sure you want to delete "<strong>{categories[deleteConfirm]}</strong>"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  remove(deleteConfirm);
+                  setDeleteConfirm(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Detail Modal */}
       {selectedCategory && (

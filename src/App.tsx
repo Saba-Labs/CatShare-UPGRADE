@@ -2446,6 +2446,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           {/* Leaf routes must have an element or RR warns; Catalogue UI lives outside <Outlet />. */}
           <Route index element={<></>} />
           <Route path="catalogues" element={<></>} />
+          <Route
+            path="manage-categories"
+            element={
+              <ProtectedRoute>
+                <ManageCategories />
+              </ProtectedRoute>
+            }
+          />
         </Route>
         <Route
           path="/create"
@@ -2552,14 +2560,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <ProInfo />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manage-categories"
-          element={
-            <ProtectedRoute>
-              <ManageCategories />
             </ProtectedRoute>
           }
         />
