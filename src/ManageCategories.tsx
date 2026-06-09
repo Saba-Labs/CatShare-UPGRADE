@@ -80,7 +80,7 @@ export default function ManageCategories() {
   const toggleProductCategory = (productId: string, categoryName: string) => {
     const updatedProducts = products.map((p) => {
       if (p.id === productId) {
-        const currentCategories = (p.category || '').split(',').map((c: string) => c.trim()).filter(Boolean);
+        const currentCategories = getProductCategoriesArray(p);
         if (currentCategories.includes(categoryName)) {
           return { ...p, category: currentCategories.filter((c: string) => c !== categoryName).join(', ') };
         } else {
@@ -97,8 +97,13 @@ export default function ManageCategories() {
     }
   };
 
-  const getProductCategoriesArray = (product: any) => {
-    return (product.category || '').split(',').map((c: string) => c.trim()).filter(Boolean);
+  const getProductCategoriesArray = (product: any): string[] => {
+    if (!product.category) return [];
+    if (Array.isArray(product.category)) return product.category;
+    if (typeof product.category === 'string') {
+      return product.category.split(',').map((c: string) => c.trim()).filter(Boolean);
+    }
+    return [];
   };
 
   const isProductInCategory = (product: any, categoryName: string) => {
