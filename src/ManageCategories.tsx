@@ -322,8 +322,10 @@ export default function ManageCategories() {
                           className="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{product.name || 'Unnamed'}</p>
-                          {product.sku && <p className="text-xs text-gray-500">SKU: {product.sku}</p>}
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {product.name || 'Unnamed'}
+                            {product.sku && <span className="text-gray-400 ml-1">({product.sku})</span>}
+                          </p>
                         </div>
                       </div>
                     ))}
