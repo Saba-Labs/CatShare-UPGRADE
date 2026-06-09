@@ -5,6 +5,7 @@ import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from '
 import { useAuth } from './context/AuthContext';
 import { syncCategories } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
+import { readProductsWithLegacyFallback } from './utils/safeStorage';
 
 export default function ManageCategories() {
   const navigate = useNavigate();
@@ -23,9 +24,9 @@ export default function ManageCategories() {
   }, []);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('products') || '[]');
+    const stored = readProductsWithLegacyFallback(user?.uid || '');
     setProducts(stored);
-  }, []);
+  }, [user?.uid]);
 
   const save = (list: string[]) => {
     setCategories(list);
@@ -89,7 +90,11 @@ export default function ManageCategories() {
       return p;
     });
     setProducts(updatedProducts);
-    localStorage.setItem('products', JSON.stringify(updatedProducts));
+
+    if (user?.uid) {
+      const { safeSetProductsCache } = require('./utils/safeStorage');
+      safeSetProductsCache(user.uid, updatedProducts);
+    }
   };
 
   const getProductCategoriesArray = (product: any) => {
