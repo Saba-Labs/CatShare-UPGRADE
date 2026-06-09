@@ -96,7 +96,7 @@ export default function ManageCategories() {
       const { safeSetProductsCache } = require('./utils/safeStorage');
       safeSetProductsCache(user.uid, updatedProducts);
 
-      syncProducts(user.uid, updatedProducts).catch((err) => {
+      syncProducts(user.uid, updatedProducts, { skipImageUrlAssertion: true }).catch((err) => {
         console.warn('⚠️ Failed to sync products to Supabase:', err);
       });
     }
