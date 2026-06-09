@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiMenu } from 'react-icons/fi';
 import { MdOutlineHome } from 'react-icons/md';
-import SideDrawer from './SideDrawer';
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -133,15 +132,17 @@ export default function ManageCategories() {
   };
 
   return (
-    <SideDrawer>
-      <div className="min-h-screen bg-white overflow-auto flex flex-col">
+    <div className="min-h-screen bg-white overflow-auto flex flex-col">
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
         <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new Event("toggle-menu"))}
+            onClick={() => {
+              navigate("/");
+              setTimeout(() => window.dispatchEvent(new Event("toggle-menu")), 0);
+            }}
             className="relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 hover:bg-gray-100 rounded-md transition"
             aria-label="Menu"
             title="Menu"
@@ -445,6 +446,5 @@ export default function ManageCategories() {
         </div>
       )}
     </div>
-    </SideDrawer>
   );
 }
