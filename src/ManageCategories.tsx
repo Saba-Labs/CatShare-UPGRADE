@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch } from 'react-icons/fi';
 import { useAuth } from './context/AuthContext';
-import { syncCategories } from './services/supabaseSync';
+import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
 import { readProductsWithLegacyFallback } from './utils/safeStorage';
 import { productImageDisplayUrl } from './utils/imageUrl';
@@ -95,6 +95,10 @@ export default function ManageCategories() {
     if (user?.uid) {
       const { safeSetProductsCache } = require('./utils/safeStorage');
       safeSetProductsCache(user.uid, updatedProducts);
+
+      syncProducts(user.uid, updatedProducts).catch((err) => {
+        console.warn('⚠️ Failed to sync products to Supabase:', err);
+      });
     }
   };
 
