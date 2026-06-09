@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiSearch, FiMenu } from 'react-icons/fi';
 import { MdOutlineHome } from 'react-icons/md';
+import SideDrawer from './SideDrawer';
 import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
@@ -132,7 +133,8 @@ export default function ManageCategories() {
   };
 
   return (
-    <div className="min-h-screen bg-white overflow-auto flex flex-col">
+    <SideDrawer>
+      <div className="min-h-screen bg-white overflow-auto flex flex-col">
       <div className="relative -mx-4">
         <div className="sticky top-0 h-[40px] bg-black z-50"></div>
         {/* Header */}
@@ -443,5 +445,6 @@ export default function ManageCategories() {
         </div>
       )}
     </div>
+    </SideDrawer>
   );
 }
