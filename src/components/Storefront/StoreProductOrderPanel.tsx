@@ -172,7 +172,7 @@ export default function StoreProductOrderPanel({
       <div className="sv-drawer-qty-header">
         <div className="sv-drawer-qty-label">Quantity</div>
         {qstep > 1 ? <PackHint step={qstep} className="website-product-pack-hint" /> : null}
-        {minQty > 1 ? <MoqHint minQty={minQty} className="website-product-pack-hint" /> : null}
+        {rules.moq > 1 ? <MoqHint minQty={minQty} className="website-product-pack-hint" /> : null}
       </div>
       <div className="sv-drawer-qty-row">
         <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
