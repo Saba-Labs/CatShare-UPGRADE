@@ -1834,7 +1834,7 @@ export default function StoreView() {
                       <button type="button" className="sv-details-btn" onClick={() => setDrawerProduct(product)}>Details</button>
                     </div>
                     {qstep > 1 && <PackHint step={qstep} />}
-                    {minQty > 1 && <MoqHint minQty={minQty} />}
+                    {rules.moq > 1 && <MoqHint minQty={minQty} />}
                   </div>
                   {isSelected && (
                     <div className="sv-pcard-subtotal">
@@ -2232,7 +2232,7 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
                         {qstep > 1 && <PackHint step={qstep} />}
-                        {minQty > 1 && <MoqHint minQty={minQty} />}
+                        {rules.moq > 1 && <MoqHint minQty={minQty} />}
                       </div>
                       <div className="sv-drawer-total-wrap">
                         {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}

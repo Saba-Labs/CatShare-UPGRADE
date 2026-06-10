@@ -133,10 +133,9 @@ export default function ManageCategories() {
 
   return (
     <div className="min-h-screen bg-white overflow-auto flex flex-col">
-      <div className="relative -mx-4">
-        <div className="sticky top-0 h-[40px] bg-black z-50"></div>
-        {/* Header */}
-        <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+      <div className="sticky top-0 h-[40px] bg-black z-50"></div>
+      {/* Header */}
+      <header className="sticky top-[40px] z-40 bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
           <button
             type="button"
             onClick={() => {
@@ -165,8 +164,7 @@ export default function ManageCategories() {
           >
             <MdOutlineHome size={24} />
           </button>
-        </header>
-      </div>
+      </header>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
