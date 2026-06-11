@@ -622,6 +622,13 @@ export default function CreateProduct() {
     return () => clearTimeout(timer);
   }, [variantConfig.combinations, editingId, variantGroups]);
 
+  // Auto-show manage details view when variants are loaded
+  useEffect(() => {
+    if (variantGroups.length > 0) {
+      setShowManageVariants(true);
+    }
+  }, [variantGroups.length]);
+
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
