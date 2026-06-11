@@ -2544,40 +2544,51 @@ if (migratedProduct.suggestedColors?.length > 0) {
           )}
 
           {formSection === 'variants' && (
-            <motion.div className="mb-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div className="flex items-baseline justify-between mb-6 gap-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            <motion.div className="mb-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+              <div className="flex items-start justify-between mb-6 gap-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
                     Product Variants
                   </h3>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                    {variantGroups.length} group{variantGroups.length !== 1 ? 's' : ''} • {variantConfig.combinations?.length || 0} combination{(variantConfig.combinations?.length || 0) !== 1 ? 's' : ''}
-                  </p>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40">
+                      <svg className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v2h16V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-xs font-bold text-blue-700 dark:text-blue-300">{variantGroups.length} {variantGroups.length === 1 ? 'group' : 'groups'}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/40">
+                      <svg className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-xs font-bold text-purple-700 dark:text-purple-300">{variantConfig.combinations?.length || 0} {(variantConfig.combinations?.length || 0) === 1 ? 'combination' : 'combinations'}</span>
+                    </div>
+                  </div>
                 </div>
                 <motion.button
                   onClick={() => setShowManageVariants(!showManageVariants)}
-                  className={`flex items-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-10px text-xs font-bold transition-all whitespace-nowrap ${
                     showManageVariants
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                      : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/30'
+                      : 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white shadow-lg shadow-emerald-500/30'
                   }`}
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{ scale: 1.05, y: -1 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {showManageVariants ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
                     ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     )}
                   </svg>
-                  {showManageVariants ? 'View List' : 'Edit'}
+                  {showManageVariants ? 'View List' : 'Edit Setup'}
                 </motion.button>
               </div>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.25 }}
               >
                 {showManageVariants ? (
                   <div className="space-y-4">
