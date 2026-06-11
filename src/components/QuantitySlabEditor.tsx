@@ -4,6 +4,7 @@ import {
   coerceEditorQuantitySlabs,
   type QuantityPriceSlab,
 } from '../utils/quantityPricingUtils';
+import { InfoTooltip } from './InfoTooltip';
 
 type Props = {
   value: QuantityPriceSlab[] | undefined;
@@ -67,11 +68,7 @@ export default function QuantitySlabEditor({ value, onChange, theme = 'classic' 
 
   return (
     <div className="space-y-2">
-      {slabs.length === 0 ? (
-        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-          No slabs — uses the single Price above. Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90).
-        </p>
-      ) : (
+      {slabs.length > 0 && (
         <div className="space-y-2">
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             <span>Min qty</span>
@@ -136,9 +133,12 @@ export default function QuantitySlabEditor({ value, onChange, theme = 'classic' 
         type="button"
         onMouseDown={(e) => e.preventDefault()}
         onClick={addSlab}
-        className="text-xs font-semibold text-green-700 dark:text-green-400 hover:underline"
+        className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-600 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-green-400 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
       >
-        + Add price slab
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>Add slab</span>
       </button>
     </div>
   );
