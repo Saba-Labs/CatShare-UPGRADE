@@ -391,9 +391,6 @@ export default function VariantCombinationEditor({
                 }
                 className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
               />
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
-                1 = any quantity. E.g. 12 → only 12, 24, 36…
-              </p>
             </div>
           </div>
 
@@ -427,9 +424,6 @@ export default function VariantCombinationEditor({
                 }
                 className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded text-xs bg-white dark:bg-gray-800 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&[type=number]]:appearance-none"
               />
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
-                1 = no extra minimum for this variant.
-              </p>
             </div>
           </div>
 
@@ -459,9 +453,6 @@ export default function VariantCombinationEditor({
                   })
                 }
               />
-              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
-                Overrides this variant&apos;s Price/Offer when qty matches a slab. Leave empty to use catalogue slabs or single price.
-              </p>
             </div>
           </div>
         </div>
