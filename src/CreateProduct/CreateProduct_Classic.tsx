@@ -2444,7 +2444,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Qty step
-                      <InfoTooltip content="1 = any quantity. E.g. 12 → only 12, 24, 36… on the order form (per catalogue)." />
+                      <InfoTooltip content={
+                        <div className="space-y-2">
+                          <p>Set the allowed order quantities:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><span className="font-semibold">1</span> = any quantity allowed</li>
+                            <li><span className="font-semibold">12</span> = only 12, 24, 36, etc.</li>
+                          </ul>
+                        </div>
+                      } />
                     </label>
                     <div className="flex-1 min-w-0">
                       <OrderQuantityStepInput
@@ -2459,7 +2467,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       MOQ
-                      <InfoTooltip content="1 = no extra minimum. E.g. 50 → buyers must order at least 50 (rounded to qty step)." />
+                      <InfoTooltip content={
+                        <div className="space-y-2">
+                          <p>Minimum quantity buyers must order:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><span className="font-semibold">1</span> = no minimum</li>
+                            <li><span className="font-semibold">50</span> = must order at least 50 units</li>
+                          </ul>
+                        </div>
+                      } />
                     </label>
                     <div className="flex-1 min-w-0">
                       <MinimumOrderQuantityInput
@@ -2474,7 +2490,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Slab pricing
-                      <InfoTooltip content="No slabs — uses the single Price above. Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90)." />
+                      <InfoTooltip content={
+                        <div className="space-y-2">
+                          <p>Volume pricing tiers for bulk orders:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><span className="font-semibold">No slabs</span> = fixed price</li>
+                            <li><span className="font-semibold">With slabs</span> = cheaper per unit at higher quantities</li>
+                            <li><span className="text-[11px] italic">Example: 1–99 @ ₹100, 100+ @ ₹90</span></li>
+                          </ul>
+                        </div>
+                      } />
                     </label>
                     <div className="flex-1 min-w-0">
                       <QuantitySlabEditor

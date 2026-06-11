@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import { FiInfo } from 'react-icons/fi';
 
 interface InfoTooltipProps {
-  content: string;
+  content: ReactNode;
   className?: string;
 }
 
