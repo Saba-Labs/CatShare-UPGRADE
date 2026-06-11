@@ -457,27 +457,35 @@ export default function VariantCombinationEditor({
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-          <button
-            onClick={handleSaveData}
-            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-xs font-medium flex-1"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleCancel}
-            className="bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-3 rounded text-xs font-medium flex-1"
-          >
-            Cancel
-          </button>
+        <div className="flex gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
           {selectedExistingData && (
             <button
               onClick={handleDeleteData}
-              className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs font-medium"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 transition-colors"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
               Delete
             </button>
           )}
+          <div className="flex-1 flex gap-2">
+            <button
+              onClick={handleCancel}
+              className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveData}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Save
+            </button>
+          </div>
         </div>
       </div>
     );
