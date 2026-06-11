@@ -14,6 +14,7 @@ import { useToast } from "../context/ToastContext";
 import { deleteImageFromR2 } from "../services/cloudflareService";
 import { uploadProductImageToR2 } from "../services/r2Upload";
 import QuantitySlabEditor from "./QuantitySlabEditor";
+import { InfoTooltip } from "./InfoTooltip";
 import {
   normalizeQuantitySlabs,
   type QuantityPriceSlab,
@@ -302,8 +303,17 @@ export default function VariantCombinationEditor({
 
           {/* Price */}
           <div className="flex gap-3 items-center">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 flex items-center gap-1">
               Price
+              <InfoTooltip content={
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Selling price for this variant:</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                    <li>Cost to buyer</li>
+                    <li>Applicable discount shows as Offer</li>
+                  </ul>
+                </div>
+              } />
             </label>
             <div className="relative flex-1">
               <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-600 dark:text-gray-400 pointer-events-none">
