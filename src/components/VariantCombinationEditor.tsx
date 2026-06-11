@@ -438,11 +438,11 @@ export default function VariantCombinationEditor({
               Slab pricing
               <InfoTooltip content={
                 <div className="space-y-2">
-                  <p className="text-gray-700 dark:text-gray-300 font-medium">Quantity-based pricing:</p>
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Volume pricing tiers for bulk orders:</p>
                   <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
-                    <li>Set different prices for bulk quantities</li>
-                    <li>Overrides Price/Offer when qty matches</li>
-                    <li>Leave empty to use single price or catalogue slabs</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">No slabs</span> = fixed price</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">With slabs</span> = cheaper per unit at higher quantities</li>
+                    <li><span className="text-[11px] italic text-gray-500 dark:text-gray-500">Example: 1–99 @ ₹100, 100+ @ ₹90</span></li>
                   </ul>
                 </div>
               } />
