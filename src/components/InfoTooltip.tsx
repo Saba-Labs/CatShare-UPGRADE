@@ -35,7 +35,7 @@ export function InfoTooltip({ content, className = '' }: InfoTooltipProps) {
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors flex-shrink-0"
+        className="inline-flex items-center justify-center w-4 h-4 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-shrink-0"
         aria-label="Information"
       >
         <FiInfo size={14} />
@@ -44,9 +44,10 @@ export function InfoTooltip({ content, className = '' }: InfoTooltipProps) {
       {isOpen && (
         <div
           ref={tooltipRef}
-          className="absolute z-50 p-2 mt-1 text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded shadow-lg whitespace-normal w-48 leading-snug"
+          className="absolute z-50 p-3 mt-2 text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md dark:shadow-xl whitespace-normal w-56 leading-relaxed"
           style={{ left: '0' }}
         >
+          <div className="absolute -top-1 left-1 w-2 h-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0 border-r-0 transform -rotate-45" />
           {content}
         </div>
       )}
