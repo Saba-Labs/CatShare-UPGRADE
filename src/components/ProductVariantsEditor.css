@@ -437,9 +437,9 @@
 /* Tabs Wrapper */
 .pve-tabs-wrapper {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   position: relative;
   z-index: 1;
 }
@@ -568,50 +568,61 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 1.5px dashed;
-  border-radius: 8px;
+  border: 2px dashed;
+  border-radius: 10px;
   background: transparent;
   cursor: pointer;
   line-height: 1;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .pve-tab-add-icon {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .pve--classic .pve-tab-add {
-  border-color: #e2e8f0;
-  color: #64748b;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .pve--classic .pve-tab-add:hover:not(:disabled) {
   border-color: #3b82f6;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: #eff6ff;
   color: #2563eb;
-  transform: scale(1.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.pve--classic .pve-tab-add:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .pve--glass .pve-tab-add {
-  border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .pve--glass .pve-tab-add:hover:not(:disabled) {
-  border-color: rgba(96, 165, 250, 0.6);
+  border-color: rgba(96, 165, 250, 0.7);
   background: rgba(59, 130, 246, 0.2);
   color: rgba(147, 197, 253, 1);
-  transform: scale(1.05);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.pve--glass .pve-tab-add:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .pve-tab-add:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
