@@ -2544,39 +2544,60 @@ if (migratedProduct.suggestedColors?.length > 0) {
           )}
 
           {formSection === 'variants' && (
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                  Product variants
-                </h3>
-                <button
+            <motion.div className="mb-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <div className="flex items-baseline justify-between mb-6 gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    Product Variants
+                  </h3>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {variantGroups.length} group{variantGroups.length !== 1 ? 's' : ''} • {variantConfig.combinations?.length || 0} combination{(variantConfig.combinations?.length || 0) !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <motion.button
                   onClick={() => setShowManageVariants(!showManageVariants)}
-                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white py-2 px-4 rounded-lg text-xs font-semibold shadow-md shadow-green-500/30 hover:shadow-lg hover:shadow-green-500/40 transition-all flex items-center gap-2"
+                  className={`flex items-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    showManageVariants
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                      : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
+                  }`}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    {showManageVariants ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    )}
                   </svg>
-                  {showManageVariants ? 'View List' : 'Manage Details'}
-                </button>
+                  {showManageVariants ? 'View List' : 'Edit'}
+                </motion.button>
               </div>
-              {showManageVariants ? (
-                <div className="space-y-4">
-                  <VariantCombinationEditor
-                    variantConfig={{ ...variantConfig, groups: variantGroups }}
-                    onChange={(updatedConfig) => {
-                      setVariantConfig(updatedConfig);
-                    }}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                {showManageVariants ? (
+                  <div className="space-y-4">
+                    <VariantCombinationEditor
+                      variantConfig={{ ...variantConfig, groups: variantGroups }}
+                      onChange={(updatedConfig) => {
+                        setVariantConfig(updatedConfig);
+                      }}
+                      theme="classic"
+                    />
+                  </div>
+                ) : (
+                  <ProductVariantsEditor
+                    groups={variantGroups}
+                    onChange={setVariantGroups}
                     theme="classic"
                   />
-                </div>
-              ) : (
-                <ProductVariantsEditor
-                  groups={variantGroups}
-                  onChange={setVariantGroups}
-                  theme="classic"
-                />
-              )}
-            </div>
+                )}
+              </motion.div>
+            </motion.div>
           )}
 
           {/* Save/Cancel Buttons */}
