@@ -2589,6 +2589,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         setVariantConfig(updatedConfig);
                       }}
                       theme="classic"
+                      onBackClick={() => setShowManageVariants(false)}
                     />
                   </div>
                 ) : (
@@ -2606,7 +2607,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
             <button
               onClick={saveAndNavigate}
-              disabled={isSaving}
+              disabled={isSaving || (variantGroups.length > 0 && (!variantConfig.combinations || variantConfig.combinations.length === 0))}
+              title={variantGroups.length > 0 && (!variantConfig.combinations || variantConfig.combinations.length === 0) ? "Configure variant combinations first" : ""}
               className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
             >
               {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
@@ -2673,6 +2675,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }}
   onChange={(updated) => setVariantConfig(updated)}
   theme="classic"
+  onBackClick={() => setShowVariantDetailsModal(false)}
   onSave={(updatedConfig) => {
     if (!editingId) return;
     const authUserIdNow = getPersistedAuthUserId();
