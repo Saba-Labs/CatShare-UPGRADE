@@ -365,8 +365,18 @@ export default function VariantCombinationEditor({
 
           {/* Qty Step */}
           <div className="flex gap-3 items-start">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
               Qty step
+              <InfoTooltip content={
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum order increment:</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                    <li>1 = any quantity allowed</li>
+                    <li>12 = only multiples (12, 24, 36, etc.)</li>
+                    <li>Controls quantity stepping in cart</li>
+                  </ul>
+                </div>
+              } />
             </label>
             <div className="flex-1 min-w-0">
               <input
@@ -388,8 +398,18 @@ export default function VariantCombinationEditor({
           </div>
 
           <div className="flex gap-3 items-start">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
               MOQ
+              <InfoTooltip content={
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum order quantity:</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                    <li>1 = no extra minimum</li>
+                    <li>Applied to this variant only</li>
+                    <li>Overrides catalogue minimum if set</li>
+                  </ul>
+                </div>
+              } />
             </label>
             <div className="flex-1 min-w-0">
               <input
@@ -414,8 +434,18 @@ export default function VariantCombinationEditor({
           </div>
 
           <div className="flex gap-3 items-start">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
               Slab pricing
+              <InfoTooltip content={
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Quantity-based pricing:</p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                    <li>Set different prices for bulk quantities</li>
+                    <li>Overrides Price/Offer when qty matches</li>
+                    <li>Leave empty to use single price or catalogue slabs</li>
+                  </ul>
+                </div>
+              } />
             </label>
             <div className="flex-1 min-w-0">
               <QuantitySlabEditor
