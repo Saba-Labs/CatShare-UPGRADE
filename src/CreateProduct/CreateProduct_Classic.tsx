@@ -2472,8 +2472,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   </div>
 
                   <div className="flex gap-3 items-start">
-                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Slab pricing
+                      <InfoTooltip content="No slabs — uses the single Price above. Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90)." />
                     </label>
                     <div className="flex-1 min-w-0">
                       <QuantitySlabEditor

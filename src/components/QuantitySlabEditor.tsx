@@ -68,12 +68,7 @@ export default function QuantitySlabEditor({ value, onChange, theme = 'classic' 
 
   return (
     <div className="space-y-2">
-      {slabs.length === 0 ? (
-        <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
-          <span>No slabs — uses the single Price above.</span>
-          <InfoTooltip content="Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90)." />
-        </div>
-      ) : (
+      {slabs.length > 0 && (
         <div className="space-y-2">
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
             <span>Min qty</span>
@@ -138,7 +133,7 @@ export default function QuantitySlabEditor({ value, onChange, theme = 'classic' 
         type="button"
         onMouseDown={(e) => e.preventDefault()}
         onClick={addSlab}
-        className="text-xs font-semibold text-green-700 dark:text-green-400 hover:underline"
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-green-600 dark:bg-green-700 rounded hover:bg-green-700 dark:hover:bg-green-600 transition-colors"
       >
         + Add price slab
       </button>
