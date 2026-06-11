@@ -114,17 +114,17 @@
 
 /* Labels - Modern Typography */
 .pve-label {
-  font-size: 10px;
-  font-weight: 800;
-  opacity: 0.6;
-  letter-spacing: 1px;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.55;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   line-height: 1.4;
 }
 
 .pve-label--options {
   margin-top: 6px;
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 .pve--classic .pve-label {
@@ -164,9 +164,9 @@
 }
 
 .pve-input--group-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
 }
 
 .pve--glass .pve-input {
@@ -316,9 +316,9 @@
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 600 !important;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.15px;
 }
 
 .pve-input--option::placeholder {
@@ -377,10 +377,10 @@
 /* Add Option / Add Group Buttons */
 .pve-add-option,
 .pve-add-group {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   border-radius: 10px;
-  padding: 11px 14px;
+  padding: 10px 12px;
   cursor: pointer;
   border: 1.5px dashed;
   background: transparent;
@@ -478,18 +478,18 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 13px;
+  padding: 8px 11px;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
   border-radius: 8px;
   transition: all 0.2s ease;
   opacity: 0.6;
   flex-shrink: 0;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .pve-tab:hover {
