@@ -568,27 +568,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   padding: 0;
   border: 2px dashed;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   cursor: pointer;
   line-height: 1;
   white-space: nowrap;
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
   flex-shrink: 0;
-  margin-left: 4px;
 }
 
 .pve-tab-add-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .pve--classic .pve-tab-add {
-  border-color: #cbd5e1;
+  border-color: #94a3b8;
   color: #475569;
 }
 
@@ -596,33 +595,23 @@
   border-color: #3b82f6;
   background: #eff6ff;
   color: #2563eb;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-}
-
-.pve--classic .pve-tab-add:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(1.05);
 }
 
 .pve--glass .pve-tab-add {
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .pve--glass .pve-tab-add:hover:not(:disabled) {
   border-color: rgba(96, 165, 250, 0.7);
   background: rgba(59, 130, 246, 0.2);
   color: rgba(147, 197, 253, 1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-}
-
-.pve--glass .pve-tab-add:active:not(:disabled) {
-  transform: translateY(0);
+  transform: scale(1.05);
 }
 
 .pve-tab-add:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
