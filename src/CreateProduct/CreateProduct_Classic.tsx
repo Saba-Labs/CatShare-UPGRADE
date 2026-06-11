@@ -58,6 +58,7 @@ import VariantCombinationEditor from "../components/VariantCombinationEditor";
 import {
   getProductVariantGroups,
   pruneVariantGroupsForSave,
+  getAllVariantCombinations,
   type ProductVariantGroup,
   type ProductVariantsConfig,
 } from "../utils/productVariants";
@@ -622,12 +623,8 @@ export default function CreateProduct() {
     return () => clearTimeout(timer);
   }, [variantConfig.combinations, editingId, variantGroups]);
 
-  // Auto-show manage details view when variants are loaded
-  useEffect(() => {
-    if (variantGroups.length > 0) {
-      setShowManageVariants(true);
-    }
-  }, [variantGroups.length]);
+  // Keep manage details view hidden until user explicitly chooses to configure variants
+  // This ensures the variant list is shown first, not the details form
 
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -2593,6 +2590,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         setVariantConfig(updatedConfig);
                       }}
                       theme="classic"
+                      onBackClick={() => setShowManageVariants(false)}
                     />
                   </div>
                 ) : (
@@ -2608,13 +2606,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
           {/* Save/Cancel Buttons */}
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-            <button
-              onClick={saveAndNavigate}
-              disabled={isSaving}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
-            >
-              {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
-            </button>
+            {(() => {
+              const generatedCombinations = getAllVariantCombinations(variantGroups);
+              const hasUnconfiguredVariants = variantGroups.length > 0 && generatedCombinations.length > 0 &&
+                (!variantConfig.combinations || variantConfig.combinations.length === 0);
+              return (
+                <button
+                  onClick={saveAndNavigate}
+                  disabled={isSaving || hasUnconfiguredVariants}
+                  title={hasUnconfiguredVariants ? "Configure variant combinations first" : ""}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
+                >
+                  {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
+                </button>
+              );
+            })()}
             <button
               onClick={handleCancel}
               disabled={isSaving}
@@ -2677,6 +2683,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }}
   onChange={(updated) => setVariantConfig(updated)}
   theme="classic"
+  onBackClick={() => setShowVariantDetailsModal(false)}
   onSave={(updatedConfig) => {
     if (!editingId) return;
     const authUserIdNow = getPersistedAuthUserId();

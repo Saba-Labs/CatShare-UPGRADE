@@ -259,10 +259,9 @@ export async function handleShare({
     }
   });
 
-  setProcessing(false);
-
   if (fileUris.length === 0) {
     console.error(`❌ Share failed: No rendered images available. Failed products:`, failedProducts);
+    setProcessing(false);
     alert("❌ Cannot share: No rendered images available.\n\nPlease ensure you have:\n1. Selected at least one product\n2. That product has an image\n\nThe app will automatically render products before sharing. If rendering failed, please:\n- Check that products have images\n- Try rendering manually first\n\nFailed products: " + failedProducts.join(", "));
     return;
   }
@@ -364,5 +363,7 @@ export async function handleShare({
     console.error("❌ Share/Download failed:", err);
     console.log(`\n📊 Share Summary: Successfully prepared ${fileUris.length} files but share was cancelled or failed`);
     alert("Sharing failed: " + (err as Error).message + "\n\nTry saving the image and share it manually using your device's sharing options.");
+  } finally {
+    setProcessing(false);
   }
 }

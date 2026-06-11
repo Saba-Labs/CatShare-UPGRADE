@@ -2018,6 +2018,11 @@ const handleTouchEnd = useCallback(() => {
                 : `Loaded ${processingIndex} of ${processingTotal}`
               : `Fetching ${processingIndex} of ${processingTotal}`}
         </div>
+        {processingPhase === "rendering" && processingTotal > 0 && (
+          <div className="text-sm font-semibold text-blue-600">
+            {Math.round((processingIndex / processingTotal) * 100)}% complete
+          </div>
+        )}
       </div>
 
       {/* Rendering or PDF image preload progress */}

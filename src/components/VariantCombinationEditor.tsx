@@ -25,6 +25,7 @@ interface VariantCombinationEditorProps {
   onChange: (updatedConfig: ProductVariantsConfig) => void;
   theme?: "classic" | "glass";
   onSave?: (updatedConfig: ProductVariantsConfig) => void;
+  onBackClick?: () => void;
 }
 
 export default function VariantCombinationEditor({
@@ -32,6 +33,7 @@ export default function VariantCombinationEditor({
   onChange,
   theme = "classic",
   onSave,
+  onBackClick,
 }: VariantCombinationEditorProps) {
   const { showToast } = useToast();
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
@@ -138,8 +140,29 @@ export default function VariantCombinationEditor({
 
   if (combinations.length === 0) {
     return (
-      <div className="p-4 text-center text-gray-500">
-        <p>No variant combinations. Create variant groups first.</p>
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <div className="mb-4 p-4 rounded-full bg-gray-100 dark:bg-gray-800/50">
+          <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+          No Variant Combinations Yet
+        </h3>
+        <p className="text-xs text-gray-600 dark:text-gray-400 max-w-xs mb-4">
+          Create variant groups first to generate combinations. Each group creates new variants that can be individually configured with images, prices, and details.
+        </p>
+        {onBackClick && (
+          <button
+            onClick={onBackClick}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Create Variant Groups
+          </button>
+        )}
       </div>
     );
   }
