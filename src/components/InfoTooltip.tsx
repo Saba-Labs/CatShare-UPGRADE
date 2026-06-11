@@ -44,11 +44,13 @@ export function InfoTooltip({ content, className = '' }: InfoTooltipProps) {
       {isOpen && (
         <div
           ref={tooltipRef}
-          className="absolute z-50 p-3 mt-2 text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-md dark:shadow-xl whitespace-normal w-56 leading-relaxed"
+          className="absolute z-50 p-3 mt-2 bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-700 rounded-lg shadow-lg dark:shadow-2xl whitespace-normal w-56 leading-relaxed"
           style={{ left: '0' }}
         >
-          <div className="absolute -top-1 left-1 w-2 h-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0 border-r-0 transform -rotate-45" />
-          {content}
+          <div className="absolute -top-1 left-1 w-2 h-2 bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-700 border-b-0 border-r-0 transform -rotate-45" />
+          <div className="text-xs text-gray-600 dark:text-gray-300">
+            {content}
+          </div>
         </div>
       )}
     </div>

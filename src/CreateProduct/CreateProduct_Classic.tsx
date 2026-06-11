@@ -2446,10 +2446,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       Qty step
                       <InfoTooltip content={
                         <div className="space-y-2">
-                          <p>Set the allowed order quantities:</p>
-                          <ul className="list-disc list-inside space-y-1">
-                            <li><span className="font-semibold">1</span> = any quantity allowed</li>
-                            <li><span className="font-semibold">12</span> = only 12, 24, 36, etc.</li>
+                          <p className="text-gray-700 dark:text-gray-300 font-medium">Set the allowed order quantities:</p>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">1</span> = any quantity allowed</li>
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">12</span> = only 12, 24, 36, etc.</li>
                           </ul>
                         </div>
                       } />
@@ -2469,10 +2469,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       MOQ
                       <InfoTooltip content={
                         <div className="space-y-2">
-                          <p>Minimum quantity buyers must order:</p>
-                          <ul className="list-disc list-inside space-y-1">
-                            <li><span className="font-semibold">1</span> = no minimum</li>
-                            <li><span className="font-semibold">50</span> = must order at least 50 units</li>
+                          <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum quantity buyers must order:</p>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">1</span> = no minimum</li>
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">50</span> = must order at least 50 units</li>
                           </ul>
                         </div>
                       } />
@@ -2492,11 +2492,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       Slab pricing
                       <InfoTooltip content={
                         <div className="space-y-2">
-                          <p>Volume pricing tiers for bulk orders:</p>
-                          <ul className="list-disc list-inside space-y-1">
-                            <li><span className="font-semibold">No slabs</span> = fixed price</li>
-                            <li><span className="font-semibold">With slabs</span> = cheaper per unit at higher quantities</li>
-                            <li><span className="text-[11px] italic">Example: 1–99 @ ₹100, 100+ @ ₹90</span></li>
+                          <p className="text-gray-700 dark:text-gray-300 font-medium">Volume pricing tiers for bulk orders:</p>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">No slabs</span> = fixed price</li>
+                            <li><span className="font-semibold text-gray-700 dark:text-gray-200">With slabs</span> = cheaper per unit at higher quantities</li>
+                            <li><span className="text-[11px] italic text-gray-500 dark:text-gray-500">Example: 1–99 @ ₹100, 100+ @ ₹90</span></li>
                           </ul>
                         </div>
                       } />
