@@ -369,11 +369,11 @@ export default function VariantCombinationEditor({
               Qty step
               <InfoTooltip content={
                 <div className="space-y-2">
-                  <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum order increment:</p>
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Order quantity increments:</p>
                   <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
-                    <li>1 = any quantity allowed</li>
-                    <li>12 = only multiples (12, 24, 36, etc.)</li>
-                    <li>Controls quantity stepping in cart</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">1</span> = any quantity allowed</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">12</span> = only multiples (12, 24, 36, etc.)</li>
+                    <li><span className="text-[11px] italic text-gray-500 dark:text-gray-500">Example: qty step 6 → buyer can order 6, 12, 18, 24…</span></li>
                   </ul>
                 </div>
               } />
@@ -402,11 +402,11 @@ export default function VariantCombinationEditor({
               MOQ
               <InfoTooltip content={
                 <div className="space-y-2">
-                  <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum order quantity:</p>
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Minimum order quantity for this variant:</p>
                   <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400">
-                    <li>1 = no extra minimum</li>
-                    <li>Applied to this variant only</li>
-                    <li>Overrides catalogue minimum if set</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">1</span> = no extra minimum</li>
+                    <li><span className="font-semibold text-gray-700 dark:text-gray-200">Variant-level</span> override (not global)</li>
+                    <li><span className="text-[11px] italic text-gray-500 dark:text-gray-500">Example: MOQ 50 → minimum order is 50 units</span></li>
                   </ul>
                 </div>
               } />
