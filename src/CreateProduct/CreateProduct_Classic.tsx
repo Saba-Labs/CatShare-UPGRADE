@@ -622,12 +622,8 @@ export default function CreateProduct() {
     return () => clearTimeout(timer);
   }, [variantConfig.combinations, editingId, variantGroups]);
 
-  // Auto-show manage details view when variants are loaded
-  useEffect(() => {
-    if (variantGroups.length > 0) {
-      setShowManageVariants(true);
-    }
-  }, [variantGroups.length]);
+  // Keep manage details view hidden until user explicitly chooses to configure variants
+  // This ensures the variant list is shown first, not the details form
 
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
