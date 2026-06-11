@@ -485,23 +485,26 @@ export default function VariantCombinationEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            {combinations.length} combination{combinations.length !== 1 ? "s" : ""}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            {existingData.length} with details set
+      <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              {combinations.length} variant{combinations.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">
+            {existingData.length} configured
           </p>
         </div>
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-          </svg>
+        <div className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+          {Math.round((existingData.length / combinations.length) * 100)}%
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto scrollbar-hide">
+      <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-hide">
         {combinations.map((combo) => {
           const hasData = existingData.some((c) => c.id === combo.id);
           const existing = existingData.find((c) => c.id === combo.id);
@@ -510,83 +513,91 @@ export default function VariantCombinationEditor({
             <button
               key={combo.id}
               onClick={() => handleSelectCombination(combo.id)}
-              className={`p-3 text-left rounded-lg border transition-all duration-200 group ${
+              className={`w-full text-left rounded-lg border transition-all duration-200 p-3 ${
                 hasData
-                  ? "border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:border-green-400 dark:hover:border-green-600 shadow-sm hover:shadow-md"
-                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md"
+                  ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50"
+                  : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-wrap gap-2">
-                  {variantConfig.groups.map((group) => {
-                    const chosen = combo.selections[group.id];
-                    if (!chosen) return null;
-                    return (
-                      <span
-                        key={group.id}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
-                      >
-                        {group.name}: {chosen}
-                      </span>
-                    );
-                  })}
-                </div>
-                {hasData && (
-                  <div className="flex-shrink-0">
-                    <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+              <div className="space-y-2">
+                {/* Variant Tags */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {variantConfig.groups.map((group) => {
+                      const chosen = combo.selections[group.id];
+                      if (!chosen) return null;
+                      return (
+                        <span
+                          key={group.id}
+                          className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-600"
+                        >
+                          <span className="text-gray-500 dark:text-gray-400 mr-1">{group.name}:</span>
+                          <span className="font-semibold">{chosen}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {hasData && (
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                  </div>
-                )}
-              </div>
-              {hasData && (
-                <div className="text-xs text-green-700 dark:text-green-300 mt-2 pt-2 border-t border-green-200 dark:border-green-800/50">
-                  <div className="grid grid-cols-2 gap-3">
+                  )}
+                </div>
+
+                {/* Details Grid */}
+                {hasData && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-green-200 dark:border-green-800">
                     {existing?.image && (
-                      <div className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
                         </svg>
-                        <span>Image</span>
+                        <span className="text-gray-700 dark:text-gray-300">Image</span>
                       </div>
                     )}
                     {existing?.price !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M8.5 5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM9 10a2 2 0 100-4 2 2 0 000 4zm0 6a4 4 0 100-8 4 4 0 000 8zm7-6a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span>{getCurrentCurrencySymbol()}{String(existing.price)}</span>
+                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(existing.price)}</span>
                       </div>
                     )}
                     {existing?.customFields?.offer !== undefined && (
-                      <div className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm0 6a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2H4z" />
                         </svg>
-                        <span>Offer: {getCurrentCurrencySymbol()}{String(existing.customFields.offer)}</span> 
+                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(existing.customFields.offer)}</span>
                       </div>
                     )}
                     {existing?.customFields?.orderQuantityStep !== undefined && existing.customFields.orderQuantityStep !== 1 && (
-                      <div className="flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
                         </svg>
-                        <span>Pack: {String(existing.customFields.orderQuantityStep)}</span>
+                        <span className="text-gray-700 dark:text-gray-300">Qty Step: <span className="font-semibold">{String(existing.customFields.orderQuantityStep)}</span></span>
+                      </div>
+                    )}
+                    {existing?.customFields?.minimumOrderQuantity !== undefined && existing.customFields.minimumOrderQuantity !== 1 && (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.3A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z" />
+                        </svg>
+                        <span className="text-gray-700 dark:text-gray-300">MOQ: <span className="font-semibold">{String(existing.customFields.minimumOrderQuantity)}</span></span>
                       </div>
                     )}
                     {normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length > 0 && (
-                      <div className="flex items-center gap-1 col-span-2">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                         </svg>
-                        <span>
-                          Slabs: {normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length} tier(s)
-                        </span>
+                        <span className="text-gray-700 dark:text-gray-300"><span className="font-semibold">{normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length}</span> slab tier(s)</span>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </button>
           );
         })}
