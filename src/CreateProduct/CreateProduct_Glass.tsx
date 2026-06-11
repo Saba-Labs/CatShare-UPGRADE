@@ -29,6 +29,7 @@ import {
   normalizeProductImageFields,
   primaryIndexAfterSlotRemoved,
 } from "../utils/productImages";
+import { InfoTooltip } from "../components/InfoTooltip";
 import {
   initializeCatalogueData,
   getCatalogueData,
@@ -2363,8 +2364,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   </div>
 
                   <div className="flex gap-3 items-start">
-                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Qty step
+                      <InfoTooltip content="1 = any quantity. E.g. 12 → only 12, 24, 36… on the order form (per catalogue)." />
                     </label>
                     <div className="flex-1 min-w-0">
                       <OrderQuantityStepInput
@@ -2373,15 +2375,13 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         onCommit={(n) => updateCatalogueData({ orderQuantityStep: n })}
                         className="border border-gray-300 dark:border-gray-700 p-2 w-full max-w-[120px] rounded text-xs bg-white dark:bg-gray-800"
                       />
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
-                        1 = any quantity. E.g. 12 → only 12, 24, 36… on the order form (per catalogue).
-                      </p>
                     </div>
                   </div>
 
                   <div className="flex gap-3 items-start">
-                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
+                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       MOQ
+                      <InfoTooltip content="1 = no extra minimum. E.g. 50 → buyers must order at least 50 (rounded to qty step)." />
                     </label>
                     <div className="flex-1 min-w-0">
                       <MinimumOrderQuantityInput
@@ -2390,9 +2390,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         onCommit={(n) => updateCatalogueData({ minimumOrderQuantity: n })}
                         className="border border-gray-300 dark:border-gray-700 p-2 w-full max-w-[120px] rounded text-xs bg-white dark:bg-gray-800"
                       />
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
-                        1 = no extra minimum. E.g. 50 → buyers must order at least 50 (rounded to qty step).
-                      </p>
                     </div>
                   </div>
 

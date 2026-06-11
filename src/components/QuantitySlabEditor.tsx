@@ -4,6 +4,7 @@ import {
   coerceEditorQuantitySlabs,
   type QuantityPriceSlab,
 } from '../utils/quantityPricingUtils';
+import { InfoTooltip } from './InfoTooltip';
 
 type Props = {
   value: QuantityPriceSlab[] | undefined;
@@ -68,9 +69,10 @@ export default function QuantitySlabEditor({ value, onChange, theme = 'classic' 
   return (
     <div className="space-y-2">
       {slabs.length === 0 ? (
-        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-          No slabs — uses the single Price above. Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90).
-        </p>
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+          <span>No slabs — uses the single Price above.</span>
+          <InfoTooltip content="Add tiers for volume pricing (e.g. 1–99 @ ₹100, 100+ @ ₹90)." />
+        </div>
       ) : (
         <div className="space-y-2">
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
