@@ -91,7 +91,7 @@ import RenderingOverlay from "./RenderingOverlay";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { saveRenderedImage } from "./Save";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
-import { DEFAULT_CATALOGUES, getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition } from "./config/catalogueConfig";
+import { DEFAULT_CATALOGUES, getAllCatalogues, getCataloguesDefinition, setCataloguesDefinition, getCatalogueByFolder, type Catalogue } from "./config/catalogueConfig";
 import { ThemeProvider } from "./context/ThemeContext";
 import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
@@ -1650,11 +1650,18 @@ function AppWithBackHandler() {
 
   // Handle rendering images with chunked processing to prevent UI freeze
   // Processes in small batches with UI yielding between chunks
-  const handleRenderPNGs = useCallback(async (customProducts?: any[], showOverlay: boolean = true) => {
+  const handleRenderPNGs = useCallback(async (
+    customProducts?: any[],
+    showOverlay: boolean = true,
+    catalogueFilter?: Catalogue | null
+  ) => {
     // Rendering must use the currently logged-in user's products (keyed storage / state),
     // otherwise images may render with missing file paths.
     const all = customProducts || products || [];
-    if (all.length === 0) return;
+    if (all.length === 0) {
+      window.dispatchEvent(new CustomEvent("renderComplete"));
+      return;
+    }
 
     // Prevent screen from sleeping during rendering
     try {
@@ -1675,8 +1682,8 @@ function AppWithBackHandler() {
       setRenderingTotal(all.length);
     });
 
-    // Get all catalogues
-    const catalogues = getAllCatalogues();
+    // Share flow renders one catalogue; manual render uses all catalogues.
+    const catalogues = catalogueFilter ? [catalogueFilter] : getAllCatalogues();
     let renderedCount = 0;
 
     // Chunk size - process this many products before yielding to UI thread
@@ -2117,9 +2124,16 @@ if (user?.uid && !authService.isOfflineGuest()) {
     };
 
     const handleRequestRenderSelectedPNGs = (event: any) => {
-      const { products, showOverlay = true } = event.detail;
+      const { products, showOverlay = true, catalogueId, catalogue } = event.detail;
+      const catalogueFilter =
+        (catalogueId && getAllCatalogues().find((c) => c.id === catalogueId)) ||
+        (catalogue?.folder && getCatalogueByFolder(catalogue.folder)) ||
+        (catalogue?.label && getCatalogueByFolder(catalogue.label)) ||
+        null;
       if (products && products.length > 0) {
-        handleRenderPNGs(products, showOverlay);
+        handleRenderPNGs(products, showOverlay, catalogueFilter);
+      } else {
+        window.dispatchEvent(new CustomEvent("renderComplete"));
       }
     };
 

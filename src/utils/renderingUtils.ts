@@ -10,21 +10,99 @@ import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getThemeById } from "../config/themeConfig";
 import { offerPriceFieldFor } from "./offerPriceUtils";
 
+export interface RenderedImageCatalogueRef {
+  label: string;
+  folder?: string;
+}
+
+/** Matches Save.jsx: always user-scoped (guest → user-anonymous). */
+export function getRenderedImageUserFolder(authUserId?: string | null): string {
+  const uid = authUserId ?? getPersistedAuthUserId();
+  return uid ? `user-${uid}` : "user-anonymous";
+}
+
+export function getRenderedImageFilename(
+  productId: string | number,
+  catalogueLabel: string
+): string {
+  return `product_${productId}_${catalogueLabel}.png`;
+}
+
+/** All on-disk paths that may hold a rendered share image (newest layout first). */
+export function getRenderedImageCandidatePaths(
+  productId: string | number,
+  catalogue: RenderedImageCatalogueRef,
+  authUserId?: string | null
+): string[] {
+  const userFolder = getRenderedImageUserFolder(authUserId);
+  const filename = getRenderedImageFilename(productId, catalogue.label);
+  const folder = catalogue.folder || catalogue.label;
+  const label = catalogue.label;
+  const paths: string[] = [
+    `${userFolder}/${folder}/${filename}`,
+    `${userFolder}/${folder}/products/${filename}`,
+  ];
+  if (folder !== label) {
+    paths.push(
+      `${userFolder}/${label}/${filename}`,
+      `${userFolder}/${label}/products/${filename}`
+    );
+  }
+  paths.push(`${label}/${filename}`, `${folder}/${filename}`);
+  return [...new Set(paths)];
+}
+
+export async function findRenderedImagePath(
+  productId: string | number,
+  catalogue: RenderedImageCatalogueRef,
+  authUserId?: string | null
+): Promise<string | null> {
+  for (const path of getRenderedImageCandidatePaths(productId, catalogue, authUserId)) {
+    try {
+      await Filesystem.stat({ path, directory: Directory.External });
+      return path;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
+}
+
+export async function getRenderedImageUri(
+  productId: string | number,
+  catalogue: RenderedImageCatalogueRef,
+  authUserId?: string | null
+): Promise<string | null> {
+  const path = await findRenderedImagePath(productId, catalogue, authUserId);
+  if (!path) return null;
+  try {
+    const fileResult = await Filesystem.getUri({
+      path,
+      directory: Directory.External,
+    });
+    return fileResult.uri || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Retrieve a rendered image from localStorage or filesystem
  * Returns the base64 data URL for the image
  */
 export async function getRenderedImage(
   productId: string,
-  catalogueLabel: string
+  catalogueLabel: string,
+  catalogueFolder?: string
 ): Promise<string | null> {
   const authUserId = getPersistedAuthUserId();
-  const userFolder = authUserId ? `user-${authUserId}` : null;
+  const userFolder = getRenderedImageUserFolder(authUserId);
+  const catalogue: RenderedImageCatalogueRef = {
+    label: catalogueLabel,
+    folder: catalogueFolder || catalogueLabel,
+  };
 
-  // First try localStorage
-  const storageKey = userFolder
-    ? `rendered::${userFolder}::${catalogueLabel}::${productId}`
-    : `rendered::${catalogueLabel}::${productId}`;
+  const storageKey = `rendered::${userFolder}::${catalogueLabel}::${productId}`;
   try {
     const stored = localStorage.getItem(storageKey);
     if (stored) {
@@ -38,52 +116,21 @@ export async function getRenderedImage(
     console.warn(`⚠️ Could not parse stored image data for ${storageKey}:`, err);
   }
 
-  // Try filesystem as fallback
-  const filename = `product_${productId}_${catalogueLabel}.png`;
-  const legacyFilePath = `${catalogueLabel}/${filename}`;
-  const userFilePathNew = userFolder
-    ? `${userFolder}/${catalogueLabel}/${filename}`
-    : null;
-  const userFilePathOld =
-    userFolder ? `${userFolder}/${catalogueLabel}/products/${filename}` : null;
-
-  try {
-    if (userFilePathNew) {
-      const fileData = await Filesystem.readFile({
-        path: userFilePathNew,
-        directory: Directory.External,
-      });
-      console.log(`✅ Retrieved rendered image from filesystem: ${userFilePathNew}`);
-      return `data:image/png;base64,${fileData.data}`;
-    }
-    if (userFilePathOld) {
-      const fileData = await Filesystem.readFile({
-        path: userFilePathOld,
-        directory: Directory.External,
-      });
-      console.log(`✅ Retrieved rendered image from legacy user layout: ${userFilePathOld}`);
-      return `data:image/png;base64,${fileData.data}`;
-    }
-    const fileData = await Filesystem.readFile({
-      path: legacyFilePath,
-      directory: Directory.External,
-    });
-    console.log(`✅ Retrieved rendered image from filesystem: ${legacyFilePath}`);
-    return `data:image/png;base64,${fileData.data}`;
-  } catch (err) {
-    // Try legacy as fallback even if userFilePath was set
+  for (const path of getRenderedImageCandidatePaths(productId, catalogue, authUserId)) {
     try {
-      if (userFilePathNew) {
-        const fileData = await Filesystem.readFile({
-          path: legacyFilePath,
-          directory: Directory.External,
-        });
-        return `data:image/png;base64,${fileData.data}`;
-      }
-    } catch {}
-    console.log(`⚠️ Rendered image not found in filesystem.`);
-    return null;
+      const fileData = await Filesystem.readFile({
+        path,
+        directory: Directory.External,
+      });
+      console.log(`✅ Retrieved rendered image from filesystem: ${path}`);
+      return `data:image/png;base64,${fileData.data}`;
+    } catch {
+      /* try next */
+    }
   }
+
+  console.log(`⚠️ Rendered image not found in filesystem.`);
+  return null;
 }
 
 /**

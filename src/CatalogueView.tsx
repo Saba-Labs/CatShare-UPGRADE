@@ -467,10 +467,9 @@ useEffect(() => {
     setProcessingTotal(total);
   };
 
-  // Listen for render complete to close modal
+  // Share.ts owns processing state through the full share flow (render + share).
   const handleRenderComplete = () => {
-    console.log("✅ CatalogueView renderComplete received");
-    setProcessing(false);
+    console.log("✅ CatalogueView renderComplete received (share flow continues)");
   };
 
   // Listen for phase changes
