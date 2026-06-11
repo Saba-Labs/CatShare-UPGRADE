@@ -58,6 +58,7 @@ import VariantCombinationEditor from "../components/VariantCombinationEditor";
 import {
   getProductVariantGroups,
   pruneVariantGroupsForSave,
+  getAllVariantCombinations,
   type ProductVariantGroup,
   type ProductVariantsConfig,
 } from "../utils/productVariants";
@@ -2605,14 +2606,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
           {/* Save/Cancel Buttons */}
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-            <button
-              onClick={saveAndNavigate}
-              disabled={isSaving || (variantGroups.length > 0 && (!variantConfig.combinations || variantConfig.combinations.length === 0))}
-              title={variantGroups.length > 0 && (!variantConfig.combinations || variantConfig.combinations.length === 0) ? "Configure variant combinations first" : ""}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
-            >
-              {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
-            </button>
+            {(() => {
+              const generatedCombinations = getAllVariantCombinations(variantGroups);
+              const hasUnconfiguredVariants = variantGroups.length > 0 && generatedCombinations.length > 0 &&
+                (!variantConfig.combinations || variantConfig.combinations.length === 0);
+              return (
+                <button
+                  onClick={saveAndNavigate}
+                  disabled={isSaving || hasUnconfiguredVariants}
+                  title={hasUnconfiguredVariants ? "Configure variant combinations first" : ""}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
+                >
+                  {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
+                </button>
+              );
+            })()}
             <button
               onClick={handleCancel}
               disabled={isSaving}
