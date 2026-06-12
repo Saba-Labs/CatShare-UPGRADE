@@ -19,6 +19,7 @@ import {
   type Catalogue,
 } from '../config/catalogueConfig';
 import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
+import { normalizeProductCategories } from '../utils/productCategoryUtils';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -135,12 +136,7 @@ function normalizePublicStoreProduct(raw: Record<string, unknown>): ProductWithC
     (typeof merged.image_url === 'string' && merged.image_url.trim()) ||
     '';
 
-  let category: string[] = [];
-  if (Array.isArray(merged.category)) {
-    category = merged.category.map((c) => String(c).trim()).filter(Boolean);
-  } else if (merged.category != null && String(merged.category).trim() !== '') {
-    category = [String(merged.category).trim()];
-  }
+  let category: string[] = normalizeProductCategories(merged.category);
 
   const base = { ...(merged as unknown as ProductWithCatalogueData) };
 
@@ -262,6 +258,8 @@ export interface StorePublic {
   /** Whether website-mode runtime should be used by storefront. */
   websiteModeEnabled?: boolean;
   cataloguesDefinition?: Array<{ id: string; label: string; priceField: string; priceUnitField: string; stockField: string; folder: string; order: number; createdAt: number; isDefault?: boolean }>;
+  /** Seller's managed category labels (for storefront filter pills). */
+  productCategories?: string[];
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -527,6 +525,55 @@ export async function getStoreSlugByCustomHostname(
   }
 }
 
+function parseProductCategoriesFromRpc(raw: unknown): string[] | undefined {
+  if (raw == null) return undefined;
+  let list: unknown[] | undefined;
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    } catch {
+      return undefined;
+    }
+  }
+  if (!list) return undefined;
+  const names = list
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const rec = item as Record<string, unknown>;
+        const n = rec.name ?? rec.label ?? rec.id;
+        return typeof n === 'string' ? n.trim() : '';
+      }
+      return '';
+    })
+    .filter(Boolean);
+  return names.length > 0 ? names : undefined;
+}
+
+async function fetchSellerProductCategories(
+  client: ReturnType<typeof getSupabaseClient>,
+  sellerUserId: string
+): Promise<string[] | undefined> {
+  if (!sellerUserId) return undefined;
+  try {
+    const { data, error } = await client
+      .from('categories')
+      .select('name')
+      .eq('user_id', sellerUserId)
+      .order('updated_at', { ascending: true });
+    if (error || !data?.length) return undefined;
+    const names = data
+      .map((row) => (typeof row.name === 'string' ? row.name.trim() : ''))
+      .filter(Boolean);
+    return names.length > 0 ? names : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getStoreBySlug(slug: string): Promise<{ success: boolean; data?: StorePublic; error?: string }> {
   try {
     const client = getSupabaseClient();
@@ -782,6 +829,12 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         /* ignore */
       }
     }
+
+    const fromRpc = parseProductCategoriesFromRpc(
+      row.productCategories ?? row.product_categories
+    );
+    normalized.productCategories =
+      fromRpc ?? (await fetchSellerProductCategories(client, sellerUserId));
 
     return { success: true, data: normalized };
   } catch (err) {

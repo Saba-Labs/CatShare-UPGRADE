@@ -1,4 +1,5 @@
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { normalizeProductCategories } from './productCategoryUtils';
 import { getWebsiteProductImageUrl } from './websiteStorefront';
 
 export interface StoreCategory {
@@ -12,25 +13,12 @@ export interface StoreCategory {
   imageUrl?: string;
 }
 
-function normalizeCategoryValues(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((v) => String(v).trim()).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
 /** Build the unique list of categories used across the store's products. */
 export function deriveStoreCategories(products: ProductWithCatalogueData[]): StoreCategory[] {
   const map = new Map<string, StoreCategory>();
 
   for (const product of products) {
-    const labels = normalizeCategoryValues(product.category);
+    const labels = normalizeProductCategories(product.category);
     for (const label of labels) {
       const id = label.toLowerCase();
       const existing = map.get(id);
@@ -58,6 +46,6 @@ export function productsInCategory(
 ): ProductWithCatalogueData[] {
   const target = String(categoryId).toLowerCase();
   return products.filter((p) =>
-    normalizeCategoryValues(p.category).some((c) => c.toLowerCase() === target)
+    normalizeProductCategories(p.category).some((c) => c.toLowerCase() === target)
   );
 }

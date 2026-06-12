@@ -15,11 +15,14 @@ import {
   type Catalogue,
 } from '../config/catalogueConfig';
 import { createOrder, type OrderItem } from '../services/orderService';
+import { buildOrderTrackingUrl } from '../services/orderTrackingService';
+import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
+import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '../utils/productCategoryUtils';
 import ProductImageGallery from '../components/ProductImageGallery';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import {
@@ -596,11 +599,11 @@ function StoreProductImageArea({
 }
 
 function getCats(p: ProductWithCatalogueData): string[] {
-  return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
+  return normalizeProductCategories(p.category);
 }
 function srchText(p: ProductWithCatalogueData): string {
   const ex = Array.from({ length: 10 }, (_, i) => { const n = i + 1; const r = p as unknown as Record<string, string | undefined>; return [r[`field${n}`], r[`field${n}Label`], r[`field${n}Unit`]].filter(Boolean).join(' '); });
-  return [p.name, p.subtitle, ...(p.category || []), ...ex].filter(Boolean).join(' ').toLowerCase();
+  return [p.name, p.subtitle, ...normalizeProductCategories(p.category), ...ex].filter(Boolean).join(' ').toLowerCase();
 }
 /**
  * Public store: detail text may live on `catalogueData[storeCatalogueId]`, top-level (Master), or another slice.
@@ -846,6 +849,7 @@ export default function StoreView() {
   const [customerWhatsappCountry, setCustomerWhatsappCountry] = useState('+91');
   const [customerWhatsappNumber, setCustomerWhatsappNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState<{ trackingUrl: string | null } | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -1113,7 +1117,19 @@ export default function StoreView() {
 
     return enabledInStock;
   }, [store?.catalogueId, productsInTableOrder, catalogue]);
-  const availableCategories = useMemo(() => Array.from(new Set(storeProducts.flatMap(getCats))), [storeProducts]);
+  const availableCategories = useMemo(
+    () => buildStorefrontCategoryFilterList(store?.productCategories, storeProducts),
+    [store?.productCategories, storeProducts]
+  );
+  useEffect(() => {
+    if (
+      selectedCategory !== 'all' &&
+      selectedCategory !== 'uncategorized' &&
+      !availableCategories.includes(selectedCategory)
+    ) {
+      setSelectedCategory('all');
+    }
+  }, [availableCategories, selectedCategory]);
   const hasUncategorized = useMemo(() => storeProducts.some((p) => getCats(p).length === 0), [storeProducts]);
   const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1318,10 +1334,23 @@ export default function StoreView() {
       });
       setSupabaseRlsUserId(store.sellerUserId);
       const fullWhatsappNumber = customerWhatsappNumber.trim() ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}` : undefined;
-      const { error } = await createOrder(store.sellerUserId, '', customerName.trim(), orderItems, reviewSummary.total, store.sellerCurrencyCode || 'INR', fullWhatsappNumber, 'store');
+      const storeSlugForOrder = (effectiveSlug || store.storeSlug || '').trim().toLowerCase();
+      const { data: createdOrder, error } = await createOrder(
+        store.sellerUserId,
+        '',
+        customerName.trim(),
+        orderItems,
+        reviewSummary.total,
+        store.sellerCurrencyCode || 'INR',
+        fullWhatsappNumber,
+        'store',
+        storeSlugForOrder || undefined
+      );
       if (error) alert('Failed to place order. Please try again.');
       else {
-        alert('Order placed! The seller will contact you soon.');
+        const trackingUrl = createdOrder?.tracking_token
+          ? buildOrderTrackingUrl(createdOrder.tracking_token)
+          : null;
         setStep('products');
         setSelectedProducts(new Map());
         setCustomerName('');
@@ -1332,6 +1361,7 @@ export default function StoreView() {
         setSearchQuery('');
         setSelectedCategory('all');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        setOrderSuccess({ trackingUrl });
       }
     } catch { alert('Error placing order. Please try again.'); }
     finally {
@@ -2247,6 +2277,13 @@ const label = productRowLabel || cloudLabel || defaultLabel;
           );
         })()}
       </div>
+
+      <OrderPlacedSuccessModal
+        isOpen={orderSuccess !== null}
+        onClose={() => setOrderSuccess(null)}
+        trackingUrl={orderSuccess?.trackingUrl ?? null}
+        subtitle="Save this link to check status and edit your order anytime while it is pending. The seller will contact you soon."
+      />
     </>
   );
 }

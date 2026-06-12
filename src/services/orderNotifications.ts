@@ -25,6 +25,9 @@ function parseRowToOrder(row: Record<string, unknown>): Order {
     currency_code: String(row.currency_code ?? 'INR'),
     status: row.status as Order['status'],
     order_source: row.order_source as Order['order_source'],
+    tracking_token: row.tracking_token != null ? String(row.tracking_token) : undefined,
+    store_slug: row.store_slug != null ? String(row.store_slug) : undefined,
+    customer_edited_at: row.customer_edited_at != null ? String(row.customer_edited_at) : undefined,
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
   };

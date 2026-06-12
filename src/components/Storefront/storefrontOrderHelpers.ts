@@ -7,6 +7,7 @@ import type { Catalogue } from '../../config/catalogueConfig';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../../config/fieldConfig';
 import { productImageDisplayUrl } from '../../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../../utils/productImages';
+import { normalizeProductCategories } from '../../utils/productCategoryUtils';
 import {
   formatQuantitySlabRange,
   getEffectiveQuantitySlabs,
@@ -42,7 +43,7 @@ export function fmtCalc(
 }
 
 export function getCats(p: ProductWithCatalogueData): string[] {
-  return Array.from(new Set((p.category || []).map((c: string) => String(c).trim()).filter(Boolean)));
+  return normalizeProductCategories(p.category);
 }
 
 function isDisplayableImageUrl(url?: string): boolean {

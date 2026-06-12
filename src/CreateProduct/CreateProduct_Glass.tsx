@@ -49,6 +49,7 @@ import { useSubscription } from "../context/SubscriptionContext";
 import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
+import { normalizeProductCategories } from "../utils/productCategoryUtils";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
 import MinimumOrderQuantityInput from "../components/MinimumOrderQuantityInput";
 import QuantitySlabEditor from "../components/QuantitySlabEditor";
@@ -695,11 +696,7 @@ export default function CreateProduct() {
           name: migratedProduct.name || "",
           subtitle: migratedProduct.subtitle || "",
           privateNotes: migratedProduct.privateNotes || "",
-          category: Array.isArray(migratedProduct.category)
-            ? migratedProduct.category
-            : migratedProduct.category
-            ? [migratedProduct.category]
-            : [],
+          category: normalizeProductCategories(migratedProduct.category),
           catalogueData: migratedProduct.catalogueData,
         });
 

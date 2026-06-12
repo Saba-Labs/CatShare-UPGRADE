@@ -11,6 +11,7 @@ import { OpenInvoicePdf } from '../plugins/openInvoicePdf';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
+import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import {
   getCatalogueData,
   isProductEnabledForCatalogue,
@@ -2399,6 +2400,49 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
+              {order.tracking_token ? (
+                <>
+                  <SectionLabel>Customer tracking link</SectionLabel>
+                  <Card>
+                    <div style={{ padding: '14px 16px' }}>
+                      <p style={{ fontSize: 12, color: COLORS.muted, marginBottom: 8, lineHeight: 1.45 }}>
+                        Share this link so the customer can view and edit their order while it is pending.
+                        {order.customer_edited_at ? (
+                          <span style={{ display: 'block', marginTop: 6, color: COLORS.blue }}>
+                            Customer last edited {formatDate(order.customer_edited_at)}
+                          </span>
+                        ) : null}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const url = buildOrderTrackingUrl(order.tracking_token!);
+                          try {
+                            await navigator.clipboard.writeText(url);
+                            showToast('Tracking link copied', 'success');
+                          } catch {
+                            showToast(url, 'info');
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: 10,
+                          border: `1.5px solid ${COLORS.border}`,
+                          background: '#FAFAFA',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: FONT,
+                          color: COLORS.blue,
+                        }}
+                      >
+                        Copy customer tracking link
+                      </button>
+                    </div>
+                  </Card>
+                </>
+              ) : null}
               <SectionLabel>Order Items</SectionLabel>
               <Card>
                 <div style={{ padding: '4px 16px' }}>

@@ -280,6 +280,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [searchParams] = useSearchParams();
   const pathname = location.pathname;
   const tab = pathname === "/catalogues" ? "catalogues" : "products";
+  /** Nested routes (e.g. manage-categories) render full-page via Outlet; hide main shell. */
+  const isNestedLeafRoute = pathname !== "/" && pathname !== "/catalogues";
   const scrollRef = useRef(null);
   const isNative = Capacitor.getPlatform() !== "web";
 
@@ -1210,8 +1212,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     <div
       className="w-full h-[100dvh] min-h-0 flex flex-col overflow-hidden bg-gradient-to-b from-white to-gray-100"
     >
-      <Outlet />
-
+      {isNestedLeafRoute ? (
+        <Outlet />
+      ) : (
+        <>
       {tab === "products" && (
         <>
           <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50"></div>
@@ -2024,6 +2028,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           setShowRatingModal(false);
         }}
       />
+        </>
+      )}
     </div>
   );
 }

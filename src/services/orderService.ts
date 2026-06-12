@@ -1,6 +1,7 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { generateOrderTrackingToken, isLikelyMissingTrackingColumnsError } from './orderTrackingService';
 
 /** Orders RLS (see SUPABASE_ORDERS_SQL.md) uses `x-user-id`. Restore from session before seller mutations when header was cleared (e.g. after StoreView order). */
 async function ensureOrdersRlsHeaderFromSession(): Promise<void> {
@@ -36,6 +37,9 @@ export interface Order {
   currency_code: string;
   status: 'pending' | 'completed' | 'cancelled';
   order_source?: 'link' | 'manual' | 'store';
+  tracking_token?: string;
+  store_slug?: string;
+  customer_edited_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -51,12 +55,14 @@ export async function createOrder(
   totalAmount: number | undefined,
   currencyCode: string = 'INR',
   customerWhatsapp?: string,
-  orderSource: 'link' | 'manual' | 'store' = 'link'
+  orderSource: 'link' | 'manual' | 'store' = 'link',
+  storeSlug?: string
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
+    const trackingToken = generateOrderTrackingToken();
 
-    const { data, error } = await client.from('orders').insert({
+    const row: Record<string, unknown> = {
       share_link_token: shareLinkToken,
       seller_user_id: sellerUserId,
       customer_name: customerName,
@@ -66,9 +72,21 @@ export async function createOrder(
       currency_code: currencyCode,
       status: 'pending',
       order_source: orderSource,
-    });
+      tracking_token: trackingToken,
+    };
+    if (storeSlug?.trim()) {
+      row.store_slug = storeSlug.trim().toLowerCase();
+    }
 
-    return { data, error };
+    let { data, error } = await client.from('orders').insert(row).select().maybeSingle();
+
+    if (error && isLikelyMissingTrackingColumnsError(error)) {
+      delete row.tracking_token;
+      delete row.store_slug;
+      ({ data, error } = await client.from('orders').insert(row).select().maybeSingle());
+    }
+
+    return { data: (data as Order | null) ?? null, error };
   } catch (err) {
     return { data: null, error: err };
   }
@@ -89,8 +107,8 @@ export async function createOrderDirectly(
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
-
-    const { data, error } = await client.from('orders').insert({
+    const trackingToken = generateOrderTrackingToken();
+    const insertRow: Record<string, unknown> = {
       share_link_token: 'manual-order',
       seller_user_id: sellerUserId,
       customer_name: customerName,
@@ -100,9 +118,17 @@ export async function createOrderDirectly(
       currency_code: currencyCode,
       status: 'pending',
       order_source: orderSource,
-    });
+      tracking_token: trackingToken,
+    };
 
-    return { data, error };
+    let { data, error } = await client.from('orders').insert(insertRow).select().maybeSingle();
+
+    if (error && isLikelyMissingTrackingColumnsError(error)) {
+      delete insertRow.tracking_token;
+      ({ data, error } = await client.from('orders').insert(insertRow).select().maybeSingle());
+    }
+
+    return { data: (data as Order | null) ?? null, error };
   } catch (err) {
     return { data: null, error: err };
   }

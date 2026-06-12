@@ -7,7 +7,15 @@ import { useAuth } from './context/AuthContext';
 import { syncCategories, syncProducts } from './services/supabaseSync';
 import { logCategoryManaged } from './config/analyticsEvents';
 import { readProductsWithLegacyFallback, safeSetProductsCache, safeSetInStorage, getStorageKey } from './utils/safeStorage';
+import { readCategoriesList, persistCategoriesList } from './utils/categoriesStorage';
 import { productImageDisplayUrl } from './utils/imageUrl';
+import {
+  normalizeProductCategories,
+  productHasCategory,
+  toggleProductCategory as toggleCategoryOnProduct,
+  removeProductCategory,
+  renameProductCategory,
+} from './utils/productCategoryUtils';
 
 export default function ManageCategories() {
   const navigate = useNavigate();
@@ -24,18 +32,45 @@ export default function ManageCategories() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem('categories') || '[]');
-    setCategories(stored);
-  }, []);
+    setCategories(readCategoriesList(user?.uid ?? null));
+  }, [user?.uid]);
+
+  const persistProducts = async (updatedProducts: any[]) => {
+    if (!user?.uid) return;
+    const normalizedProducts = updatedProducts.map((p) => ({
+      ...p,
+      category: normalizeProductCategories(p.category),
+    }));
+    safeSetProductsCache(user.uid, normalizedProducts);
+    safeSetInStorage(getStorageKey('products', user.uid), normalizedProducts);
+    await syncProducts(user.uid, normalizedProducts, { skipImageUrlAssertion: true });
+    setProducts(normalizedProducts);
+    return normalizedProducts;
+  };
 
   useEffect(() => {
-    const stored = readProductsWithLegacyFallback(user?.uid || '');
-    setProducts(stored);
+    if (!user?.uid) return;
+    const stored = readProductsWithLegacyFallback(user.uid);
+    const allowed = new Set(readCategoriesList(user.uid));
+    let changed = false;
+    const cleaned = stored.map((p) => {
+      const normalized = normalizeProductCategories(p.category);
+      const filtered =
+        allowed.size > 0 ? normalized.filter((c) => allowed.has(c)) : normalized;
+      if (filtered.length !== normalized.length) changed = true;
+      return { ...p, category: filtered };
+    });
+    setProducts(cleaned);
+    if (changed) {
+      persistProducts(cleaned).catch((err) => {
+        console.warn('⚠️ Failed to prune orphan categories from products:', err);
+      });
+    }
   }, [user?.uid]);
 
   const save = (list: string[]) => {
     setCategories(list);
-    localStorage.setItem('categories', JSON.stringify(list));
+    persistCategoriesList(user?.uid ?? null, list);
 
     if (user?.uid) {
       const categoriesForSync = list.map((cat) => ({
@@ -59,10 +94,23 @@ export default function ManageCategories() {
   };
 
   const update = () => {
+    const oldName = categories[editIndex!];
+    const newName = editText.trim();
     const list = [...categories];
-    list[editIndex!] = editText.trim();
+    list[editIndex!] = newName;
     save(list);
-    logCategoryManaged('edited', editText.trim());
+    logCategoryManaged('edited', newName);
+
+    if (oldName !== newName && user?.uid) {
+      const updatedProducts = products.map((p) => ({
+        ...p,
+        category: renameProductCategory(p.category, oldName, newName),
+      }));
+      persistProducts(updatedProducts).catch((err) => {
+        console.warn('⚠️ Failed to rename category on products:', err);
+      });
+    }
+
     setEditIndex(null);
     setEditText('');
   };
@@ -72,6 +120,16 @@ export default function ManageCategories() {
     const list = categories.filter((_, idx) => idx !== i);
     save(list);
     logCategoryManaged('deleted', removedCat);
+
+    if (user?.uid) {
+      const updatedProducts = products.map((p) => ({
+        ...p,
+        category: removeProductCategory(p.category, removedCat),
+      }));
+      persistProducts(updatedProducts).catch((err) => {
+        console.warn('⚠️ Failed to remove category from products:', err);
+      });
+    }
   };
 
   const handleDragEnd = (result: any) => {
@@ -86,12 +144,10 @@ export default function ManageCategories() {
     const basedOnProducts = pendingProducts.length > 0 ? pendingProducts : products;
     const updatedProducts = basedOnProducts.map((p) => {
       if (p.id === productId) {
-        const currentCategories = getProductCategoriesArray(p);
-        if (currentCategories.includes(categoryName)) {
-          return { ...p, category: currentCategories.filter((c: string) => c !== categoryName).join(', ') };
-        } else {
-          return { ...p, category: [...currentCategories, categoryName].join(', ') };
-        }
+        return {
+          ...p,
+          category: toggleCategoryOnProduct(p.category, categoryName),
+        };
       }
       return p;
     });
@@ -103,12 +159,7 @@ export default function ManageCategories() {
 
     setIsSaving(true);
     try {
-      safeSetProductsCache(user.uid, pendingProducts);
-      safeSetInStorage(getStorageKey('products', user.uid), pendingProducts);
-
-      await syncProducts(user.uid, pendingProducts, { skipImageUrlAssertion: true });
-
-      setProducts(pendingProducts);
+      await persistProducts(pendingProducts);
       setPendingProducts([]);
       setSelectedCategory(null);
     } catch (err) {
@@ -118,17 +169,8 @@ export default function ManageCategories() {
     }
   };
 
-  const getProductCategoriesArray = (product: any): string[] => {
-    if (!product.category) return [];
-    if (Array.isArray(product.category)) return product.category;
-    if (typeof product.category === 'string') {
-      return product.category.split(',').map((c: string) => c.trim()).filter(Boolean);
-    }
-    return [];
-  };
-
   const isProductInCategory = (product: any, categoryName: string) => {
-    return getProductCategoriesArray(product).includes(categoryName);
+    return productHasCategory(product, categoryName);
   };
 
   return (

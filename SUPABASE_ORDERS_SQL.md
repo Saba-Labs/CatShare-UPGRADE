@@ -15,6 +15,10 @@ create table if not exists public.orders (
   total_amount numeric,
   currency_code text default 'INR',
   status text default 'pending' check (status in ('pending', 'completed', 'cancelled')),
+  order_source text,
+  tracking_token text,
+  store_slug text,
+  customer_edited_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -114,6 +118,19 @@ using (seller_user_id::text = (auth.uid())::text);
 ```
 
 Keep the existing `seller_select_own_orders` policy that uses `x-user-id` for REST clients that rely on that header. Postgres combines multiple `SELECT` policies with **OR**, so both can apply.
+
+### 5) Customer order tracking (secret link, no login)
+
+Run `sql/order_tracking_rpc.sql` (or migration `20260612120000_order_tracking_token.sql`).
+
+- Each new order gets a random `tracking_token` (64-char hex).
+- Store orders also store `store_slug` so customers can add products from the live storefront catalogue when editing.
+- Public URL: `https://your-domain/track/{tracking_token}`
+- RPCs (security definer, granted to `anon`):
+  - `get_order_by_tracking_token(p_token)` — read order
+  - `update_order_by_tracking_token(...)` — full edit while `status = pending`; customer may set `cancelled`
+
+No Supabase Auth user is created, so this does **not** increase MAU.
 
 ### Troubleshooting
 

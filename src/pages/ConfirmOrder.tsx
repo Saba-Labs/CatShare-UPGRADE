@@ -1,11 +1,13 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
+import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { type ShareLinkItem } from '../services/shareLinks';
 import { formatVariantSelectionSummary } from '../utils/productVariants';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
 
 type QtyMap = Record<string, number>;
 
@@ -145,6 +147,10 @@ export default function ConfirmOrder() {
   const [customerWhatsapp, setCustomerWhatsapp] = useState(state?.customerWhatsapp || '');
   const [savingOrder, setSavingOrder] = useState(false);
   const [localQty, setLocalQty] = useState<QtyMap>(state?.qty || {});
+  const [orderSuccess, setOrderSuccess] = useState<{
+    trackingUrl: string | null;
+    whatsAppHref: string;
+  } | null>(null);
 
   // Validate that we have the required state
   if (!state || !token) {
@@ -201,6 +207,8 @@ export default function ConfirmOrder() {
 
     if (!guardOnline()) return;
 
+    let trackingUrl: string | null = null;
+
     // Save order to Supabase
     if (token && sellerUserId) {
       setSavingOrder(true);
@@ -232,7 +240,7 @@ export default function ConfirmOrder() {
         });
 
         // Create order
-        const { error } = await createOrder(
+        const { data: createdOrder, error } = await createOrder(
           sellerUserId,
           token,
           customerName.trim(),
@@ -246,6 +254,9 @@ export default function ConfirmOrder() {
           console.error('Error creating order:', error);
           // Don't block WhatsApp opening even if order creation fails
         } else {
+          if (createdOrder?.tracking_token) {
+            trackingUrl = buildOrderTrackingUrl(createdOrder.tracking_token);
+          }
           // Clear the saved order quantities from sessionStorage on successful order creation
           sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }
@@ -316,10 +327,17 @@ export default function ConfirmOrder() {
     }
 
     lines.push('Please confirm availability and share payment details. Thank you!');
+    if (trackingUrl) {
+      lines.push('');
+      lines.push('📦 *Track & edit your order:*');
+      lines.push(trackingUrl);
+    }
     const message = lines.join('\n');
 
-    // Open WhatsApp
-    window.location.href = `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
+    setOrderSuccess({
+      trackingUrl,
+      whatsAppHref: `https://wa.me/${to}?text=${encodeURIComponent(message)}`,
+    });
   };
 
   return (
@@ -511,6 +529,17 @@ export default function ConfirmOrder() {
           </button>
         </div>
       </div>
+
+      <OrderPlacedSuccessModal
+        isOpen={orderSuccess != null}
+        onClose={() => {
+          setOrderSuccess(null);
+          navigate(`/o/${token}`);
+        }}
+        trackingUrl={orderSuccess?.trackingUrl ?? null}
+        whatsAppHref={orderSuccess?.whatsAppHref ?? null}
+        subtitle="Copy or open your tracking link below. You can edit the order while it is pending. When ready, send the order details to the seller on WhatsApp."
+      />
     </div>
   );
 }

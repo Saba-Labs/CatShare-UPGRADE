@@ -65,6 +65,7 @@ const Orders = lazy(() => import("./pages/Orders"));
 const Store = lazy(() => import("./pages/Store"));
 const CreateOrder = lazy(() => import("./pages/CreateOrder"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
+const TrackOrder = lazy(() => import("./pages/TrackOrder"));
 const OrderForm = lazy(() => import("./pages/OrderForm"));
 const ConfirmOrder = lazy(() => import("./pages/ConfirmOrder"));
 const StoreView = lazy(() => import("./pages/StoreView"));
@@ -180,7 +181,8 @@ function AppWithBackHandler() {
     isStoreSubdomainHost ||
     isStorefrontRootRoute ||
     location.pathname.startsWith('/store/') ||
-    location.pathname.startsWith('/o/');
+    location.pathname.startsWith('/o/') ||
+    location.pathname.startsWith('/track/');
 
   const isNative = Capacitor.getPlatform() !== "web";
   const OFFLINE_MIGRATION_PENDING_PREFIX = "offlineMigrationPending::";
@@ -1422,7 +1424,7 @@ function AppWithBackHandler() {
       hasCompletedOnboarding = true;
     }
 
-    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/email-confirmed', '/privacy', '/terms', '/website', '/o/'];
+    const publicPages = ['/welcome', '/login', '/register', '/forgot-password', '/reset-password', '/email-confirmed', '/privacy', '/terms', '/website', '/o/', '/track/'];
     const isOnPublicPage = publicPages.some(p => location.pathname.includes(p));
 
     if (!(isNewUser && !hasPersistedFieldDefinition && !hasCompletedOnboarding && !isOnPublicPage)) {
@@ -2415,6 +2417,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
         {/* Public Routes */}
         <Route path="/o/:token" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
+        <Route path="/track/:token" element={<TrackOrder />} />
         <Route path="/store/:slug/*" element={<StoreView />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
