@@ -62,6 +62,9 @@ import {
   type ProductVariantGroup,
   type ProductVariantsConfig,
 } from "../utils/productVariants";
+import ProductCatalogueStockEditor, {
+  type ProductCatalogueStockEditorHandle,
+} from "../components/ProductCatalogueStockEditor";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 import {
   offerPriceFieldFor,
@@ -351,6 +354,9 @@ export default function CreateProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
+  const draftProductIdRef = useRef(editingId || String(Date.now()));
+  const stockEditorRef = useRef<ProductCatalogueStockEditorHandle>(null);
+  const stockProductId = editingId || draftProductIdRef.current;
   const catalogueParam = searchParams.get("catalogue");
   const fromParam = searchParams.get("from");
   const { showToast } = useToast();
@@ -1193,7 +1199,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
     }
 
     setIsSaving(true);
-    const id = editingId || Date.now().toString();
+    const id = editingId || draftProductIdRef.current;
     // Re-read user id at the time of saving to avoid timing issues
     // when the auth/localStorage value is still being populated.
     const authUserIdNow = getPersistedAuthUserId();
@@ -1372,6 +1378,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
           detail: { onlyProductId: String(newItem.id), forceCloudSync: true },
         })
       );
+
+      await stockEditorRef.current?.flushPending();
 
       // Check if we should show the rating modal
       // Pattern: 10, 25 (10+15), 45 (25+20), 70 (45+25), 100 (70+30), etc.
@@ -2406,6 +2414,24 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     </div>
                   </div>
 
+                  {(() => {
+                    const activeCat = catalogues.find((c) => c.id === selectedCatalogue);
+                    if (!activeCat) return null;
+                    return (
+                      <ProductCatalogueStockEditor
+                        ref={stockEditorRef}
+                        catalogue={activeCat}
+                        productId={stockProductId}
+                        variantGroups={variantGroups}
+                        inStock={getCatalogueFormData()[activeCat.stockField] !== false}
+                        onInStockChange={(next) =>
+                          updateCatalogueData({ [activeCat.stockField]: next })
+                        }
+                        theme="glass"
+                      />
+                    );
+                  })()}
+
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Slab pricing
@@ -2492,6 +2518,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }}
   onChange={(updated) => setVariantConfig(updated)}
   theme="glass"
+  catalogues={catalogues}
+  selectedCatalogue={selectedCatalogue}
+  onCatalogueChange={setSelectedCatalogue}
+  productId={stockProductId}
   onSave={(updatedConfig) => {
     if (!editingId) return;
     const authUserIdNow = getPersistedAuthUserId();

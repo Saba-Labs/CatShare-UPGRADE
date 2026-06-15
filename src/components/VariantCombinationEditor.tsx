@@ -4,10 +4,16 @@ import {
   getAllVariantCombinations,
   formatVariantSelectionSummary,
   upsertVariantCombination,
+  deleteVariantCombinationCatalogueDetails,
+  extractVariantCombinationDetails,
+  hasVariantCombinationDetailsForCatalogue,
+  countConfiguredCombinationsForCatalogue,
   type ProductVariantGroup,
   type ProductVariantsConfig,
   type VariantCombination,
+  type VariantCombinationDetails,
 } from "../utils/productVariants";
+import type { Catalogue } from "../config/catalogueConfig";
 import { getAllFields } from "../config/fieldConfig";
 import { getCurrentCurrencySymbol } from "../utils/currencyUtils";
 import { useToast } from "../context/ToastContext";
@@ -15,6 +21,7 @@ import { deleteImageFromR2 } from "../services/cloudflareService";
 import { uploadProductImageToR2 } from "../services/r2Upload";
 import QuantitySlabEditor from "./QuantitySlabEditor";
 import { InfoTooltip } from "./InfoTooltip";
+import VariantCombinationStockField from "./VariantCombinationStockField";
 import {
   normalizeQuantitySlabs,
   type QuantityPriceSlab,
@@ -26,6 +33,10 @@ interface VariantCombinationEditorProps {
   theme?: "classic" | "glass";
   onSave?: (updatedConfig: ProductVariantsConfig) => void;
   onBackClick?: () => void;
+  catalogues: Catalogue[];
+  selectedCatalogue: string;
+  onCatalogueChange?: (catalogueId: string) => void;
+  productId: string;
 }
 
 export default function VariantCombinationEditor({
@@ -34,10 +45,14 @@ export default function VariantCombinationEditor({
   theme = "classic",
   onSave,
   onBackClick,
+  catalogues,
+  selectedCatalogue,
+  onCatalogueChange,
+  productId,
 }: VariantCombinationEditorProps) {
   const { showToast } = useToast();
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<Partial<VariantCombination>>({});
+  const [editingData, setEditingData] = useState<Partial<VariantCombinationDetails>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,29 +65,41 @@ export default function VariantCombinationEditor({
     ? existingData.find((c) => c.id === selectedCombination.id)
     : null;
 
+  const selectedCatalogueConfig = catalogues.find((c) => c.id === selectedCatalogue);
+
   const handleSelectCombination = useCallback((combinationId: string) => {
     setSelectedCombinationId(combinationId);
     const existing = existingData.find((c) => c.id === combinationId);
-    setEditingData(existing ? { ...existing } : {});
-  }, [existingData]);
+    const details = existing
+      ? extractVariantCombinationDetails(existing, selectedCatalogue)
+      : undefined;
+    setEditingData(details ? { ...details, inStock: details.inStock !== false } : { inStock: true });
+  }, [existingData, selectedCatalogue]);
 
   const handleSaveData = useCallback(() => {
     if (!selectedCombination) return;
     const slabs = normalizeQuantitySlabs(editingData.customFields?.quantitySlabs);
-    const payload: Partial<VariantCombination> = {
+    const payload: Partial<VariantCombinationDetails> = {
       ...editingData,
+      inStock: editingData.inStock !== false,
       customFields: {
         ...editingData.customFields,
         quantitySlabs: slabs.length > 0 ? slabs : undefined,
       },
     };
-    const updated = upsertVariantCombination(variantConfig, selectedCombination.id, payload);
+    const updated = upsertVariantCombination(
+      variantConfig,
+      selectedCombination.id,
+      selectedCatalogue,
+      payload,
+      selectedCombination.selections
+    );
     onChange(updated);
     showToast("Variant details saved and syncing to cloud...", "success");
     onSave?.(updated);
     setSelectedCombinationId(null);
     setEditingData({});
-  }, [selectedCombination, variantConfig, editingData, onChange, onSave, showToast, theme]);
+  }, [selectedCombination, variantConfig, editingData, onChange, onSave, showToast, selectedCatalogue]);
 
   const handleCancel = useCallback(() => {
     setSelectedCombinationId(null);
@@ -81,12 +108,15 @@ export default function VariantCombinationEditor({
 
   const handleDeleteData = useCallback(() => {
     if (!selectedCombination) return;
-    const updated = { ...variantConfig };
-    updated.combinations = (updated.combinations ?? []).filter((c) => c.id !== selectedCombination.id);
+    const updated = deleteVariantCombinationCatalogueDetails(
+      variantConfig,
+      selectedCombination.id,
+      selectedCatalogue
+    );
     onChange(updated);
     setSelectedCombinationId(null);
     setEditingData({});
-  }, [selectedCombination, variantConfig, onChange]);
+  }, [selectedCombination, variantConfig, onChange, selectedCatalogue]);
 
   const handleRemoveVariantImage = useCallback(async () => {
     if (editingData.image && editingData.image.startsWith("https://")) {
@@ -138,6 +168,44 @@ export default function VariantCombinationEditor({
     }
   }, [selectedCombinationId, showToast]);
 
+  const selectedCatalogueLabel =
+    catalogues.find((c) => c.id === selectedCatalogue)?.label ?? selectedCatalogue;
+  const configuredCount = countConfiguredCombinationsForCatalogue(
+    existingData,
+    selectedCatalogue
+  );
+
+  const cataloguePicker = (
+    <div className="mb-4 pb-3 border-b border-gray-200 dark:border-gray-800">
+      <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">
+        Catalogue
+      </label>
+      <div className="flex gap-2 flex-wrap items-center">
+        {catalogues.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => {
+              onCatalogueChange?.(cat.id);
+              setSelectedCombinationId(null);
+              setEditingData({});
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+              selectedCatalogue === cat.id
+                ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/30"
+                : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+        Variant groups are shared; details below apply to <span className="font-semibold">{selectedCatalogueLabel}</span> only.
+      </p>
+    </div>
+  );
+
   if (combinations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
@@ -170,6 +238,7 @@ export default function VariantCombinationEditor({
   if (selectedCombination) {
     return (
       <div className="space-y-4">
+        {cataloguePicker}
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-sm">
             {formatVariantSelectionSummary(variantConfig.groups, selectedCombination.selections)}
@@ -386,6 +455,18 @@ export default function VariantCombinationEditor({
             </div>
           </div>
 
+          {selectedCatalogueConfig && selectedCombination ? (
+            <VariantCombinationStockField
+              catalogue={selectedCatalogueConfig}
+              productId={productId}
+              variantCombinationId={selectedCombination.id}
+              inStock={editingData.inStock !== false}
+              onInStockChange={(next) =>
+                setEditingData((prev) => ({ ...prev, inStock: next }))
+              }
+            />
+          ) : null}
+
           {/* Qty Step */}
           <div className="flex gap-3 items-start">
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
@@ -481,7 +562,8 @@ export default function VariantCombinationEditor({
         </div>
 
         <div className="flex gap-2 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-          {selectedExistingData && (
+          {selectedExistingData &&
+            hasVariantCombinationDetailsForCatalogue(selectedExistingData, selectedCatalogue) && (
             <button
               onClick={handleDeleteData}
               className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 transition-colors"
@@ -516,6 +598,7 @@ export default function VariantCombinationEditor({
 
   return (
     <div className="space-y-4">
+      {cataloguePicker}
       <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -527,18 +610,25 @@ export default function VariantCombinationEditor({
             </p>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 ml-6">
-            {existingData.length} configured
+            {configuredCount} configured for {selectedCatalogueLabel}
           </p>
         </div>
         <div className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-          {Math.round((existingData.length / combinations.length) * 100)}%
+          {combinations.length > 0
+            ? Math.round((configuredCount / combinations.length) * 100)
+            : 0}%
         </div>
       </div>
 
       <div className="space-y-2 max-h-96 overflow-y-auto scrollbar-hide">
         {combinations.map((combo) => {
-          const hasData = existingData.some((c) => c.id === combo.id);
           const existing = existingData.find((c) => c.id === combo.id);
+          const hasData = existing
+            ? hasVariantCombinationDetailsForCatalogue(existing, selectedCatalogue)
+            : false;
+          const details = existing
+            ? extractVariantCombinationDetails(existing, selectedCatalogue)
+            : undefined;
 
           return (
             <button
@@ -576,9 +666,9 @@ export default function VariantCombinationEditor({
                 </div>
 
                 {/* Details Grid */}
-                {hasData && (
+                {hasData && details && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-green-200 dark:border-green-800">
-                    {existing?.image && (
+                    {details.image && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
@@ -586,44 +676,52 @@ export default function VariantCombinationEditor({
                         <span className="text-gray-700 dark:text-gray-300">Image</span>
                       </div>
                     )}
-                    {existing?.price !== undefined && (
+                    {details.inStock === false && (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <svg className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-red-700 dark:text-red-400 font-semibold">Out of stock</span>
+                      </div>
+                    )}
+                    {details.price !== undefined && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M8.5 5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM9 10a2 2 0 100-4 2 2 0 000 4zm0 6a4 4 0 100-8 4 4 0 000 8zm7-6a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(existing.price)}</span>
+                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(details.price)}</span>
                       </div>
                     )}
-                    {existing?.customFields?.offer !== undefined && (
+                    {details.customFields?.offer !== undefined && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm0 6a2 2 0 00-2 2v4a2 2 0 002 2h10a2 2 0 002-2v-4a2 2 0 00-2-2H4z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(existing.customFields.offer)}</span>
+                        <span className="text-gray-700 dark:text-gray-300 font-semibold">{getCurrentCurrencySymbol()}{String(details.customFields.offer)}</span>
                       </div>
                     )}
-                    {existing?.customFields?.orderQuantityStep !== undefined && existing.customFields.orderQuantityStep !== 1 && (
+                    {details.customFields?.orderQuantityStep !== undefined && details.customFields.orderQuantityStep !== 1 && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M3 5a2 2 0 012-2h3.28a1 1 0 00.948-.684l1.498-4.493a1 1 0 011.502-.684l1.498 4.493a1 1 0 00.948.684H17a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm5 9a2 2 0 100-4 2 2 0 000 4z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300">Qty Step: <span className="font-semibold">{String(existing.customFields.orderQuantityStep)}</span></span>
+                        <span className="text-gray-700 dark:text-gray-300">Qty Step: <span className="font-semibold">{String(details.customFields.orderQuantityStep)}</span></span>
                       </div>
                     )}
-                    {existing?.customFields?.minimumOrderQuantity !== undefined && existing.customFields.minimumOrderQuantity !== 1 && (
+                    {details.customFields?.minimumOrderQuantity !== undefined && details.customFields.minimumOrderQuantity !== 1 && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.3A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300">MOQ: <span className="font-semibold">{String(existing.customFields.minimumOrderQuantity)}</span></span>
+                        <span className="text-gray-700 dark:text-gray-300">MOQ: <span className="font-semibold">{String(details.customFields.minimumOrderQuantity)}</span></span>
                       </div>
                     )}
-                    {normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length > 0 && (
+                    {normalizeQuantitySlabs(details.customFields?.quantitySlabs).length > 0 && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300"><span className="font-semibold">{normalizeQuantitySlabs(existing?.customFields?.quantitySlabs).length}</span> slab tier(s)</span>
+                        <span className="text-gray-700 dark:text-gray-300"><span className="font-semibold">{normalizeQuantitySlabs(details.customFields?.quantitySlabs).length}</span> slab tier(s)</span>
                       </div>
                     )}
                   </div>

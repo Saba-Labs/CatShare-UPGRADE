@@ -3,8 +3,13 @@ import { useState, useMemo } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
-import { type ShareLinkItem } from '../services/shareLinks';
-import { formatVariantSelectionSummary } from '../utils/productVariants';
+import { type ShareLinkItem, getShareLinkItemUnitPrice } from '../services/shareLinks';
+import { formatVariantSelectionSummary, generateVariantCombinationId } from '../utils/productVariants';
+import {
+  activeCartLines,
+  setCartLineQtyById,
+  type OrderCartLine,
+} from '../utils/orderCartLines';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
@@ -12,8 +17,11 @@ import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
 type QtyMap = Record<string, number>;
 
 interface ConfirmOrderState {
-  selectedItems: ShareLinkItem[];
-  qty: QtyMap;
+  cartLines: OrderCartLine[];
+  items: ShareLinkItem[];
+  /** @deprecated legacy navigation state */
+  selectedItems?: ShareLinkItem[];
+  qty?: QtyMap;
   variantSelections?: Record<string, Record<string, string>>;
   currencySymbol: string;
   currencyCode: string;
@@ -21,7 +29,6 @@ interface ConfirmOrderState {
   sellerUserId: string;
   customerName: string;
   customerWhatsapp: string;
-  lineAmounts: Record<string, number>;
   orderTotalAmount: number;
 }
 
@@ -146,14 +153,14 @@ export default function ConfirmOrder() {
   const [customerName, setCustomerName] = useState(state?.customerName || '');
   const [customerWhatsapp, setCustomerWhatsapp] = useState(state?.customerWhatsapp || '');
   const [savingOrder, setSavingOrder] = useState(false);
-  const [localQty, setLocalQty] = useState<QtyMap>(state?.qty || {});
+  const [localCartLines, setLocalCartLines] = useState<OrderCartLine[]>(state?.cartLines || []);
   const [orderSuccess, setOrderSuccess] = useState<{
     trackingUrl: string | null;
     whatsAppHref: string;
   } | null>(null);
 
   // Validate that we have the required state
-  if (!state || !token) {
+  if (!state || !token || !state.cartLines?.length) {
     return (
       <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
         <p>Invalid order data. Please go back and try again.</p>
@@ -163,34 +170,34 @@ export default function ConfirmOrder() {
   }
 
   const {
-    selectedItems,
+    items: catalogueItems,
     currencySymbol,
     currencyCode,
     sellerWhatsapp,
     sellerUserId,
-    variantSelections = {},
   } = state;
 
-  const handleQtyChange = (productId: string, delta: number) => {
-    setLocalQty((prev) => {
-      const newQty = Math.max(0, (prev[productId] ?? 0) + delta);
-      return { ...prev, [productId]: newQty };
+  const handleQtyChange = (lineId: string, delta: number) => {
+    setLocalCartLines((prev) => {
+      const line = prev.find((l) => l.lineId === lineId);
+      if (!line) return prev;
+      const catItem = catalogueItems.find((i) => i.productId === line.productId);
+      const step = Math.max(1, Math.floor(catItem?.quantityStep ?? 1) || 1);
+      const newQty = Math.max(0, line.quantity + delta * step);
+      return setCartLineQtyById(prev, lineId, newQty);
     });
   };
 
-  // Recalculate line amounts and total based on local quantities
-  const { updatedLineAmounts, updatedTotal } = useMemo(() => {
-    const lineAmounts: Record<string, number> = {};
+  const { updatedTotal } = useMemo(() => {
     let total = 0;
-    selectedItems.forEach((item) => {
-      const q = localQty[item.productId] ?? 0;
-      const unitPrice = parseItemPriceNumeric(item.price);
-      const lineTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
-      lineAmounts[item.productId] = lineTotal;
-      total += lineTotal;
+    activeCartLines(localCartLines).forEach((line) => {
+      const catItem = catalogueItems.find((i) => i.productId === line.productId);
+      if (!catItem) return;
+      const unitPrice = getShareLinkItemUnitPrice(catItem, line.quantity);
+      if (Number.isFinite(unitPrice)) total += unitPrice * line.quantity;
     });
-    return { updatedLineAmounts: lineAmounts, updatedTotal: total };
-  }, [selectedItems, localQty]);
+    return { updatedTotal: total };
+  }, [localCartLines, catalogueItems]);
 
   const confirmOrder = async () => {
     // Validate customer name (required)
@@ -215,27 +222,38 @@ export default function ConfirmOrder() {
       setSupabaseRlsUserId(sellerUserId);
       try {
         // Build order items structure
-        const orderItems: OrderItem[] = selectedItems.map((i) => {
-          const q = localQty[i.productId] ?? 0;
-          const unitPrice = parseItemPriceNumeric(i.price);
-          const rowTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
+        const orderItems: OrderItem[] = activeCartLines(localCartLines).map((line) => {
+          const i = catalogueItems.find((it) => it.productId === line.productId);
+          if (!i) {
+            return {
+              productId: line.productId,
+              name: 'Product',
+              quantity: line.quantity,
+              unitPrice: 0,
+              rowTotal: 0,
+            };
+          }
+          const unitPrice = getShareLinkItemUnitPrice(i, line.quantity);
+          const rowTotal = Number.isFinite(unitPrice) ? unitPrice * line.quantity : 0;
+          const groups = i.variantGroups ?? [];
 
           return {
             productId: i.productId,
             name: i.name,
-            quantity: q,
+            quantity: line.quantity,
             unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
-            rowTotal: rowTotal,
+            rowTotal,
             category: (i.category || []).join(', ') || '',
             subtitle: i.subtitle || '',
             priceUnit: i.priceUnit || undefined,
             imageUrl: i.imageUrl,
             quantityStep: i.quantityStep,
             variantSummary:
-              formatVariantSelectionSummary(
-                i.variantGroups ?? [],
-                variantSelections[i.productId]
-              ) || undefined,
+              formatVariantSelectionSummary(groups, line.variantSelection) || undefined,
+            variantCombinationId:
+              groups.length > 0 && Object.keys(line.variantSelection).length > 0
+                ? generateVariantCombinationId(line.variantSelection)
+                : undefined,
           };
         });
 
@@ -258,6 +276,7 @@ export default function ConfirmOrder() {
             trackingUrl = buildOrderTrackingUrl(createdOrder.tracking_token);
           }
           // Clear the saved order quantities from sessionStorage on successful order creation
+          sessionStorage.removeItem(`catshare_order_cart_${token}`);
           sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }
       } catch (err) {
@@ -286,18 +305,17 @@ export default function ConfirmOrder() {
     lines.push('*Items Ordered:*');
 
     let total = 0;
-    selectedItems.forEach((i, idx) => {
-      const q = localQty[i.productId] ?? 0;
-      const unit = parseItemPriceNumeric(i.price);
+    activeCartLines(localCartLines).forEach((line, idx) => {
+      const i = catalogueItems.find((it) => it.productId === line.productId);
+      if (!i) return;
+      const q = line.quantity;
+      const unit = getShareLinkItemUnitPrice(i, q);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
       total += itemTotal;
 
       const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
       lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
-      const variantLine = formatVariantSelectionSummary(
-        i.variantGroups ?? [],
-        variantSelections[i.productId]
-      );
+      const variantLine = formatVariantSelectionSummary(i.variantGroups ?? [], line.variantSelection);
       if (variantLine) {
         lines.push(`   _${variantLine}_`);
       }
@@ -425,7 +443,7 @@ export default function ConfirmOrder() {
           {/* Order Items Summary */}
           <div style={{ marginTop: 24 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.text, marginBottom: 12, fontFamily: FONT }}>
-              Order Items ({selectedItems.length})
+              Order Items ({activeCartLines(localCartLines).length})
             </div>
             <div style={{
               background: COLORS.surface,
@@ -434,14 +452,20 @@ export default function ConfirmOrder() {
               overflow: 'hidden',
             }}>
               <div style={{ padding: '4px 16px' }}>
-                {selectedItems.map((item, i) => {
-                  const q = localQty[item.productId] ?? 0;
+                {activeCartLines(localCartLines).map((line, i) => {
+                  const item = catalogueItems.find((it) => it.productId === line.productId);
+                  if (!item) return null;
+                  const q = line.quantity;
                   const hasCost = item.price !== undefined && item.price !== '';
-                  const unitPrice = parseItemPriceNumeric(item.price);
-                  const lineTotal = updatedLineAmounts[item.productId] ?? 0;
+                  const unitPrice = getShareLinkItemUnitPrice(item, q);
+                  const lineTotal = Number.isFinite(unitPrice) ? unitPrice * q : 0;
+                  const variantSummary = formatVariantSelectionSummary(
+                    item.variantGroups ?? [],
+                    line.variantSelection
+                  );
 
                   return (
-                    <div key={item.productId}>
+                    <div key={line.lineId}>
                       {i > 0 && <Divider />}
                       <div style={{ display: 'flex', alignItems: 'flex-start', padding: '12px 0', gap: 12 }}>
                         <ProductThumb url={item.imageUrl} name={item.name} imageVersion={item.imageVersion} />
@@ -454,7 +478,12 @@ export default function ConfirmOrder() {
                               {item.subtitle}
                             </div>
                           )}
-                          <QtyControl value={q} step={item.quantityStep || 1} onChange={(delta) => handleQtyChange(item.productId, delta)} />
+                          {variantSummary && (
+                            <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONT, marginBottom: 8 }}>
+                              {variantSummary}
+                            </div>
+                          )}
+                          <QtyControl value={q} step={item.quantityStep || 1} onChange={(delta) => handleQtyChange(line.lineId, delta)} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && Number.isFinite(unitPrice) && (

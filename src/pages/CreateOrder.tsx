@@ -12,17 +12,63 @@ import { STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
 import {
   applyQuantityDelta,
   getProductOrderQuantityRules,
-  resolveQuantityAwarePricing,
   roundQuantityToRules,
 } from '../utils/quantityPricingUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
+import { applyInventoryCapToQuantity } from '../utils/orderQuantityStock';
+import TypedQuantityStepper from '../components/TypedQuantityStepper';
+import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import { getStorefrontPriceAndUnit } from '../components/Storefront/storefrontOrderHelpers';
+import { isCatalogueInventoryTracked } from '../utils/inventoryAvailability';
+import {
+  formatVariantSelectionSummary,
+  generateVariantCombinationId,
+  getProductVariantGroups,
+  getVariantCombinationData,
+  isVariantSelectionComplete,
+} from '../utils/productVariants';
+import { isOrderLineOutOfStock, isVariantOptionInStock } from '../utils/catalogueWarehouseStock';
+import {
+  activeCartLines,
+  cartLinesForProduct,
+  getCartLineQty,
+  productHasCartLines,
+  removeZeroQtyLinesForProduct,
+  setCartLineQty,
+  setCartLineQtyById,
+  type OrderCartLine,
+} from '../utils/orderCartLines';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './CreateOrder.css';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
+
+function OutOfStockPill({ style }: { style?: React.CSSProperties }) {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: '0.05em',
+        textTransform: 'uppercase',
+        color: '#B91C1C',
+        background: '#FEE2E2',
+        border: '1px solid #FECACA',
+        borderRadius: 999,
+        padding: '5px 10px',
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
+        ...style,
+      }}
+    >
+      Out of stock
+    </span>
+  );
+}
 
 // Icons
 function IconChevronRight() {
@@ -139,56 +185,6 @@ function ProductThumb({
   );
 }
 
-// Quantity stepper
-function QtyStepper({ value, step, onChange }: { value: number; step: number; onChange: (n: number) => void }) {
-  const normalizedStep = normalizeOrderQuantityStep(step);
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F2F2F7', borderRadius: 6, border: '1.5px solid #E2E8F0', width: 'fit-content' }}>
-      <button
-        onClick={() => onChange(Math.max(0, value - normalizedStep))}
-        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: value <= 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: value <= 0 ? '#CBD5E1' : COLORS.text }}
-        disabled={value <= 0}
-      >
-        <IconMinus />
-      </button>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value > 0 ? String(value) : ''}
-        onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, '');
-          if (!digits) {
-            onChange(0);
-          } else {
-            const num = parseInt(digits, 10);
-            const rounded = Math.max(0, Math.round(num / normalizedStep) * normalizedStep);
-            onChange(rounded);
-          }
-        }}
-        aria-label="Quantity"
-        style={{
-          width: 40,
-          border: 'none',
-          background: 'transparent',
-          textAlign: 'center',
-          fontSize: 14,
-          fontWeight: 700,
-          color: value === 0 ? '#94A3B8' : COLORS.text,
-          fontFamily: 'inherit',
-          padding: 0,
-          outline: 'none',
-        }}
-      />
-      <button
-        onClick={() => onChange(value + normalizedStep)}
-        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
-      >
-        <IconPlus />
-      </button>
-    </div>
-  );
-}
-
 export default function CreateOrder() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -197,12 +193,14 @@ export default function CreateOrder() {
 
   const [step, setStep] = useState<Step>('catalogue');
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
-  const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
+  const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
+  const [draftVariantSelections, setDraftVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [variantErrorIds, setVariantErrorIds] = useState<Set<string>>(new Set());
   const isSwipeProcessingRef = useRef(false);
   const stepRef = useRef<Step>('catalogue');
 
@@ -234,6 +232,11 @@ export default function CreateOrder() {
   }, []);
 
   const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
+  const selectedCatalogue = useMemo(
+    () => catalogues.find((c) => c.id === selectedCatalogueId) ?? null,
+    [catalogues, selectedCatalogueId]
+  );
+  const inventoryMap = useCatalogueInventoryMap(user?.uid, selectedCatalogue);
   const products = useMemo(
     () => safeGetFromStorage(user?.uid ? getStorageKey('products', user.uid) : '', []) as ProductWithCatalogueData[],
     [user?.uid]
@@ -303,6 +306,7 @@ export default function CreateOrder() {
     if (!catalogue) return { items: [], total: 0, count: 0 };
 
     const items: Array<{
+      lineId: string;
       productId: string;
       name: string;
       quantity: number;
@@ -314,28 +318,39 @@ export default function CreateOrder() {
       priceUnit?: string;
       subtitle?: string;
       quantityStep?: number;
+      variantSummary?: string;
+      variantCombinationId?: string;
+      variantSelection: Record<string, string>;
     }> = [];
 
     let total = 0;
     let count = 0;
 
-    selectedProducts.forEach((quantity, productId) => {
+    activeCartLines(cartLines).forEach((line) => {
+      const productId = line.productId;
+      const quantity = line.quantity;
       const product = products.find(p => p.id === productId);
       if (product) {
         const catData = getCatalogueData(product, selectedCatalogueId);
-        const pricing = resolveQuantityAwarePricing(
+        const groups = getProductVariantGroups(product);
+        const selection = line.variantSelection;
+        const variantData =
+          selection && groups.length > 0
+            ? getVariantCombinationData(product, selection, selectedCatalogueId)
+            : undefined;
+        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
           catData,
-          catalogue.priceField,
-          product as Record<string, unknown>,
+          catalogue,
+          product,
+          selection,
           quantity
         );
-        const unitPrice = pricing.effectiveUnitPrice;
         const rowTotal = unitPrice * quantity;
 
-        const priceUnit = catData[catalogue.priceUnitField];
-        const quantityStep = getProductOrderQuantityRules(catData).step;
+        const quantityStep = getProductOrderQuantityRules(catData, variantData?.customFields).step;
         const productImage = imageMap[product.id] || product.image || product.imageUrl;
         items.push({
+          lineId: line.lineId,
           productId,
           name: product.name,
           quantity,
@@ -350,6 +365,15 @@ export default function CreateOrder() {
           priceUnit,
           subtitle: product.subtitle,
           quantityStep,
+          variantSelection: { ...selection },
+          variantSummary:
+            groups.length > 0 && selection
+              ? formatVariantSelectionSummary(groups, selection)
+              : undefined,
+          variantCombinationId:
+            groups.length > 0 && selection && isVariantSelectionComplete(groups, selection)
+              ? generateVariantCombinationId(selection)
+              : undefined,
         });
 
         total += rowTotal;
@@ -358,53 +382,213 @@ export default function CreateOrder() {
     });
 
     return { items, total, count };
-  }, [selectedCatalogueId, selectedProducts, products, catalogues]);
+  }, [selectedCatalogueId, cartLines, products, catalogues, imageMap]);
 
   const handleSelectCatalogue = (catId: string) => {
     setSelectedCatalogueId(catId);
-    setSelectedProducts(new Map());
+    setCartLines([]);
+    setDraftVariantSelections({});
+    setVariantErrorIds(new Set());
     setSearchQuery('');
     setSelectedCategory('all');
     setStepSync('products');
+  };
+
+  const resolveDraftVariantId = (
+    product: ProductWithCatalogueData,
+    productId: string,
+    selection: Record<string, string>
+  ): { variantId: string | null; needsSelection: boolean } => {
+    const groups = getProductVariantGroups(product);
+    if (groups.length === 0) {
+      return { variantId: null, needsSelection: false };
+    }
+    if (!isVariantSelectionComplete(groups, selection)) {
+      return { variantId: null, needsSelection: true };
+    }
+    return { variantId: generateVariantCombinationId(selection), needsSelection: false };
+  };
+
+  const applyDraftVariantSelection = (productId: string, groupId: string, option: string) => {
+    const nextSelection = { ...(draftVariantSelections[productId] ?? {}), [groupId]: option };
+
+    setDraftVariantSelections((prev) => ({
+      ...prev,
+      [productId]: nextSelection,
+    }));
+
+    setCartLines((prev) => removeZeroQtyLinesForProduct(prev, productId));
+
+    setVariantErrorIds((prev) => {
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
+  };
+
+  const loadDraftVariantIntoEditor = (productId: string, selection: Record<string, string>) => {
+    setDraftVariantSelections((prev) => ({
+      ...prev,
+      [productId]: { ...selection },
+    }));
+    setCartLines((prev) => removeZeroQtyLinesForProduct(prev, productId));
+  };
+
+  const applyStockCap = (
+    productId: string,
+    rawQty: number,
+    warn: boolean,
+    variantId: string | null,
+    needsVariantSelection: boolean,
+    variantSelection: Record<string, string>
+  ): number => {
+    if (!selectedCatalogueId) return rawQty;
+    const product = products.find((p) => p.id === productId);
+    if (!product) return rawQty;
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const variantData =
+      Object.keys(variantSelection).length > 0
+        ? getVariantCombinationData(product, variantSelection, selectedCatalogueId)
+        : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+
+    if (needsVariantSelection) {
+      if (rawQty > 0 && warn) {
+        showToast('Please select all variants for this product.', 'warning');
+      }
+      if (isCatalogueInventoryTracked(selectedCatalogue, inventoryMap)) {
+        return rawQty > 0 && warn ? 0 : rawQty;
+      }
+      return roundQuantityToRules(rawQty, rules.step, rules.moq);
+    }
+
+    const { quantity, wasCapped, available } = applyInventoryCapToQuantity(
+      rawQty,
+      rules.step,
+      rules.moq,
+      selectedCatalogue,
+      inventoryMap,
+      productId,
+      variantId
+    );
+    if (warn && wasCapped && available != null) {
+      showToast(
+        available === 0
+          ? 'This item is out of stock — quantity set to 0.'
+          : `Only ${available} available — quantity adjusted.`,
+        'warning'
+      );
+    }
+    return quantity;
   };
 
   const changeProductQty = (productId: string, delta: number) => {
     if (!selectedCatalogueId) return;
     const product = products.find((p) => p.id === productId);
     if (!product) return;
+    const selection = draftVariantSelections[productId] ?? {};
+    const { variantId, needsSelection } = resolveDraftVariantId(product, productId, selection);
+    if (needsSelection) {
+      setVariantErrorIds(new Set([productId]));
+      showToast('Please select all variants before setting quantity.', 'warning');
+      return;
+    }
     const catData = getCatalogueData(product, selectedCatalogueId);
-    const rules = getProductOrderQuantityRules(catData);
-    const current = selectedProducts.get(productId) || 0;
+    const variantData =
+      Object.keys(selection).length > 0
+        ? getVariantCombinationData(product, selection, selectedCatalogueId)
+        : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+    const current = getCartLineQty(cartLines, productId, selection);
     const next = applyQuantityDelta(current, delta, rules.step, rules.moq);
-    const newSelected = new Map(selectedProducts);
-    newSelected.set(productId, next);
-    setSelectedProducts(newSelected);
+    const capped = applyStockCap(productId, next, false, variantId, false, selection);
+    setCartLines((prev) => setCartLineQty(prev, productId, selection, capped));
   };
 
-  const setProductQty = (productId: string, raw: number) => {
+  const changeCartLineQty = (lineId: string, delta: number) => {
     if (!selectedCatalogueId) return;
-    const product = products.find((p) => p.id === productId);
+    const line = cartLines.find((l) => l.lineId === lineId);
+    if (!line) return;
+    const product = products.find((p) => p.id === line.productId);
     if (!product) return;
+    const selection = line.variantSelection;
+    const { variantId } = resolveDraftVariantId(product, line.productId, selection);
     const catData = getCatalogueData(product, selectedCatalogueId);
-    const rules = getProductOrderQuantityRules(catData);
-    const next = roundQuantityToRules(raw, rules.step, rules.moq);
-    const newSelected = new Map(selectedProducts);
-    newSelected.set(productId, next);
-    setSelectedProducts(newSelected);
+    const variantData =
+      Object.keys(selection).length > 0
+        ? getVariantCombinationData(product, selection, selectedCatalogueId)
+        : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+    const next = applyQuantityDelta(line.quantity, delta, rules.step, rules.moq);
+    const capped = applyStockCap(line.productId, next, false, variantId, false, selection);
+    setCartLines((prev) => setCartLineQtyById(prev, lineId, capped));
+  };
+
+  const setProductQtyDraft = (productId: string, raw: number) => {
+    if (!selectedCatalogueId) return;
+    const selection = draftVariantSelections[productId] ?? {};
+    setCartLines((prev) => setCartLineQty(prev, productId, selection, raw));
+  };
+
+  const setCartLineQtyDraft = (lineId: string, raw: number) => {
+    setCartLines((prev) => setCartLineQtyById(prev, lineId, raw));
+  };
+
+  const commitProductQtyOnBlur = (productId: string) => {
+    const selection = draftVariantSelections[productId] ?? {};
+    setCartLines((prev) => {
+      const raw = getCartLineQty(prev, productId, selection);
+      const product = products.find((p) => p.id === productId);
+      if (!product || !selectedCatalogueId) return prev;
+      const { variantId, needsSelection } = resolveDraftVariantId(product, productId, selection);
+      const catData = getCatalogueData(product, selectedCatalogueId);
+      const variantData =
+        Object.keys(selection).length > 0
+          ? getVariantCombinationData(product, selection, selectedCatalogueId)
+          : undefined;
+      const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+      const rounded = roundQuantityToRules(raw, rules.step, rules.moq);
+      const capped = applyStockCap(productId, rounded, true, variantId, needsSelection, selection);
+      return setCartLineQty(prev, productId, selection, capped);
+    });
+  };
+
+  const commitCartLineQtyOnBlur = (lineId: string) => {
+    const line = cartLines.find((l) => l.lineId === lineId);
+    if (!line || !selectedCatalogueId) return;
+    const product = products.find((p) => p.id === line.productId);
+    if (!product) return;
+    const selection = line.variantSelection;
+    const { variantId, needsSelection } = resolveDraftVariantId(product, line.productId, selection);
+    const catData = getCatalogueData(product, selectedCatalogueId);
+    const variantData =
+      Object.keys(selection).length > 0
+        ? getVariantCombinationData(product, selection, selectedCatalogueId)
+        : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+    const rounded = roundQuantityToRules(line.quantity, rules.step, rules.moq);
+    const capped = applyStockCap(line.productId, rounded, true, variantId, needsSelection, selection);
+    setCartLines((prev) => setCartLineQtyById(prev, lineId, capped));
   };
 
   const handleContinueToCustomer = () => {
-    // Filter out products with 0 quantity
-    const filteredProducts = new Map(
-      Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
-    );
+    for (const line of activeCartLines(cartLines)) {
+      const product = products.find((p) => p.id === line.productId);
+      if (!product) continue;
+      const groups = getProductVariantGroups(product);
+      if (groups.length > 0 && !isVariantSelectionComplete(groups, line.variantSelection)) {
+        setVariantErrorIds(new Set([line.productId]));
+        showToast(`Please select variants for "${product.name}" before continuing.`, 'error');
+        return;
+      }
+    }
 
-    if (filteredProducts.size === 0) {
+    if (activeCartLines(cartLines).length === 0) {
       showToast('Please add at least one product to the order', 'error');
       return;
     }
 
-    setSelectedProducts(filteredProducts);
+    setCartLines(activeCartLines(cartLines));
     setStepSync('customer');
   };
 
@@ -421,18 +605,9 @@ export default function CreateOrder() {
     };
   }, [orderSummary]);
 
-  // Clean up items with 0 quantity when navigating away
   React.useEffect(() => {
-    const cleanupOnUnmount = () => {
-      // Filter out items with 0 quantity when component unmounts
-      const filteredProducts = new Map(
-        Array.from(selectedProducts).filter(([_, qty]) => qty > 0)
-      );
-      setSelectedProducts(filteredProducts);
-    };
-
     return () => {
-      cleanupOnUnmount();
+      setCartLines((prev) => activeCartLines(prev));
     };
   }, []);
 
@@ -462,6 +637,8 @@ export default function CreateOrder() {
         imageVersion: item.imageVersion,
         priceUnit: item.priceUnit,
         quantityStep: item.quantityStep,
+        variantSummary: item.variantSummary,
+        variantCombinationId: item.variantCombinationId,
       }));
 
       const { error } = await createOrderDirectly(
@@ -835,27 +1012,51 @@ export default function CreateOrder() {
                 </div>
               ) : (
                 filteredProducts.map((product) => {
-                  const quantity = selectedProducts.get(product.id) || 0;
+                  const draftSelection = draftVariantSelections[product.id] ?? {};
+                  const quantity = getCartLineQty(cartLines, product.id, draftSelection);
                   const catalogue = catalogues.find(c => c.id === selectedCatalogueId);
                   const catData = catalogue ? getCatalogueData(product, selectedCatalogueId!) : null;
-                  const pricing =
+                  const variantGroups = getProductVariantGroups(product);
+                  const variantData =
+                    Object.keys(draftSelection).length > 0 && variantGroups.length > 0
+                      ? getVariantCombinationData(product, draftSelection, selectedCatalogueId!)
+                      : undefined;
+                  const { price, priceUnit, listPrice, showOffer, priceFrom } =
                     catalogue && catData
-                      ? resolveQuantityAwarePricing(
-                          catData,
-                          catalogue.priceField,
-                          product as Record<string, unknown>,
-                          quantity
-                        )
-                      : null;
-                  const price = pricing ? pricing.effectiveUnitPrice : 0;
-                  const priceUnit = catalogue && catData ? catData[catalogue.priceUnitField] : undefined;
-                  const rules = getProductOrderQuantityRules(catData);
+                      ? getStorefrontPriceAndUnit(catData, catalogue, product, draftSelection, quantity)
+                      : { price: 0, priceUnit: undefined, listPrice: undefined, showOffer: false, priceFrom: false };
+                  const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
                   const quantityStep = rules.step;
-                  const minQty = rules.minQty;
+                  const lineTotal = price * quantity;
                   const productImage = imageMap[product.id] || product.image;
                   const hasImage = productImage && (productImage.startsWith('data:') || /^https?:\/\//i.test(productImage));
-                  const isSelected = quantity > 0;
-                  const lineTotal = price * quantity;
+                  const isSelected = productHasCartLines(cartLines, product.id);
+                  const hasVariants = variantGroups.length > 0;
+                  const draftComplete = isVariantSelectionComplete(variantGroups, draftSelection);
+                  const committedLines = hasVariants
+                    ? cartLinesForProduct(cartLines, product.id)
+                    : [];
+                  const productLineTotal = cartLinesForProduct(cartLines, product.id).reduce((sum, line) => {
+                    if (!catalogue || !catData) return sum;
+                    const { price: unitPrice } = getStorefrontPriceAndUnit(
+                      catData,
+                      catalogue,
+                      product,
+                      line.variantSelection,
+                      line.quantity
+                    );
+                    return sum + unitPrice * line.quantity;
+                  }, 0);
+                  const lineOutOfStock = !hasVariants && isOrderLineOutOfStock(
+                    selectedCatalogue,
+                    inventoryMap,
+                    product,
+                    draftSelection
+                  );
+                  const draftLineOos =
+                    hasVariants &&
+                    draftComplete &&
+                    isOrderLineOutOfStock(selectedCatalogue, inventoryMap, product, draftSelection);
 
                   return (
                     <div
@@ -866,7 +1067,7 @@ export default function CreateOrder() {
                         border: isSelected ? '1.5px solid #16A34A' : '1.5px solid #E2E8F0',
                         overflow: 'hidden',
                         display: 'flex',
-                        alignItems: 'stretch',
+                        alignItems: 'flex-start',
                         transition: 'all 0.2s',
                         marginBottom: 8,
                         boxShadow: isSelected ? '0 0 0 2px rgba(22,163,74,0.12), 0 1px 4px rgba(0,0,0,0.04)' : '0 1px 4px rgba(0,0,0,0.04)',
@@ -884,11 +1085,13 @@ export default function CreateOrder() {
                         }
                       }}
                     >
-                      {/* Image */}
+                      {/* Image — fixed square so it does not stretch with tall variant rows */}
                       <div style={{
-                        width: 100,
-                        minWidth: 100,
-                        minHeight: 100,
+                        width: 80,
+                        height: 80,
+                        minWidth: 80,
+                        margin: '10px 0 10px 10px',
+                        borderRadius: 8,
                         overflow: 'hidden',
                         background: '#F1F5F9',
                         display: 'flex',
@@ -898,7 +1101,17 @@ export default function CreateOrder() {
                         flexShrink: 0,
                       }}>
                         {hasImage ? (
-                          <img src={productImage} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          <img
+                            src={productImage}
+                            alt={product.name}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              objectPosition: 'center',
+                              display: 'block',
+                            }}
+                          />
                         ) : (
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" strokeWidth="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
@@ -926,10 +1139,10 @@ export default function CreateOrder() {
                       {/* Body */}
                       <div style={{
                         flex: 1,
-                        padding: '12px',
+                        padding: '10px 10px 10px 8px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 10,
+                        gap: 6,
                         minWidth: 0,
                       }}>
                         {/* Product Info */}
@@ -965,11 +1178,12 @@ export default function CreateOrder() {
                               fontWeight: 700,
                               color: '#166534',
                             }}>
-                              {pricing?.showStrikeout ? (
+                              {priceFrom ? 'From ' : ''}
+                              {showOffer ? (
                                 <>
                                   ₹{price.toLocaleString('en-IN')}
                                   <span style={{ ...STRUCK_LIST_PRICE_STYLE, fontWeight: 600 }}>
-                                    ₹{pricing.listPrice.toLocaleString('en-IN')}
+                                    ₹{(listPrice ?? 0).toLocaleString('en-IN')}
                                   </span>
                                   {' / '}{getOrderUnitLabel(priceUnit)}
                                 </>
@@ -980,79 +1194,253 @@ export default function CreateOrder() {
                           )}
                         </div>
 
-                        {/* Quantity Control */}
                         <div style={{
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: 0,
-                          background: '#F1F5F9',
-                          borderRadius: 6,
-                          border: '1.5px solid #E2E8F0',
-                          width: 'fit-content',
+                          alignItems: hasVariants ? 'flex-end' : 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          flexWrap: 'wrap',
                         }}>
-                          <button
-                            onClick={() => changeProductQty(product.id, -quantityStep)}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              border: 'none',
-                              background: 'transparent',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: quantity === 0 ? '#CBD5E1' : '#374151',
-                              fontFamily: 'inherit',
-                              transition: 'color 0.15s',
-                            }}
-                            disabled={quantity === 0}
-                          >
-                            <IconMinus />
-                          </button>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={quantity > 0 ? String(quantity) : ''}
-                            onChange={(e) => {
-                              const digits = e.target.value.replace(/\D/g, '');
-                              setProductQty(product.id, digits ? parseInt(digits, 10) : 0);
-                            }}
-                            aria-label={`Quantity for ${product.name}`}
-                            style={{
-                              width: 40,
-                              border: 'none',
-                              background: 'transparent',
-                              textAlign: 'center',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: quantity === 0 ? '#94A3B8' : '#0F172A',
-                              fontFamily: 'inherit',
-                              padding: 0,
-                              outline: 'none',
-                            }}
-                          />
-                          <button
-                            onClick={() => changeProductQty(product.id, quantityStep)}
-                            style={{
-                              width: 32,
-                              height: 32,
-                              border: 'none',
-                              background: 'transparent',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#374151',
-                              fontFamily: 'inherit',
-                              transition: 'color 0.15s',
-                            }}
-                          >
-                            <IconPlus />
-                          </button>
+                          {hasVariants ? (
+                            <div style={{ flex: '1 1 140px', minWidth: 0 }}>
+                              <ProductVariantsDisplay
+                                compact
+                                groups={variantGroups}
+                                mode="select"
+                                selection={draftSelection}
+                                error={variantErrorIds.has(product.id)}
+                                isOptionAvailable={(groupId, option) =>
+                                  isVariantOptionInStock(
+                                    selectedCatalogue,
+                                    inventoryMap,
+                                    product,
+                                    selectedCatalogueId!,
+                                    variantGroups,
+                                    draftSelection,
+                                    groupId,
+                                    option
+                                  )
+                                }
+                                onSelect={(groupId, option) => applyDraftVariantSelection(product.id, groupId, option)}
+                              />
+                            </div>
+                          ) : null}
+                          {hasVariants ? (
+                            draftComplete ? (
+                              draftLineOos ? (
+                                <OutOfStockPill style={{ flexShrink: 0 }} />
+                              ) : quantity === 0 ? (
+                                <TypedQuantityStepper
+                                  value={quantity}
+                                  onDraftChange={(qty) => setProductQtyDraft(product.id, qty)}
+                                  onBlurCommit={() => commitProductQtyOnBlur(product.id)}
+                                  onDecrement={() => changeProductQty(product.id, -quantityStep)}
+                                  onIncrement={() => changeProductQty(product.id, quantityStep)}
+                                  decrementDisabled={quantity <= 0}
+                                  renderMinus={<IconMinus />}
+                                  renderPlus={<IconPlus />}
+                                  containerStyle={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0,
+                                    background: '#F1F5F9',
+                                    borderRadius: 6,
+                                    border: '1.5px solid #E2E8F0',
+                                    width: 'fit-content',
+                                    flexShrink: 0,
+                                  }}
+                                  buttonStyle={{
+                                    width: 32,
+                                    height: 32,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#374151',
+                                    fontFamily: 'inherit',
+                                    transition: 'color 0.15s',
+                                  }}
+                                  minusButtonStyle={{
+                                    color: quantity === 0 ? '#CBD5E1' : '#374151',
+                                  }}
+                                  inputStyle={{
+                                    width: 40,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    textAlign: 'center',
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                                    fontFamily: 'inherit',
+                                    padding: 0,
+                                    outline: 'none',
+                                  }}
+                                />
+                              ) : null
+                            ) : null
+                          ) : lineOutOfStock ? (
+                            <OutOfStockPill />
+                          ) : (
+                            <TypedQuantityStepper
+                              value={quantity}
+                              onDraftChange={(qty) => setProductQtyDraft(product.id, qty)}
+                              onBlurCommit={() => commitProductQtyOnBlur(product.id)}
+                              onDecrement={() => changeProductQty(product.id, -quantityStep)}
+                              onIncrement={() => changeProductQty(product.id, quantityStep)}
+                              decrementDisabled={quantity <= 0}
+                              renderMinus={<IconMinus />}
+                              renderPlus={<IconPlus />}
+                              containerStyle={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0,
+                                background: '#F1F5F9',
+                                borderRadius: 6,
+                                border: '1.5px solid #E2E8F0',
+                                width: 'fit-content',
+                                flexShrink: 0,
+                              }}
+                              buttonStyle={{
+                                width: 32,
+                                height: 32,
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#374151',
+                                fontFamily: 'inherit',
+                                transition: 'color 0.15s',
+                              }}
+                              minusButtonStyle={{
+                                color: quantity === 0 ? '#CBD5E1' : '#374151',
+                              }}
+                              inputStyle={{
+                                width: 40,
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: 'center',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: quantity === 0 ? '#94A3B8' : '#0F172A',
+                                fontFamily: 'inherit',
+                                padding: 0,
+                                outline: 'none',
+                              }}
+                            />
+                          )}
                         </div>
 
+                        {hasVariants && committedLines.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {committedLines.map((line) => {
+                              const lineSummary = formatVariantSelectionSummary(variantGroups, line.variantSelection);
+                              const lineRules = getProductOrderQuantityRules(
+                                catData,
+                                getVariantCombinationData(product, line.variantSelection, selectedCatalogueId!)?.customFields
+                              );
+                              const lineStep = lineRules.step;
+                              const lineOos = isOrderLineOutOfStock(
+                                selectedCatalogue,
+                                inventoryMap,
+                                product,
+                                line.variantSelection
+                              );
+                              return (
+                                <div
+                                  key={line.lineId}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 8,
+                                    padding: '6px 8px',
+                                    background: '#F8FAFC',
+                                    borderRadius: 6,
+                                    border: '1px solid #E2E8F0',
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => loadDraftVariantIntoEditor(product.id, line.variantSelection)}
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      border: 'none',
+                                      background: 'transparent',
+                                      padding: 0,
+                                      textAlign: 'left',
+                                      cursor: 'pointer',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      color: '#475569',
+                                      fontFamily: 'inherit',
+                                    }}
+                                  >
+                                    {lineSummary || 'Variant'}
+                                  </button>
+                                  {lineOos ? (
+                                    <OutOfStockPill />
+                                  ) : (
+                                    <TypedQuantityStepper
+                                      value={line.quantity}
+                                      onDraftChange={(qty) => setCartLineQtyDraft(line.lineId, qty)}
+                                      onBlurCommit={() => commitCartLineQtyOnBlur(line.lineId)}
+                                      onDecrement={() => changeCartLineQty(line.lineId, -lineStep)}
+                                      onIncrement={() => changeCartLineQty(line.lineId, lineStep)}
+                                      decrementDisabled={line.quantity <= 0}
+                                      renderMinus={<IconMinus />}
+                                      renderPlus={<IconPlus />}
+                                      containerStyle={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0,
+                                        background: '#fff',
+                                        borderRadius: 6,
+                                        border: '1.5px solid #E2E8F0',
+                                        width: 'fit-content',
+                                        flexShrink: 0,
+                                      }}
+                                      buttonStyle={{
+                                        width: 28,
+                                        height: 28,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#374151',
+                                        fontFamily: 'inherit',
+                                      }}
+                                      minusButtonStyle={{
+                                        color: line.quantity === 0 ? '#CBD5E1' : '#374151',
+                                      }}
+                                      inputStyle={{
+                                        width: 32,
+                                        border: 'none',
+                                        background: 'transparent',
+                                        textAlign: 'center',
+                                        fontSize: 13,
+                                        fontWeight: 700,
+                                        color: line.quantity === 0 ? '#94A3B8' : '#0F172A',
+                                        fontFamily: 'inherit',
+                                        padding: 0,
+                                        outline: 'none',
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
                         {/* Subtotal - Below Quantity (Compact Single Line) */}
-                        {quantity > 0 && (
+                        {((hasVariants && productLineTotal > 0) || (!hasVariants && quantity > 0)) && (
                           <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -1062,12 +1450,16 @@ export default function CreateOrder() {
                             color: '#64748B',
                             marginTop: 2,
                           }}>
-                            <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
-                              {quantity} {getOrderUnitLabel(priceUnit)} ({Math.round(quantity / quantityStep)}) × ₹{price.toLocaleString('en-IN')}
-                            </span>
-                            <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                            {!hasVariants && (
+                              <>
+                                <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
+                                  {quantity} {getOrderUnitLabel(priceUnit)} ({Math.round(quantity / quantityStep)}) × ₹{price.toLocaleString('en-IN')}
+                                </span>
+                                <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
+                              </>
+                            )}
                             <span style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
-                              ₹{lineTotal.toLocaleString('en-IN')}
+                              ₹{(hasVariants ? productLineTotal : lineTotal).toLocaleString('en-IN')}
                             </span>
                           </div>
                         )}
@@ -1165,8 +1557,17 @@ export default function CreateOrder() {
                   const lineTotal = item.rowTotal;
                   const hasCost = item.unitPrice !== undefined && item.unitPrice > 0;
                   const isZero = item.quantity === 0;
+                  const reviewProduct = products.find((p) => p.id === item.productId);
+                  const lineOutOfStock = reviewProduct
+                    ? isOrderLineOutOfStock(
+                        selectedCatalogue,
+                        inventoryMap,
+                        reviewProduct,
+                        item.variantSelection
+                      )
+                    : false;
                   return (
-                    <div key={item.productId}>
+                    <div key={item.lineId}>
                       {i > 0 && <Divider />}
                       <div style={{
                         display: 'flex',
@@ -1187,6 +1588,11 @@ export default function CreateOrder() {
                                 {item.subtitle}
                               </div>
                             )}
+                            {item.variantSummary && (
+                              <div style={{ fontSize: 11, color: COLORS.muted, fontFamily: FONT, marginTop: 2 }}>
+                                {item.variantSummary}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                             {hasCost && (
@@ -1201,11 +1607,55 @@ export default function CreateOrder() {
                             )}
                           </div>
                         </div>
-                        <QtyStepper
-                          value={item.quantity}
-                          step={item.quantityStep ?? 1}
-                          onChange={(qty) => setProductQty(item.productId, qty)}
-                        />
+                        {lineOutOfStock ? (
+                          <OutOfStockPill />
+                        ) : (
+                          <TypedQuantityStepper
+                            value={item.quantity}
+                            onDraftChange={(qty) => setCartLineQtyDraft(item.lineId, qty)}
+                            onBlurCommit={() => commitCartLineQtyOnBlur(item.lineId)}
+                            onDecrement={() => changeCartLineQty(item.lineId, -(item.quantityStep ?? 1))}
+                            onIncrement={() => changeCartLineQty(item.lineId, item.quantityStep ?? 1)}
+                            decrementDisabled={item.quantity <= 0}
+                            renderMinus={<IconMinus />}
+                            renderPlus={<IconPlus />}
+                            containerStyle={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0,
+                              background: '#F2F2F7',
+                              borderRadius: 6,
+                              border: '1.5px solid #E2E8F0',
+                              width: 'fit-content',
+                            }}
+                            buttonStyle={{
+                              width: 34,
+                              height: 34,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: COLORS.text,
+                            }}
+                            minusButtonStyle={{
+                              color: item.quantity <= 0 ? '#CBD5E1' : COLORS.text,
+                            }}
+                            inputStyle={{
+                              width: 40,
+                              border: 'none',
+                              background: 'transparent',
+                              textAlign: 'center',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: item.quantity === 0 ? '#94A3B8' : COLORS.text,
+                              fontFamily: 'inherit',
+                              padding: 0,
+                              outline: 'none',
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   );
@@ -1279,6 +1729,7 @@ export default function CreateOrder() {
                       </div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                         {item.quantity} × ₹{item.unitPrice.toLocaleString('en-IN')}
+                        {item.variantSummary ? ` · ${item.variantSummary}` : ''}
                       </div>
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#166534' }}>

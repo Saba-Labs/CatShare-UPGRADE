@@ -27,9 +27,12 @@ import ProductImageGallery from '../components/ProductImageGallery';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import {
   formatVariantSelectionSummary,
+  generateVariantCombinationId,
+  getAllVariantCombinations,
   getProductVariantGroups,
   isVariantSelectionComplete,
   getVariantCombinationData,
+  getVariantLegacyInStock,
 } from '../utils/productVariants';
 import {
   getStorePathFallbackBaseUrl,
@@ -37,6 +40,17 @@ import {
   resolveStoreSlugFromHostname,
 } from '../utils/storefrontDomain';
 import { getStoreSlugByCustomHostname } from '../services/storeService';
+import {
+  activeCartLines,
+  cartLinesForProduct,
+  getCartLineQty,
+  productHasCartLines,
+  removeZeroQtyLinesForProduct,
+  setCartLineQty,
+  setCartLineQtyById,
+  totalCartLineCount,
+  type OrderCartLine,
+} from '../utils/orderCartLines';
 import {
   applyQuantityDelta,
   getProductOrderQuantityRules,
@@ -53,6 +67,19 @@ import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
 import { collectionPagePath, productPagePath, resolveStoreWhatsapp } from '../utils/websiteStorefront';
 import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
+import { computeCheckoutTotals } from '../utils/checkoutTotals';
+import { getStorefrontInventory } from '../services/inventoryService';
+import {
+  buildInventoryAvailabilityMap,
+  getAvailableQty,
+  isCatalogueInventoryTracked,
+  isInStockWithInventory,
+  isLowStock,
+  type InventoryAvailabilityMap,
+} from '../utils/inventoryAvailability';
+import { normalizeCheckoutSettings } from '../types/checkoutSettings';
+import { isVariantOptionInStock } from '../utils/catalogueWarehouseStock';
+import CheckoutBreakdown from '../components/Storefront/CheckoutBreakdown';
 import { normalizeHomepageLayoutForWebsiteMode } from '../config/homepageBuilderConfig';
 import '../components/Storefront/storefront-checkout.css';
 import {
@@ -242,6 +269,19 @@ body { background: var(--c-bg); }
 .sv-panel-cta:hover:not(:disabled) { opacity: 0.88; }
 .sv-panel-cta:active:not(:disabled) { transform: scale(0.97); }
 .sv-panel-cta:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.sv-checkout-breakdown { margin-top: 12px; padding: 12px 14px; background: var(--c-surface2); border-radius: var(--r-md); border: 1px solid var(--c-border2); }
+.sv-checkout-breakdown-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--c-text2); padding: 4px 0; }
+.sv-checkout-breakdown-row--grand { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--c-border2); font-size: 15px; font-weight: 700; color: var(--c-text); }
+.sv-checkout-breakdown-row .is-discount { color: var(--c-accent, #1a7a4a); }
+.sv-checkout-breakdown-note { font-size: 11px; color: var(--c-accent, #1a7a4a); margin-top: 4px; }
+.sv-payment-options { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.sv-payment-opt { flex: 1; min-width: 120px; padding: 10px 12px; border-radius: var(--r-md); border: 1.5px solid var(--c-border2); background: var(--c-surface); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+.sv-payment-opt.is-active { border-color: var(--c-accent); background: color-mix(in srgb, var(--c-accent) 8%, white); color: var(--c-accent); }
+.sv-coupon-row { display: flex; gap: 8px; margin-top: 6px; }
+.sv-coupon-row input { flex: 1; }
+.sv-coupon-apply { padding: 0 14px; border-radius: var(--r-md); border: none; background: var(--c-accent); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
+.sv-coupon-apply:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Step bar ── */
 .sv-steps { display: flex; align-items: center; padding: 16px 16px 0; }
@@ -842,20 +882,25 @@ export default function StoreView() {
         if (data) setSellerFieldsDefinition(data);
       });
   }, [store?.sellerUserId]);
+
   const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<Map<string, number>>(new Map());
+  const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
+  const [draftVariantSelections, setDraftVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsappCountry, setCustomerWhatsappCountry] = useState('+91');
   const [customerWhatsappNumber, setCustomerWhatsappNumber] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'prepaid' | 'cod'>('prepaid');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{ trackingUrl: string | null } | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [drawerProduct, setDrawerProduct] = useState<ProductWithCatalogueData | null>(null);
-  const [variantSelections, setVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const [variantErrorIds, setVariantErrorIds] = useState<Set<string>>(new Set());
+  const [inventoryMap, setInventoryMap] = useState<InventoryAvailabilityMap | null>(null);
+  const [resolvedInventoryId, setResolvedInventoryId] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const pathFallbackSentRef = useRef(false);
@@ -1099,24 +1144,70 @@ export default function StoreView() {
     return inferCatalogueStubFromRowData(id, raw);
   }, [catalogues, store?.catalogueId, productsInTableOrder]);
 
+  const effectiveCatalogue = useMemo((): Catalogue | null => {
+    if (!catalogue) return null;
+    const inv = resolvedInventoryId?.trim() || catalogue.inventoryId?.trim();
+    if (!inv || inv === catalogue.inventoryId) return catalogue;
+    return { ...catalogue, inventoryId: inv };
+  }, [catalogue, resolvedInventoryId]);
+
+  const inventoryTracked = useMemo(
+    () => isCatalogueInventoryTracked(effectiveCatalogue, inventoryMap, resolvedInventoryId),
+    [effectiveCatalogue, inventoryMap, resolvedInventoryId]
+  );
+
+  const reloadStoreInventory = useCallback(() => {
+    if (!store?.sellerUserId || !store?.catalogueId) return;
+    void getStorefrontInventory(store.sellerUserId, store.catalogueId).then((res) => {
+      setInventoryMap(buildInventoryAvailabilityMap(res.data.lines));
+      setResolvedInventoryId(res.data.inventoryId);
+    });
+  }, [store?.sellerUserId, store?.catalogueId]);
+
+  useEffect(() => {
+    reloadStoreInventory();
+  }, [reloadStoreInventory]);
+
   const storeProducts = useMemo(() => {
     if (!store?.catalogueId) return [];
 
-    const inStock = (p: ProductWithCatalogueData) =>
-      isProductInStockForCatalogue(p, store.catalogueId, catalogue);
+    const productInStockForStore = (p: ProductWithCatalogueData) => {
+      const legacy = isProductInStockForCatalogue(p, store.catalogueId, effectiveCatalogue);
+      if (!inventoryTracked) {
+        const groups = getProductVariantGroups(p);
+        if (groups.length === 0) return legacy;
+        return getAllVariantCombinations(groups).some((combo) =>
+          getVariantLegacyInStock(p, store.catalogueId, combo.id, legacy)
+        );
+      }
+      const groups = getProductVariantGroups(p);
+      if (groups.length === 0) {
+        return isInStockWithInventory(effectiveCatalogue, inventoryMap, p.id, null, legacy, resolvedInventoryId);
+      }
+      return getAllVariantCombinations(groups).some((combo) =>
+        isInStockWithInventory(
+          effectiveCatalogue,
+          inventoryMap,
+          p.id,
+          combo.id || null,
+          getVariantLegacyInStock(p, store.catalogueId, combo.id, legacy),
+          resolvedInventoryId
+        )
+      );
+    };
 
     const enabledProducts = productsInTableOrder.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
 
-    const enabledInStock = enabledProducts.filter(inStock);
+    const enabledInStock = enabledProducts.filter(productInStockForStore);
 
     if (enabledInStock.length > 0) return enabledInStock;
 
     if (enabledProducts.length === 0 && productsInTableOrder.length > 0) {
-      return productsInTableOrder.filter(inStock);
+      return productsInTableOrder.filter(productInStockForStore);
     }
 
     return enabledInStock;
-  }, [store?.catalogueId, productsInTableOrder, catalogue]);
+  }, [store?.catalogueId, productsInTableOrder, effectiveCatalogue, inventoryMap, inventoryTracked, resolvedInventoryId]);
   const availableCategories = useMemo(
     () => buildStorefrontCategoryFilterList(store?.productCategories, storeProducts),
     [store?.productCategories, storeProducts]
@@ -1142,15 +1233,21 @@ export default function StoreView() {
   const orderSummary = useMemo(() => {
     if (!store?.catalogueId) return { items: [] as any[], total: 0 };
     const items: any[] = []; let total = 0;
-    selectedProducts.forEach((quantity, productId) => {
+    activeCartLines(cartLines).forEach((line) => {
+      const productId = line.productId;
+      const quantity = line.quantity;
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
+      const selection = line.variantSelection;
       const catData = getCatalogueData(product, store.catalogueId);
-      const variantData = variantSelections[productId] ? getVariantCombinationData(product, variantSelections[productId]) : undefined;
+      const variantData =
+        Object.keys(selection).length > 0
+          ? getVariantCombinationData(product, selection, store.catalogueId)
+          : undefined;
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
         catData,
         catalogue,
         product,
-        variantSelections[productId],
+        selection,
         quantity
       );
       const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
@@ -1160,7 +1257,9 @@ export default function StoreView() {
       const iv = pr.imageVersion ?? pr.image_version;
       const variantImageUrl = variantData?.image;
       const baseImageUrl = pickProductImageSrc(product);
+      const groups = getProductVariantGroups(product);
       items.push({
+        lineId: line.lineId,
         productId,
         name: product.name,
         quantity,
@@ -1171,17 +1270,19 @@ export default function StoreView() {
         imageUrl: variantImageUrl || baseImageUrl,
         imageVersion: typeof iv === 'number' && Number.isFinite(iv) ? iv : undefined,
         subtitle: product.subtitle,
-        variantSummary: formatVariantSelectionSummary(
-          getProductVariantGroups(product),
-          variantSelections[productId]
-        ),
+        variantSelection: { ...selection },
+        variantSummary: formatVariantSelectionSummary(groups, selection),
+        variantCombinationId:
+          groups.length > 0 && isVariantSelectionComplete(groups, selection)
+            ? generateVariantCombinationId(selection)
+            : undefined,
       });
       total += rowTotal;
     });
     return { items, total };
-  }, [selectedProducts, store, catalogue, allProducts, variantSelections]);
+  }, [cartLines, store, catalogue, allProducts]);
 
-  const selectedProductCount = useMemo(() => Array.from(selectedProducts.values()).filter((q) => q > 0).length, [selectedProducts]);
+  const selectedProductCount = useMemo(() => totalCartLineCount(cartLines), [cartLines]);
   const minimumOrderValue = useMemo(() => {
     const n = store?.minimumOrderValue;
     return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0;
@@ -1199,8 +1300,9 @@ export default function StoreView() {
     const product = drawerProduct || allProducts.find(p => p.id === productId);
     if (!product) return;
 
+    const draftSelection = draftVariantSelections[productId] ?? {};
     const groups = getProductVariantGroups(product);
-    const isComplete = isVariantSelectionComplete(groups, variantSelections[productId]);
+    const isComplete = isVariantSelectionComplete(groups, draftSelection);
 
     if (groups.length > 0 && !isComplete) {
       setVariantErrorIds(new Set([productId]));
@@ -1209,16 +1311,89 @@ export default function StoreView() {
     }
 
     const catData = store?.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-    const variantData = variantSelections[productId]
-      ? getVariantCombinationData(product, variantSelections[productId])
-      : undefined;
+    const variantData =
+      Object.keys(draftSelection).length > 0
+        ? getVariantCombinationData(product, draftSelection, store.catalogueId)
+        : undefined;
     const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
-    const current = selectedProducts.get(productId) || 0;
-    const rounded = applyQuantityDelta(current, delta, rules.step, rules.moq);
-    const map = new Map(selectedProducts);
-    map.set(productId, rounded);
-    setSelectedProducts(map);
+    const current = getCartLineQty(cartLines, productId, draftSelection);
+    let rounded = applyQuantityDelta(current, delta, rules.step, rules.moq);
+
+    if (inventoryTracked && store?.catalogueId) {
+      const variantId =
+        groups.length > 0 && Object.keys(draftSelection).length > 0
+          ? generateVariantCombinationId(draftSelection)
+          : null;
+      const available = getAvailableQty(
+        effectiveCatalogue,
+        inventoryMap,
+        productId,
+        variantId,
+        resolvedInventoryId
+      );
+      if (available != null && rounded > available) {
+        rounded = available;
+      }
+    }
+
+    setCartLines((prev) => setCartLineQty(prev, productId, draftSelection, rounded));
   };
+
+  const changeCartLineQty = (lineId: string, delta: number) => {
+    const line = cartLines.find((l) => l.lineId === lineId);
+    if (!line || !store?.catalogueId) return;
+    const product = allProducts.find((p) => p.id === line.productId);
+    if (!product) return;
+    const selection = line.variantSelection;
+    const groups = getProductVariantGroups(product);
+    const catData = getCatalogueData(product, store.catalogueId);
+    const variantData =
+      Object.keys(selection).length > 0
+        ? getVariantCombinationData(product, selection, store.catalogueId)
+        : undefined;
+    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
+    let rounded = applyQuantityDelta(line.quantity, delta, rules.step, rules.moq);
+    if (inventoryTracked) {
+      const variantId =
+        groups.length > 0 && Object.keys(selection).length > 0
+          ? generateVariantCombinationId(selection)
+          : null;
+      const available = getAvailableQty(
+        effectiveCatalogue,
+        inventoryMap,
+        line.productId,
+        variantId,
+        resolvedInventoryId
+      );
+      if (available != null && rounded > available) {
+        rounded = available;
+      }
+    }
+    setCartLines((prev) => setCartLineQtyById(prev, lineId, rounded));
+  };
+
+  const applyDraftVariantSelection = useCallback((productId: string, groupId: string, option: string) => {
+    setDraftVariantSelections((prev) => ({
+      ...prev,
+      [productId]: { ...(prev[productId] ?? {}), [groupId]: option },
+    }));
+
+    setCartLines((prev) => removeZeroQtyLinesForProduct(prev, productId));
+
+    setVariantErrorIds((prev) => {
+      const next = new Set(prev);
+      next.delete(productId);
+      return next;
+    });
+  }, []);
+
+  const loadDraftVariantIntoEditor = useCallback((productId: string, selection: Record<string, string>) => {
+    setDraftVariantSelections((prev) => ({
+      ...prev,
+      [productId]: { ...selection },
+    }));
+    setCartLines((prev) => removeZeroQtyLinesForProduct(prev, productId));
+  }, []);
 
   const websiteOrderBridge = useMemo<WebsiteOrderBridgeValue | null>(() => {
     if (!store?.websiteModeEnabled) return null;
@@ -1226,14 +1401,12 @@ export default function StoreView() {
       currencySymbol,
       catalogue,
       sellerFieldsDefinition,
-      getProductQty: (productId: string) => selectedProducts.get(productId) || 0,
+      getProductQty: (productId: string) =>
+        getCartLineQty(cartLines, productId, draftVariantSelections[productId] ?? {}),
       changeProductQty: (productId: string, delta: number, qstep: number) => changeQty(productId, delta, qstep),
-      getVariantSelection: (productId: string) => variantSelections[productId] ?? {},
+      getVariantSelection: (productId: string) => draftVariantSelections[productId] ?? {},
       setVariantSelection: (productId: string, groupId: string, option: string) => {
-        setVariantSelections((prev) => ({
-          ...prev,
-          [productId]: { ...(prev[productId] ?? {}), [groupId]: option },
-        }));
+        applyDraftVariantSelection(productId, groupId, option);
       },
       hasVariantError: (productId: string) => variantErrorIds.has(productId),
     };
@@ -1242,9 +1415,10 @@ export default function StoreView() {
     currencySymbol,
     catalogue,
     sellerFieldsDefinition,
-    selectedProducts,
-    variantSelections,
+    cartLines,
+    draftVariantSelections,
     variantErrorIds,
+    applyDraftVariantSelection,
   ]);
 
   const websiteCheckoutTheme = useMemo(
@@ -1279,6 +1453,27 @@ export default function StoreView() {
     };
   }, [orderSummary]);
 
+  const checkoutSettings = useMemo(
+    () => normalizeCheckoutSettings(store?.checkoutSettings),
+    [store?.checkoutSettings]
+  );
+
+  const checkoutTotals = useMemo(
+    () =>
+      computeCheckoutTotals(reviewSummary.total, checkoutSettings, {
+        couponCode,
+        paymentMethod,
+      }),
+    [reviewSummary.total, checkoutSettings, couponCode, paymentMethod]
+  );
+
+  const showCodOption = useMemo(() => {
+    if (checkoutSettings.enableCod) return true;
+    return checkoutSettings.rules.some((r) => r.enabled && r.type === 'cod_charge');
+  }, [checkoutSettings]);
+
+  const hasCheckoutRules = checkoutSettings.rules.some((r) => r.enabled);
+
   const handlePlaceOrder = async () => {
     if (!store?.catalogueId) return;
     for (const item of reviewSummary.items) {
@@ -1287,7 +1482,7 @@ export default function StoreView() {
       const groups = getProductVariantGroups(product);
       if (
         groups.length > 0 &&
-        !isVariantSelectionComplete(groups, variantSelections[item.productId])
+        !isVariantSelectionComplete(groups, item.variantSelection ?? {})
       ) {
         alert(`Please choose all variants for "${item.name}" before placing the order.`);
         if (store.websiteModeEnabled) {
@@ -1298,6 +1493,35 @@ export default function StoreView() {
           setStep('products');
         }
         return;
+      }
+    }
+    if (inventoryTracked) {
+      for (const item of reviewSummary.items) {
+        const available = getAvailableQty(
+          effectiveCatalogue,
+          inventoryMap,
+          item.productId,
+          item.variantCombinationId ?? null,
+          resolvedInventoryId
+        );
+        if (available != null && item.quantity > available) {
+          alert(
+            available === 0
+              ? `"${item.name}" is out of stock. Remove it or choose another variant.`
+              : `Only ${available} available for "${item.name}". Please adjust the quantity.`
+          );
+          const product = allProducts.find((p) => p.id === item.productId);
+          if (product) {
+            if (store.websiteModeEnabled) {
+              const slugForPath = effectiveSlug || store.storeSlug || '';
+              navigate(productPagePath(slugForPath, product, dedicatedHost));
+            } else {
+              setDrawerProduct(product);
+              setStep('products');
+            }
+          }
+          return;
+        }
       }
     }
     if (minimumOrderValue > 0 && reviewSummary.total < minimumOrderValue) {
@@ -1316,7 +1540,12 @@ export default function StoreView() {
       reviewSummary.items.forEach((item) => {
         const product = allProducts.find((p) => p.id === item.productId); if (!product) return;
         const catData = getCatalogueData(product, store.catalogueId);
-        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product, variantSelections[item.productId]);
+        const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
+          catData,
+          catalogue,
+          product,
+          item.variantSelection ?? {}
+        );
         orderItems.push({
           productId: item.productId,
           name: item.name,
@@ -1330,6 +1559,7 @@ export default function StoreView() {
           imageVersion: item.imageVersion,
           quantityStep: catData.orderQuantityStep,
           variantSummary: item.variantSummary || undefined,
+          variantCombinationId: item.variantCombinationId || undefined,
         });
       });
       setSupabaseRlsUserId(store.sellerUserId);
@@ -1340,28 +1570,40 @@ export default function StoreView() {
         '',
         customerName.trim(),
         orderItems,
-        reviewSummary.total,
+        checkoutTotals.grandTotal,
         store.sellerCurrencyCode || 'INR',
         fullWhatsappNumber,
         'store',
-        storeSlugForOrder || undefined
+        storeSlugForOrder || undefined,
+        {
+          paymentMethod: showCodOption ? paymentMethod : 'prepaid',
+          checkoutAdjustments: checkoutTotals,
+        }
       );
-      if (error) alert('Failed to place order. Please try again.');
-      else {
+      if (error) {
+        const msg = String((error as { message?: string })?.message ?? error ?? '');
+        if (msg.includes('insufficient_stock')) {
+          alert('Some items are no longer in stock. Please review your cart and try again.');
+        } else {
+          alert('Failed to place order. Please try again.');
+        }
+      } else {
         const trackingUrl = createdOrder?.tracking_token
           ? buildOrderTrackingUrl(createdOrder.tracking_token)
           : null;
         setStep('products');
-        setSelectedProducts(new Map());
+        setCartLines([]);
+        setDraftVariantSelections({});
         setCustomerName('');
         setCustomerWhatsappCountry('+91');
         setCustomerWhatsappNumber('');
         setDrawerProduct(null);
-        setVariantSelections({});
+        setDraftVariantSelections({});
         setSearchQuery('');
         setSelectedCategory('all');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         setOrderSuccess({ trackingUrl });
+        reloadStoreInventory();
       }
     } catch { alert('Error placing order. Please try again.'); }
     finally {
@@ -1693,18 +1935,21 @@ export default function StoreView() {
               <div className="sv-empty"><div className="sv-empty-icon"><IconSearch size={40} /></div><strong>Nothing found</strong><p>Try a different search or category.</p></div>
             )}
             {!productsLoading && filteredProducts.map((product) => {
-              const quantity = selectedProducts.get(product.id) || 0;
-              const isSelected = quantity > 0;
+              const draftSelection = draftVariantSelections[product.id] ?? {};
+              const variantGroups = getProductVariantGroups(product);
+              const quantity = getCartLineQty(cartLines, product.id, draftSelection);
+              const isSelected = productHasCartLines(cartLines, product.id);
               const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-              const variantData = variantSelections[product.id]
-                ? getVariantCombinationData(product, variantSelections[product.id])
-                : undefined;
+              const variantData =
+                Object.keys(draftSelection).length > 0
+                  ? getVariantCombinationData(product, draftSelection, store.catalogueId)
+                  : undefined;
               const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
               const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
                 catData,
                 catalogue,
                 product,
-                variantSelections[product.id],
+                draftSelection,
                 quantity
               );
               const qstep = rules.step;
@@ -1825,9 +2070,9 @@ export default function StoreView() {
                   <div className="sv-pcard-body">
                     <div className="sv-pcard-name">{product.name}</div>
                     {product.subtitle && <div className="sv-pcard-sub">{product.subtitle}</div>}
-                    {isSelected && variantSelections[product.id] && (() => {
-                      const summary = formatVariantSelectionSummary(getProductVariantGroups(product), variantSelections[product.id]);
-                      return summary ? <VariantPills summary={summary} /> : null;
+                    {isSelected && Object.keys(draftSelection).length > 0 && (() => {
+                      const summary = formatVariantSelectionSummary(variantGroups, draftSelection);
+                      return summary && quantity > 0 ? <VariantPills summary={summary} /> : null;
                     })()}
                     {Number.isFinite(price) && (
                       <div className="sv-pcard-price">
@@ -1851,8 +2096,8 @@ export default function StoreView() {
                         value={quantity}
                         step={qstep}
                         onChange={(d) => {
-                          const hasVariants = getProductVariantGroups(product).length > 0;
-                          const variantComplete = isVariantSelectionComplete(getProductVariantGroups(product), variantSelections[product.id]);
+                          const hasVariants = variantGroups.length > 0;
+                          const variantComplete = isVariantSelectionComplete(variantGroups, draftSelection);
                           if (hasVariants && !variantComplete) {
                             setDrawerProduct(product);
                           } else {
@@ -1982,6 +2227,48 @@ export default function StoreView() {
                     </div>
                   </section>
 
+                  {showCodOption ? (
+                    <section className="sv-checkout-section">
+                      <div className="sv-checkout-section-title">Payment method</div>
+                      <div className="sv-payment-options">
+                        <button
+                          type="button"
+                          className={`sv-payment-opt${paymentMethod === 'prepaid' ? ' is-active' : ''}`}
+                          onClick={() => setPaymentMethod('prepaid')}
+                        >
+                          Pay now / UPI
+                        </button>
+                        <button
+                          type="button"
+                          className={`sv-payment-opt${paymentMethod === 'cod' ? ' is-active' : ''}`}
+                          onClick={() => setPaymentMethod('cod')}
+                        >
+                          Cash on delivery
+                        </button>
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {checkoutSettings.allowCouponEntry && checkoutSettings.rules.some((r) => r.enabled && r.type.startsWith('coupon_')) ? (
+                    <section className="sv-checkout-section">
+                      <div className="sv-checkout-section-title">Coupon code</div>
+                      <div className="sv-coupon-row">
+                        <input
+                          type="text"
+                          placeholder="Enter code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          style={{ flex: 1, padding: '10px 12px', borderRadius: 'var(--r-md)', border: '1px solid var(--c-border2)', fontSize: 14 }}
+                        />
+                      </div>
+                      {couponCode.trim() && !checkoutTotals.appliedCouponCode ? (
+                        <p className="sv-checkout-breakdown-note" style={{ color: '#92641a' }}>
+                          Code not recognized or does not apply to this order.
+                        </p>
+                      ) : null}
+                    </section>
+                  ) : null}
+
                   {orderSummary.items.length > 0 && (
                     <section className="sv-checkout-section sv-checkout-section--summary">
                       <div className="sv-checkout-section-title">Your items</div>
@@ -1991,7 +2278,7 @@ export default function StoreView() {
                           const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
                           const cd = item.quantity > 0 ? fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep) : null;
                           return (
-                            <div key={item.productId} className={`sv-checkout-item-card${item.quantity === 0 ? ' is-muted' : ''}`}>
+                            <div key={item.lineId} className={`sv-checkout-item-card${item.quantity === 0 ? ' is-muted' : ''}`}>
                               <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ width: 80, height: 80, flexShrink: 0, background: 'var(--c-surface2)', overflow: 'hidden', position: 'relative', borderRadius: 'var(--r-md)' }}>
                                   {(() => {
@@ -2008,7 +2295,7 @@ export default function StoreView() {
                                     {item.variantSummary && <VariantPills summary={item.variantSummary} />}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                    <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeQty(item.productId, delta, qstep)} accent={item.quantity > 0} />
+                                    <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeCartLineQty(item.lineId, delta)} accent={item.quantity > 0} />
                                   </div>
                                 </div>
                               </div>
@@ -2022,13 +2309,12 @@ export default function StoreView() {
                           );
                         })}
                       </div>
-                      <div className="sv-order-pill" style={{ marginTop: 14 }}>
-                        <div>
-                          <div className="sv-order-pill-label">Total</div>
-                          <div className="sv-order-pill-detail">{orderSummary.items.length} item{orderSummary.items.length === 1 ? '' : 's'}</div>
-                        </div>
-                        <div className="sv-order-pill-total">{fmt(orderSummary.total, currencySymbol)}</div>
-                      </div>
+                      <CheckoutBreakdown
+                        totals={checkoutTotals}
+                        currencySymbol={currencySymbol}
+                        fmt={fmt}
+                        showBreakdown={checkoutSettings.showBreakdown && hasCheckoutRules}
+                      />
                     </section>
                   )}
                 </div>
@@ -2078,15 +2364,20 @@ export default function StoreView() {
                     </div>
                   </section>
                   <section className="sv-checkout-section sv-checkout-section--summary">
-                    <div className="sv-review-total-bar">
-                      <div>
-                        <div className="sv-review-total-label">Total amount</div>
-                        <div className="sv-review-total-val">{fmt(reviewSummary.total, currencySymbol)}</div>
+                    {showCodOption ? (
+                      <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--c-text2)' }}>
+                        Payment: <strong>{paymentMethod === 'cod' ? 'Cash on delivery' : 'Pay now / UPI'}</strong>
                       </div>
-                      <button type="button" className="sv-edit-btn" onClick={() => setStep('customer')}>
-                        Edit items
-                      </button>
-                    </div>
+                    ) : null}
+                    <CheckoutBreakdown
+                      totals={checkoutTotals}
+                      currencySymbol={currencySymbol}
+                      fmt={fmt}
+                      showBreakdown={checkoutSettings.showBreakdown && hasCheckoutRules}
+                    />
+                    <button type="button" className="sv-edit-btn" style={{ marginTop: 12 }} onClick={() => setStep('customer')}>
+                      Edit items
+                    </button>
                   </section>
                 </div>
               </div>
@@ -2128,7 +2419,9 @@ const resolvedFields = cloudFields
 const fieldDefinition = { fields: resolvedFields };
 
           const catData = store.catalogueId ? getCatalogueData(drawerProduct, store.catalogueId) : null;
-          const variantData = variantSelections[drawerProduct.id] ? getVariantCombinationData(drawerProduct, variantSelections[drawerProduct.id]) : undefined;
+          const variantData = Object.keys(draftVariantSelections[drawerProduct.id] ?? {}).length > 0
+            ? getVariantCombinationData(drawerProduct, draftVariantSelections[drawerProduct.id], store.catalogueId)
+            : undefined;
           /** Default `fieldConfig` has field1–10 `enabled: false`; guests have no seller localStorage. When the seller is logged in on the same device, `fieldsDefinition` may set `visibility.onlineStore: false` — still show any slot that has catalogue/product text so the public store matches what buyers see when logged out. */
           const visibleStoreFieldNumbers = new Set(
             fieldDefinition.fields
@@ -2143,7 +2436,13 @@ const fieldDefinition = { fields: resolvedFields };
               .map((f) => Number(String(f.key).replace('field', '')))
               .filter((n) => Number.isFinite(n))
           );
-          const quantity = selectedProducts.get(drawerProduct.id) || 0;
+          const drawerDraft = draftVariantSelections[drawerProduct.id] ?? {};
+          const quantity = getCartLineQty(cartLines, drawerProduct.id, drawerDraft);
+          const drawerVariantGroups = getProductVariantGroups(drawerProduct);
+          const drawerDraftComplete = isVariantSelectionComplete(drawerVariantGroups, drawerDraft);
+          const drawerCommittedLines = cartLinesForProduct(cartLines, drawerProduct.id);
+          const showDrawerDraftQty =
+            drawerVariantGroups.length === 0 || (drawerDraftComplete && quantity === 0);
           const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
           const qstep = rules.step;
           const minQty = rules.minQty;
@@ -2152,7 +2451,7 @@ const fieldDefinition = { fields: resolvedFields };
             catData,
             catalogue,
             drawerProduct,
-            variantSelections[drawerProduct.id],
+            drawerDraft,
             quantity
           );
           const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
@@ -2209,9 +2508,9 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                 <div className="sv-drawer-body">
                   <div className="sv-drawer-name">{drawerProduct.name}</div>
                   {drawerProduct.subtitle && <div className="sv-drawer-sub">{drawerProduct.subtitle}</div>}
-                  {variantSelections[drawerProduct.id] && (() => {
-                    const summary = formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), variantSelections[drawerProduct.id]);
-                    return summary ? <VariantPills summary={summary} /> : null;
+                  {Object.keys(drawerDraft).length > 0 && (() => {
+                    const summary = formatVariantSelectionSummary(getProductVariantGroups(drawerProduct), drawerDraft);
+                    return summary && quantity > 0 ? <VariantPills summary={summary} /> : null;
                   })()}
                   <div className="sv-drawer-price">
                     {Number.isFinite(price) ? (
@@ -2243,16 +2542,24 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                     <ProductVariantsDisplay
                       groups={getProductVariantGroups(drawerProduct)}
                       mode="select"
-                      selection={variantSelections[drawerProduct.id] ?? {}}
+                      selection={drawerDraft}
                       error={variantErrorIds.has(drawerProduct.id)}
+                      isOptionAvailable={(groupId, option) =>
+                        store?.catalogueId
+                          ? isVariantOptionInStock(
+                              effectiveCatalogue,
+                              inventoryMap,
+                              drawerProduct,
+                              store.catalogueId,
+                              getProductVariantGroups(drawerProduct),
+                              drawerDraft,
+                              groupId,
+                              option
+                            )
+                          : true
+                      }
                       onSelect={(groupId, option) => {
-                        setVariantSelections((prev) => ({
-                          ...prev,
-                          [drawerProduct.id]: {
-                            ...(prev[drawerProduct.id] ?? {}),
-                            [groupId]: option,
-                          },
-                        }));
+                        applyDraftVariantSelection(drawerProduct.id, groupId, option);
                       }}
                     />
                   )}
@@ -2260,15 +2567,88 @@ const label = productRowLabel || cloudLabel || defaultLabel;
                     <div className="sv-drawer-qty-label">Quantity</div>
                     <div className="sv-drawer-qty-row">
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
-                        {qstep > 1 && <PackHint step={qstep} />}
-                        {rules.moq > 1 && <MoqHint minQty={minQty} />}
+                        {showDrawerDraftQty && (
+                          <QtyControl value={quantity} step={qstep} onChange={(d) => changeQty(drawerProduct.id, d, qstep)} accent={quantity > 0} />
+                        )}
+                        {showDrawerDraftQty && qstep > 1 && <PackHint step={qstep} />}
+                        {showDrawerDraftQty && rules.moq > 1 && <MoqHint minQty={minQty} />}
+                        {inventoryTracked && (() => {
+                          const dGroups = getProductVariantGroups(drawerProduct);
+                          const sel = drawerDraft;
+                          const variantId =
+                            dGroups.length > 0 && sel ? generateVariantCombinationId(sel) : null;
+                          if (!isLowStock(effectiveCatalogue, inventoryMap, drawerProduct.id, variantId, resolvedInventoryId)) return null;
+                          const avail = getAvailableQty(
+                            effectiveCatalogue,
+                            inventoryMap,
+                            drawerProduct.id,
+                            variantId,
+                            resolvedInventoryId
+                          );
+                          if (avail == null) return null;
+                          return (
+                            <span style={{ fontSize: 12, color: '#b45309', fontWeight: 600 }}>
+                              Only {avail} left
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="sv-drawer-total-wrap">
                         {calcDetail && <div className="sv-drawer-calc">{calcDetail}</div>}
                         <div className="sv-drawer-total">{fmt(price * quantity, currencySymbol)}</div>
                       </div>
                     </div>
+                    {drawerCommittedLines.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                        {drawerCommittedLines.map((line) => {
+                          const lineSummary = formatVariantSelectionSummary(
+                            getProductVariantGroups(drawerProduct),
+                            line.variantSelection
+                          );
+                          return (
+                            <div
+                              key={line.lineId}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                                padding: '8px 10px',
+                                background: 'var(--c-surface2)',
+                                borderRadius: 'var(--r-sm)',
+                                border: '1px solid var(--c-border2)',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => loadDraftVariantIntoEditor(drawerProduct.id, line.variantSelection)}
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  padding: 0,
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: 'var(--c-text)',
+                                  fontFamily: 'inherit',
+                                }}
+                              >
+                                {lineSummary || 'Variant'}
+                              </button>
+                              <QtyControl
+                                value={line.quantity}
+                                step={qstep}
+                                onChange={(d) => changeCartLineQty(line.lineId, d)}
+                                accent={line.quantity > 0}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     <button className="sv-drawer-done" onClick={closeProductDrawer}>Done</button>
                   </div>
                 </div>

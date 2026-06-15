@@ -9,6 +9,10 @@ import { getAllCatalogues } from "./config/catalogueConfig";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import { getPriceUnits } from "./utils/priceUnitsUtils";
 import { logBulkEdit } from "./config/analyticsEvents";
+import {
+  CATALOGUE_WAREHOUSE_STOCK_WARNING,
+  isCatalogueLinkedToWarehouse,
+} from "./utils/catalogueWarehouseStock";
 import { saveProducts, setFieldValue, setUnitValue } from "./config/productUtils";
 import OrderQuantityStepInput from "./components/OrderQuantityStepInput";
 import MinimumOrderQuantityInput from "./components/MinimumOrderQuantityInput";
@@ -418,6 +422,10 @@ useEffect(() => {
    const handleSave = () => {
   try {
     if (!guardCloudWrite()) return;
+    if (isCatalogueLinkedToWarehouse(selectedCatalogueConfig) && selectedFields.includes("stock")) {
+      showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, "warning");
+      return;
+    }
     const isMasterCatalogue = catalogueId === "cat1";
     const savedAt = new Date().toISOString();
     const cleanData = editedData.map((p) => {
@@ -525,6 +533,7 @@ useEffect(() => {
 
     saveProducts(mergedData);
     setProducts(mergedData);
+
     window.dispatchEvent(
       new CustomEvent("product-added", {
         detail: {

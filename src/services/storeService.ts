@@ -16,10 +16,15 @@ import {
   tryExtractCataloguesArray,
   DEFAULT_CATALOGUES,
   ensureCataloguesForStorefront,
+  mergeStorefrontCatalogueDefinitions,
   type Catalogue,
 } from '../config/catalogueConfig';
 import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
 import { normalizeProductCategories } from '../utils/productCategoryUtils';
+import {
+  normalizeCheckoutSettings,
+  type StoreCheckoutSettings,
+} from '../types/checkoutSettings';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -64,12 +69,10 @@ function extractCataloguesListFromStoreRpcPayload(row: Record<string, unknown>):
   const fromSettings = tryExtractCataloguesArray(
     row.cataloguesDefinitionUserSettings ?? row.catalogues_definition_user_settings
   );
-  if (fromSettings && fromSettings.length > 0) return fromSettings;
   const fromManaged = tryExtractCataloguesArray(
     row.cataloguesDefinitionManaged ?? row.catalogues_definition_managed
   );
-  if (fromManaged && fromManaged.length > 0) return fromManaged;
-  return null;
+  return mergeStorefrontCatalogueDefinitions(fromSettings, fromManaged);
 }
 
 /**
@@ -218,6 +221,8 @@ export interface Store {
   customHostname: string | null;
   /** `pending` | `active` | `error` — from Vercel DNS verification. */
   customDomainStatus: string | null;
+  /** Shipping, tax, and discount rules for storefront checkout. */
+  checkoutSettings: StoreCheckoutSettings;
 }
 
 export interface StorePublic {
@@ -260,6 +265,8 @@ export interface StorePublic {
   cataloguesDefinition?: Array<{ id: string; label: string; priceField: string; priceUnitField: string; stockField: string; folder: string; order: number; createdAt: number; isDefault?: boolean }>;
   /** Seller's managed category labels (for storefront filter pills). */
   productCategories?: string[];
+  /** Shipping, tax, and discount rules for checkout. */
+  checkoutSettings?: StoreCheckoutSettings;
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -314,6 +321,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
       typeof row.custom_domain_status === 'string' && row.custom_domain_status.trim() !== ''
         ? row.custom_domain_status.trim().toLowerCase()
         : null,
+    checkoutSettings: normalizeCheckoutSettings(row.checkout_settings ?? row.checkoutSettings),
   };
 }
 
@@ -662,9 +670,10 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
           : null;
     let homepageEnabled = coerceOptionalBoolean(row.homepageEnabled ?? row.homepage_enabled);
     let websiteModeEnabled = coerceOptionalBoolean(row.websiteModeEnabled ?? row.website_mode_enabled);
+    let checkoutSettingsRaw: unknown = row.checkout_settings ?? row.checkoutSettings;
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -695,6 +704,9 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
         websiteModeEnabled = coerceOptionalBoolean(
           storeRecord?.website_mode_enabled ?? storeRecord?.websiteModeEnabled
         );
+      }
+      if (checkoutSettingsRaw == null) {
+        checkoutSettingsRaw = storeRecord?.checkout_settings ?? storeRecord?.checkoutSettings;
       }
     }
 
@@ -763,6 +775,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       ) ?? null,
       minimumOrderValue: minimumOrderValue ?? null,
       viewMode: viewMode ?? 'grid',
+      checkoutSettings: normalizeCheckoutSettings(checkoutSettingsRaw),
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
@@ -1092,6 +1105,43 @@ export async function updateStoreMinimumOrderValue(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreMinimumOrderValue:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreCheckoutSettings(
+  sellerUserId: string,
+  checkoutSettings: StoreCheckoutSettings
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+    const normalized = normalizeCheckoutSettings(checkoutSettings);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        checkout_settings: normalized,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating store checkout settings:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreCheckoutSettings:', errorMessage);
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);

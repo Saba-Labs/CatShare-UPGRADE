@@ -28,6 +28,19 @@ import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
+import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
+import { applyInventoryCapToQuantity } from '../utils/orderQuantityStock';
+import { isVariantOptionInStock } from '../utils/catalogueWarehouseStock';
+import { applyQuantityDelta } from '../utils/quantityPricingUtils';
+import TypedQuantityStepper from '../components/TypedQuantityStepper';
+import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import {
+  formatVariantSelectionSummary,
+  generateVariantCombinationId,
+  getProductVariantGroups,
+  isVariantSelectionComplete,
+  parseVariantSummaryToSelection,
+} from '../utils/productVariants';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
 
@@ -70,6 +83,8 @@ interface OrderItem {
   imageVersion?: number;
   priceUnit?: string;
   quantityStep?: number;
+  /** Stable variant line id for warehouse stock cap */
+  variantCombinationId?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1102,56 +1117,6 @@ function ActionTile({
   );
 }
 
-// ─── Qty stepper ─────────────────────────────────────────────────────────────
-function QtyStepper({ value, step, onChange }: { value: number; step: number; onChange: (n: number) => void }) {
-  const normalizedStep = normalizeOrderQuantityStep(step);
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: '#F2F2F7', borderRadius: 6, border: '1.5px solid #E2E8F0', width: 'fit-content' }}>
-      <button
-        onClick={() => onChange(Math.max(0, value - normalizedStep))}
-        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: value === 0 ? '#CBD5E1' : COLORS.text }}
-        disabled={value === 0}
-      >
-        <Ic.Minus />
-      </button>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value > 0 ? String(value) : ''}
-        onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, '');
-          if (!digits) {
-            onChange(0);
-          } else {
-            const num = parseInt(digits, 10);
-            // Manual typing should allow exact override (not forced to quantity step)
-            onChange(Math.max(0, num));
-          }
-        }}
-        aria-label="Quantity"
-        style={{
-          width: 40,
-          border: 'none',
-          background: 'transparent',
-          textAlign: 'center',
-          fontSize: 14,
-          fontWeight: 700,
-          color: value === 0 ? '#94A3B8' : COLORS.text,
-          fontFamily: 'inherit',
-          padding: 0,
-          outline: 'none',
-        }}
-      />
-      <button
-        onClick={() => onChange(value + normalizedStep)}
-        style={{ width: 34, height: 34, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.text }}
-      >
-        <Ic.Plus />
-      </button>
-    </div>
-  );
-}
-
 // ─── Product image ────────────────────────────────────────────────────────────
 function ProductThumb({
   url,
@@ -1269,21 +1234,97 @@ useEffect(() => {
         : null,
     [orderCatalogueId, user?.uid]
   );
+  const inventoryMap = useCatalogueInventoryMap(user?.uid, orderCatalogueConfig);
+
+  const applyEditItemStockCap = useCallback(
+    (
+      item: OrderItem & { _key: string },
+      rawQty: number,
+      warn: boolean
+    ): number => {
+      const { quantity, wasCapped, available } = applyInventoryCapToQuantity(
+        rawQty,
+        item.quantityStep ?? 1,
+        1,
+        orderCatalogueConfig,
+        inventoryMap,
+        item.productId,
+        item.variantCombinationId ?? null
+      );
+      if (warn && wasCapped && available != null) {
+        showToast(
+          available === 0
+            ? `${item.name}: out of stock — quantity set to 0.`
+            : `Only ${available} available for ${item.name} — quantity adjusted.`,
+          'warning'
+        );
+      }
+      return quantity;
+    },
+    [orderCatalogueConfig, inventoryMap, showToast]
+  );
+
+  const updateEditItemQuantity = useCallback(
+    (
+      itemKey: string,
+      rawQty: number | null,
+      options?: { warn?: boolean; draft?: boolean }
+    ) => {
+      setEditItems((prev) =>
+        prev.map((x) => {
+          if (x._key !== itemKey) return x;
+          const base = rawQty ?? x.quantity;
+          if (options?.draft) {
+            return { ...x, quantity: Math.max(0, Math.floor(base)) };
+          }
+          const quantity = applyEditItemStockCap(x, base, options?.warn ?? false);
+          return { ...x, quantity };
+        })
+      );
+    },
+    [applyEditItemStockCap]
+  );
+
+  const updateEditItemVariant = useCallback(
+    (itemKey: string, groupId: string, option: string) => {
+      setEditItems((prev) =>
+        prev.map((x) => {
+          if (x._key !== itemKey || !x.productId) return x;
+          const product = localProducts.find((p) => String(p.id) === String(x.productId));
+          if (!product) return x;
+          const groups = getProductVariantGroups(product);
+          const current = parseVariantSummaryToSelection(groups, x.variantSummary);
+          const nextSelection = { ...current, [groupId]: option };
+          if (!isVariantSelectionComplete(groups, nextSelection)) {
+            return {
+              ...x,
+              variantSummary: formatVariantSelectionSummary(groups, nextSelection) || undefined,
+              variantCombinationId: undefined,
+            };
+          }
+          return {
+            ...x,
+            variantSummary: formatVariantSelectionSummary(groups, nextSelection) || undefined,
+            variantCombinationId: generateVariantCombinationId(nextSelection),
+          };
+        })
+      );
+    },
+    [localProducts]
+  );
 
   const addableCatalogueProducts = useMemo(() => {
     if (!orderCatalogueId || !orderCatalogueConfig || !localProducts.length) return [];
-    const inOrder = new Set(editItems.map((it) => it.productId).filter(Boolean).map(String));
     const q = addItemsSearch.trim().toLowerCase();
     return localProducts.filter((p) => {
       if (!isProductEnabledForCatalogue(p, orderCatalogueId)) return false;
-      if (inOrder.has(String(p.id))) return false;
       if (q) {
         const name = (p.name || '').toLowerCase();
         if (!name.includes(q)) return false;
       }
       return true;
     });
-  }, [orderCatalogueId, orderCatalogueConfig, localProducts, editItems, addItemsSearch]);
+  }, [orderCatalogueId, orderCatalogueConfig, localProducts, addItemsSearch]);
 
   useEffect(() => {
     if (!editMode) {
@@ -2031,6 +2072,39 @@ useEffect(() => {
                         <ProductThumb url={resolveOrderItemImageUrl(it)} name={it.name} imageVersion={it.imageVersion} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text, marginBottom: 2 }}>{it.name}</div>
+                          {(() => {
+                            const product = it.productId
+                              ? localProducts.find((p) => String(p.id) === String(it.productId))
+                              : undefined;
+                            const groups = product ? getProductVariantGroups(product) : [];
+                            if (groups.length === 0) return null;
+                            const selection = parseVariantSummaryToSelection(groups, it.variantSummary);
+                            return (
+                              <div style={{ marginBottom: 8 }}>
+                                <ProductVariantsDisplay
+                                  compact
+                                  groups={groups}
+                                  mode="select"
+                                  selection={selection}
+                                  isOptionAvailable={(groupId, option) =>
+                                    orderCatalogueId && product
+                                      ? isVariantOptionInStock(
+                                          orderCatalogueConfig,
+                                          inventoryMap,
+                                          product,
+                                          orderCatalogueId,
+                                          groups,
+                                          selection,
+                                          groupId,
+                                          option
+                                        )
+                                      : true
+                                  }
+                                  onSelect={(groupId, option) => updateEditItemVariant(it._key, groupId, option)}
+                                />
+                              </div>
+                            );
+                          })()}
                           {it.unitPrice ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: COLORS.muted }}>
                               <span>{symbol}{it.unitPrice} / {getOrderUnitLabel(it.priceUnit)}</span>
@@ -2056,13 +2130,61 @@ useEffect(() => {
                           ) : null}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                          <QtyStepper
+                          <TypedQuantityStepper
                             value={it.quantity}
-                            step={it.quantityStep ?? 1}
-                            onChange={(qty) => {
-                              setEditItems((prev) =>
-                                prev.map((x) => (x._key === it._key ? { ...x, quantity: qty } : x))
-                              );
+                            onDraftChange={(qty) =>
+                              updateEditItemQuantity(it._key, qty, { draft: true })
+                            }
+                            onBlurCommit={() =>
+                              updateEditItemQuantity(it._key, null, { warn: true })
+                            }
+                            onDecrement={() => {
+                              const step = it.quantityStep ?? 1;
+                              const next = applyQuantityDelta(it.quantity, -step, step, 1);
+                              updateEditItemQuantity(it._key, next);
+                            }}
+                            onIncrement={() => {
+                              const step = it.quantityStep ?? 1;
+                              const next = applyQuantityDelta(it.quantity, step, step, 1);
+                              updateEditItemQuantity(it._key, next);
+                            }}
+                            decrementDisabled={it.quantity <= 0}
+                            renderMinus={<Ic.Minus />}
+                            renderPlus={<Ic.Plus />}
+                            containerStyle={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0,
+                              background: '#F2F2F7',
+                              borderRadius: 6,
+                              border: '1.5px solid #E2E8F0',
+                              width: 'fit-content',
+                            }}
+                            buttonStyle={{
+                              width: 34,
+                              height: 34,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: COLORS.text,
+                            }}
+                            minusButtonStyle={{
+                              color: it.quantity === 0 ? '#CBD5E1' : COLORS.text,
+                            }}
+                            inputStyle={{
+                              width: 40,
+                              border: 'none',
+                              background: 'transparent',
+                              textAlign: 'center',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: it.quantity === 0 ? '#94A3B8' : COLORS.text,
+                              fontFamily: 'inherit',
+                              padding: 0,
+                              outline: 'none',
                             }}
                           />
                           {(it.quantityStep ?? 1) !== 1 && (

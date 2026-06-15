@@ -18,8 +18,13 @@ import { KeepAwake } from "@capacitor-community/keep-awake";
 import { MdInventory2 } from "react-icons/md";
 import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
+import {
+  CATALOGUE_WAREHOUSE_STOCK_WARNING,
+  isCatalogueLinkedToWarehouse,
+} from "./utils/catalogueWarehouseStock";
 import RatingModal from "./components/RatingModal";
 import MainAppBottomNav from "./components/MainAppBottomNav";
+import SupportWhatsAppFab from "./components/SupportWhatsAppFab";
 import { useAuth } from "./context/AuthContext";
 import { useToast } from "./context/ToastContext";
 import { useSync } from "./context/SyncContext";
@@ -767,6 +772,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const handleStockToggleRequest = (id, field) => {
+    const catForField = catalogues.find((c) => c.stockField === field);
+    if (isCatalogueLinkedToWarehouse(catForField)) {
+      showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, "warning");
+      return;
+    }
     const bypassUntil = parseInt(sessionStorage.getItem("bypassStockWarningUntil") || "0", 10);
     const now = Date.now();
 
@@ -790,6 +800,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   };
 
   const handleMasterStockToggleRequest = (id) => {
+    if (catalogues.some((c) => isCatalogueLinkedToWarehouse(c))) {
+      showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, "warning");
+      return;
+    }
     const bypassUntil = parseInt(sessionStorage.getItem("bypassStockWarningUntil") || "0", 10);
     const now = Date.now();
 
@@ -1856,6 +1870,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
       {tab === "products" && (
         <>
+          <SupportWhatsAppFab />
+
           {/* Sibling of FAB column so z-40 is not trapped under in-parent z-35 scrim */}
           <AnimatePresence>
             {productFabExpanded && (

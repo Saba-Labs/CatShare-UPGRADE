@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
@@ -25,6 +25,13 @@ import {
 } from "../utils/productImages";
 import { productImageDisplayUrl } from "../utils/imageUrl";
 import ProductImageGallery from "../components/ProductImageGallery";
+import { useAuth } from "../context/AuthContext";
+import { useCatalogueInventoryMap } from "../hooks/useCatalogueInventoryMap";
+import {
+  CATALOGUE_WAREHOUSE_STOCK_WARNING,
+  isCatalogueStockToggleLocked,
+  isProductInStockForSellerCatalogue,
+} from "../utils/catalogueWarehouseStock";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -100,8 +107,24 @@ export default function ProductPreviewModal_Glass({
   filteredProducts = [],
 }) {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const { currentTheme } = useTheme();
   const { isPro } = useSubscription();
+
+  const previewCatalogueId = useMemo(() => {
+    if (externalCatalogueId) return externalCatalogueId;
+    if (tab === "catalogue1") return "cat1";
+    if (tab === "catalogue2") return "cat2";
+    if (tab && tab.startsWith("cat")) return tab;
+    return "cat1";
+  }, [externalCatalogueId, tab]);
+
+  const previewCatalogueConfig = useMemo(
+    () => getAllCatalogues().find((c) => c.id === previewCatalogueId) ?? null,
+    [previewCatalogueId]
+  );
+
+  const inventoryMap = useCatalogueInventoryMap(user?.uid, previewCatalogueConfig);
 
   // Helper to darken color for gradient
   const darkenColor = (color, amount) => {
@@ -268,6 +291,7 @@ export default function ProductPreviewModal_Glass({
   if (!product) return null;
 
   const bothOut = !product.wholesaleStock && !product.resellStock;
+  const viewingCatalogueContext = Boolean(externalCatalogueId) || (tab && tab !== "products");
   const productList = filteredProducts.length > 0 ? filteredProducts : [product];
   const currentIndex = productList.findIndex((p) => p.id === product.id);
 
@@ -292,6 +316,16 @@ export default function ProductPreviewModal_Glass({
   };
 
   const onToggleMasterStock = () => {
+    if (externalCatalogueId && isCatalogueStockToggleLocked(externalCatalogueId)) {
+      showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, "warning");
+      return;
+    }
+    const linkedCatalogues = getAllCatalogues().filter((c) => c.inventoryId?.trim());
+    if (linkedCatalogues.length > 0) {
+      showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, "warning");
+      return;
+    }
+
     const allCatalogues = getAllCatalogues();
     const allInStock = getAllStockStatus();
     const newStatus = !allInStock;
@@ -323,7 +357,21 @@ export default function ProductPreviewModal_Glass({
 
   // Check if product is out of stock in the current catalogue
   const stockField = catalogueConfig?.stockField || "wholesaleStock";
-  const isCurrentCatalogueOutOfStock = !product[stockField];
+  const legacyCatalogueOutOfStock = !product[stockField];
+  const warehouseOutOfStock =
+    viewingCatalogueContext &&
+    !isProductInStockForSellerCatalogue(
+      product,
+      catalogueId,
+      catalogueConfig,
+      inventoryMap
+    );
+  const isCurrentCatalogueOutOfStock = viewingCatalogueContext
+    ? warehouseOutOfStock
+    : legacyCatalogueOutOfStock;
+  const showOutOfStockBar = viewingCatalogueContext
+    ? warehouseOutOfStock
+    : legacyCatalogueOutOfStock || bothOut;
 
   const priceValue = catalogueData[priceField] || product[priceField];
   const offerPricing = resolveListOfferEffective(catalogueData, priceField, product);
@@ -562,7 +610,7 @@ export default function ProductPreviewModal_Glass({
                     )}
 
                     {/* Out of Stock Bar */}
-                    {(isCurrentCatalogueOutOfStock || bothOut) && (
+                    {(showOutOfStockBar) && (
                       <div
                         style={{
                           position: "absolute",

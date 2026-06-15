@@ -14,8 +14,24 @@ import ProductImageGallery from '../components/ProductImageGallery';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import {
   formatVariantSelectionSummary,
+  generateVariantCombinationId,
   isVariantSelectionComplete,
 } from '../utils/productVariants';
+import {
+  activeCartLines,
+  cartLinesForProduct,
+  getCartLineQty,
+  loadCartLinesFromSession,
+  loadLegacyQtyMapFromSession,
+  migrateLegacyCartToLines,
+  productHasCartLines,
+  removeZeroQtyLinesForProduct,
+  saveCartLinesToSession,
+  setCartLineQty,
+  setCartLineQtyById,
+  totalCartLineCount,
+  type OrderCartLine,
+} from '../utils/orderCartLines';
 import './OrderForm.css';
 
 /** CatShare on Google Play — update if store listing changes. */
@@ -25,7 +41,6 @@ const CATSHARE_PLAY_STORE_URL =
 /** History state key so swipe / hardware back closes the drawer before leaving the page. */
 const ORDER_FORM_DRAWER_HISTORY_KEY = 'ofProductDrawer';
 
-type QtyMap = Record<string, number>;
 type VariantSelectionMap = Record<string, Record<string, string>>;
 
 function getQuantityStep(item: ShareLinkItem): number {
@@ -240,8 +255,8 @@ export default function OrderForm() {
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
-  const [qty, setQty] = useState<QtyMap>({});
-  const [variantSelections, setVariantSelections] = useState<VariantSelectionMap>({});
+  const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
+  const [draftVariantSelections, setDraftVariantSelections] = useState<VariantSelectionMap>({});
   const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -311,25 +326,15 @@ export default function OrderForm() {
         );
         setCurrencyCode(data.sellerCurrencyCode || 'INR');
         setItems(data.items || []);
-        const initial: QtyMap = {};
-        (data.items || []).forEach((i) => { initial[i.productId] = 0; });
-
-        // Try to restore qty from sessionStorage
-        const savedQty = sessionStorage.getItem(`catshare_order_qty_${token}`);
-        if (savedQty) {
-          try {
-            const restored = JSON.parse(savedQty) as QtyMap;
-            // Merge restored qty with initial (in case items list changed)
-            (data.items || []).forEach((i) => {
-              if (restored[i.productId] !== undefined) {
-                initial[i.productId] = restored[i.productId];
-              }
-            });
-          } catch {
-            // If JSON parsing fails, just use initial
+        const restoredCart = token ? loadCartLinesFromSession(token) : null;
+        if (restoredCart && restoredCart.length > 0) {
+          setCartLines(restoredCart);
+        } else if (token) {
+          const legacyQty = loadLegacyQtyMapFromSession(token);
+          if (legacyQty) {
+            setCartLines(migrateLegacyCartToLines(legacyQty, {}));
           }
         }
-        setQty(initial);
 
         // Fetch seller_user_id using public RPC function
         if (token) {
@@ -354,29 +359,44 @@ export default function OrderForm() {
   const changeQty = (id: string, delta: number) => {
     const item = items.find((i) => i.productId === id);
     if (!item) return;
-    setQty((prev) => ({
-      ...prev,
-      [id]: applyQuantityDelta(
-        prev[id] ?? 0,
-        delta,
-        getQuantityStep(item),
-        item.minimumOrderQuantity
-      ),
-    }));
+    const draftSelection = draftVariantSelections[id] ?? {};
+    const groups = item.variantGroups ?? [];
+    if (groups.length > 0 && !isVariantSelectionComplete(groups, draftSelection)) {
+      const drawerTarget = items.find((i) => i.productId === id);
+      if (drawerTarget) openProductDrawer(drawerTarget);
+      return;
+    }
+    const current = getCartLineQty(cartLines, id, draftSelection);
+    const next = applyQuantityDelta(
+      current,
+      delta,
+      getQuantityStep(item),
+      item.minimumOrderQuantity
+    );
+    setCartLines((prev) => setCartLineQty(prev, id, draftSelection, next));
   };
 
-  // Persist qty to sessionStorage whenever it changes
-  useEffect(() => {
-    if (token && Object.keys(qty).length > 0) {
-      sessionStorage.setItem(`catshare_order_qty_${token}`, JSON.stringify(qty));
-    }
-  }, [qty, token]);
+  const changeCartLineQty = (lineId: string, delta: number) => {
+    const line = cartLines.find((l) => l.lineId === lineId);
+    if (!line) return;
+    const item = items.find((i) => i.productId === line.productId);
+    if (!item) return;
+    const next = applyQuantityDelta(
+      line.quantity,
+      delta,
+      getQuantityStep(item),
+      item.minimumOrderQuantity
+    );
+    setCartLines((prev) => setCartLineQtyById(prev, lineId, next));
+  };
 
-  /** Number of distinct products with qty > 0 (not sum of quantities). */
-  const selectedProductCount = useMemo(
-    () => items.filter((i) => (qty[i.productId] ?? 0) > 0).length,
-    [items, qty]
-  );
+  useEffect(() => {
+    if (token) {
+      saveCartLinesToSession(token, cartLines);
+    }
+  }, [cartLines, token]);
+
+  const selectedProductCount = useMemo(() => totalCartLineCount(cartLines), [cartLines]);
 
   const availableCategories = useMemo(() => {
     const categories = items.flatMap((item) => getItemCategories(item));
@@ -402,32 +422,30 @@ export default function OrderForm() {
     });
   }, [items, searchQuery, selectedCategory]);
 
-  const lineAmounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    items.forEach((i) => {
-      const q = qty[i.productId] ?? 0;
-      const unit = getShareLinkItemUnitPrice(i, q);
-      map[i.productId] = q > 0 && Number.isFinite(unit) ? q * unit : 0;
-    });
-    return map;
-  }, [items, qty]);
-
   const orderTotalAmount = useMemo(
-    () => Object.values(lineAmounts).reduce((a, b) => a + b, 0),
-    [lineAmounts]
+    () =>
+      activeCartLines(cartLines).reduce((sum, line) => {
+        const item = items.find((i) => i.productId === line.productId);
+        if (!item) return sum;
+        const unit = getShareLinkItemUnitPrice(item, line.quantity);
+        return sum + (line.quantity > 0 && Number.isFinite(unit) ? line.quantity * unit : 0);
+      }, 0),
+    [cartLines, items]
   );
 
   const selectionIncludesUnpricedLines = useMemo(
-    () => items.some((i) => {
-      const q = qty[i.productId] ?? 0;
-      return q > 0 && !Number.isFinite(getShareLinkItemUnitPrice(i, q));
-    }),
-    [items, qty]
+    () =>
+      activeCartLines(cartLines).some((line) => {
+        const item = items.find((i) => i.productId === line.productId);
+        if (!item) return false;
+        return line.quantity > 0 && !Number.isFinite(getShareLinkItemUnitPrice(item, line.quantity));
+      }),
+    [cartLines, items]
   );
 
   const message = useMemo(() => {
-    const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
-    if (selectedItems.length === 0) return 'No items selected.';
+    const linesInCart = activeCartLines(cartLines);
+    if (linesInCart.length === 0) return 'No items selected.';
 
     const date = new Date().toLocaleDateString('en-IN', {
       day: 'numeric',
@@ -442,18 +460,17 @@ export default function OrderForm() {
     lines.push('*Items Ordered:*');
 
     let total = 0;
-    selectedItems.forEach((i, idx) => {
-      const q = qty[i.productId] ?? 0;
+    linesInCart.forEach((line, idx) => {
+      const i = items.find((it) => it.productId === line.productId);
+      if (!i) return;
+      const q = line.quantity;
       const unit = getShareLinkItemUnitPrice(i, q);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
       total += itemTotal;
 
       const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
       lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
-      const variantLine = formatVariantSelectionSummary(
-        i.variantGroups ?? [],
-        variantSelections[i.productId]
-      );
+      const variantLine = formatVariantSelectionSummary(i.variantGroups ?? [], line.variantSelection);
       if (variantLine) {
         lines.push(`   _${variantLine}_`);
       }
@@ -484,40 +501,36 @@ export default function OrderForm() {
 
     lines.push('Please confirm availability and share payment details. Thank you!');
     return lines.join('\n');
-  }, [items, qty, currencySymbol, variantSelections]);
+  }, [items, cartLines, currencySymbol]);
 
   const goToConfirmOrder = () => {
-    const selectedItems = items.filter((i) => (qty[i.productId] ?? 0) > 0);
-    if (selectedItems.length === 0) {
+    const linesInCart = activeCartLines(cartLines);
+    if (linesInCart.length === 0) {
       alert('Please select at least one item');
       return;
     }
 
-    for (const item of selectedItems) {
+    for (const line of linesInCart) {
+      const item = items.find((i) => i.productId === line.productId);
+      if (!item) continue;
       const groups = item.variantGroups ?? [];
-      if (
-        groups.length > 0 &&
-        !isVariantSelectionComplete(groups, variantSelections[item.productId])
-      ) {
+      if (groups.length > 0 && !isVariantSelectionComplete(groups, line.variantSelection)) {
         alert(`Please choose all variants for "${item.name}" before confirming.`);
         openProductDrawer(item);
         return;
       }
     }
 
-    // Navigate to confirm page with order data
     navigate(`/o/${token}/confirm`, {
       state: {
-        selectedItems,
-        qty,
-        variantSelections,
+        cartLines: linesInCart,
+        items,
         currencySymbol,
         currencyCode,
         sellerWhatsapp,
         sellerUserId,
         customerName: '',
         customerWhatsapp: '',
-        lineAmounts,
         orderTotalAmount,
       },
     });
@@ -794,9 +807,11 @@ export default function OrderForm() {
           )}
 
           {filteredItems.map((item) => {
-            const q = qty[item.productId] ?? 0;
-            const isSelected = q > 0;
-            const lineAmt = lineAmounts[item.productId] ?? 0;
+            const draftSelection = draftVariantSelections[item.productId] ?? {};
+            const q = getCartLineQty(cartLines, item.productId, draftSelection);
+            const isSelected = productHasCartLines(cartLines, item.productId);
+            const unit = getShareLinkItemUnitPrice(item, q);
+            const lineAmt = q > 0 && Number.isFinite(unit) ? q * unit : 0;
             const hasParsedPrice = Number.isFinite(parseItemPriceNumeric(item.price));
             const lineCalcDetail =
               hasParsedPrice && q > 0
@@ -955,8 +970,15 @@ export default function OrderForm() {
 
       {/* Detail drawer */}
       {drawerItem && (() => {
-        const dQ = qty[drawerItem.productId] ?? 0;
-        const dAmt = lineAmounts[drawerItem.productId] ?? 0;
+        const drawerDraft = draftVariantSelections[drawerItem.productId] ?? {};
+        const dQ = getCartLineQty(cartLines, drawerItem.productId, drawerDraft);
+        const unit = getShareLinkItemUnitPrice(drawerItem, dQ);
+        const dAmt = dQ > 0 && Number.isFinite(unit) ? dQ * unit : 0;
+        const drawerVariantGroups = drawerItem.variantGroups ?? [];
+        const drawerDraftComplete = isVariantSelectionComplete(drawerVariantGroups, drawerDraft);
+        const drawerCommittedLines = cartLinesForProduct(cartLines, drawerItem.productId);
+        const showDrawerDraftQty =
+          drawerVariantGroups.length === 0 || (drawerDraftComplete && dQ === 0);
         const dHasPrice = Number.isFinite(parseItemPriceNumeric(drawerItem.price));
         const drawerCalcDetail =
           dHasPrice && dQ > 0
@@ -1033,15 +1055,17 @@ export default function OrderForm() {
                   <ProductVariantsDisplay
                     groups={drawerItem.variantGroups!}
                     mode="select"
-                    selection={variantSelections[drawerItem.productId] ?? {}}
+                    selection={drawerDraft}
                     onSelect={(groupId, option) => {
-                      setVariantSelections((prev) => ({
+                      const nextSelection = {
+                        ...(draftVariantSelections[drawerItem.productId] ?? {}),
+                        [groupId]: option,
+                      };
+                      setDraftVariantSelections((prev) => ({
                         ...prev,
-                        [drawerItem.productId]: {
-                          ...(prev[drawerItem.productId] ?? {}),
-                          [groupId]: option,
-                        },
+                        [drawerItem.productId]: nextSelection,
                       }));
+                      setCartLines((prev) => removeZeroQtyLinesForProduct(prev, drawerItem.productId));
                     }}
                   />
                 )}
@@ -1050,12 +1074,14 @@ export default function OrderForm() {
                 <div className="of-drawer-qty-section">
                   <div className="of-drawer-qty-label">Select quantity</div>
                   <div className="of-drawer-qty-row">
-                    <QtyControl
-                      value={dQ}
-                      step={getQuantityStep(drawerItem)}
-                      onChange={(delta) => changeQty(drawerItem.productId, delta)}
-                    />
-                    {dQ > 0 && (
+                    {showDrawerDraftQty && (
+                      <QtyControl
+                        value={dQ}
+                        step={getQuantityStep(drawerItem)}
+                        onChange={(delta) => changeQty(drawerItem.productId, delta)}
+                      />
+                    )}
+                    {showDrawerDraftQty && dQ > 0 && (
                       <div className="of-drawer-line-total-wrap">
                         {drawerCalcDetail && (
                           <div className="of-drawer-line-calc">{drawerCalcDetail}</div>
@@ -1066,6 +1092,61 @@ export default function OrderForm() {
                       </div>
                     )}
                   </div>
+                  {drawerCommittedLines.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                      {drawerCommittedLines.map((line) => {
+                        const lineSummary = formatVariantSelectionSummary(
+                          drawerItem.variantGroups ?? [],
+                          line.variantSelection
+                        );
+                        return (
+                          <div
+                            key={line.lineId}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              padding: '8px 10px',
+                              background: '#f8fafc',
+                              borderRadius: 8,
+                              border: '1px solid #e2e8f0',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDraftVariantSelections((prev) => ({
+                                  ...prev,
+                                  [drawerItem.productId]: { ...line.variantSelection },
+                                }))
+                              }
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                border: 'none',
+                                background: 'transparent',
+                                padding: 0,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#475569',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {lineSummary || 'Variant'}
+                            </button>
+                            <QtyControl
+                              value={line.quantity}
+                              step={getQuantityStep(drawerItem)}
+                              onChange={(delta) => changeCartLineQty(line.lineId, delta)}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <button type="button" className="of-drawer-done" onClick={() => closeProductDrawer()}>

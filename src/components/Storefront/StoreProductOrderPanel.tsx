@@ -98,7 +98,7 @@ export default function StoreProductOrderPanel({
   showQuantitySelector = true,
 }: StoreProductOrderPanelProps) {
   const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-  const variantData = getVariantCombinationData(product, variantSelection);
+  const variantData = getVariantCombinationData(product, variantSelection, store.catalogueId);
   const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
   const qstep = rules.step;
   const minQty = rules.minQty;

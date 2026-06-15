@@ -2,6 +2,8 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { generateOrderTrackingToken, isLikelyMissingTrackingColumnsError } from './orderTrackingService';
+import type { CheckoutTotals } from '../types/checkoutSettings';
+import { applyOrderInventory, restoreOrderInventory } from './inventoryService';
 
 /** Orders RLS (see SUPABASE_ORDERS_SQL.md) uses `x-user-id`. Restore from session before seller mutations when header was cleared (e.g. after StoreView order). */
 async function ensureOrdersRlsHeaderFromSession(): Promise<void> {
@@ -24,6 +26,8 @@ export interface OrderItem {
   quantityStep?: number;
   /** e.g. "Size: L; Colour: Red" */
   variantSummary?: string;
+  /** Stable variant line id for warehouse deduction */
+  variantCombinationId?: string;
 }
 
 export interface Order {
@@ -40,6 +44,8 @@ export interface Order {
   tracking_token?: string;
   store_slug?: string;
   customer_edited_at?: string;
+  payment_method?: 'prepaid' | 'cod';
+  checkout_adjustments?: CheckoutTotals | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,7 +62,11 @@ export async function createOrder(
   currencyCode: string = 'INR',
   customerWhatsapp?: string,
   orderSource: 'link' | 'manual' | 'store' = 'link',
-  storeSlug?: string
+  storeSlug?: string,
+  checkoutExtras?: {
+    paymentMethod?: 'prepaid' | 'cod';
+    checkoutAdjustments?: CheckoutTotals;
+  }
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
@@ -77,13 +87,47 @@ export async function createOrder(
     if (storeSlug?.trim()) {
       row.store_slug = storeSlug.trim().toLowerCase();
     }
+    if (checkoutExtras?.paymentMethod) {
+      row.payment_method = checkoutExtras.paymentMethod;
+    }
+    if (checkoutExtras?.checkoutAdjustments) {
+      row.checkout_adjustments = checkoutExtras.checkoutAdjustments;
+    }
 
     let { data, error } = await client.from('orders').insert(row).select().maybeSingle();
 
     if (error && isLikelyMissingTrackingColumnsError(error)) {
       delete row.tracking_token;
-      delete row.store_slug;
       ({ data, error } = await client.from('orders').insert(row).select().maybeSingle());
+    }
+
+    if (error && (String(error.message || '').includes('checkout_adjustments') || String(error.message || '').includes('payment_method'))) {
+      delete row.checkout_adjustments;
+      delete row.payment_method;
+      ({ data, error } = await client.from('orders').insert(row).select().maybeSingle());
+    }
+
+    if (!error && data?.id && orderSource === 'store') {
+      const inv = await applyOrderInventory(String(data.id));
+      if (inv.error) {
+        const msg = String((inv.error as { message?: string })?.message ?? inv.error ?? '');
+        await client.from('orders').delete().eq('id', data.id);
+        return {
+          data: null,
+          error: {
+            message: msg.includes('insufficient_stock') ? 'insufficient_stock' : 'inventory_failed',
+            code: msg.includes('insufficient_stock') ? 'insufficient_stock' : 'inventory_failed',
+          },
+        };
+      }
+      const invPayload = inv.data as { applied?: boolean; reason?: string } | null;
+      if (invPayload?.applied === false && invPayload.reason !== 'no_inventory_link') {
+        await client.from('orders').delete().eq('id', data.id);
+        return {
+          data: null,
+          error: { message: 'inventory_failed', code: 'inventory_failed' },
+        };
+      }
     }
 
     return { data: (data as Order | null) ?? null, error };
@@ -229,10 +273,22 @@ export async function updateOrderStatus(
     await ensureOrdersRlsHeaderFromSession();
     const client = getSupabaseClient();
 
+    const { data: existing } = await client
+      .from('orders')
+      .select('status')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    const prevStatus = existing?.status as Order['status'] | undefined;
+
     const { data, error } = await client
       .from('orders')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', orderId);
+
+    if (!error && status === 'cancelled' && prevStatus && prevStatus !== 'cancelled') {
+      await restoreOrderInventory(orderId);
+    }
 
     return { data, error };
   } catch (err) {

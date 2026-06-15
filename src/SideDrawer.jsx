@@ -9,7 +9,7 @@ import JSZip from "jszip";
 import { saveRenderedImage } from "./Save";
 import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { MdInventory2, MdBackup, MdCategory, MdBook, MdImage, MdSettings, MdPublic, MdSupportAgent } from "react-icons/md";
+import { MdInventory2, MdBackup, MdCategory, MdBook, MdImage, MdSettings, MdPublic, MdSupportAgent, MdDomain } from "react-icons/md";
 import { RiEdit2Line } from "react-icons/ri";
 import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 import { APP_VERSION } from "./config/version";
@@ -1857,6 +1857,17 @@ setShowBrowseForBackup(false);
 >
   <RiEdit2Line className="text-gray-500 text-[18px]" />
   <span className="text-sm font-medium">Bulk Editor</span>
+</button>
+
+<button
+  onClick={() => {
+    navigate("/warehouse");
+    onClose();
+  }}
+  className="w-full flex items-center gap-3 px-5 py-3 mb-3 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition shadow-sm"
+>
+  <MdDomain className="text-gray-500 text-[18px]" />
+  <span className="text-sm font-medium">Warehouse</span>
 </button>
 
 <button

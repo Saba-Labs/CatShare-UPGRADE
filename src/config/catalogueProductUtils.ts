@@ -160,7 +160,7 @@ export interface ProductWithCatalogueData {
   badge?: string;
   category?: string[];
   catalogueData?: Record<string, CatalogueData>;
-  /** Size / colour / custom option groups (product-level, all catalogues). */
+  /** Size / colour / custom option groups (product-level). Combination details are per catalogue in `variants.combinations[].catalogueDetails`. */
   variants?: import('../utils/productVariants').ProductVariantsConfig;
   [key: string]: any;
 }

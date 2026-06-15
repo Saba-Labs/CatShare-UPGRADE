@@ -135,7 +135,7 @@ export function getStorefrontPriceAndUnit(
   const pr = product as Record<string, unknown> | null | undefined;
   let variantOverride: ReturnType<typeof getVariantCombinationData> | null = null;
   if (product && variantSelection) {
-    variantOverride = getVariantCombinationData(product, variantSelection);
+    variantOverride = getVariantCombinationData(product, variantSelection, catalogue?.id);
   }
 
   const pack = (
@@ -249,7 +249,7 @@ export function buildStorefrontDetailFields(
   }
   const resolvedFields = cloudFields ?? getFieldsDefinition().fields ?? [];
   const fieldDefinition = { fields: resolvedFields };
-  const variantData = getVariantCombinationData(product, variantSelection);
+  const variantData = getVariantCombinationData(product, variantSelection, catalogueId);
 
   const visible = new Set(
     fieldDefinition.fields

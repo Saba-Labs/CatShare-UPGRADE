@@ -14,6 +14,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { App } from "@capacitor/app";
 import { getCatalogueData, isProductEnabledForCatalogue } from "./config/catalogueProductUtils";
+import { getAllCatalogues } from "./config/catalogueConfig";
+import { useCatalogueInventoryMap } from "./hooks/useCatalogueInventoryMap";
+import { useToast } from "./context/ToastContext";
+import {
+  CATALOGUE_WAREHOUSE_STOCK_WARNING,
+  isCatalogueStockToggleLocked,
+  isProductInStockForSellerCatalogue,
+} from "./utils/catalogueWarehouseStock";
 import { getFieldConfig, getAllFields } from "./config/fieldConfig";
 import AddProductsModal from "./components/AddProductsModal";
 import BulkEdit from "./BulkEdit";
@@ -44,7 +52,7 @@ import {
 const ProductCard = React.memo(({
   p,
   isSelected,
-  stockField,
+  outOfStock,
   showEdit,
   showInfo,
   currencySymbol,
@@ -82,9 +90,7 @@ const ProductCard = React.memo(({
   data-id={p.id}
   draggable={false}
   onDragStart={(e) => e.preventDefault()}
-  className={`share-card bg-white rounded-sm shadow-sm overflow-hidden relative cursor-pointer transition-all duration-200 ${
-    !p[stockField] ? "opacity-100" : ""
-  }`}
+  className="share-card bg-white rounded-sm shadow-sm overflow-hidden relative cursor-pointer transition-all duration-200"
   onClick={() => onCardClick(p.id)}
   onTouchStart={(e) => onTouchStart(e, p.id)}
   onTouchMove={onTouchMove}
@@ -121,7 +127,7 @@ const ProductCard = React.memo(({
   }}
 />
       
-        {!p[stockField] && (
+        {!outOfStock ? null : (
           <div className="absolute top-1/2 left-1/2 w-[140%] -translate-x-1/2 -translate-y-1/2 rotate-[-15deg] bg-red-500 bg-opacity-60 text-white text-center py-0.5 shadow-md">
             <span className="block text-sm font-bold tracking-wider">
               OUT OF STOCK
@@ -248,7 +254,7 @@ const ProductCard = React.memo(({
               {p.badge.toUpperCase()}
             </div>
           )}
-          {!p[stockField] && (
+          {!outOfStock ? null : (
             <div style={{
               position: "absolute", top: "50%", left: "50%",
               transform: "translate(-50%, -50%) rotate(-30deg)",
@@ -358,8 +364,30 @@ export default React.memo(function CatalogueView({
 }: CatalogueViewProps) {
   const { user, supabaseData } = useAuth();
   const { guardCloudWrite } = useCloudWriteGate();
+  const { showToast } = useToast();
   const { isPro } = useSubscription();
   const navigate = useNavigate();
+
+  const catalogueConfig = useMemo(
+    () => getAllCatalogues().find((c) => c.id === catalogueId) ?? null,
+    [catalogueId]
+  );
+  const inventoryMap = useCatalogueInventoryMap(user?.uid, catalogueConfig);
+  const warehouseStockLocked = useMemo(
+    () => isCatalogueStockToggleLocked(catalogueId),
+    [catalogueId]
+  );
+
+  const isProductOutOfStock = useCallback(
+    (p: { id: string }) =>
+      !isProductInStockForSellerCatalogue(
+        p as import('./config/catalogueProductUtils').ProductWithCatalogueData,
+        catalogueId,
+        catalogueConfig,
+        inventoryMap
+      ),
+    [catalogueId, catalogueConfig, inventoryMap]
+  );
   // Helper function to get catalogue-specific data for a product
   const getProductCatalogueData = useCallback((product) => {
     if (!catalogueId) return product; // Fallback to product if no catalogueId
@@ -669,11 +697,10 @@ useEffect(() => {
       const isEnabled = isProductEnabledForCatalogue(p, catalogueId);
       if (!isEnabled) return false;
 
-      // Use the catalogue's stockField instead of hardcoded field
-      const productStock = p[stockField];
+      const productInStock = !isProductOutOfStock(p);
       const matchesStock =
-        (stockFilter.includes("in") && productStock) ||
-        (stockFilter.includes("out") && !productStock);
+        (stockFilter.includes("in") && productInStock) ||
+        (stockFilter.includes("out") && !productInStock);
       const matchesCategory =
         categoryFilter === "" ||
         (Array.isArray(p.category)
@@ -684,7 +711,7 @@ useEffect(() => {
         p.subtitle?.toLowerCase().includes(search.toLowerCase());
       return matchesStock && matchesCategory && matchesSearch;
     });
-}, [filtered, stockFilter, categoryFilter, search, catalogueId, stockField]);
+}, [filtered, stockFilter, categoryFilter, search, catalogueId, isProductOutOfStock]);
 
 
   // Memoized touch handlers for better performance
@@ -1519,6 +1546,11 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (warehouseStockLocked) {
+                    showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, 'warning');
+                    setShowToolsMenu(false);
+                    return;
+                  }
                   if (!guardCloudWrite()) return;
                   console.log('🟢 Mark as In Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
@@ -1553,6 +1585,11 @@ const handleTouchEnd = useCallback(() => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (warehouseStockLocked) {
+                    showToast(CATALOGUE_WAREHOUSE_STOCK_WARNING, 'warning');
+                    setShowToolsMenu(false);
+                    return;
+                  }
                   if (!guardCloudWrite()) return;
                   console.log('🔴 Mark as Out of Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
@@ -1978,7 +2015,7 @@ const handleTouchEnd = useCallback(() => {
     key={p.id}
     p={p}
     isSelected={selected.includes(p.id)}
-    stockField={stockField}
+    outOfStock={isProductOutOfStock(p)}
     showEdit={showEdit}
     showInfo={showInfo}
     currencySymbol={currencySymbol}

@@ -8,6 +8,7 @@ import { isOfflineBuilderMode } from '../config/offlineBuilder';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
+import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
@@ -28,6 +29,7 @@ function buildLocalFallbackStore(uid: string): Store {
     websiteModeEnabled: true,
     customHostname: null,
     customDomainStatus: null,
+    checkoutSettings: { ...DEFAULT_CHECKOUT_SETTINGS },
   };
 }
 

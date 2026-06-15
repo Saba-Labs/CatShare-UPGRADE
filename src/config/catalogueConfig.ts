@@ -25,6 +25,8 @@ export interface Catalogue {
   isDefault?: boolean; // True for default catalogues (can't be deleted)
   heroImage?: string; // Hero image URL or base64 data
   description?: string; // Catalogue description
+  /** Inventory room this catalogue sells from (warehouse model) */
+  inventoryId?: string | null;
 }
 
 export interface CataloguesDefinition {
@@ -208,6 +210,39 @@ export function tryExtractCataloguesArray(raw: unknown): Catalogue[] | null {
     return fromNumeric as Catalogue[];
   }
   return null;
+}
+
+/**
+ * Merge user_settings and managed catalogue lists for public storefront.
+ * Managed `catalogues_definition` wins for warehouse fields (`inventoryId`) when present.
+ */
+export function mergeStorefrontCatalogueDefinitions(
+  fromUserSettings: Catalogue[] | null | undefined,
+  fromManaged: Catalogue[] | null | undefined
+): Catalogue[] | null {
+  const settings = fromUserSettings ?? [];
+  const managed = fromManaged ?? [];
+  if (settings.length === 0 && managed.length === 0) return null;
+  if (settings.length === 0) return managed;
+  if (managed.length === 0) return settings;
+
+  const managedById = new Map(managed.map((c) => [c.id, c]));
+  const merged = settings.map((c) => {
+    const m = managedById.get(c.id);
+    if (!m) return c;
+    const inventoryId = m.inventoryId?.trim() || c.inventoryId?.trim() || null;
+    if (inventoryId && inventoryId !== c.inventoryId) {
+      return { ...c, inventoryId };
+    }
+    if (m.inventoryId && !c.inventoryId) {
+      return { ...c, inventoryId: m.inventoryId };
+    }
+    return c;
+  });
+  for (const m of managed) {
+    if (!merged.some((c) => c.id === m.id)) merged.push(m);
+  }
+  return merged;
 }
 
 /**

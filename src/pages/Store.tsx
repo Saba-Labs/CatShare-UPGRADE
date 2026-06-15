@@ -38,10 +38,18 @@ import {
 } from '../utils/catalogueSessionHydration';
 import { Capacitor } from '@capacitor/core';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
+import { normalizeCheckoutSettings } from '../types/checkoutSettings';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 const STORE_FETCH_TIMEOUT_MS = 14_000;
 const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
+
+function summarizeCheckoutSettings(raw: unknown): string {
+  const s = normalizeCheckoutSettings(raw);
+  const enabled = s.rules.filter((r) => r.enabled).length;
+  if (enabled === 0) return 'Shipping, taxes & coupons for checkout';
+  return `${enabled} active rule${enabled === 1 ? '' : 's'}`;
+}
 
 /* ─── Icons ─────────────────────────────────────────────── */
 const IconCopy = () => (
@@ -1739,6 +1747,24 @@ export default function StorePage() {
                         : store.customHostname
                           ? `${store.customHostname} — finish DNS setup`
                           : 'Use your own domain on Vercel'}
+                    </div>
+                  </div>
+                  <span className="domain-nav-chevron" aria-hidden>
+                    <IconChevron />
+                  </span>
+                </button>
+              </div>
+
+              <div className="gap">
+                <button
+                  type="button"
+                  className="domain-nav-trigger"
+                  onClick={() => navigate('/store/checkout-settings')}
+                >
+                  <div>
+                    <div className="domain-nav-title">Checkout settings</div>
+                    <div className="domain-nav-sub">
+                      {summarizeCheckoutSettings(store.checkoutSettings)}
                     </div>
                   </div>
                   <span className="domain-nav-chevron" aria-hidden>

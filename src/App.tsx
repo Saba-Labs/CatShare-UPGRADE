@@ -18,6 +18,7 @@ import { runMigrations, migrateUnkeyedDataToUserKeyed } from "./utils/dataMigrat
 import { initializeFirebaseMessaging } from "./services/firebaseService";
 import { initWebAnalyticsIfNeeded } from "./config/firebaseConfig";
 import { subscribeToNewSellerOrders, startPollingForNewSellerOrders } from "./services/orderNotifications";
+import { startPollingForLowStock } from "./services/lowStockNotifications";
 import { initPushTokenForLoggedInUser } from "./services/pushTokenService";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
@@ -75,6 +76,8 @@ const Website = lazy(() => import("./Website"));
 const Tutorial = lazy(() => import("./Tutorial"));
 const HomepageEditorPage = lazy(() => import("./pages/HomepageEditorPage"));
 const StoreCustomDomain = lazy(() => import("./pages/StoreCustomDomain"));
+const StoreCheckoutSettingsPage = lazy(() => import("./pages/StoreCheckoutSettingsPage"));
+const WarehousePage = lazy(() => import("./pages/WarehousePage"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
@@ -1955,6 +1958,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
     };
   }, [loading, user?.uid, user?.isAnonymous]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!user?.uid) return;
+    if (authService.isOfflineGuest()) return;
+    if (user.isAnonymous) return;
+    return startPollingForLowStock(user.uid);
+  }, [loading, user?.uid, user?.isAnonymous]);
+
   // Register FCM token for new-order push as soon as the seller is signed in (native only).
   useEffect(() => {
     if (loading) return;
@@ -2617,6 +2628,22 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <StoreCustomDomain />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/checkout-settings"
+          element={
+            <ProtectedRoute>
+              <StoreCheckoutSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/warehouse"
+          element={
+            <ProtectedRoute>
+              <WarehousePage />
             </ProtectedRoute>
           }
         />

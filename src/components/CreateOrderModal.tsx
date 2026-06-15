@@ -7,6 +7,8 @@ import { isProductEnabledForCatalogue, getCatalogueData } from '../config/catalo
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
+import { applyInventoryCapToQuantity } from '../utils/orderQuantityStock';
 import { STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
 import {
   applyQuantityDelta,
@@ -93,6 +95,12 @@ export default function CreateOrderModal({
 
   const catalogues = getAllCatalogues();
 
+  const selectedCatalogue = useMemo(
+    () => catalogues.find((c) => c.id === selectedCatalogueId) ?? null,
+    [catalogues, selectedCatalogueId]
+  );
+  const inventoryMap = useCatalogueInventoryMap(user?.uid, selectedCatalogue);
+
   // Get products for selected catalogue
   const catalogueProducts = useMemo(() => {
     if (!selectedCatalogueId) return [];
@@ -177,9 +185,23 @@ export default function CreateOrderModal({
     const catData = getCatalogueData(product, selectedCatalogueId);
     const rules = getProductOrderQuantityRules(catData);
     const current = selectedProducts.get(productId) || 0;
-    const next = applyQuantityDelta(current, delta, rules.step, rules.moq);
+    let next = applyQuantityDelta(current, delta, rules.step, rules.moq);
+    const { quantity: capped } = applyInventoryCapToQuantity(
+      next,
+      rules.step,
+      rules.moq,
+      selectedCatalogue,
+      inventoryMap,
+      productId,
+      null
+    );
+    next = capped;
     const newSelected = new Map(selectedProducts);
-    newSelected.set(productId, next);
+    if (next <= 0) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.set(productId, next);
+    }
     setSelectedProducts(newSelected);
   };
 
@@ -189,7 +211,15 @@ export default function CreateOrderModal({
     if (!product) return;
     const catData = getCatalogueData(product, selectedCatalogueId);
     const rules = getProductOrderQuantityRules(catData);
-    const next = roundQuantityToRules(quantity, rules.step, rules.moq);
+    const { quantity: next } = applyInventoryCapToQuantity(
+      quantity,
+      rules.step,
+      rules.moq,
+      selectedCatalogue,
+      inventoryMap,
+      productId,
+      null
+    );
     const newSelected = new Map(selectedProducts);
     if (next <= 0) {
       newSelected.delete(productId);

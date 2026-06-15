@@ -15,6 +15,8 @@ import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import { useSubscription } from "./context/SubscriptionContext";
 import { FREE_MAX_CATALOGUES } from "./config/freeTierLimits";
 import { syncCataloguesDefinition, syncProducts } from "./services/supabaseSync";
+import { ensureDefaultWarehouse, fetchInventoryRooms } from "./services/inventoryService";
+import type { InventoryRoom } from "./types/inventory";
 import { getStorageKey, safeSetInStorage } from "./utils/safeStorage";
 import { uploadImageToR2, stripDataUriPrefix, deleteImageFromR2 } from "./services/cloudflareService";
 
@@ -67,12 +69,23 @@ export default React.memo(function ManageCatalogues({
   const [formLabel, setFormLabel] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formHeroImage, setFormHeroImage] = useState("");
+  const [formInventoryId, setFormInventoryId] = useState("");
+  const [inventoryRooms, setInventoryRooms] = useState<InventoryRoom[]>([]);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
     const cats = getAllCatalogues();
     setCatalogues(cats);
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    void (async () => {
+      await ensureDefaultWarehouse(user.uid);
+      const res = await fetchInventoryRooms(user.uid);
+      setInventoryRooms(res.data ?? []);
+    })();
+  }, [user?.uid]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,6 +109,7 @@ export default React.memo(function ManageCatalogues({
     setFormLabel("");
     setFormDescription("");
     setFormHeroImage("");
+    setFormInventoryId("");
     setFormError("");
   };
 
@@ -265,6 +279,7 @@ export default React.memo(function ManageCatalogues({
         folder: newFolder,
         heroImage: heroImageValue,
         description: formDescription.trim(),
+        inventoryId: formInventoryId || null,
       };
       updateCatalogue(showEditForm.id, updates);
 
@@ -378,6 +393,7 @@ export default React.memo(function ManageCatalogues({
     setFormLabel(catalogue.label);
     setFormDescription(catalogue.description || "");
     setFormHeroImage(catalogue.heroImage || "");
+    setFormInventoryId(catalogue.inventoryId ?? "");
     setShowEditForm(catalogue);
     setFormError("");
   };
@@ -587,6 +603,27 @@ export default React.memo(function ManageCatalogues({
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
                       rows={2}
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Inventory
+                    </label>
+                    <select
+                      value={formInventoryId}
+                      onChange={(e) => setFormInventoryId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">None</option>
+                      {inventoryRooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Link this catalogue to warehouse inventory for numeric stock on your store.
+                    </p>
                   </div>
 
                   {/* Error Message */}

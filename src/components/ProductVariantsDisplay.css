@@ -1,4 +1,16 @@
 .pvd { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.pvd--compact { gap: 4px; margin-top: 0; }
+.pvd--compact .pvd-group { flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pvd--compact .pvd-group-name {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+.pvd--compact .pvd-options { gap: 4px; }
+.pvd--compact .pvd-chip { font-size: 11px; padding: 2px 8px; line-height: 1.35; }
 @keyframes pvd-chip-error-glow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
   50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
@@ -37,8 +49,27 @@
   color: #fff;
   font-weight: 600;
 }
+.pvd-chip--unavailable {
+  color: #64748b;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  text-decoration-color: rgba(100, 116, 139, 0.45);
+}
+.pvd-chip--unavailable:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+.pvd-chip--active.pvd-chip--unavailable {
+  background: #64748b;
+  border-color: #64748b;
+  color: #fff;
+  text-decoration: none;
+}
 
 /* Store theme overrides via parent */
 .sv-drawer-body .pvd-group-name { color: var(--c-text3); }
 .sv-drawer-body .pvd-chip { border-color: var(--c-border2); background: var(--c-surface2); color: var(--c-text); }
 .sv-drawer-body .pvd-chip--active { background: var(--c-accent); border-color: var(--c-accent); color: #fff; }
+.sv-drawer-body .pvd-chip--unavailable { color: var(--c-text3); background: var(--c-surface2); border-color: var(--c-border2); }

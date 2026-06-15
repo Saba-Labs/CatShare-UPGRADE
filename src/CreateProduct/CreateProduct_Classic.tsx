@@ -60,9 +60,13 @@ import {
   getProductVariantGroups,
   pruneVariantGroupsForSave,
   getAllVariantCombinations,
+  countConfiguredCombinationsForCatalogue,
   type ProductVariantGroup,
   type ProductVariantsConfig,
 } from "../utils/productVariants";
+import ProductCatalogueStockEditor, {
+  type ProductCatalogueStockEditorHandle,
+} from "../components/ProductCatalogueStockEditor";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
 import {
   offerPriceFieldFor,
@@ -322,6 +326,9 @@ export default function CreateProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
+  const draftProductIdRef = useRef(editingId || String(Date.now()));
+  const stockEditorRef = useRef<ProductCatalogueStockEditorHandle>(null);
+  const stockProductId = editingId || draftProductIdRef.current;
   const catalogueParam = searchParams.get("catalogue");
   const fromParam = searchParams.get("from");
   const { showToast } = useToast();
@@ -1248,7 +1255,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
     }
 
     setIsSaving(true);
-    const id = editingId || Date.now().toString();
+    const id = editingId || draftProductIdRef.current;
     // Re-read user id at the time of saving to avoid timing issues
     // when the auth/localStorage value is still being populated.
     const authUserIdNow = getPersistedAuthUserId();
@@ -1426,6 +1433,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
           detail: { onlyProductId: String(newItem.id), forceCloudSync: true },
         })
       );
+
+      await stockEditorRef.current?.flushPending();
 
       const totalProducts = updated.length;
       const isRatingMilestone = (count: number): boolean => {
@@ -2489,6 +2498,24 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     </div>
                   </div>
 
+                  {(() => {
+                    const activeCat = catalogues.find((c) => c.id === selectedCatalogue);
+                    if (!activeCat) return null;
+                    return (
+                      <ProductCatalogueStockEditor
+                        ref={stockEditorRef}
+                        catalogue={activeCat}
+                        productId={stockProductId}
+                        variantGroups={variantGroups}
+                        inStock={getCatalogueFormData()[activeCat.stockField] !== false}
+                        onInStockChange={(next) =>
+                          updateCatalogueData({ [activeCat.stockField]: next })
+                        }
+                        theme="classic"
+                      />
+                    );
+                  })()}
+
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Slab pricing
@@ -2549,7 +2576,13 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tracking-wider uppercase">{variantGroups.length} Group{variantGroups.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/50">
-                      <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tracking-wider uppercase">{variantConfig.combinations?.length || 0} Combo</span>
+                      <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 tracking-wider uppercase">
+                        {countConfiguredCombinationsForCatalogue(
+                          variantConfig.combinations ?? [],
+                          selectedCatalogue
+                        )}{' '}
+                        configured
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2588,6 +2621,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       }}
                       theme="classic"
                       onBackClick={() => setShowManageVariants(false)}
+                      catalogues={catalogues}
+                      selectedCatalogue={selectedCatalogue}
+                      onCatalogueChange={setSelectedCatalogue}
+                      productId={stockProductId}
                     />
                   </div>
                 ) : (
@@ -2604,14 +2641,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
           {/* Save/Cancel Buttons */}
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
             {(() => {
-              const generatedCombinations = getAllVariantCombinations(variantGroups);
-              const hasUnconfiguredVariants = variantGroups.length > 0 && generatedCombinations.length > 0 &&
-                (!variantConfig.combinations || variantConfig.combinations.length === 0);
               return (
                 <button
                   onClick={saveAndNavigate}
-                  disabled={isSaving || hasUnconfiguredVariants}
-                  title={hasUnconfiguredVariants ? "Configure variant combinations first" : ""}
+                  disabled={isSaving}
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
                 >
                   {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
@@ -2681,6 +2714,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
   onChange={(updated) => setVariantConfig(updated)}
   theme="classic"
   onBackClick={() => setShowVariantDetailsModal(false)}
+  catalogues={catalogues}
+  selectedCatalogue={selectedCatalogue}
+  onCatalogueChange={setSelectedCatalogue}
+  productId={stockProductId}
   onSave={(updatedConfig) => {
     if (!editingId) return;
     const authUserIdNow = getPersistedAuthUserId();
