@@ -200,17 +200,27 @@ function buildOrderImageShareText(customerName: string): string {
   return `Hi ${customerName}, here is your order summary.\n\n${CATSHARE_SHARE_PROMO_LINE}`;
 }
 
+/** Safe segment for PDF/PNG filenames only (not share message text). */
+function sanitizeCustomerNameForFileName(name: string, maxLen = 80): string {
+  const cleaned = (name || 'customer')
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, maxLen);
+  return cleaned || 'customer';
+}
+
 /** Safe PDF filename for device storage (avoid path separators and reserved chars). */
 function invoicePdfFileName(order: Order): string {
   const idPart = order.id.substring(0, 8);
-  const raw = (order.customer_name || 'customer').replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_').slice(0, 80);
-  return `Invoice_${idPart}_${raw || 'customer'}.pdf`;
+  const raw = sanitizeCustomerNameForFileName(order.customer_name || 'customer');
+  return `Invoice_${idPart}_${raw}.pdf`;
 }
 
 function orderSnapshotPngFileName(order: Order): string {
   const idPart = order.id.substring(0, 8);
-  const raw = (order.customer_name || 'customer').replace(/[/\\?%*:|"<>]/g, '_').replace(/\s+/g, '_').slice(0, 80);
-  return `Order_${idPart}_${raw || 'customer'}.png`;
+  const raw = sanitizeCustomerNameForFileName(order.customer_name || 'customer');
+  return `Order_${idPart}_${raw}.png`;
 }
 
 /** Supabase JSON may use snake_case; UI expects camelCase. */

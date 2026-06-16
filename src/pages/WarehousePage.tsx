@@ -311,23 +311,6 @@ function groupMovementsByDate(movements: InventoryMovement[]): [string, Inventor
   return Array.from(groups.entries());
 }
 
-async function linkCataloguesToMainRoom(userId: string, mainInventoryId: string): Promise<Catalogue[]> {
-  const def = getCataloguesDefinition(userId);
-  let changed = false;
-  const catalogues = def.catalogues.map((c) => {
-    if (!c.inventoryId) {
-      changed = true;
-      return { ...c, inventoryId: mainInventoryId };
-    }
-    return c;
-  });
-  if (!changed) return getAllCatalogues();
-  const next = { ...def, catalogues, lastUpdated: Date.now() };
-  setCataloguesDefinition(next);
-  await syncCataloguesDefinition(userId, next).catch(() => undefined);
-  return catalogues;
-}
-
 export default function WarehousePage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -459,7 +442,7 @@ export default function WarehousePage() {
       }
       setWarehouseName(ensured.data.warehouseName);
       setMainInventoryId(ensured.data.mainInventoryId);
-      const cats = await linkCataloguesToMainRoom(effectiveUid, ensured.data.mainInventoryId);
+      const cats = getAllCatalogues(effectiveUid);
       setCatalogues(cats);
       const roomsRes = await fetchInventoryRooms(effectiveUid, ensured.data.warehouseId);
       setRooms(roomsRes.data ?? []);
