@@ -37,8 +37,7 @@ function isLocalDevOrigin(origin: string): boolean {
 
 
 function requiresServerApi(provider: IntegrationProviderId): boolean {
-
-  return provider === 'shiprocket';
+  return provider === 'shiprocket' || provider === 'razorpay';
 
 }
 
@@ -344,6 +343,9 @@ export async function apiConnectIntegration(
 
   const payload: Record<string, unknown> = { provider };
 
+  if (provider === 'razorpay' && options?.razorpay) {
+    payload.razorpay = options.razorpay;
+  }
   if (provider === 'shiprocket' && options?.shiprocket) {
 
     payload.shiprocket = options.shiprocket;
@@ -429,7 +431,7 @@ export async function apiDisconnectIntegration(
   if (!r.ok) {
     const msg = typeof r.error === 'string' ? r.error : '';
     if (
-      provider === 'shiprocket' &&
+      (provider === 'shiprocket' || provider === 'razorpay') &&
       (r.httpStatus === 404 ||
         r.httpStatus === 0 ||
         msg.includes('Failed to fetch') ||

@@ -4,18 +4,20 @@ import { applyApiCors } from '../../lib/apiCors.js';
 import { getSupabaseUserFromRequest } from '../../lib/supabaseAuthRequest.js';
 import {
   deleteIntegration,
-  getIntegration,
   isValidProvider,
   listIntegrations,
-  stubRazorpayMetadata,
-  upsertIntegration,
   type IntegrationProviderId,
 } from '../../lib/integrationsServer.js';
+import {
+  connectRazorpayIntegration,
+  refreshRazorpayIntegration,
+} from '../../lib/razorpayIntegration.js';
 import {
   connectShiprocketIntegration,
   createShiprocketShipmentForOrder,
   refreshShiprocketIntegration,
 } from '../../lib/shiprocketIntegration.js';
+import { RazorpayApiError } from '../../lib/razorpayServer.js';
 import { ShiprocketApiError } from '../../lib/shiprocketServer.js';
 
 const supabase = createClient(
@@ -52,6 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (key === 'connect' && req.method === 'POST') {
     const body = (req.body ?? {}) as {
       provider?: string;
+      razorpay?: { keyId?: string; keySecret?: string };
       shiprocket?: { email?: string; password?: string };
     };
     const provider = String(body.provider ?? '').trim();
@@ -60,8 +63,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const now = new Date().toISOString();
-
       if (provider === 'shiprocket') {
         const email = String(body.shiprocket?.email ?? '').trim();
         const password = String(body.shiprocket?.password ?? '');
@@ -74,34 +75,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ integration, oauthUrl: null });
       }
 
-      const metadata = stubRazorpayMetadata();
-      const integration = await upsertIntegration(
-        supabase,
-        auth.userId,
-        provider as IntegrationProviderId,
-        {
-          status: 'pending_verification',
-          account_id: String(metadata.merchantId ?? ''),
-          metadata,
-          connected_at: now,
-        }
-      );
+      if (provider === 'razorpay') {
+        const keyId = String(body.razorpay?.keyId ?? '').trim();
+        const keySecret = String(body.razorpay?.keySecret ?? '');
+        const integration = await connectRazorpayIntegration(
+          supabase,
+          auth.userId,
+          keyId,
+          keySecret
+        );
+        return res.status(200).json({ integration, oauthUrl: null });
+      }
 
-      return res.status(200).json({
-        integration,
-        oauthUrl: null,
-        message:
-          'MVP stub: real OAuth will be enabled when gateway credentials are configured.',
-      });
+      return res.status(400).json({ error: 'Unsupported provider connect request' });
     } catch (e) {
       console.error('integrations connect:', e);
       const msg =
         e instanceof ShiprocketApiError
           ? e.message
+          : e instanceof RazorpayApiError
+            ? e.message
           : e instanceof Error
             ? e.message
             : 'Could not connect integration';
-      const status = e instanceof ShiprocketApiError && e.status === 401 ? 401 : 500;
+      const status =
+        (e instanceof ShiprocketApiError || e instanceof RazorpayApiError) &&
+        e.status === 401
+          ? 401
+          : 500;
       return res.status(status).json({ error: msg });
     }
   }
@@ -133,46 +134,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ integration });
       }
 
-      const existing = await getIntegration(
-        supabase,
-        auth.userId,
-        provider as IntegrationProviderId
-      );
-
-      if (!existing) {
-        return res.status(404).json({ error: 'Integration not connected' });
+      if (provider === 'razorpay') {
+        const integration = await refreshRazorpayIntegration(supabase, auth.userId);
+        return res.status(200).json({ integration });
       }
 
-      const now = new Date().toISOString();
-      let status = String(existing.status ?? 'not_connected');
-      let metadata =
-        existing.metadata && typeof existing.metadata === 'object'
-          ? { ...(existing.metadata as Record<string, unknown>) }
-          : {};
-
-      if (provider === 'razorpay' && status === 'pending_verification') {
-        status = 'connected';
-        metadata = { ...stubRazorpayMetadata(), ...metadata, accountStatus: 'activated' };
-      }
-
-      const integration = await upsertIntegration(
-        supabase,
-        auth.userId,
-        provider as IntegrationProviderId,
-        {
-          status,
-          account_id: existing.account_id != null ? String(existing.account_id) : null,
-          metadata,
-          connected_at: existing.connected_at != null ? String(existing.connected_at) : now,
-        }
-      );
-
-      return res.status(200).json({ integration });
+      return res.status(400).json({ error: 'Unsupported provider refresh request' });
     } catch (e) {
       console.error('integrations refresh:', e);
       const msg =
         e instanceof ShiprocketApiError
           ? e.message
+          : e instanceof RazorpayApiError
+            ? e.message
           : e instanceof Error
             ? e.message
             : 'Could not refresh integration status';

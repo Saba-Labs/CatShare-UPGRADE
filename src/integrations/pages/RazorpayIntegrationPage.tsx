@@ -13,6 +13,7 @@ import { IntegrationActionBar } from '../components/IntegrationActionBar';
 import { IntegrationDetailsPanel } from '../components/IntegrationDetailsPanel';
 import { IntegrationGuideCard } from '../components/IntegrationGuideCard';
 import { IntegrationStatusBadge } from '../components/IntegrationStatusBadge';
+import { RazorpayConnectForm } from '../components/RazorpayConnectForm';
 import { useIntegrationProvider } from '../hooks/useIntegrationProvider';
 import {
   INTEGRATIONS_PAGE_CSS,
@@ -36,12 +37,21 @@ export default function RazorpayIntegrationPage() {
   } = useIntegrationProvider('razorpay');
 
   const [showDetails, setShowDetails] = useState(false);
+  const [keyId, setKeyId] = useState('');
+  const [keySecret, setKeySecret] = useState('');
   const status = view?.status ?? 'not_connected';
+  const canConnect = status === 'not_connected' || status === 'error';
 
   const handleConnect = async () => {
     if (!guardCloudWrite()) return;
+    if (!keyId.trim() || !keySecret) {
+      showToast('Enter Razorpay Key ID and Key Secret', 'error');
+      return;
+    }
     setActionLoading(true);
-    const res = await connectIntegration(sellerId, 'razorpay');
+    const res = await connectIntegration(sellerId, 'razorpay', {
+      razorpay: { keyId: keyId.trim(), keySecret },
+    });
     setActionLoading(false);
     if (res.error) {
       showToast(
@@ -50,7 +60,8 @@ export default function RazorpayIntegrationPage() {
       );
       return;
     }
-    showToast('Razorpay connection started', 'success');
+    setKeySecret('');
+    showToast('Razorpay connected', 'success');
     await reload();
   };
 
@@ -140,25 +151,37 @@ export default function RazorpayIntegrationPage() {
             ) : null}
 
             {status === 'not_connected' || status === 'error' ? (
-              <IntegrationGuideCard
-                title="How to connect Razorpay"
-                steps={provider.getGuideSteps()}
-                securityNote={securityNote}
-              />
+              <>
+                <IntegrationGuideCard
+                  title="How to connect Razorpay"
+                  steps={provider.getGuideSteps()}
+                  securityNote={securityNote}
+                />
+                <RazorpayConnectForm
+                  keyId={keyId}
+                  keySecret={keySecret}
+                  loading={actionLoading}
+                  onKeyIdChange={setKeyId}
+                  onKeySecretChange={setKeySecret}
+                  onSubmit={handleConnect}
+                />
+              </>
             ) : null}
 
             {view && showDetails ? <IntegrationDetailsPanel view={view} /> : null}
 
-            <IntegrationActionBar
-              status={status}
-              connectLabel="Connect Razorpay"
-              loading={actionLoading}
-              onConnect={handleConnect}
-              onRefresh={handleRefresh}
-              onDisconnect={handleDisconnect}
-              showDetails={showDetails}
-              onToggleDetails={() => setShowDetails((v) => !v)}
-            />
+            {!canConnect ? (
+              <IntegrationActionBar
+                status={status}
+                connectLabel="Connect Razorpay"
+                loading={actionLoading}
+                onConnect={handleConnect}
+                onRefresh={handleRefresh}
+                onDisconnect={handleDisconnect}
+                showDetails={showDetails}
+                onToggleDetails={() => setShowDetails((v) => !v)}
+              />
+            ) : null}
           </>
         )}
       </main>

@@ -6,6 +6,8 @@ const SERVER_ONLY_METADATA_KEYS = new Set([
   'encryptedPassword',
   'encryptedAccessToken',
   'apiUserEmail',
+  'encryptedKeyId',
+  'encryptedKeySecret',
 ]);
 
 export function sanitizeIntegrationMetadata(

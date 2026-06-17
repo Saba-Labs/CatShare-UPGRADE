@@ -3,31 +3,27 @@ import type { IntegrationGuideStep, IntegrationSecurityNote } from '../../../cor
 export const RAZORPAY_GUIDE_STEPS: IntegrationGuideStep[] = [
   {
     step: 1,
-    title: 'Create a Razorpay account if you don\'t already have one.',
+    title: 'Create a Razorpay account and complete KYC.',
   },
   {
     step: 2,
-    title: 'Complete KYC.',
+    title: 'Enable payment methods and bank settlement in Razorpay Dashboard.',
   },
   {
     step: 3,
-    title: 'Add your bank account.',
+    title: 'Go to Settings > API Keys and create/generate Key ID and Key Secret.',
   },
   {
     step: 4,
-    title: 'Wait until Razorpay activates your account.',
+    title: 'Keep Key Secret safe (you may not be able to view it again).',
   },
   {
     step: 5,
-    title: 'Return here.',
+    title: 'Return to CatShare and paste Key ID + Key Secret below.',
   },
   {
     step: 6,
     title: 'Click Connect Razorpay.',
-  },
-  {
-    step: 7,
-    title: 'Authorize CatShare.',
   },
 ];
 
@@ -35,7 +31,7 @@ export const RAZORPAY_SECURITY_NOTE: IntegrationSecurityNote = {
   title: 'How payments work',
   points: [
     'Payments will be collected directly into your Razorpay account.',
-    'CatShare never stores your banking passwords.',
-    'CatShare only stores the secure connection information needed to process payments.',
+    'CatShare never stores your Razorpay dashboard password.',
+    'API credentials are encrypted before storage on the server.',
   ],
 };

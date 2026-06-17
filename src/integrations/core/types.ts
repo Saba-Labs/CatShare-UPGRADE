@@ -164,7 +164,13 @@ export type ShiprocketConnectCredentials = {
   password: string;
 };
 
+export type RazorpayConnectCredentials = {
+  keyId: string;
+  keySecret: string;
+};
+
 export type IntegrationConnectOptions = {
+  razorpay?: RazorpayConnectCredentials;
   shiprocket?: ShiprocketConnectCredentials;
 };
 

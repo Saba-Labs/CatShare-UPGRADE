@@ -52,7 +52,7 @@ export const razorpayProvider: PaymentProvider = {
       { label: 'Business Name', value: details.businessName },
       { label: 'Email', value: details.email },
       { label: 'Phone', value: details.phone },
-      { label: 'Merchant ID', value: details.merchantId, mono: true },
+      { label: 'Key ID', value: details.merchantId, mono: true },
       { label: 'Connection Date', value: details.connectionDate },
       { label: 'Account Status', value: details.accountStatus },
     ].filter((f) => f.value) as SellerIntegrationView['details'];
@@ -80,7 +80,7 @@ export const razorpayProvider: PaymentProvider = {
       businessName: m.businessName ?? null,
       email: m.email ?? null,
       phone: m.phone ?? null,
-      merchantId: m.merchantId ?? connection.accountId ?? null,
+      merchantId: m.keyIdMasked ?? m.merchantId ?? connection.accountId ?? null,
       accountStatus: m.accountStatus ?? null,
       connectionDate: m.connectionDate ?? connection.connectedAt ?? null,
     };
@@ -88,9 +88,9 @@ export const razorpayProvider: PaymentProvider = {
 
   async connect(
     sellerId: string,
-    _options?: import('../../../core/types').IntegrationConnectOptions
+    options?: import('../../../core/types').IntegrationConnectOptions
   ): Promise<ConnectIntegrationResult> {
-    const res = await apiConnectIntegration(sellerId, 'razorpay');
+    const res = await apiConnectIntegration(sellerId, 'razorpay', options);
     if (res.error || !res.data) {
       throw new Error(
         typeof res.error === 'string' ? res.error : 'Could not connect Razorpay'

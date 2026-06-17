@@ -1,6 +1,7 @@
 import type { RazorpayConnectionStatus } from '../../../core/types';
 
 export interface RazorpayIntegrationMetadata {
+  keyIdMasked?: string;
   accountName?: string;
   businessName?: string;
   email?: string;
