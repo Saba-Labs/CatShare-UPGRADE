@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyApiCors(req, res, 'GET, POST, DELETE, OPTIONS')) return;
 
   const auth = await getSupabaseUserFromRequest(req.headers.authorization);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     return res.status(401).json({ error: auth.error });
   }
 
@@ -180,7 +180,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const validation = validateStoreHostname(hostnameInput, {
         platformRootHost: platformRootHost(),
       });
-      if (!validation.ok) {
+      if (validation.ok === false) {
         return res.status(400).json({ error: validation.error });
       }
       const hostname = validation.hostname;

@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── 1. Verify Supabase access token ───────────────────────────────────────
   const authResult = await getSupabaseUserFromRequest(req.headers.authorization);
-  if (!authResult.ok) {
+  if (authResult.ok === false) {
     return res.status(401).json({ error: authResult.error });
   }
   const uid = authResult.userId;

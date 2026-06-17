@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyApiCors(req, res, 'POST, OPTIONS')) return;
 
   const auth = await getSupabaseUserFromRequest(req.headers.authorization);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     return res.status(401).json({ error: auth.error });
   }
 

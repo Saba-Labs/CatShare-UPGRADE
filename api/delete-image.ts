@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
   const authResult = await getSupabaseUserFromRequest(req.headers.authorization);
-  if (!authResult.ok) {
+  if (authResult.ok === false) {
     return res.status(401).json({ error: authResult.error });
   }
   const userId = authResult.userId;

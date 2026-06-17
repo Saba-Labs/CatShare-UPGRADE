@@ -41,7 +41,7 @@ export async function handleDevIntegrationsRequest(
   process.env.SUPABASE_SERVICE_ROLE_KEY = env.supabaseServiceKey;
 
   const auth = await getSupabaseUserFromRequest(authHeader);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     return jsonResponse(401, { error: auth.error });
   }
 

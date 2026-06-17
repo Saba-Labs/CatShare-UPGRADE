@@ -2,7 +2,8 @@
  * Verify Supabase JWT from Authorization: Bearer <access_token>
  * Server-only — used by Vercel /api routes. Lives outside /api so the bundler inlines it.
  */
-import { createClient, User } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { User } from "@supabase/auth-js";
 
 export type SupabaseAuthResult =
   | { ok: true; user: User; userId: string }
