@@ -19,6 +19,11 @@ import { MdInventory2 } from "react-icons/md";
 import { saveRenderedImage, deleteRenderedImageForProduct } from "./Save";
 import { getAllCatalogues, type Catalogue } from "./config/catalogueConfig";
 import {
+  applyMasterCatalogueStockChange,
+  isProductInStockForCatalogue,
+  toggleProductStockForCatalogue,
+} from "./config/catalogueProductUtils";
+import {
   CATALOGUE_WAREHOUSE_STOCK_WARNING,
   isCatalogueLinkedToWarehouse,
 } from "./utils/catalogueWarehouseStock";
@@ -760,7 +765,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
     await Haptics.impact({ style: ImpactStyle.Medium });
 
-    const freshProducts = products.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p));
+    const freshProducts = products.map((p) => {
+      if (p.id !== id) return p;
+      const cat = catalogues.find((c) => c.stockField === field);
+      if (!cat) return { ...p, [field]: !p[field] };
+      return toggleProductStockForCatalogue(p, cat.id, field, cat);
+    });
     setProducts(freshProducts);
 
     if (isStrictMode() && user?.uid) {
@@ -784,7 +794,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       if (!guardCloudWrite()) return;
       // Bypassed within 5 minutes
       Haptics.impact({ style: ImpactStyle.Medium });
-      const freshProducts = products.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p));
+      const freshProducts = products.map((p) => {
+      if (p.id !== id) return p;
+      const cat = catalogues.find((c) => c.stockField === field);
+      if (!cat) return { ...p, [field]: !p[field] };
+      return toggleProductStockForCatalogue(p, cat.id, field, cat);
+    });
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
@@ -813,12 +828,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       Haptics.impact({ style: ImpactStyle.Medium });
       const freshProducts = products.map((p) => {
         if (p.id === id) {
-          const allInStock = catalogues.every((cat) => p[cat.stockField]);
-          const updated = { ...p };
-          catalogues.forEach((cat) => {
-            updated[cat.stockField] = !allInStock;
-          });
-          return updated;
+          const allInStock = catalogues.every((cat) =>
+            isProductInStockForCatalogue(p, cat.id, cat)
+          );
+          return applyMasterCatalogueStockChange(p, catalogues, !allInStock);
         }
         return p;
       });
@@ -1700,17 +1713,20 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                     if (field === "MASTER") {
                       freshProducts = products.map((p) => {
                         if (p.id === id) {
-                          const allInStock = catalogues.every((cat) => p[cat.stockField]);
-                          const updated = { ...p };
-                          catalogues.forEach((cat) => {
-                            updated[cat.stockField] = !allInStock;
-                          });
-                          return updated;
+                          const allInStock = catalogues.every((cat) =>
+                            isProductInStockForCatalogue(p, cat.id, cat)
+                          );
+                          return applyMasterCatalogueStockChange(p, catalogues, !allInStock);
                         }
                         return p;
                       });
                     } else {
-                      freshProducts = products.map((p) => (p.id === id ? { ...p, [field]: !p[field] } : p));
+                      freshProducts = products.map((p) => {
+                        if (p.id !== id) return p;
+                        const cat = catalogues.find((c) => c.stockField === field);
+                        if (!cat) return { ...p, [field]: !p[field] };
+                        return toggleProductStockForCatalogue(p, cat.id, field, cat);
+                      });
                     }
                     setProducts(freshProducts);
 
@@ -1803,12 +1819,20 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               let updated;
 
               if (isMasterToggle && typeof fieldOrProduct === 'object') {
-                // Master toggle: fieldOrProduct is the complete updated product
-                updated = fieldOrProduct;
+                const allInStock = catalogues.every((cat) =>
+                  isProductInStockForCatalogue(fieldOrProduct, cat.id, cat)
+                );
+                updated = applyMasterCatalogueStockChange(
+                  previewProduct,
+                  catalogues,
+                  !allInStock
+                );
               } else {
-                // Individual toggle: fieldOrProduct is a field string
                 const field = fieldOrProduct;
-                updated = { ...previewProduct, [field]: !previewProduct[field] };
+                const cat = catalogues.find((c) => c.stockField === field);
+                updated = cat
+                  ? toggleProductStockForCatalogue(previewProduct, cat.id, field, cat)
+                  : { ...previewProduct, [field]: !previewProduct[field] };
               }
 
               updateProduct(updated);

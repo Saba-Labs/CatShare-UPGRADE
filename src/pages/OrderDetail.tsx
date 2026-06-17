@@ -22,6 +22,9 @@ import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
 import { generateInvoicePDF } from '../utils/invoiceGenerator';
 import { getBusinessProfileForPdf } from '../config/businessProfile';
 import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
+import { OrderPaymentSection } from '../integrations/components/OrderPaymentSection';
+import { OrderShipmentSection } from '../integrations/components/OrderShipmentSection';
+import { OrderCustomerTrackingSection } from '../integrations/components/OrderCustomerTrackingSection';
 import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
@@ -1180,6 +1183,10 @@ export default function OrderDetail() {
   const [editItems, setEditItems] = useState<(OrderItem & { _key: string })[]>([]);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editShipLine1, setEditShipLine1] = useState('');
+  const [editShipCity, setEditShipCity] = useState('');
+  const [editShipState, setEditShipState] = useState('');
+  const [editShipPincode, setEditShipPincode] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
@@ -1400,6 +1407,11 @@ useEffect(() => {
           setOrder(hydrated);
           setEditName(hydrated.customer_name || '');
           setEditPhone((hydrated as any).customer_whatsapp || '');
+          const addr = hydrated.shipping_address;
+          setEditShipLine1(addr?.line1 || '');
+          setEditShipCity(addr?.city || '');
+          setEditShipState(addr?.state || '');
+          setEditShipPincode(addr?.pincode || '');
           setEditItems((hydrated.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
         } else showToast('Order not found', 'error');
       } else showToast('Failed to load order', 'error');
@@ -1443,6 +1455,11 @@ useEffect(() => {
     if (!order) return;
     setEditName(order.customer_name || '');
     setEditPhone((order as any).customer_whatsapp || '');
+    const addr = order.shipping_address;
+    setEditShipLine1(addr?.line1 || '');
+    setEditShipCity(addr?.city || '');
+    setEditShipState(addr?.state || '');
+    setEditShipPincode(addr?.pincode || '');
     setEditItems((order.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
     setEditModeSync(true);
   }, [order]);
@@ -1458,11 +1475,22 @@ useEffect(() => {
         ...item,
         rowTotal: (item.unitPrice || 0) * item.quantity,
       })) as any[];
+      const shipping_address =
+        editShipLine1.trim() && editShipCity.trim() && editShipState.trim() && editShipPincode.trim()
+          ? {
+              line1: editShipLine1.trim(),
+              city: editShipCity.trim(),
+              state: editShipState.trim(),
+              pincode: editShipPincode.trim(),
+              country: 'India',
+            }
+          : null;
       const { error } = await updateOrder(order.id, {
         items: itemsToSave as any,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total,
+        shipping_address,
       });
 
       if (error) {
@@ -1482,6 +1510,7 @@ useEffect(() => {
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total,
+        shipping_address,
       } as any);
       setEditModeSync(false);
       showToast('Order saved', 'success');
@@ -2055,6 +2084,56 @@ useEffect(() => {
                       }}
                     />
                   </div>
+                  <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.text, marginBottom: 8 }}>
+                      Shipping address (for Shiprocket AWB)
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <input
+                        value={editShipLine1}
+                        onChange={(e) => setEditShipLine1(e.target.value)}
+                        placeholder="Street / building / area"
+                        style={{
+                          width: '100%', padding: '10px 12px',
+                          borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
+                          fontSize: 15, background: '#FAFAFA',
+                        }}
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <input
+                          value={editShipCity}
+                          onChange={(e) => setEditShipCity(e.target.value)}
+                          placeholder="City"
+                          style={{
+                            width: '100%', padding: '10px 12px',
+                            borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
+                            fontSize: 15, background: '#FAFAFA',
+                          }}
+                        />
+                        <input
+                          value={editShipState}
+                          onChange={(e) => setEditShipState(e.target.value)}
+                          placeholder="State"
+                          style={{
+                            width: '100%', padding: '10px 12px',
+                            borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
+                            fontSize: 15, background: '#FAFAFA',
+                          }}
+                        />
+                      </div>
+                      <input
+                        value={editShipPincode}
+                        onChange={(e) => setEditShipPincode(e.target.value)}
+                        placeholder="PIN code"
+                        inputMode="numeric"
+                        style={{
+                          width: '100%', padding: '10px 12px',
+                          borderRadius: 10, border: `1.5px solid ${COLORS.border}`,
+                          fontSize: 15, background: '#FAFAFA',
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </Card>
               <SectionLabel>Edit Items</SectionLabel>
@@ -2532,49 +2611,6 @@ useEffect(() => {
                   </div>
                 </div>
               </Card>
-              {order.tracking_token ? (
-                <>
-                  <SectionLabel>Customer tracking link</SectionLabel>
-                  <Card>
-                    <div style={{ padding: '14px 16px' }}>
-                      <p style={{ fontSize: 12, color: COLORS.muted, marginBottom: 8, lineHeight: 1.45 }}>
-                        Share this link so the customer can view and edit their order while it is pending.
-                        {order.customer_edited_at ? (
-                          <span style={{ display: 'block', marginTop: 6, color: COLORS.blue }}>
-                            Customer last edited {formatDate(order.customer_edited_at)}
-                          </span>
-                        ) : null}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const url = buildOrderTrackingUrl(order.tracking_token!);
-                          try {
-                            await navigator.clipboard.writeText(url);
-                            showToast('Tracking link copied', 'success');
-                          } catch {
-                            showToast(url, 'info');
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: 10,
-                          border: `1.5px solid ${COLORS.border}`,
-                          background: '#FAFAFA',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          fontFamily: FONT,
-                          color: COLORS.blue,
-                        }}
-                      >
-                        Copy customer tracking link
-                      </button>
-                    </div>
-                  </Card>
-                </>
-              ) : null}
               <SectionLabel>Order Items</SectionLabel>
               <Card>
                 <div style={{ padding: '4px 16px' }}>
@@ -2779,6 +2815,22 @@ useEffect(() => {
                   </button>
                 )}
                 </div>
+              </div>
+
+              <div style={{ padding: '0 6px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                <OrderPaymentSection order={order} />
+                <OrderShipmentSection orderId={order.id} />
+                <OrderCustomerTrackingSection
+                  order={order}
+                  onCopy={async (url) => {
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      showToast('Tracking link copied', 'success');
+                    } catch {
+                      showToast(url, 'info');
+                    }
+                  }}
+                />
               </div>
             </>
           )}

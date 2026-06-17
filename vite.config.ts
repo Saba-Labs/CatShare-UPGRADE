@@ -5,6 +5,7 @@ import {
   serverFetchImageAsDataUrl,
 } from "./lib/publicImageProxy";
 import { createClient } from "@supabase/supabase-js";
+import { handleDevIntegrationsRequest } from "./lib/devIntegrationsApi";
 
 /**
  * Dev / preview: Homepage config API proxy for Supabase access.
@@ -210,9 +211,107 @@ function devFetchPublicImagePlugin(): Plugin {
   };
 }
 
+/**
+ * Dev / preview: same-origin `/api/integrations/*` for Shiprocket connect + AWB creation.
+ */
+function devIntegrationsApiPlugin(): Plugin {
+  const setup = (middlewares: { use: (fn: unknown) => void }, mode: string) => {
+    const env = loadEnv(mode, process.cwd(), "");
+    const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL;
+    const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn(
+        "[devIntegrationsApiPlugin] Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — Shiprocket API disabled in dev"
+      );
+      return;
+    }
+
+    middlewares.use(
+      async (
+        req: {
+          url?: string;
+          method?: string;
+          headers?: { authorization?: string };
+          on?: (event: string, handler: (data: Buffer) => void) => void;
+        },
+        res: {
+          statusCode: number;
+          setHeader: (k: string, v: string) => void;
+          end: (b: string) => void;
+        },
+        next: () => void
+      ) => {
+        const path = req.url?.split("?")[0] || "";
+        if (!path.startsWith("/api/integrations")) {
+          return next();
+        }
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization"
+        );
+
+        if (req.method === "OPTIONS") {
+          res.statusCode = 200;
+          res.end("");
+          return;
+        }
+
+        try {
+          let rawBody = "";
+          if (req.on && req.method !== "GET") {
+            await new Promise<void>((resolve) => {
+              req.on!("data", (chunk: Buffer) => {
+                rawBody += chunk.toString();
+              });
+              req.on!("end", () => resolve());
+            });
+          }
+
+          const body = rawBody ? JSON.parse(rawBody) : {};
+          const result = await handleDevIntegrationsRequest(
+            req.method || "GET",
+            path,
+            req.headers?.authorization,
+            body,
+            { supabaseUrl, supabaseServiceKey: supabaseKey }
+          );
+
+          res.statusCode = result.status;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(result.body));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: msg }));
+        }
+      }
+    );
+  };
+
+  return {
+    name: "dev-integrations-api",
+    configureServer(server) {
+      setup(server.middlewares, server.config.mode);
+    },
+    configurePreviewServer(server) {
+      setup(server.middlewares, server.config.mode);
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), devHomepageConfigPlugin(), devFetchPublicImagePlugin()],
+  plugins: [
+    react(),
+    devHomepageConfigPlugin(),
+    devFetchPublicImagePlugin(),
+    devIntegrationsApiPlugin(),
+  ],
   build: {
     // Optimize bundle size for better ASO metrics
     target: "esnext",

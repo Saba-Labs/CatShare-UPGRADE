@@ -447,3 +447,53 @@ export function ensureProductHasCatalogueData(product: ProductWithCatalogueData)
 
   return product;
 }
+
+/** Deep-clone catalogueData before mutating stock so React and cloud sync see the change. */
+function cloneProductForStockMutation(product: ProductWithCatalogueData): ProductWithCatalogueData {
+  return {
+    ...product,
+    catalogueData: product.catalogueData
+      ? JSON.parse(JSON.stringify(product.catalogueData))
+      : undefined,
+  };
+}
+
+/**
+ * Set in/out stock for one catalogue on both the top-level stock column and `catalogueData[catId]`.
+ * Legacy toggles only updated top-level fields; stale `catalogueData` false kept items out of stock.
+ */
+export function applyCatalogueStockChange(
+  product: ProductWithCatalogueData,
+  catalogueId: string,
+  stockField: string,
+  inStock: boolean
+): ProductWithCatalogueData {
+  const copy = cloneProductForStockMutation(product);
+  copy[stockField] = inStock;
+  return setCatalogueData(copy, catalogueId, { [stockField]: inStock });
+}
+
+/** Toggle stock using the same rules as the seller grid / public store visibility. */
+export function toggleProductStockForCatalogue(
+  product: ProductWithCatalogueData,
+  catalogueId: string,
+  stockField: string,
+  catalogue: Catalogue | null
+): ProductWithCatalogueData {
+  const nextInStock = !isProductInStockForCatalogue(product, catalogueId, catalogue);
+  return applyCatalogueStockChange(product, catalogueId, stockField, nextInStock);
+}
+
+/** Master toggle: apply the same in/out status to every catalogue row. */
+export function applyMasterCatalogueStockChange(
+  product: ProductWithCatalogueData,
+  catalogues: Catalogue[],
+  inStock: boolean
+): ProductWithCatalogueData {
+  let copy = cloneProductForStockMutation(product);
+  for (const cat of catalogues) {
+    copy[cat.stockField] = inStock;
+    copy = setCatalogueData(copy, cat.id, { [cat.stockField]: inStock });
+  }
+  return copy;
+}

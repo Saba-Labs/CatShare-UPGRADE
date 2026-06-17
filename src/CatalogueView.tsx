@@ -13,7 +13,11 @@ import { renderElementToCanvas, canvasToBlob } from "./utils/canvasRenderer";
 import { AnimatePresence, motion } from "framer-motion";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { App } from "@capacitor/app";
-import { getCatalogueData, isProductEnabledForCatalogue } from "./config/catalogueProductUtils";
+import {
+  applyCatalogueStockChange,
+  getCatalogueData,
+  isProductEnabledForCatalogue,
+} from "./config/catalogueProductUtils";
 import { getAllCatalogues } from "./config/catalogueConfig";
 import { useCatalogueInventoryMap } from "./hooks/useCatalogueInventoryMap";
 import { useToast } from "./context/ToastContext";
@@ -1555,7 +1559,9 @@ const handleTouchEnd = useCallback(() => {
                   console.log('🟢 Mark as In Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
-                    selected.includes(p.id) ? { ...p, [stockField]: true } : p
+                    selected.includes(p.id)
+                      ? applyCatalogueStockChange(p, catalogueId, stockField, true)
+                      : p
                   );
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);
@@ -1594,7 +1600,9 @@ const handleTouchEnd = useCallback(() => {
                   console.log('🔴 Mark as Out of Stock clicked for', selected.length, 'products');
                   const allProds = allProducts;
                   const updated = allProds.map((p) =>
-                    selected.includes(p.id) ? { ...p, [stockField]: false } : p
+                    selected.includes(p.id)
+                      ? applyCatalogueStockChange(p, catalogueId, stockField, false)
+                      : p
                   );
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
                   setProducts(updated);

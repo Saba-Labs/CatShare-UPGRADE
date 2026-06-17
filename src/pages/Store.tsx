@@ -1759,6 +1759,24 @@ export default function StorePage() {
                 <button
                   type="button"
                   className="domain-nav-trigger"
+                  onClick={() => navigate('/store/integrations')}
+                >
+                  <div>
+                    <div className="domain-nav-title">Integrations</div>
+                    <div className="domain-nav-sub">
+                      Razorpay, Shiprocket &amp; more
+                    </div>
+                  </div>
+                  <span className="domain-nav-chevron" aria-hidden>
+                    <IconChevron />
+                  </span>
+                </button>
+              </div>
+
+              <div className="gap">
+                <button
+                  type="button"
+                  className="domain-nav-trigger"
                   onClick={() => navigate('/store/checkout-settings')}
                 >
                   <div>

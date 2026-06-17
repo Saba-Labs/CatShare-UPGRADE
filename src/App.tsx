@@ -77,6 +77,9 @@ const Tutorial = lazy(() => import("./Tutorial"));
 const HomepageEditorPage = lazy(() => import("./pages/HomepageEditorPage"));
 const StoreCustomDomain = lazy(() => import("./pages/StoreCustomDomain"));
 const StoreCheckoutSettingsPage = lazy(() => import("./pages/StoreCheckoutSettingsPage"));
+const IntegrationsPage = lazy(() => import("./integrations/pages/IntegrationsPage"));
+const RazorpayIntegrationPage = lazy(() => import("./integrations/pages/RazorpayIntegrationPage"));
+const ShiprocketIntegrationPage = lazy(() => import("./integrations/pages/ShiprocketIntegrationPage"));
 const WarehousePage = lazy(() => import("./pages/WarehousePage"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
@@ -2636,6 +2639,30 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <StoreCheckoutSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/integrations"
+          element={
+            <ProtectedRoute>
+              <IntegrationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/integrations/razorpay"
+          element={
+            <ProtectedRoute>
+              <RazorpayIntegrationPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/integrations/shiprocket"
+          element={
+            <ProtectedRoute>
+              <ShiprocketIntegrationPage />
             </ProtectedRoute>
           }
         />

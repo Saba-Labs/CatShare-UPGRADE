@@ -46,6 +46,14 @@ export interface Order {
   customer_edited_at?: string;
   payment_method?: 'prepaid' | 'cod';
   checkout_adjustments?: CheckoutTotals | null;
+  shipping_address?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country?: string;
+  } | null;
   created_at: string;
   updated_at: string;
 }
@@ -306,6 +314,7 @@ export async function updateOrder(
     customer_name?: string;
     customer_whatsapp?: string;
     total_amount?: number;
+    shipping_address?: Order['shipping_address'];
   }
 ): Promise<{ data: Order | null; error: any }> {
   try {
