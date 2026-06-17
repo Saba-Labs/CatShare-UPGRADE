@@ -3,6 +3,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { sanitizeIntegrationRow, sanitizeIntegrationRows } from './integrationsMetadata.js';
+import { syncStoreIntegrationFlags } from './storeIntegrationFlags.js';
 
 export type IntegrationProviderId = 'razorpay' | 'shiprocket';
 
@@ -73,6 +74,7 @@ export async function upsertIntegration(
     .single();
 
   if (error) throw error;
+  await syncStoreIntegrationFlags(supabase, sellerUserId).catch(() => undefined);
   return sanitizeIntegrationRow(data as Record<string, unknown>);
 }
 
@@ -102,6 +104,7 @@ export async function deleteIntegration(
     .eq('provider', provider);
 
   if (error) throw error;
+  await syncStoreIntegrationFlags(supabase, sellerUserId).catch(() => undefined);
 }
 
 export async function getIntegration(

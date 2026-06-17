@@ -25,6 +25,10 @@ import {
   normalizeCheckoutSettings,
   type StoreCheckoutSettings,
 } from '../types/checkoutSettings';
+import {
+  normalizeStoreIntegrationFlags,
+  type StoreIntegrationFlags,
+} from '../types/storeIntegrationFlags';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -267,6 +271,8 @@ export interface StorePublic {
   productCategories?: string[];
   /** Shipping, tax, and discount rules for checkout. */
   checkoutSettings?: StoreCheckoutSettings;
+  /** Which seller integrations affect public checkout. */
+  integrationFlags?: StoreIntegrationFlags;
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -671,9 +677,10 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     let homepageEnabled = coerceOptionalBoolean(row.homepageEnabled ?? row.homepage_enabled);
     let websiteModeEnabled = coerceOptionalBoolean(row.websiteModeEnabled ?? row.website_mode_enabled);
     let checkoutSettingsRaw: unknown = row.checkout_settings ?? row.checkoutSettings;
+    let integrationFlagsRaw: unknown = row.integration_flags ?? row.integrationFlags;
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null || integrationFlagsRaw == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -707,6 +714,9 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       }
       if (checkoutSettingsRaw == null) {
         checkoutSettingsRaw = storeRecord?.checkout_settings ?? storeRecord?.checkoutSettings;
+      }
+      if (integrationFlagsRaw == null) {
+        integrationFlagsRaw = storeRecord?.integration_flags ?? storeRecord?.integrationFlags;
       }
     }
 
@@ -776,6 +786,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       minimumOrderValue: minimumOrderValue ?? null,
       viewMode: viewMode ?? 'grid',
       checkoutSettings: normalizeCheckoutSettings(checkoutSettingsRaw),
+      integrationFlags: normalizeStoreIntegrationFlags(integrationFlagsRaw),
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;

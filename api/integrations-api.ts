@@ -8,6 +8,7 @@ import {
   listIntegrations,
   type IntegrationProviderId,
 } from '../lib/integrationsServer.js';
+import { syncStoreIntegrationFlags } from '../lib/storeIntegrationFlags.js';
 import {
   connectRazorpayIntegration,
   refreshRazorpayIntegration,
@@ -45,6 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (key === '' && req.method === 'GET') {
     try {
       const integrations = await listIntegrations(supabase, auth.userId);
+      await syncStoreIntegrationFlags(supabase, auth.userId).catch(() => undefined);
       return res.status(200).json({ integrations });
     } catch (e) {
       console.error('integrations index:', e);

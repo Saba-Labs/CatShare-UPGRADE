@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   getCatalogueData,
   normalizeOrderQuantityStep,
@@ -12,6 +12,7 @@ import {
 } from '../../../utils/websiteStorefront';
 import { ProductImagePlaceholder } from '../../Storefront/StorefrontIcons';
 import { getStorefrontPriceAndUnit, unitLabel } from '../../Storefront/storefrontOrderHelpers';
+import { getProductVariantGroups } from '../../../utils/productVariants';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
 import { useWebsiteStore } from '../WebsiteStoreContext';
@@ -219,10 +220,20 @@ function CollectionProductCard({
   onQtyChange: (delta: number, step: number) => void;
 }) {
   const { store } = useWebsiteStore();
+  const navigate = useNavigate();
   const img = getWebsiteProductImageUrl(product);
   const catData = getCatalogueData(product, store.catalogueId);
   const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
   const clampedStep = normalizeOrderQuantityStep(quantityStep);
+  const variantGroups = getProductVariantGroups(product);
+
+  const handleQtyChange = (delta: number) => {
+    if (delta > 0 && variantGroups.length > 0 && quantity <= 0) {
+      navigate(href);
+      return;
+    }
+    onQtyChange(delta, clampedStep);
+  };
 
   return (
     <article
@@ -252,11 +263,11 @@ function CollectionProductCard({
         ) : null}
         <div className="website-product-card-order-row">
           <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
-            <button type="button" className="website-qty-btn" onClick={() => onQtyChange(-clampedStep, clampedStep)}>
+            <button type="button" className="website-qty-btn" onClick={() => handleQtyChange(-clampedStep)}>
               -
             </button>
             <span className="website-qty-val">{quantity}</span>
-            <button type="button" className="website-qty-btn" onClick={() => onQtyChange(clampedStep, clampedStep)}>
+            <button type="button" className="website-qty-btn" onClick={() => handleQtyChange(clampedStep)}>
               +
             </button>
           </div>

@@ -6,6 +6,7 @@ import {
 } from "./lib/publicImageProxy";
 import { createClient } from "@supabase/supabase-js";
 import { handleDevIntegrationsRequest } from "./lib/devIntegrationsApi";
+import { handleDevStorePaymentRequest } from "./lib/devStorePaymentApi";
 
 /**
  * Dev / preview: Homepage config API proxy for Supabase access.
@@ -243,7 +244,9 @@ function devIntegrationsApiPlugin(): Plugin {
         next: () => void
       ) => {
         const path = req.url?.split("?")[0] || "";
-        if (!path.startsWith("/api/integrations")) {
+        const isIntegrations = path.startsWith("/api/integrations");
+        const isStorePayments = path.startsWith("/api/store-payments");
+        if (!isIntegrations && !isStorePayments) {
           return next();
         }
 
@@ -272,13 +275,20 @@ function devIntegrationsApiPlugin(): Plugin {
           }
 
           const body = rawBody ? JSON.parse(rawBody) : {};
-          const result = await handleDevIntegrationsRequest(
-            req.method || "GET",
-            path,
-            req.headers?.authorization,
-            body,
-            { supabaseUrl, supabaseServiceKey: supabaseKey }
-          );
+          const result = isStorePayments
+            ? await handleDevStorePaymentRequest(
+                req.method || "POST",
+                path,
+                body,
+                { supabaseUrl, supabaseServiceKey: supabaseKey }
+              )
+            : await handleDevIntegrationsRequest(
+                req.method || "GET",
+                path,
+                req.headers?.authorization,
+                body,
+                { supabaseUrl, supabaseServiceKey: supabaseKey }
+              );
 
           res.statusCode = result.status;
           res.setHeader("Content-Type", "application/json");

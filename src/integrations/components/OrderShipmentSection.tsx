@@ -175,7 +175,7 @@ export function OrderShipmentSection({
                   ? needsAddressForm
                     ? 'Enter the customer delivery address, then create an AWB in Shiprocket.'
                     : 'Create an AWB in Shiprocket for this order.'
-                  : 'Connect Shiprocket in Store → Integrations to create AWBs and track deliveries.'
+                  : 'Connect Shiprocket in Store settings to create AWBs and track deliveries.'
               }
             />
 

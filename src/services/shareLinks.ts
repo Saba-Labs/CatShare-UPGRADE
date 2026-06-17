@@ -1,4 +1,9 @@
 import { getSupabaseClient, supabase } from '../supabaseClient';
+import { normalizeCheckoutSettings, type StoreCheckoutSettings } from '../types/checkoutSettings';
+import {
+  normalizeStoreIntegrationFlags,
+  type StoreIntegrationFlags,
+} from '../types/storeIntegrationFlags';
 import { getAllFields, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { getCatalogueData, normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import {
@@ -322,6 +327,51 @@ export type ShareLinkForCustomer = {
   /** Business logo URL (Account); RPC merges `user_settings.data.businessProfile.logoUrl`. */
   sellerLogoUrl?: string;
 };
+
+export type SellerCheckoutFeatures = {
+  integrationFlags: StoreIntegrationFlags;
+  checkoutSettings: StoreCheckoutSettings;
+};
+
+export async function fetchSellerCheckoutFeatures(
+  sellerUserId: string
+): Promise<SellerCheckoutFeatures> {
+  const defaults: SellerCheckoutFeatures = {
+    integrationFlags: normalizeStoreIntegrationFlags(null),
+    checkoutSettings: normalizeCheckoutSettings(null),
+  };
+  if (!sellerUserId?.trim()) return defaults;
+
+  try {
+    const { data, error } = await getSupabaseClient().rpc('get_seller_checkout_features', {
+      p_seller_user_id: sellerUserId.trim(),
+    });
+    if (error) {
+      console.warn('[fetchSellerCheckoutFeatures]', error.message);
+      return defaults;
+    }
+    let parsed: unknown = data;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return defaults;
+      }
+    }
+    const row = (parsed ?? {}) as Record<string, unknown>;
+    return {
+      integrationFlags: normalizeStoreIntegrationFlags(
+        row.integrationFlags ?? row.integration_flags
+      ),
+      checkoutSettings: normalizeCheckoutSettings(
+        row.checkoutSettings ?? row.checkout_settings
+      ),
+    };
+  } catch (e) {
+    console.warn('[fetchSellerCheckoutFeatures]', e);
+    return defaults;
+  }
+}
 
 export async function fetchShareLinkForCustomer(token: string): Promise<ShareLinkForCustomer | null> {
   const { data, error } = await supabase.rpc('get_share_link', {

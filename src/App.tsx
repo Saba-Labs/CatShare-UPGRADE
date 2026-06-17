@@ -2429,7 +2429,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/email-confirmed" element={<EmailConfirmed />} />
 
         {/* Public Routes */}
-        <Route path="/o/:token" element={<OrderForm />} />
+        <Route path="/o/:token/*" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
         <Route path="/track/:token" element={<TrackOrder />} />
         <Route path="/store/:slug/*" element={<StoreView />} />

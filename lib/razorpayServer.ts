@@ -1,3 +1,5 @@
+import { createHmac } from 'crypto';
+
 type RazorpayAccountProfile = {
   id?: string;
   name?: string;
@@ -68,4 +70,61 @@ export async function fetchRazorpayAccountProfile(
     id: keyId.trim(),
     name: keyId.trim().startsWith('rzp_test_') ? 'Razorpay (Test)' : 'Razorpay',
   };
+}
+
+export type RazorpayCreateOrderResult = {
+  id: string;
+  amount: number;
+  currency: string;
+};
+
+export async function createRazorpayOrder(
+  keyId: string,
+  keySecret: string,
+  input: {
+    amountPaise: number;
+    currency: string;
+    receipt: string;
+    notes?: Record<string, string>;
+  }
+): Promise<RazorpayCreateOrderResult> {
+  const response = await fetch(`${RAZORPAY_API_BASE}/v1/orders`, {
+    method: 'POST',
+    headers: {
+      Authorization: basicAuthHeader(keyId, keySecret),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: input.amountPaise,
+      currency: input.currency,
+      receipt: input.receipt,
+      notes: input.notes ?? {},
+    }),
+  });
+
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+  if (!response.ok) {
+    throw new RazorpayApiError(
+      razorpayErrorMessage(body, response.status, 'Could not create Razorpay order'),
+      response.status
+    );
+  }
+
+  return {
+    id: String(body.id ?? ''),
+    amount: Number(body.amount ?? input.amountPaise),
+    currency: String(body.currency ?? input.currency),
+  };
+}
+
+export function verifyRazorpayPaymentSignature(
+  keySecret: string,
+  razorpayOrderId: string,
+  razorpayPaymentId: string,
+  razorpaySignature: string
+): boolean {
+  const payload = `${razorpayOrderId}|${razorpayPaymentId}`;
+  const expected = createHmac('sha256', keySecret).update(payload).digest('hex');
+  return expected === razorpaySignature;
 }

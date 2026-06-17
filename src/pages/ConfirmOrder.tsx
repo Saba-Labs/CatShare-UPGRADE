@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { createOrder, type OrderItem } from '../services/orderService';
 import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
@@ -13,6 +13,15 @@ import {
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
+import { normalizeCheckoutSettings } from '../types/checkoutSettings';
+import { normalizeStoreIntegrationFlags } from '../types/storeIntegrationFlags';
+import { computeCheckoutTotals } from '../utils/checkoutTotals';
+import CheckoutBreakdown from '../components/Storefront/CheckoutBreakdown';
+import {
+  beginStoreRazorpayCheckout,
+  openStoreRazorpayCheckout,
+} from '../services/storePaymentApi';
+import '../components/Storefront/storefront-checkout.css';
 
 type QtyMap = Record<string, number>;
 
@@ -30,6 +39,9 @@ interface ConfirmOrderState {
   customerName: string;
   customerWhatsapp: string;
   orderTotalAmount: number;
+  integrationFlags?: { razorpay?: boolean; shiprocket?: boolean };
+  checkoutSettings?: unknown;
+  sellerBusinessName?: string;
 }
 
 // Design tokens
@@ -150,8 +162,16 @@ export default function ConfirmOrder() {
   const state = location.state as ConfirmOrderState | null;
   const { guardOnline } = useCloudWriteGate();
 
+  const isValid = Boolean(state && token && state.cartLines?.length);
+
   const [customerName, setCustomerName] = useState(state?.customerName || '');
   const [customerWhatsapp, setCustomerWhatsapp] = useState(state?.customerWhatsapp || '');
+  const [shipLine1, setShipLine1] = useState('');
+  const [shipCity, setShipCity] = useState('');
+  const [shipState, setShipState] = useState('');
+  const [shipPincode, setShipPincode] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'prepaid' | 'cod'>('prepaid');
+  const [couponCode, setCouponCode] = useState('');
   const [savingOrder, setSavingOrder] = useState(false);
   const [localCartLines, setLocalCartLines] = useState<OrderCartLine[]>(state?.cartLines || []);
   const [orderSuccess, setOrderSuccess] = useState<{
@@ -159,34 +179,44 @@ export default function ConfirmOrder() {
     whatsAppHref: string;
   } | null>(null);
 
-  // Validate that we have the required state
-  if (!state || !token || !state.cartLines?.length) {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-        <p>Invalid order data. Please go back and try again.</p>
-        <button onClick={() => navigate(`/o/${token}`)}>Back to Order Form</button>
-      </div>
-    );
-  }
+  const catalogueItems = state?.items ?? [];
+  const currencySymbol = state?.currencySymbol ?? '₹';
+  const currencyCode = state?.currencyCode ?? 'INR';
+  const sellerWhatsapp = state?.sellerWhatsapp ?? '';
+  const sellerUserId = state?.sellerUserId ?? '';
+  const sellerBusinessName = state?.sellerBusinessName?.trim() || 'Store';
 
-  const {
-    items: catalogueItems,
-    currencySymbol,
-    currencyCode,
-    sellerWhatsapp,
-    sellerUserId,
-  } = state;
+  const checkoutSettings = useMemo(
+    () => normalizeCheckoutSettings(state?.checkoutSettings),
+    [state?.checkoutSettings]
+  );
+  const integrationFlags = useMemo(
+    () => normalizeStoreIntegrationFlags(state?.integrationFlags),
+    [state?.integrationFlags]
+  );
+  const shiprocketActive = integrationFlags.shiprocket;
+  const razorpayActive = integrationFlags.razorpay;
+  const requiresShippingAddress = shiprocketActive;
 
-  const handleQtyChange = (lineId: string, delta: number) => {
-    setLocalCartLines((prev) => {
-      const line = prev.find((l) => l.lineId === lineId);
-      if (!line) return prev;
-      const catItem = catalogueItems.find((i) => i.productId === line.productId);
-      const step = Math.max(1, Math.floor(catItem?.quantityStep ?? 1) || 1);
-      const newQty = Math.max(0, line.quantity + delta * step);
-      return setCartLineQtyById(prev, lineId, newQty);
-    });
-  };
+  const showCodOption = useMemo(() => {
+    if (checkoutSettings.enableCod) return true;
+    return checkoutSettings.rules.some((r) => r.enabled && r.type === 'cod_charge');
+  }, [checkoutSettings]);
+
+  const showPrepaidOption = razorpayActive;
+  const showPaymentMethodChoice = showPrepaidOption && showCodOption;
+
+  const effectivePaymentMethod = useMemo(() => {
+    if (showPrepaidOption && showCodOption) return paymentMethod;
+    if (showPrepaidOption) return 'prepaid' as const;
+    if (showCodOption) return 'cod' as const;
+    return 'prepaid' as const;
+  }, [showPrepaidOption, showCodOption, paymentMethod]);
+
+  useEffect(() => {
+    if (showPrepaidOption && !showCodOption) setPaymentMethod('prepaid');
+    if (!showPrepaidOption && showCodOption) setPaymentMethod('cod');
+  }, [showPrepaidOption, showCodOption]);
 
   const { updatedTotal } = useMemo(() => {
     let total = 0;
@@ -199,10 +229,46 @@ export default function ConfirmOrder() {
     return { updatedTotal: total };
   }, [localCartLines, catalogueItems]);
 
+  const checkoutTotals = useMemo(
+    () =>
+      computeCheckoutTotals(updatedTotal, checkoutSettings, {
+        couponCode,
+        paymentMethod: effectivePaymentMethod,
+      }),
+    [updatedTotal, checkoutSettings, couponCode, effectivePaymentMethod]
+  );
+
+  if (!isValid) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+        <p>Invalid order data. Please go back and try again.</p>
+        <button onClick={() => navigate(`/o/${token}`)}>Back to Order Form</button>
+      </div>
+    );
+  }
+
+  const handleQtyChange = (lineId: string, delta: number) => {
+    setLocalCartLines((prev) => {
+      const line = prev.find((l) => l.lineId === lineId);
+      if (!line) return prev;
+      const catItem = catalogueItems.find((i) => i.productId === line.productId);
+      const step = Math.max(1, Math.floor(catItem?.quantityStep ?? 1) || 1);
+      const newQty = Math.max(0, line.quantity + delta * step);
+      return setCartLineQtyById(prev, lineId, newQty);
+    });
+  };
+
   const confirmOrder = async () => {
-    // Validate customer name (required)
     if (!customerName.trim()) {
       alert('Please enter your name');
+      return;
+    }
+
+    if (
+      requiresShippingAddress &&
+      (!shipLine1.trim() || !shipCity.trim() || !shipState.trim() || shipPincode.replace(/\D/g, '').length !== 6)
+    ) {
+      alert('Please enter your full delivery address (street, city, state, and 6-digit pincode)');
       return;
     }
 
@@ -216,12 +282,10 @@ export default function ConfirmOrder() {
 
     let trackingUrl: string | null = null;
 
-    // Save order to Supabase
     if (token && sellerUserId) {
       setSavingOrder(true);
       setSupabaseRlsUserId(sellerUserId);
       try {
-        // Build order items structure
         const orderItems: OrderItem[] = activeCartLines(localCartLines).map((line) => {
           const i = catalogueItems.find((it) => it.productId === line.productId);
           if (!i) {
@@ -257,21 +321,48 @@ export default function ConfirmOrder() {
           };
         });
 
-        // Create order
         const { data: createdOrder, error } = await createOrder(
           sellerUserId,
           token,
           customerName.trim(),
           orderItems,
-          updatedTotal,
+          checkoutTotals.grandTotal,
           currencyCode,
-          customerWhatsapp.trim() || undefined
+          customerWhatsapp.trim() || undefined,
+          'link',
+          undefined,
+          {
+            paymentMethod: effectivePaymentMethod,
+            checkoutAdjustments: checkoutTotals,
+            shippingAddress:
+              requiresShippingAddress &&
+              shipLine1.trim() &&
+              shipCity.trim() &&
+              shipState.trim() &&
+              shipPincode.trim()
+                ? {
+                    line1: shipLine1.trim(),
+                    city: shipCity.trim(),
+                    state: shipState.trim(),
+                    pincode: shipPincode.replace(/\D/g, '').slice(0, 6),
+                    country: 'India',
+                  }
+                : undefined,
+          }
         );
 
         if (error) {
           console.error('Error creating order:', error);
-          // Don't block WhatsApp opening even if order creation fails
         } else {
+          if (effectivePaymentMethod === 'prepaid' && razorpayActive && createdOrder?.id) {
+            try {
+              const session = await beginStoreRazorpayCheckout(createdOrder.id);
+              await openStoreRazorpayCheckout(session, sellerBusinessName);
+            } catch (payErr) {
+              const payMsg = payErr instanceof Error ? payErr.message : 'Payment could not be completed';
+              alert(`Order placed but payment was not completed: ${payMsg}`);
+            }
+          }
           if (createdOrder?.tracking_token) {
             trackingUrl = buildOrderTrackingUrl(createdOrder.tracking_token);
           }
@@ -304,14 +395,13 @@ export default function ConfirmOrder() {
     lines.push('');
     lines.push('*Items Ordered:*');
 
-    let total = 0;
+    let total = checkoutTotals.grandTotal;
     activeCartLines(localCartLines).forEach((line, idx) => {
       const i = catalogueItems.find((it) => it.productId === line.productId);
       if (!i) return;
       const q = line.quantity;
       const unit = getShareLinkItemUnitPrice(i, q);
       const itemTotal = Number.isFinite(unit) ? unit * q : 0;
-      total += itemTotal;
 
       const subtitlePart = i.subtitle ? ` _(${i.subtitle})_` : '';
       lines.push(`${idx + 1}. *${i.name}*${subtitlePart}`);
@@ -341,6 +431,14 @@ export default function ConfirmOrder() {
 
     if (total > 0) {
       lines.push(`💰 *Total: ${currencySymbol}${total.toLocaleString('en-IN')}*`);
+      if (checkoutTotals.lines.length > 0) {
+        checkoutTotals.lines.forEach((line) => {
+          const sign = line.amount < 0 ? '−' : '+';
+          lines.push(
+            `   ${line.label}: ${sign}${currencySymbol}${Math.abs(line.amount).toLocaleString('en-IN')}`
+          );
+        });
+      }
       lines.push('');
     }
 
@@ -440,6 +538,128 @@ export default function ConfirmOrder() {
             />
           </div>
 
+          {requiresShippingAddress ? (
+            <>
+              <div className="of-modal-input-group">
+                <label className="of-modal-label">
+                  Delivery address <span className="of-modal-required">*</span>
+                </label>
+                <input
+                  type="text"
+                  className="of-modal-input"
+                  placeholder="Street / building / area"
+                  value={shipLine1}
+                  onChange={(e) => setShipLine1(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="of-modal-input-group">
+                  <label className="of-modal-label">City *</label>
+                  <input
+                    type="text"
+                    className="of-modal-input"
+                    placeholder="City"
+                    value={shipCity}
+                    onChange={(e) => setShipCity(e.target.value)}
+                  />
+                </div>
+                <div className="of-modal-input-group">
+                  <label className="of-modal-label">State *</label>
+                  <input
+                    type="text"
+                    className="of-modal-input"
+                    placeholder="State"
+                    value={shipState}
+                    onChange={(e) => setShipState(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="of-modal-input-group">
+                <label className="of-modal-label">Pincode *</label>
+                <input
+                  type="text"
+                  className="of-modal-input"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="6-digit pincode"
+                  value={shipPincode}
+                  onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {showPaymentMethodChoice ? (
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">Payment method</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('prepaid')}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: `1.5px solid ${paymentMethod === 'prepaid' ? COLORS.green : COLORS.border}`,
+                    background: paymentMethod === 'prepaid' ? COLORS.greenLight : COLORS.surface,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: FONT,
+                  }}
+                >
+                  Pay now / UPI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('cod')}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: `1.5px solid ${paymentMethod === 'cod' ? COLORS.green : COLORS.border}`,
+                    background: paymentMethod === 'cod' ? COLORS.greenLight : COLORS.surface,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: FONT,
+                  }}
+                >
+                  Cash on delivery
+                </button>
+              </div>
+            </div>
+          ) : showPrepaidOption ? (
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">Payment</label>
+              <p style={{ fontSize: 13, color: COLORS.muted, margin: 0, fontFamily: FONT }}>
+                You will pay online via Razorpay after confirming.
+              </p>
+            </div>
+          ) : showCodOption ? (
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">Payment</label>
+              <p style={{ fontSize: 13, color: COLORS.muted, margin: 0, fontFamily: FONT }}>
+                Cash on delivery
+                {checkoutTotals.codTotal > 0
+                  ? ` (includes ${formatOrderMoney(checkoutTotals.codTotal, currencySymbol)} COD fee)`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
+
+          {checkoutSettings.allowCouponEntry &&
+          checkoutSettings.rules.some((r) => r.enabled && r.type.startsWith('coupon_')) ? (
+            <div className="of-modal-input-group">
+              <label className="of-modal-label">Coupon code</label>
+              <input
+                type="text"
+                className="of-modal-input"
+                placeholder="Enter code"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              />
+            </div>
+          ) : null}
+
           {/* Order Items Summary */}
           <div style={{ marginTop: 24 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.text, marginBottom: 12, fontFamily: FONT }}>
@@ -508,16 +728,14 @@ export default function ConfirmOrder() {
                 })}
 
                 {/* Total row */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '14px 0 10px', marginTop: 4,
-                  borderTop: `2px solid ${COLORS.border}`,
-                  fontFamily: FONT,
-                }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                  <span style={{ fontSize: 20, fontWeight: 600, color: COLORS.green, letterSpacing: '-0.4px' }}>
-                    {formatOrderMoney(updatedTotal, currencySymbol)}
-                  </span>
+                <div style={{ padding: '12px 0 4px', marginTop: 4, borderTop: `2px solid ${COLORS.border}` }}>
+                  <CheckoutBreakdown
+                    totals={checkoutTotals}
+                    currencySymbol={currencySymbol}
+                    fmt={formatOrderMoney}
+                    showBreakdown={checkoutSettings.showBreakdown}
+                    compact
+                  />
                 </div>
               </div>
             </div>
@@ -550,11 +768,23 @@ export default function ConfirmOrder() {
             type="button"
             className="of-modal-btn of-modal-confirm"
             onClick={confirmOrder}
-            disabled={!customerName.trim() || savingOrder}
+            disabled={
+              !customerName.trim() ||
+              savingOrder ||
+              (requiresShippingAddress &&
+                (!shipLine1.trim() ||
+                  !shipCity.trim() ||
+                  !shipState.trim() ||
+                  shipPincode.replace(/\D/g, '').length !== 6))
+            }
             title={!customerName.trim() ? 'Please enter your name first' : ''}
             style={{ flex: 1 }}
           >
-            {savingOrder ? 'Saving…' : 'Confirm & Order'}
+            {savingOrder
+              ? 'Saving…'
+              : effectivePaymentMethod === 'prepaid' && razorpayActive
+                ? 'Pay & confirm order'
+                : 'Confirm & order'}
           </button>
         </div>
       </div>

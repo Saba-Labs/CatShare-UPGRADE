@@ -17,6 +17,29 @@ export function productHandle(product: ProductWithCatalogueData): string {
   return slugifyStorefront(product.name || product.id);
 }
 
+/** Product slug from `/store/:slug/products/:handle` or subdomain `/products/:handle`. */
+export function parseStorefrontProductHandle(pathname: string, onSubdomain = false): string | null {
+  const segments = pathname.split('/').filter(Boolean);
+  const storeSlugIndex = segments.findIndex((s) => s === 'store');
+  const pageSegments = storeSlugIndex >= 0 ? segments.slice(storeSlugIndex + 2) : onSubdomain ? segments : [];
+  if (pageSegments[0] !== 'products') return null;
+  const handle = pageSegments[1];
+  if (!handle) return null;
+  try {
+    return decodeURIComponent(handle);
+  } catch {
+    return handle;
+  }
+}
+
+export function findProductByHandle(
+  products: ProductWithCatalogueData[],
+  handle: string
+): ProductWithCatalogueData | null {
+  const normalized = handle.toLowerCase();
+  return products.find((p) => productHandle(p).toLowerCase() === normalized) ?? null;
+}
+
 export function storeBasePath(slug: string, onSubdomain = false): string {
   return onSubdomain ? '' : `/store/${slug}`;
 }

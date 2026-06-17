@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   fetchShareLinkForCustomer,
   fetchSellerUserIdForToken,
+  fetchSellerCheckoutFeatures,
+  type SellerCheckoutFeatures,
   getShareLinkItemUnitPrice,
   type ShareLinkItem,
 } from '../services/shareLinks';
@@ -10,36 +12,35 @@ import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { applyQuantityDelta, getEffectiveMinimumOrderQuantity } from '../utils/quantityPricingUtils';
 import { resolveShareLinkCurrencyDisplay } from '../utils/currencyUtils';
 import { productImageDisplayUrl } from '../utils/imageUrl';
-import ProductImageGallery from '../components/ProductImageGallery';
-import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import {
   formatVariantSelectionSummary,
-  generateVariantCombinationId,
   isVariantSelectionComplete,
 } from '../utils/productVariants';
 import {
   activeCartLines,
-  cartLinesForProduct,
   getCartLineQty,
   loadCartLinesFromSession,
   loadLegacyQtyMapFromSession,
   migrateLegacyCartToLines,
   productHasCartLines,
-  removeZeroQtyLinesForProduct,
   saveCartLinesToSession,
   setCartLineQty,
   setCartLineQtyById,
   totalCartLineCount,
   type OrderCartLine,
 } from '../utils/orderCartLines';
+import {
+  findShareLinkItemByHandle,
+  orderLinkBasePath,
+  orderLinkProductPath,
+  parseOrderLinkProductHandle,
+} from '../utils/orderLinkPaths';
+import OrderLinkProductDetail from './OrderLinkProductDetail';
 import './OrderForm.css';
 
 /** CatShare on Google Play — update if store listing changes. */
 const CATSHARE_PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.catshare.official';
-
-/** History state key so swipe / hardware back closes the drawer before leaving the page. */
-const ORDER_FORM_DRAWER_HISTORY_KEY = 'ofProductDrawer';
 
 type VariantSelectionMap = Record<string, Record<string, string>>;
 
@@ -105,24 +106,6 @@ function isPublicHttpUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-function getFieldLabelAndUnitSuffix(
-  item: ShareLinkItem,
-  n: number
-): { label: string; unitSuffix: string } {
-  const row = item as unknown as Record<string, string | undefined>;
-  const explicitUnit = row[`field${n}Unit`];
-  const rawLabel = row[`field${n}Label`];
-  if (explicitUnit != null && String(explicitUnit).trim() !== '') {
-    return { label: (rawLabel || `Field ${n}`).trim(), unitSuffix: String(explicitUnit).trim() };
-  }
-  if (rawLabel) {
-    const m = rawLabel.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-    if (m) return { label: m[1].trim(), unitSuffix: m[2].trim() };
-    return { label: rawLabel.trim(), unitSuffix: '' };
-  }
-  return { label: `Field ${n}`, unitSuffix: '' };
 }
 
 function getItemSearchText(item: ShareLinkItem): string {
@@ -246,6 +229,7 @@ function SkeletonCard() {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function OrderForm() {
   const { token } = useParams();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sellerWhatsapp, setSellerWhatsapp] = useState('');
@@ -257,50 +241,38 @@ export default function OrderForm() {
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
   const [draftVariantSelections, setDraftVariantSelections] = useState<VariantSelectionMap>({});
-  const [drawerItem, setDrawerItem] = useState<ShareLinkItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sellerUserId, setSellerUserId] = useState<string | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const [checkoutFeatures, setCheckoutFeatures] = useState<SellerCheckoutFeatures | null>(null);
   const navigate = useNavigate();
-  /** Number of drawer entries we pushed onto session history (usually 0 or 1). */
-  const drawerHistoryDepthRef = useRef(0);
 
-  const openProductDrawer = useCallback((item: ShareLinkItem) => {
-    setDrawerItem(item);
-    window.history.pushState({ [ORDER_FORM_DRAWER_HISTORY_KEY]: true }, '', window.location.href);
-    drawerHistoryDepthRef.current += 1;
-  }, []);
+  const productHandle = useMemo(
+    () => (token ? parseOrderLinkProductHandle(location.pathname, token) : null),
+    [location.pathname, token]
+  );
 
-  const closeProductDrawer = useCallback(() => {
-    if (drawerHistoryDepthRef.current > 0) {
-      window.history.back();
-    } else {
-      setDrawerItem(null);
-    }
-  }, []);
+  const activeProduct = useMemo(
+    () => (productHandle ? findShareLinkItemByHandle(items, productHandle) : null),
+    [items, productHandle]
+  );
 
-  useEffect(() => {
-    const onPopState = () => {
-      setDrawerItem((current) => {
-        if (current) {
-          drawerHistoryDepthRef.current = Math.max(0, drawerHistoryDepthRef.current - 1);
-          return null;
-        }
-        return current;
-      });
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  const openProductPage = useCallback(
+    (item: ShareLinkItem) => {
+      if (!token) return;
+      navigate(orderLinkProductPath(token, item));
+    },
+    [navigate, token]
+  );
+
+  const closeProductPage = useCallback(() => {
+    if (!token) return;
+    navigate(orderLinkBasePath(token));
+  }, [navigate, token]);
 
   useEffect(() => {
-    setDrawerItem(null);
     setSearchQuery('');
     setSelectedCategory('all');
-    drawerHistoryDepthRef.current = 0;
-    // Clear sessionStorage for old token if switching to a new one
-    // (This will be handled naturally when token changes and new useEffect fetches new data)
   }, [token]);
 
   useEffect(() => {
@@ -341,6 +313,8 @@ export default function OrderForm() {
           const sellerId = await fetchSellerUserIdForToken(token);
           if (sellerId) {
             setSellerUserId(sellerId);
+            const features = await fetchSellerCheckoutFeatures(sellerId);
+            if (!cancelled) setCheckoutFeatures(features);
           }
         }
       } catch (e: any) {
@@ -363,7 +337,7 @@ export default function OrderForm() {
     const groups = item.variantGroups ?? [];
     if (groups.length > 0 && !isVariantSelectionComplete(groups, draftSelection)) {
       const drawerTarget = items.find((i) => i.productId === id);
-      if (drawerTarget) openProductDrawer(drawerTarget);
+      if (drawerTarget) openProductPage(drawerTarget);
       return;
     }
     const current = getCartLineQty(cartLines, id, draftSelection);
@@ -516,7 +490,7 @@ export default function OrderForm() {
       const groups = item.variantGroups ?? [];
       if (groups.length > 0 && !isVariantSelectionComplete(groups, line.variantSelection)) {
         alert(`Please choose all variants for "${item.name}" before confirming.`);
-        openProductDrawer(item);
+        openProductPage(item);
         return;
       }
     }
@@ -532,6 +506,9 @@ export default function OrderForm() {
         customerName: '',
         customerWhatsapp: '',
         orderTotalAmount,
+        integrationFlags: checkoutFeatures?.integrationFlags,
+        checkoutSettings: checkoutFeatures?.checkoutSettings,
+        sellerBusinessName,
       },
     });
   };
@@ -691,6 +668,39 @@ export default function OrderForm() {
   // ── Main ──
   return (
     <div className="of-bg">
+      {productHandle ? (
+        <div className="of-product-page">
+          <div className="of-product-page-top">
+            <button type="button" className="of-product-back" onClick={closeProductPage} aria-label="Back to items">
+              ←
+            </button>
+            <div className="of-product-top-meta">
+              <div className="of-store-name">{sellerBusinessName || 'Order Form'}</div>
+            </div>
+          </div>
+          <div className="of-product-page-content">
+            {activeProduct ? (
+              <OrderLinkProductDetail
+                item={activeProduct}
+                currencySymbol={currencySymbol}
+                cartLines={cartLines}
+                draftVariantSelections={draftVariantSelections}
+                onDraftVariantSelectionsChange={setDraftVariantSelections}
+                onCartLinesChange={setCartLines}
+                onDone={closeProductPage}
+              />
+            ) : (
+              <div className="of-empty of-product-not-found">
+                <strong>Product not found</strong>
+                <p>This item is not on this order link anymore.</p>
+                <button type="button" className="of-view-btn" onClick={closeProductPage}>
+                  Back to all items
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="of-page">
 
         {/* Sticky header */}
@@ -824,7 +834,7 @@ export default function OrderForm() {
                 className={`of-item-card${isSelected ? ' is-selected' : ''}`}
               >
                 {/* Image */}
-                <div className="of-img-wrap" onClick={() => openProductDrawer(item)}>
+                <div className="of-img-wrap" onClick={() => openProductPage(item)}>
                   {item.imageUrl ? (
                     <img
                       key={productImageDisplayUrl(item.imageUrl, item.imageVersion)}
@@ -884,7 +894,7 @@ export default function OrderForm() {
                     <button
                       type="button"
                       className="of-view-btn"
-                      onClick={() => openProductDrawer(item)}
+                      onClick={() => openProductPage(item)}
                     >
                       Details ›
                     </button>
@@ -938,6 +948,7 @@ export default function OrderForm() {
           </p>
         </div>
       </div>
+      )}
 
       {/* Floating summary bar */}
       {selectedProductCount > 0 && (
@@ -968,195 +979,6 @@ export default function OrderForm() {
         </div>
       )}
 
-      {/* Detail drawer */}
-      {drawerItem && (() => {
-        const drawerDraft = draftVariantSelections[drawerItem.productId] ?? {};
-        const dQ = getCartLineQty(cartLines, drawerItem.productId, drawerDraft);
-        const unit = getShareLinkItemUnitPrice(drawerItem, dQ);
-        const dAmt = dQ > 0 && Number.isFinite(unit) ? dQ * unit : 0;
-        const drawerVariantGroups = drawerItem.variantGroups ?? [];
-        const drawerDraftComplete = isVariantSelectionComplete(drawerVariantGroups, drawerDraft);
-        const drawerCommittedLines = cartLinesForProduct(cartLines, drawerItem.productId);
-        const showDrawerDraftQty =
-          drawerVariantGroups.length === 0 || (drawerDraftComplete && dQ === 0);
-        const dHasPrice = Number.isFinite(parseItemPriceNumeric(drawerItem.price));
-        const drawerCalcDetail =
-          dHasPrice && dQ > 0
-            ? formatLineCalculationDetail(dQ, drawerItem, currencySymbol)
-            : null;
-        const fields = Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-          const val = (drawerItem as Record<string, unknown>)[`field${n}`];
-          if (val === undefined || val === null || String(val).trim() === '') return null;
-          const { label, unitSuffix } = getFieldLabelAndUnitSuffix(drawerItem, n);
-          return { label, value: unitSuffix ? `${String(val)} ${unitSuffix}` : String(val) };
-        }).filter(Boolean);
-
-        return (
-          <div
-            ref={overlayRef}
-            className="of-overlay"
-            onClick={(e) => { if (e.target === overlayRef.current) closeProductDrawer(); }}
-          >
-            <div className="of-drawer">
-              <div className="of-drawer-handle" />
-
-              {/* Image */}
-              <div className="of-drawer-img-wrap">
-                {drawerItem.imageUrls && drawerItem.imageUrls.length > 1 ? (
-                  <div className="of-drawer-img of-drawer-img--gallery">
-                    <ProductImageGallery
-                      urls={drawerItem.imageUrls}
-                      primaryIndex={drawerItem.primaryImageIndex ?? 0}
-                      primaryImageVersion={drawerItem.imageVersion}
-                    />
-                  </div>
-                ) : drawerItem.imageUrl ? (
-                  <img
-                    key={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
-                    src={productImageDisplayUrl(drawerItem.imageUrl, drawerItem.imageVersion)}
-                    alt={drawerItem.name}
-                    className="of-drawer-img"
-                  />
-                ) : (
-                  <div className="of-drawer-img-ph"><ImgIcon size={48} /></div>
-                )}
-                <button type="button" className="of-drawer-close" onClick={() => closeProductDrawer()}>✕</button>
-              </div>
-
-              {/* Content */}
-              <div className="of-drawer-body">
-                <div className="of-drawer-name">{drawerItem.name}</div>
-                {drawerItem.subtitle && (
-                  <div className="of-drawer-sub">({drawerItem.subtitle})</div>
-                )}
-
-                {drawerItem.price !== undefined && drawerItem.price !== '' && (
-                  <div className="of-drawer-price-row">
-                    <div className="of-drawer-price">
-                      {formatUnitPrice(drawerItem.price, currencySymbol)}
-                      {drawerItem.priceUnit ? ` ${drawerItem.priceUnit}` : ''}
-                    </div>
-                  </div>
-                )}
-
-                {/* Detail fields table */}
-                {fields.length > 0 && (
-                  <div className="of-detail-table">
-                    {fields.map((f, i) => (
-                      <div key={i} className="of-detail-row">
-                        <span className="of-detail-label">{f!.label}</span>
-                        <span className="of-detail-val">{f!.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {(drawerItem.variantGroups?.length ?? 0) > 0 && (
-                  <ProductVariantsDisplay
-                    groups={drawerItem.variantGroups!}
-                    mode="select"
-                    selection={drawerDraft}
-                    onSelect={(groupId, option) => {
-                      const nextSelection = {
-                        ...(draftVariantSelections[drawerItem.productId] ?? {}),
-                        [groupId]: option,
-                      };
-                      setDraftVariantSelections((prev) => ({
-                        ...prev,
-                        [drawerItem.productId]: nextSelection,
-                      }));
-                      setCartLines((prev) => removeZeroQtyLinesForProduct(prev, drawerItem.productId));
-                    }}
-                  />
-                )}
-
-                {/* Quantity section */}
-                <div className="of-drawer-qty-section">
-                  <div className="of-drawer-qty-label">Select quantity</div>
-                  <div className="of-drawer-qty-row">
-                    {showDrawerDraftQty && (
-                      <QtyControl
-                        value={dQ}
-                        step={getQuantityStep(drawerItem)}
-                        onChange={(delta) => changeQty(drawerItem.productId, delta)}
-                      />
-                    )}
-                    {showDrawerDraftQty && dQ > 0 && (
-                      <div className="of-drawer-line-total-wrap">
-                        {drawerCalcDetail && (
-                          <div className="of-drawer-line-calc">{drawerCalcDetail}</div>
-                        )}
-                        <span className="of-drawer-line-total">
-                          {dHasPrice ? formatOrderMoney(dAmt, currencySymbol) : '—'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {drawerCommittedLines.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                      {drawerCommittedLines.map((line) => {
-                        const lineSummary = formatVariantSelectionSummary(
-                          drawerItem.variantGroups ?? [],
-                          line.variantSelection
-                        );
-                        return (
-                          <div
-                            key={line.lineId}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 8,
-                              padding: '8px 10px',
-                              background: '#f8fafc',
-                              borderRadius: 8,
-                              border: '1px solid #e2e8f0',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDraftVariantSelections((prev) => ({
-                                  ...prev,
-                                  [drawerItem.productId]: { ...line.variantSelection },
-                                }))
-                              }
-                              style={{
-                                flex: 1,
-                                minWidth: 0,
-                                border: 'none',
-                                background: 'transparent',
-                                padding: 0,
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: '#475569',
-                                fontFamily: 'inherit',
-                              }}
-                            >
-                              {lineSummary || 'Variant'}
-                            </button>
-                            <QtyControl
-                              value={line.quantity}
-                              step={getQuantityStep(drawerItem)}
-                              onChange={(delta) => changeCartLineQty(line.lineId, delta)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <button type="button" className="of-drawer-done" onClick={() => closeProductDrawer()}>
-                  Done — {dQ > 0 ? `${dQ} added` : 'close'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

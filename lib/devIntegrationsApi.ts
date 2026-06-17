@@ -12,7 +12,10 @@ import {
   type IntegrationProviderId,
 } from './integrationsServer.js';
 import { connectShiprocketIntegration, createShiprocketShipmentForOrder, refreshShiprocketIntegration } from './shiprocketIntegration.js';
+import { connectRazorpayIntegration, refreshRazorpayIntegration } from './razorpayIntegration.js';
 import { ShiprocketApiError } from './shiprocketServer.js';
+import { RazorpayApiError } from './razorpayServer.js';
+import { syncStoreIntegrationFlags } from './storeIntegrationFlags.js';
 
 export type DevIntegrationsEnv = {
   supabaseUrl: string;
@@ -50,6 +53,7 @@ export async function handleDevIntegrationsRequest(
   if (path === '/api/integrations' && method === 'GET') {
     try {
       const integrations = await listIntegrations(supabase, auth.userId);
+      await syncStoreIntegrationFlags(supabase, auth.userId).catch(() => undefined);
       return jsonResponse(200, { integrations });
     } catch (e) {
       return jsonResponse(500, { error: 'Could not load integrations' });
@@ -73,18 +77,24 @@ export async function handleDevIntegrationsRequest(
         );
         return jsonResponse(200, { integration, oauthUrl: null });
       }
-      const now = new Date().toISOString();
-      const metadata = stubRazorpayMetadata();
-      const integration = await upsertIntegration(supabase, auth.userId, 'razorpay', {
-        status: 'pending_verification',
-        account_id: String(metadata.merchantId ?? ''),
-        metadata,
-        connected_at: now,
-      });
-      return jsonResponse(200, { integration, oauthUrl: null });
+      if (provider === 'razorpay') {
+        const keyId = String((body.razorpay as { keyId?: string })?.keyId ?? '').trim();
+        const keySecret = String((body.razorpay as { keySecret?: string })?.keySecret ?? '');
+        const integration = await connectRazorpayIntegration(
+          supabase,
+          auth.userId,
+          keyId,
+          keySecret
+        );
+        return jsonResponse(200, { integration, oauthUrl: null });
+      }
+      return jsonResponse(400, { error: 'Unsupported provider connect request' });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not connect integration';
-      const status = e instanceof ShiprocketApiError && e.status === 401 ? 401 : 500;
+      const status =
+        (e instanceof ShiprocketApiError || e instanceof RazorpayApiError) && e.status === 401
+          ? 401
+          : 500;
       return jsonResponse(status, { error: msg });
     }
   }
@@ -110,6 +120,10 @@ export async function handleDevIntegrationsRequest(
     try {
       if (provider === 'shiprocket') {
         const integration = await refreshShiprocketIntegration(supabase, auth.userId);
+        return jsonResponse(200, { integration });
+      }
+      if (provider === 'razorpay') {
+        const integration = await refreshRazorpayIntegration(supabase, auth.userId);
         return jsonResponse(200, { integration });
       }
       return jsonResponse(400, { error: 'Refresh not supported for this provider' });

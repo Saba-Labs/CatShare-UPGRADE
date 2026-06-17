@@ -45,9 +45,7 @@ export function OrderPaymentSection({ order }: { order: Order }) {
   if (loading && !payment && !hasLegacy) return null;
   if (!payment && !hasLegacy) return null;
 
-  const pill = getPaymentStatusPill(
-    payment?.status ?? (order.payment_method === 'cod' ? 'pending' : 'paid')
-  );
+  const pill = getPaymentStatusPill(payment?.status ?? 'pending');
   const amountStr = payment
     ? formatMoney(payment.amount, payment.currency)
     : formatMoney(order.checkout_adjustments?.grandTotal ?? order.total_amount ?? null, currency);
