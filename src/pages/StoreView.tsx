@@ -890,6 +890,10 @@ export default function StoreView() {
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsappCountry, setCustomerWhatsappCountry] = useState('+91');
   const [customerWhatsappNumber, setCustomerWhatsappNumber] = useState('');
+  const [shipLine1, setShipLine1] = useState('');
+  const [shipCity, setShipCity] = useState('');
+  const [shipState, setShipState] = useState('');
+  const [shipPincode, setShipPincode] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'prepaid' | 'cod'>('prepaid');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1578,6 +1582,16 @@ export default function StoreView() {
         {
           paymentMethod: showCodOption ? paymentMethod : 'prepaid',
           checkoutAdjustments: checkoutTotals,
+          shippingAddress:
+            shipLine1.trim() && shipCity.trim() && shipState.trim() && shipPincode.trim()
+              ? {
+                  line1: shipLine1.trim(),
+                  city: shipCity.trim(),
+                  state: shipState.trim(),
+                  pincode: shipPincode.replace(/\D/g, '').slice(0, 6),
+                  country: 'India',
+                }
+              : undefined,
         }
       );
       if (error) {
@@ -1597,6 +1611,10 @@ export default function StoreView() {
         setCustomerName('');
         setCustomerWhatsappCountry('+91');
         setCustomerWhatsappNumber('');
+        setShipLine1('');
+        setShipCity('');
+        setShipState('');
+        setShipPincode('');
         setDrawerProduct(null);
         setDraftVariantSelections({});
         setSearchQuery('');
@@ -1628,6 +1646,10 @@ export default function StoreView() {
     if (step === 'customer') {
       if (!customerName.trim()) { alert('Please enter your name'); return; }
       if (!customerWhatsappNumber.trim()) { alert('Please enter your WhatsApp number'); return; }
+      if (!shipLine1.trim() || !shipCity.trim() || !shipState.trim() || shipPincode.replace(/\D/g, '').length !== 6) {
+        alert('Please enter your full delivery address (street, city, state, and 6-digit pincode)');
+        return;
+      }
       setStep('review');
     }
     else void handlePlaceOrder();
@@ -2173,7 +2195,7 @@ export default function StoreView() {
                 onClick={handlePanelAction}
                 disabled={
                   step === 'customer'
-                    ? !customerName.trim() || !customerWhatsappNumber.trim() || (minimumOrderValue > 0 && !minimumOrderMet)
+                    ? !customerName.trim() || !customerWhatsappNumber.trim() || !shipLine1.trim() || !shipCity.trim() || !shipState.trim() || shipPincode.replace(/\D/g, '').length !== 6 || (minimumOrderValue > 0 && !minimumOrderMet)
                     : isSubmitting || (minimumOrderValue > 0 && !minimumOrderMet)
                 }
               >
@@ -2192,6 +2214,11 @@ export default function StoreView() {
                     {(!customerName.trim() || !customerWhatsappNumber.trim()) && (
                       <div className="sv-checkout-alert">
                         Name and WhatsApp are required to continue.
+                      </div>
+                    )}
+                    {(!shipLine1.trim() || !shipCity.trim() || !shipState.trim() || shipPincode.replace(/\D/g, '').length !== 6) && (
+                      <div className="sv-checkout-alert">
+                        Delivery address is required for shipping your order.
                       </div>
                     )}
                     {minimumOrderValue > 0 && !minimumOrderMet && (
@@ -2224,6 +2251,46 @@ export default function StoreView() {
                           <input type="text" value={customerWhatsappNumber} onChange={(e) => setCustomerWhatsappNumber(e.target.value.replace(/\D/g, ''))} placeholder="98xxxxxxxx" inputMode="numeric" />
                         </div>
                       </div>
+                    </div>
+                    <div className="sv-field">
+                      <label>Delivery address *</label>
+                      <input
+                        type="text"
+                        value={shipLine1}
+                        onChange={(e) => setShipLine1(e.target.value)}
+                        placeholder="Street / building / area"
+                      />
+                    </div>
+                    <div className="sv-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div>
+                        <label>City *</label>
+                        <input
+                          type="text"
+                          value={shipCity}
+                          onChange={(e) => setShipCity(e.target.value)}
+                          placeholder="City"
+                        />
+                      </div>
+                      <div>
+                        <label>State *</label>
+                        <input
+                          type="text"
+                          value={shipState}
+                          onChange={(e) => setShipState(e.target.value)}
+                          placeholder="State"
+                        />
+                      </div>
+                    </div>
+                    <div className="sv-field">
+                      <label>Pincode *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={shipPincode}
+                        onChange={(e) => setShipPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-digit pincode"
+                      />
                     </div>
                   </section>
 

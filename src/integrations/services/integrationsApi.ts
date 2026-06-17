@@ -519,17 +519,23 @@ export async function apiRefreshIntegration(
 
 
 export async function apiCreateOrderShipment(
-
-  orderId: string
-
+  orderId: string,
+  shippingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+    country?: string;
+  } | null
 ): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
-
+  const payload: Record<string, unknown> = { orderId };
+  if (shippingAddress) {
+    payload.shippingAddress = shippingAddress;
+  }
   const r = await apiJson('/api/integrations/shipments/create', {
-
     method: 'POST',
-
-    body: JSON.stringify({ orderId }),
-
+    body: JSON.stringify(payload),
   });
 
   if (!r.ok) {

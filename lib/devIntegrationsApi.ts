@@ -128,7 +128,8 @@ export async function handleDevIntegrationsRequest(
       const shipment = await createShiprocketShipmentForOrder(
         supabase,
         auth.userId,
-        orderId
+        orderId,
+        body.shippingAddress ?? null
       );
       return jsonResponse(200, { shipment });
     } catch (e) {

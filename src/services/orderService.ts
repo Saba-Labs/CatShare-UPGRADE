@@ -74,6 +74,7 @@ export async function createOrder(
   checkoutExtras?: {
     paymentMethod?: 'prepaid' | 'cod';
     checkoutAdjustments?: CheckoutTotals;
+    shippingAddress?: Order['shipping_address'];
   }
 ): Promise<{ data: Order | null; error: any }> {
   try {
@@ -100,6 +101,9 @@ export async function createOrder(
     }
     if (checkoutExtras?.checkoutAdjustments) {
       row.checkout_adjustments = checkoutExtras.checkoutAdjustments;
+    }
+    if (checkoutExtras?.shippingAddress) {
+      row.shipping_address = checkoutExtras.shippingAddress;
     }
 
     let { data, error } = await client.from('orders').insert(row).select().maybeSingle();

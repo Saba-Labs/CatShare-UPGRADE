@@ -156,7 +156,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (key === 'shipments/create' && req.method === 'POST') {
-    const orderId = String((req.body as { orderId?: string })?.orderId ?? '').trim();
+    const body = (req.body ?? {}) as {
+      orderId?: string;
+      shippingAddress?: {
+        line1?: string;
+        line2?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+        country?: string;
+      };
+    };
+    const orderId = String(body.orderId ?? '').trim();
     if (!orderId) {
       return res.status(400).json({ error: 'orderId is required' });
     }
@@ -165,7 +176,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const shipment = await createShiprocketShipmentForOrder(
         supabase,
         auth.userId,
-        orderId
+        orderId,
+        body.shippingAddress ?? null
       );
       return res.status(200).json({ shipment });
     } catch (e) {

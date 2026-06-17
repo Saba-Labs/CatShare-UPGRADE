@@ -138,8 +138,19 @@ export const shiprocketProvider: ShippingProvider = {
     return shiprocketProvider.normalizeConnection(mapRowToSellerIntegration(res.data));
   },
 
-  async createShipment(sellerId: string, orderId: string): Promise<OrderShipment> {
-    const res = await apiCreateOrderShipment(orderId);
+  async createShipment(
+    sellerId: string,
+    orderId: string,
+    shippingAddress?: {
+      line1: string;
+      line2?: string;
+      city: string;
+      state: string;
+      pincode: string;
+      country?: string;
+    } | null
+  ): Promise<OrderShipment> {
+    const res = await apiCreateOrderShipment(orderId, shippingAddress ?? undefined);
     if (res.error || !res.data) {
       throw new Error(res.error ?? 'Could not create shipment');
     }

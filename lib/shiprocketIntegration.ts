@@ -178,14 +178,12 @@ export async function ensureShiprocketToken(
   return { token: auth.token, metadata: updated };
 }
 
-export type OrderShippingAddress = {
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  pincode: string;
-  country?: string;
-};
+import {
+  normalizeShippingAddress,
+  type ShippingAddress,
+} from './shippingAddressUtils.js';
+
+export type OrderShippingAddress = ShippingAddress;
 
 export type CatShareOrderRow = {
   id: string;
@@ -218,7 +216,8 @@ function mapPaymentMethod(method: string | undefined): 'COD' | 'Prepaid' {
 export async function createShiprocketShipmentForOrder(
   supabase: SupabaseClient,
   sellerUserId: string,
-  orderId: string
+  orderId: string,
+  shippingAddressOverride?: OrderShippingAddress | null
 ): Promise<Record<string, unknown>> {
   const integrationRow = await getIntegration(supabase, sellerUserId, 'shiprocket');
   if (!integrationRow || integrationRow.status !== 'connected') {
@@ -241,11 +240,26 @@ export async function createShiprocketShipmentForOrder(
   if (!order) throw new Error('Order not found');
 
   const orderRow = order as CatShareOrderRow;
-  const address = orderRow.shipping_address;
-  if (!address?.line1 || !address.city || !address.state || !address.pincode) {
+  const existingAddress = normalizeShippingAddress(orderRow.shipping_address);
+  const overrideAddress = normalizeShippingAddress(shippingAddressOverride);
+  const address = overrideAddress ?? existingAddress;
+
+  if (!address) {
     throw new Error(
-      'Add a delivery address on this order (Edit order → Shipping address) before creating an AWB'
+      'Add a delivery address (street, city, state, and 6-digit pincode) before creating an AWB'
     );
+  }
+
+  if (overrideAddress && !existingAddress) {
+    const { error: addrErr } = await supabase
+      .from('orders')
+      .update({
+        shipping_address: overrideAddress,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .eq('seller_user_id', sellerUserId);
+    if (addrErr) throw addrErr;
   }
 
   const pickupName =

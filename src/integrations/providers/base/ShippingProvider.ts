@@ -14,7 +14,15 @@ export interface ShippingProvider extends IntegrationProvider {
   /** Future: create AWB / shipment */
   createShipment?(
     sellerId: string,
-    orderId: string
+    orderId: string,
+    shippingAddress?: {
+      line1: string;
+      line2?: string;
+      city: string;
+      state: string;
+      pincode: string;
+      country?: string;
+    } | null
   ): Promise<OrderShipment>;
 
   /** Future: sync tracking from provider */

@@ -2819,7 +2819,13 @@ useEffect(() => {
 
               <div style={{ padding: '0 6px', display: 'flex', flexDirection: 'column', gap: 0 }}>
                 <OrderPaymentSection order={order} />
-                <OrderShipmentSection orderId={order.id} />
+                <OrderShipmentSection
+                  orderId={order.id}
+                  shippingAddress={order.shipping_address ?? null}
+                  onShippingAddressSaved={(address) => {
+                    setOrder((prev) => (prev ? { ...prev, shipping_address: address } : prev));
+                  }}
+                />
                 <OrderCustomerTrackingSection
                   order={order}
                   onCopy={async (url) => {
