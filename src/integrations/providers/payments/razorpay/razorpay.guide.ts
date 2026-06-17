@@ -11,7 +11,7 @@ export const RAZORPAY_GUIDE_STEPS: IntegrationGuideStep[] = [
   },
   {
     step: 3,
-    title: 'Go to Settings > API Keys and create/generate Key ID and Key Secret.',
+    title: 'Switch to Test Mode, then go to Settings > API Keys and generate Test Key ID + Secret.',
   },
   {
     step: 4,

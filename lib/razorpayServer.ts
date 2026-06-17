@@ -23,11 +23,31 @@ function basicAuthHeader(keyId: string, keySecret: string): string {
   return `Basic ${token}`;
 }
 
+function razorpayErrorMessage(
+  body: Record<string, unknown>,
+  status: number,
+  fallback: string
+): string {
+  const apiMsg = String(
+    (body.error as { description?: string } | undefined)?.description ??
+      body.error_description ??
+      body.description ??
+      ''
+  ).trim();
+
+  if (status === 401) {
+    return 'Invalid Razorpay Key ID or Key Secret. Use Test mode keys from the Razorpay dashboard.';
+  }
+
+  return apiMsg || fallback;
+}
+
+/** Validate standard merchant API keys (test or live). */
 export async function fetchRazorpayAccountProfile(
   keyId: string,
   keySecret: string
 ): Promise<RazorpayAccountProfile> {
-  const response = await fetch(`${RAZORPAY_API_BASE}/v1/accounts`, {
+  const response = await fetch(`${RAZORPAY_API_BASE}/v1/orders?count=1`, {
     method: 'GET',
     headers: {
       Authorization: basicAuthHeader(keyId, keySecret),
@@ -37,18 +57,15 @@ export async function fetchRazorpayAccountProfile(
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!response.ok) {
-    const msg = String(
-      (body.error as { description?: string } | undefined)?.description ??
-        body.error_description ??
-        body.description ??
-        'Razorpay authentication failed'
+    throw new RazorpayApiError(
+      razorpayErrorMessage(body, response.status, 'Razorpay authentication failed'),
+      response.status
     );
-    throw new RazorpayApiError(msg, response.status);
   }
 
-  const items = Array.isArray(body.items) ? body.items : [];
-  if (!items.length) {
-    return {};
-  }
-  return (items[0] ?? {}) as RazorpayAccountProfile;
+  // Standard merchant keys do not expose account profile via API; key id is enough for display.
+  return {
+    id: keyId.trim(),
+    name: keyId.trim().startsWith('rzp_test_') ? 'Razorpay (Test)' : 'Razorpay',
+  };
 }
