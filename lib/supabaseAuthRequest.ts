@@ -2,11 +2,15 @@
  * Verify Supabase JWT from Authorization: Bearer <access_token>
  * Server-only — used by Vercel /api routes. Lives outside /api so the bundler inlines it.
  */
-import { createClient } from "@supabase/supabase-js";
-import type { User } from "@supabase/auth-js";
+type SupabaseAuthUser = {
+  id: string;
+  created_at: string;
+  email?: string;
+  [key: string]: unknown;
+};
 
 export type SupabaseAuthResult =
-  | { ok: true; user: User; userId: string }
+  | { ok: true; user: SupabaseAuthUser; userId: string }
   | { ok: false; error: string };
 
 export async function getSupabaseUserFromRequest(
@@ -27,12 +31,23 @@ export async function getSupabaseUserFromRequest(
     return { ok: false, error: "Server configuration error" };
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  const authUrl = `${url.replace(/\/+$/, "")}/auth/v1/user`;
+  const response = await fetch(authUrl, {
+    method: "GET",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${token}`,
+    },
   });
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) {
+
+  if (!response.ok) {
     return { ok: false, error: "Invalid or expired token" };
   }
-  return { ok: true, user: data.user, userId: data.user.id };
+
+  const user = (await response.json()) as SupabaseAuthUser | null;
+  if (!user?.id) {
+    return { ok: false, error: "Invalid or expired token" };
+  }
+
+  return { ok: true, user, userId: user.id };
 }

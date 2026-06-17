@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const fileContentType = filePart.contentType || "application/octet-stream";
 
   try {
-    await client.send(
+    await (client as { send: (command: PutObjectCommand) => Promise<unknown> }).send(
       new PutObjectCommand({
         Bucket: bucket,
         Key: key,

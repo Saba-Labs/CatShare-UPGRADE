@@ -30,13 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = authResult.userId;
 
   try {
-    const { data: authData, error: authErr } = await supabase.auth.admin.getUserById(userId);
-    if (authErr || !authData?.user) {
-      console.error("subscription: getUserById failed", authErr);
-      return res.status(500).json({ error: "Could not load user" });
-    }
-
-    const trialEndsAt = computeTrialEndsAtIso(authData.user.created_at);
+    const trialEndsAt = computeTrialEndsAtIso(authResult.user.created_at);
 
     const { data: subRow, error: subErr } = await supabase
       .from("user_subscriptions")
