@@ -11,8 +11,12 @@
   },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "source": "/api/integrations",
+      "destination": "/api/integrations-api"
+    },
+    {
+      "source": "/api/integrations/(.*)",
+      "destination": "/api/integrations-api?route=$1"
     },
     {
       "source": "/(.*)",

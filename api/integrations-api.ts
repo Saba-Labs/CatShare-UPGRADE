@@ -1,24 +1,24 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { applyApiCors } from '../../lib/apiCors.js';
-import { getSupabaseUserFromRequest } from '../../lib/supabaseAuthRequest.js';
+import { applyApiCors } from '../lib/apiCors.js';
+import { getSupabaseUserFromRequest } from '../lib/supabaseAuthRequest.js';
 import {
   deleteIntegration,
   isValidProvider,
   listIntegrations,
   type IntegrationProviderId,
-} from '../../lib/integrationsServer.js';
+} from '../lib/integrationsServer.js';
 import {
   connectRazorpayIntegration,
   refreshRazorpayIntegration,
-} from '../../lib/razorpayIntegration.js';
+} from '../lib/razorpayIntegration.js';
 import {
   connectShiprocketIntegration,
   createShiprocketShipmentForOrder,
   refreshShiprocketIntegration,
-} from '../../lib/shiprocketIntegration.js';
-import { RazorpayApiError } from '../../lib/razorpayServer.js';
-import { ShiprocketApiError } from '../../lib/shiprocketServer.js';
+} from '../lib/shiprocketIntegration.js';
+import { RazorpayApiError } from '../lib/razorpayServer.js';
+import { ShiprocketApiError } from '../lib/shiprocketServer.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
@@ -26,9 +26,10 @@ const supabase = createClient(
 );
 
 function routeKey(req: VercelRequest): string {
-  const param = req.query.route;
-  if (Array.isArray(param)) return param.join('/');
-  return param ? String(param) : '';
+  const fromQuery = req.query.route;
+  if (Array.isArray(fromQuery)) return fromQuery.join('/');
+  if (typeof fromQuery === 'string') return fromQuery;
+  return '';
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -95,9 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? e.message
           : e instanceof RazorpayApiError
             ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Could not connect integration';
+            : e instanceof Error
+              ? e.message
+              : 'Could not connect integration';
       const status =
         (e instanceof ShiprocketApiError || e instanceof RazorpayApiError) &&
         e.status === 401
@@ -147,9 +148,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ? e.message
           : e instanceof RazorpayApiError
             ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Could not refresh integration status';
+            : e instanceof Error
+              ? e.message
+              : 'Could not refresh integration status';
       return res.status(500).json({ error: msg });
     }
   }
