@@ -3,6 +3,10 @@ import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 import { applyApiCors } from "../lib/apiCors.js";
 
+type S3DeleteSender = {
+  send: (command: DeleteObjectCommand) => Promise<unknown>;
+};
+
 const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -39,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    await r2.send(
+    await (r2 as unknown as S3DeleteSender).send(
       new DeleteObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME!,
         Key: safeKey,

@@ -4,6 +4,10 @@ import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 import { applyApiCors } from "../lib/apiCors.js";
 import { purgeCloudflareCacheForUrls } from "../lib/cloudflarePurge.js";
 
+type S3Sender = {
+  send: (command: PutObjectCommand) => Promise<unknown>;
+};
+
 export const config = {
   api: {
     bodyParser: false,
@@ -116,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const fileContentType = filePart.contentType || "application/octet-stream";
 
   try {
-    await (client as { send: (command: PutObjectCommand) => Promise<unknown> }).send(
+    await (client as unknown as S3Sender).send(
       new PutObjectCommand({
         Bucket: bucket,
         Key: key,
