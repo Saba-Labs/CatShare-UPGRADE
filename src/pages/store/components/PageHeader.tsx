@@ -37,7 +37,7 @@ export default function PageHeader({
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <h1 style={{ fontSize: 14, fontWeight: 700, color: '#1f2937', lineHeight: 1.2 }}>{title}</h1>
+            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#1f2937', lineHeight: 1.2 }}>{title}</h1>
             {description && <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-3xl">{description}</p>}
           </div>
         </div>
