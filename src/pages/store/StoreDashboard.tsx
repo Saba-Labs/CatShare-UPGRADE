@@ -8,7 +8,6 @@ import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
 import type { Store } from '../../services/storeService';
 import StoreLayout from './components/StoreLayout';
 import StoreHeader from './components/StoreHeader';
-import StoreHealthCard from './components/StoreHealthCard';
 import NavigationCard from './components/NavigationCard';
 import StoreIconTile from './components/StoreIconTile';
 import { STORE_NAVIGATION } from './config/storeNavigation';
@@ -130,8 +129,6 @@ export default function StoreDashboard() {
         storeUrl={storeUrl}
         isLive={store?.isLive ?? false}
       />
-
-      <StoreHealthCard metrics={metrics} />
 
       <div className="space-y-10">
         {STORE_NAVIGATION.map((category) => (
