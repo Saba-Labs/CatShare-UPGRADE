@@ -432,6 +432,10 @@ export default function StoreSettings() {
 
       setOriginalSettings(settings);
       showToast('Settings saved successfully', 'success');
+
+      // Dispatch custom event to notify StoreView component of changes (especially catalogue_id)
+      const event = new CustomEvent('store-updated', { detail: { catalogueIdChanged: settings.catalogueId !== originalSettings.catalogueId } });
+      window.dispatchEvent(event);
     } catch (error) {
       console.error('Failed to save settings:', error);
       showToast('Failed to save settings', 'error');
