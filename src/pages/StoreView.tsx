@@ -25,7 +25,6 @@ import { productImageDisplayUrl } from '../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
 import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '../utils/productCategoryUtils';
 import {
-  applyMaxProducts,
   filterProductsByBehaviorScope,
   productImageAspectRatio,
   productsPerRowCount,
@@ -1211,12 +1210,6 @@ export default function StoreView() {
         : '',
     [behavior.productsToShow, store?.catalogueId, catalogues]
   );
-  const storefrontGridStyle = useMemo(
-    () => ({
-      gridTemplateColumns: `repeat(${productsPerRowCount(behavior.productsPerRow)}, minmax(0, 1fr))`,
-    }),
-    [behavior.productsPerRow]
-  );
   const storefrontImageAspectRatio = useMemo(
     () => productImageAspectRatio(behavior.productImageRatio),
     [behavior.productImageRatio]
@@ -1316,14 +1309,11 @@ export default function StoreView() {
       }
     }
 
-    return applyMaxProducts(
-      sortStorefrontProducts(
-        listed,
-        behavior.defaultSorting,
-        listingCatalogueId,
-        effectiveCatalogue
-      ),
-      behavior.maxProducts
+    return sortStorefrontProducts(
+      listed,
+      behavior.defaultSorting,
+      listingCatalogueId,
+      effectiveCatalogue
     );
   }, [
     listingCatalogueId,
@@ -1334,7 +1324,6 @@ export default function StoreView() {
     resolvedInventoryId,
     behavior.productsToShow,
     behavior.defaultSorting,
-    behavior.maxProducts,
   ]);
   const availableCategories = useMemo(
     () => buildStorefrontCategoryFilterList(store?.productCategories, storeProducts),
@@ -2227,7 +2216,6 @@ export default function StoreView() {
           {/* ══ PRODUCT LISTING (grid / OrderForm-style list) ══ */}
           <div
             className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}
-            style={storefrontViewMode === 'grid' ? storefrontGridStyle : undefined}
           >
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (

@@ -148,6 +148,7 @@ export default function StoreSettings() {
   const [validationErrors, setValidationErrors] = useState<Partial<Record<SettingsKey, string>>>({});
   const [slugValidation, setSlugValidation] = useState<'available' | 'taken' | 'invalid' | null>(null);
   const [slugValidating, setSlugValidating] = useState(false);
+  const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
 
   // Load initial settings
   useEffect(() => {
@@ -169,6 +170,10 @@ export default function StoreSettings() {
           if (store.checkoutSettings?.experience) {
             checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
             checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
+          }
+
+          if (store.cataloguesDefinition && store.cataloguesDefinition.length > 0) {
+            setCatalogues(store.cataloguesDefinition);
           }
 
           const loadedSettings: StoreSettingsState = {
@@ -628,30 +633,16 @@ export default function StoreSettings() {
                 <select
                   value={settings.productsToShow}
                   onChange={(e) => handleChange('productsToShow', e.target.value as any)}
-                  disabled={saving}
+                  disabled={saving || catalogues.length === 0}
                   className={fieldClassName}
                 >
-                  <option value="all">All Products</option>
-                  <option value="wholesale">Wholesale</option>
-                  <option value="reseller">Reseller</option>
-                  <option value="featured">Featured Collection</option>
-                  <option value="category">Category</option>
+                  <option value="">Select a catalogue...</option>
+                  {catalogues.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Maximum Products
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={settings.maxProducts}
-                  onChange={(e) => handleChange('maxProducts', parseInt(e.target.value) || 100)}
-                  disabled={saving}
-                  className={fieldClassName}
-                />
               </div>
 
               <div>
@@ -719,28 +710,6 @@ export default function StoreSettings() {
                       } disabled:opacity-50 disabled:cursor-not-allowed capitalize text-sm`}
                     >
                       {ratio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-                  Products Per Row
-                </label>
-                <div className="grid grid-cols-4 gap-3">
-                  {(['1', '2', '3', '4'] as const).map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => handleChange('productsPerRow', num)}
-                      disabled={saving}
-                      className={`${chipBaseClassName} ${
-                        settings.productsPerRow === num
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {num}
                     </button>
                   ))}
                 </div>
