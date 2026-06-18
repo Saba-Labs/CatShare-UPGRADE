@@ -17,7 +17,7 @@ import SettingsCard from './components/SettingsCard';
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 
 const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
 
 function loadBusinessProfileFromCache(
   userSettings: Parameters<typeof businessProfileFromUserSettings>[0]
