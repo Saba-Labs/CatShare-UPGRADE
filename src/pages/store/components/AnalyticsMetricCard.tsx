@@ -1,4 +1,5 @@
 import type { AnalyticsMetric } from '../types/analytics';
+import { STORE_METRIC_VALUE } from '../storeTypography';
 import StoreIconTile from './StoreIconTile';
 
 interface AnalyticsMetricCardProps {
@@ -17,11 +18,11 @@ export default function AnalyticsMetricCard({ metric, loading }: AnalyticsMetric
   }
 
   return (
-    <article className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm hover:shadow-md transition-shadow">
+    <article className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{metric.label}</p>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+          <p className={`mt-1.5 ${STORE_METRIC_VALUE}`}>
             {metric.value}
           </p>
           {metric.change ? (

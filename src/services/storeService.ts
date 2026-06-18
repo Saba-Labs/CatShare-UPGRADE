@@ -691,9 +691,25 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     let integrationFlagsRaw: unknown = row.integration_flags ?? row.integrationFlags;
     let maintenanceMode = coerceOptionalBoolean(row.maintenanceMode ?? row.maintenance_mode);
     let behaviorSettingsRaw: unknown = row.behavior_settings ?? row.behaviorSettings;
+    let catalogueId = firstNonEmptyString(
+      row.catalogueId,
+      row.catalogue_id,
+      (parsed as StorePublic | undefined)?.catalogueId
+    );
 
-    /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null || integrationFlagsRaw == null || maintenanceMode == null || behaviorSettingsRaw == null) {
+    /* RPC may be older than `stores` columns; public RLS often allows read by slug. */
+    if (
+      !whatsapp ||
+      !catalogueId ||
+      minimumOrderValue == null ||
+      viewMode == null ||
+      homepageEnabled == null ||
+      websiteModeEnabled == null ||
+      checkoutSettingsRaw == null ||
+      integrationFlagsRaw == null ||
+      maintenanceMode == null ||
+      behaviorSettingsRaw == null
+    ) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -738,6 +754,13 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       }
       if (behaviorSettingsRaw == null) {
         behaviorSettingsRaw = storeRecord?.behavior_settings ?? storeRecord?.behaviorSettings;
+      }
+      const catalogueFromStore = firstNonEmptyString(
+        storeRecord?.catalogue_id,
+        storeRecord?.catalogueId
+      );
+      if (catalogueFromStore) {
+        catalogueId = catalogueFromStore;
       }
     }
 
@@ -807,6 +830,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       ) ?? null,
       minimumOrderValue: minimumOrderValue ?? null,
       viewMode: viewMode ?? 'grid',
+      catalogueId: catalogueId ?? '',
       checkoutSettings: normalizeCheckoutSettings(checkoutSettingsRaw),
       integrationFlags: normalizeStoreIntegrationFlags(integrationFlagsRaw),
       behaviorSettings: normalizeBehaviorSettings(behaviorSettingsRaw),
@@ -816,12 +840,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       normalized.storeWhatsapp = whatsapp;
     }
 
-    const storeCatId = String(
-      normalized.catalogueId ??
-        (row as Record<string, unknown>).catalogue_id ??
-        (row as Record<string, unknown>).catalogueId ??
-        ''
-    ).trim();
+    const storeCatId = String(catalogueId ?? normalized.catalogueId ?? '').trim();
 
     // Catalogue definitions: prefer RPC payload (`get_store_by_slug` security definer); anon RLS blocks direct `user_settings` / `catalogues_definition`.
     let list: Catalogue[] | null = extractCataloguesListFromStoreRpcPayload(row);

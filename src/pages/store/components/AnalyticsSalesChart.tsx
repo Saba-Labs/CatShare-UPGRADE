@@ -15,7 +15,7 @@ export default function AnalyticsSalesChart({
     return (
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
         <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Sales Overview</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Sales Overview</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{rangeLabel}</p>
         </div>
         <div className="flex h-44 items-center justify-center rounded-xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/60 px-6 text-center">
@@ -31,7 +31,7 @@ export default function AnalyticsSalesChart({
     <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Sales Overview</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Sales Overview</h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{rangeLabel}</p>
         </div>
       </div>

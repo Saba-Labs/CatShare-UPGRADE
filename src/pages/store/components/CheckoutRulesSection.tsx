@@ -8,9 +8,7 @@ import {
   type CheckoutRuleCategory,
   type CheckoutRulePreset,
 } from '../../../types/checkoutSettings';
-
-const fieldClassName =
-  'w-full px-3 py-2.5 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+import { STORE_FIELD_CLASS } from '../storeTypography';
 
 interface CheckoutRulesSectionProps {
   category: CheckoutRuleCategory;
@@ -77,7 +75,7 @@ export default function CheckoutRulesSection({
                 value={rule.label}
                 disabled={disabled}
                 onChange={(e) => patchRule(rule.id, { label: e.target.value })}
-                className={`${fieldClassName} font-semibold`}
+                className={`${STORE_FIELD_CLASS} font-semibold`}
               />
               <div className="flex items-center gap-2 flex-shrink-0">
                 <ToggleSwitch
@@ -109,7 +107,7 @@ export default function CheckoutRulesSection({
                   value={rule.value}
                   disabled={disabled}
                   onChange={(e) => patchRule(rule.id, { value: Number(e.target.value) || 0 })}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
 
@@ -123,7 +121,7 @@ export default function CheckoutRulesSection({
                     value={rule.code ?? ''}
                     disabled={disabled}
                     onChange={(e) => patchRule(rule.id, { code: e.target.value.toUpperCase() })}
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                     placeholder="SAVE10"
                   />
                 </div>
@@ -144,7 +142,7 @@ export default function CheckoutRulesSection({
                         freeAbove: e.target.value === '' ? null : Number(e.target.value),
                       })
                     }
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                   />
                 </div>
               ) : null}

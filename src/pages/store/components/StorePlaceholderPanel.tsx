@@ -1,4 +1,4 @@
-import { FiClock, FiLoader, FiRefreshCw } from 'react-icons/fi';
+import { STORE_SECTION_TITLE, STORE_BODY } from '../storeTypography';
 
 interface StorePlaceholderPanelProps {
   title: string;
@@ -30,9 +30,9 @@ export default function StorePlaceholderPanel({
           <FiClock className="h-3.5 w-3.5" />
           {badge}
         </span>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
+        <h3 className={STORE_SECTION_TITLE}>{title}</h3>
       </div>
-      <p className="text-sm text-gray-700 dark:text-gray-300">{description}</p>
+      <p className={STORE_BODY}>{description}</p>
 
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[1, 2, 3].map((item) => (

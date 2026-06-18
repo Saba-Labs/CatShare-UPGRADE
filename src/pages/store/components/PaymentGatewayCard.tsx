@@ -1,5 +1,5 @@
 import { FiExternalLink, FiLink2, FiSettings, FiX } from 'react-icons/fi';
-import type { IntegrationConnectionStatus } from '../../../integrations/core/types';
+import { STORE_CARD_TITLE } from '../storeTypography';
 import {
   canConnect,
   canDisconnect,
@@ -91,7 +91,7 @@ export default function PaymentGatewayCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className={STORE_CARD_TITLE}>
               {gateway.name}
             </h3>
             <span

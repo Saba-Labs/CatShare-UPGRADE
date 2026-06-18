@@ -17,9 +17,11 @@ import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
 import MarketingIntegrationCard from './components/MarketingIntegrationCard';
 import { getActiveMarketingIntegrations } from './config/marketingIntegrations';
-
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+import {
+  STORE_FIELD_CLASS,
+  STORE_SAVE_BTN_DISABLED,
+  STORE_SAVE_BTN_ENABLED,
+} from './storeTypography';
 
 function ToggleRow({
   title,
@@ -171,7 +173,7 @@ export default function Marketing() {
                     patch({ seo: { ...settings.seo, metaTitle: e.target.value } })
                   }
                   placeholder="Your Store — Wholesale Catalogue"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                   maxLength={70}
                 />
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -191,7 +193,7 @@ export default function Marketing() {
                   }
                   placeholder="Browse our wholesale catalogue and place orders online."
                   rows={3}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                   maxLength={160}
                 />
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -211,7 +213,7 @@ export default function Marketing() {
                     patch({ seo: { ...settings.seo, keywords: e.target.value } })
                   }
                   placeholder="wholesale, fashion, reseller, catalogue"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                   Comma-separated keywords for search relevance.
@@ -230,7 +232,7 @@ export default function Marketing() {
                     patch({ seo: { ...settings.seo, ogImageUrl: e.target.value } })
                   }
                   placeholder="https://example.com/og-image.jpg"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                   Image shown when your store link is shared on social media (1200×630 recommended).
@@ -261,7 +263,7 @@ export default function Marketing() {
                     })
                   }
                   placeholder="google-site-verification=..."
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
                 <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                   Paste your Google Search Console verification meta tag content.
@@ -282,7 +284,7 @@ export default function Marketing() {
                     })
                   }
                   placeholder="123456789012345"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
 
@@ -300,7 +302,7 @@ export default function Marketing() {
                     })
                   }
                   placeholder="G-XXXXXXXXXX or UA-XXXXXXXX-X"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
             </div>
@@ -341,7 +343,7 @@ export default function Marketing() {
                           },
                         })
                       }
-                      className={fieldClassName}
+                      className={STORE_FIELD_CLASS}
                     />
                   </div>
                   <div>
@@ -361,7 +363,7 @@ export default function Marketing() {
                         })
                       }
                       placeholder="https://"
-                      className={fieldClassName}
+                      className={STORE_FIELD_CLASS}
                     />
                   </div>
                 </>
@@ -404,7 +406,7 @@ export default function Marketing() {
                           },
                         })
                       }
-                      className={fieldClassName}
+                      className={STORE_FIELD_CLASS}
                     />
                   </div>
                   <div className="sm:col-span-2">
@@ -423,7 +425,7 @@ export default function Marketing() {
                           },
                         })
                       }
-                      className={fieldClassName}
+                      className={STORE_FIELD_CLASS}
                     />
                   </div>
                   <div>
@@ -442,7 +444,7 @@ export default function Marketing() {
                           },
                         })
                       }
-                      className={fieldClassName}
+                      className={STORE_FIELD_CLASS}
                     />
                   </div>
                 </div>
@@ -484,7 +486,7 @@ export default function Marketing() {
                       })
                     }
                     rows={2}
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                   />
                 </div>
               ) : null}
@@ -547,11 +549,7 @@ export default function Marketing() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`w-full py-3 rounded-xl font-medium transition-colors ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
-          }`}
+          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
@@ -562,11 +560,7 @@ export default function Marketing() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-xl'
-          }`}
+          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>

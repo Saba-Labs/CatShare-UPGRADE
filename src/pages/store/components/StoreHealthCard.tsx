@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { STORE_METRIC_VALUE, STORE_SECTION_TITLE } from '../storeTypography';
 import StoreIconTile, { type StoreIconKey } from './StoreIconTile';
 
 interface MetricProps {
@@ -18,7 +19,7 @@ function MetricItem({ label, value, iconKey, icon, trend, trendValue }: MetricPr
         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{label}</span>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</span>
+        <span className={STORE_METRIC_VALUE}>{value}</span>
         {trend && trendValue ? (
           <span
             className={`text-xs font-semibold ${
@@ -66,9 +67,9 @@ export default function StoreHealthCard({ metrics, isLoading = false }: StoreHea
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 md:p-8 mb-8">
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Store Overview</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-5 mb-6">
+      <h2 className={`${STORE_SECTION_TITLE} mb-4`}>Store Overview</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {metrics.map((metric, index) => (
           <MetricItem key={index} {...metric} />
         ))}

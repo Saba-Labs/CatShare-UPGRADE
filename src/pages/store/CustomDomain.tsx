@@ -27,9 +27,9 @@ import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import DnsRecordsTable, { formatDnsRecordsForCopy } from './components/DnsRecordsTable';
 import { DOMAIN_PROVIDER_GUIDES } from './config/domainProviders';
+import { STORE_FIELD_CLASS } from './storeTypography';
 
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-mono text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+const STORE_FIELD_MONO_CLASS = `${STORE_FIELD_CLASS} font-mono`;
 
 function statusBadgeClasses(status: 'connected' | 'pending' | 'error' | 'none'): string {
   switch (status) {
@@ -398,7 +398,7 @@ export default function CustomDomain() {
                 placeholder="shop.yourbrand.com"
                 autoCapitalize="none"
                 autoCorrect="off"
-                className={fieldClassName}
+                className={STORE_FIELD_MONO_CLASS}
               />
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 Use a subdomain you control. Apex domains may require additional DNS setup.

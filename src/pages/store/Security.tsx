@@ -25,11 +25,12 @@ import {
   FiTrash2,
   FiUserX,
 } from 'react-icons/fi';
-
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
-const chipBaseClassName =
-  'px-4 py-3 rounded-xl font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60';
+import {
+  STORE_CHIP_CLASS,
+  STORE_FIELD_CLASS,
+  STORE_SAVE_BTN_DISABLED,
+  STORE_SAVE_BTN_ENABLED,
+} from './storeTypography';
 
 const VISIBILITY_OPTIONS: { value: StoreVisibility; label: string; description: string }[] = [
   {
@@ -233,7 +234,7 @@ export default function Security() {
                     type="button"
                     disabled={saving}
                     onClick={() => patch({ visibility: option.value })}
-                    className={`w-full text-left rounded-xl border p-4 transition-all ${chipBaseClassName} ${
+                    className={`w-full text-left rounded-xl border p-4 transition-all ${STORE_CHIP_CLASS} ${
                       selected
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100'
                         : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
@@ -275,7 +276,7 @@ export default function Security() {
                     disabled={saving}
                     onChange={(e) => patch({ storePassword: e.target.value })}
                     placeholder="Enter a secure password"
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                     autoComplete="new-password"
                   />
                 </div>
@@ -301,7 +302,7 @@ export default function Security() {
                     }
                   }}
                   placeholder="customer@email.com"
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
                 <button
                   type="button"
@@ -417,11 +418,7 @@ export default function Security() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`w-full py-3 rounded-xl font-medium transition-colors ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
-          }`}
+          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
@@ -432,11 +429,7 @@ export default function Security() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-xl'
-          }`}
+          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>

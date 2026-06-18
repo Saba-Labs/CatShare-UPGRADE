@@ -11,6 +11,7 @@ import StoreHeader from './components/StoreHeader';
 import NavigationCard from './components/NavigationCard';
 import StoreIconTile from './components/StoreIconTile';
 import { STORE_NAVIGATION } from './config/storeNavigation';
+import { STORE_CATEGORY_TITLE } from './storeTypography';
 
 function isToday(dateStr: string): boolean {
   const date = new Date(dateStr);
@@ -130,10 +131,10 @@ export default function StoreDashboard() {
         isLive={store?.isLive ?? false}
       />
 
-      <div className="space-y-10">
+      <div className="space-y-8">
         {STORE_NAVIGATION.map((category) => (
           <section key={category.title}>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+            <h2 className={`${STORE_CATEGORY_TITLE} mb-3`}>
               {category.title}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

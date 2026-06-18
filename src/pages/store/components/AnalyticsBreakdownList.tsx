@@ -20,7 +20,7 @@ export default function AnalyticsBreakdownList({ title, rows, loading }: Analyti
 
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">{title}</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-gray-600 dark:text-gray-400">No data available yet.</p>
       ) : (

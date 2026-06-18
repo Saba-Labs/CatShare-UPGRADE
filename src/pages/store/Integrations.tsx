@@ -16,6 +16,7 @@ import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { useSellerIntegrations } from '../../integrations/hooks/useSellerIntegrations';
 import { disconnectIntegration } from '../../integrations/core/IntegrationConnectionService';
 import { isConnectedStatus } from '../../integrations/core/IntegrationStatusService';
+import { STORE_CATEGORY_TITLE, STORE_SECTION_DESCRIPTION } from './storeTypography';
 
 export default function Integrations() {
   const navigate = useNavigate();
@@ -148,9 +149,9 @@ export default function Integrations() {
 
           return (
             <section key={category}>
-              <div className="mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{meta.label}</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{meta.description}</p>
+              <div className="mb-3">
+                <h2 className={STORE_CATEGORY_TITLE}>{meta.label}</h2>
+                <p className={STORE_SECTION_DESCRIPTION}>{meta.description}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

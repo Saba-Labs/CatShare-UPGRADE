@@ -15,18 +15,21 @@ import {
   type StoreBehaviorSettings,
 } from '../types/storeBehaviorSettings';
 
+export function resolveListingCatalogueId(
+  storeCatalogueId: string | null | undefined
+): string {
+  return String(storeCatalogueId ?? '').trim();
+}
+
+/** @deprecated Use {@link resolveListingCatalogueId} — store.catalogue_id is set via Store Settings. */
 export function resolveBehaviorCatalogueId(
   productsToShow: ProductsToShow,
   storeCatalogueId: string,
   catalogues: Catalogue[]
 ): string {
-  if (productsToShow === 'wholesale') {
-    return catalogues.find((c) => c.id === 'cat1')?.id ?? storeCatalogueId;
-  }
-  if (productsToShow === 'reseller') {
-    return catalogues.find((c) => c.id === 'cat2')?.id ?? storeCatalogueId;
-  }
-  return storeCatalogueId;
+  void productsToShow;
+  void catalogues;
+  return resolveListingCatalogueId(storeCatalogueId);
 }
 
 function isFeaturedProduct(product: ProductWithCatalogueData, catalogueId: string): boolean {
@@ -54,7 +57,7 @@ export function filterProductsByBehaviorScope(
     case 'reseller':
       return products.filter((p) => isProductEnabledForCatalogue(p, catalogueId));
     default:
-      return products;
+      return products.filter((p) => isProductEnabledForCatalogue(p, catalogueId));
   }
 }
 

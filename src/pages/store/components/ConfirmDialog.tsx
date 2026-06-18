@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { FiAlertTriangle, FiX } from 'react-icons/fi';
+import { STORE_SECTION_TITLE } from '../storeTypography';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -96,7 +97,7 @@ export default function ConfirmDialog({
               <div className="min-w-0">
                 <h2
                   id={titleId}
-                  className={`text-lg font-semibold ${
+                  className={`${STORE_SECTION_TITLE} ${
                     isDanger
                       ? 'text-red-900 dark:text-red-100'
                       : 'text-gray-900 dark:text-gray-100'

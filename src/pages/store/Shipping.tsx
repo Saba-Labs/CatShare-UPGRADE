@@ -24,11 +24,12 @@ import {
   fetchShippingPreferences,
   updateShippingPreferences,
 } from '../../integrations/services/shippingPreferencesService';
-
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
-const chipBaseClassName =
-  'px-4 py-3 rounded-xl font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60';
+import {
+  STORE_CHIP_CLASS,
+  STORE_FIELD_CLASS,
+  STORE_SAVE_BTN_DISABLED,
+  STORE_SAVE_BTN_ENABLED,
+} from './storeTypography';
 
 const DELIVERY_MODES: { mode: ShippingPreferenceMode; label: string; description: string }[] = [
   {
@@ -414,7 +415,7 @@ export default function Shipping() {
                     type="button"
                     disabled={saving}
                     onClick={() => updateSettings({ mode: option.mode })}
-                    className={`${chipBaseClassName} text-left ${
+                    className={`${STORE_CHIP_CLASS} text-left ${
                       settings.mode === option.mode
                         ? 'bg-blue-600 border-blue-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -451,7 +452,7 @@ export default function Shipping() {
                           e.target.value === '' ? undefined : Number(e.target.value),
                       })
                     }
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                   />
                 </div>
               ) : null}
@@ -499,7 +500,7 @@ export default function Shipping() {
                           e.target.value === '' ? undefined : Number(e.target.value),
                       })
                     }
-                    className={fieldClassName}
+                    className={STORE_FIELD_CLASS}
                   />
                 </div>
               ) : null}
@@ -524,7 +525,7 @@ export default function Shipping() {
                   onChange={(e) =>
                     updateSettings({ serviceCharge: Number(e.target.value) || 0 })
                   }
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -540,7 +541,7 @@ export default function Shipping() {
                   onChange={(e) =>
                     updateSettings({ packagingCharge: Number(e.target.value) || 0 })
                   }
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -556,7 +557,7 @@ export default function Shipping() {
                   onChange={(e) =>
                     updateSettings({ handlingCharge: Number(e.target.value) || 0 })
                   }
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
             </div>
@@ -582,7 +583,7 @@ export default function Shipping() {
                       estimatedDeliveryMinDays: Number(e.target.value) || 1,
                     })
                   }
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
               <div>
@@ -600,7 +601,7 @@ export default function Shipping() {
                       estimatedDeliveryMaxDays: Number(e.target.value) || 1,
                     })
                   }
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 />
               </div>
             </div>
@@ -689,7 +690,7 @@ export default function Shipping() {
                           value={zone.name}
                           disabled={saving}
                           onChange={(e) => updateZone(index, { name: e.target.value })}
-                          className={fieldClassName}
+                          className={STORE_FIELD_CLASS}
                         />
                       </div>
                       <div>
@@ -701,7 +702,7 @@ export default function Shipping() {
                           value={zone.regions}
                           disabled={saving}
                           onChange={(e) => updateZone(index, { regions: e.target.value })}
-                          className={fieldClassName}
+                          className={STORE_FIELD_CLASS}
                           placeholder="States, pincodes, or countries"
                         />
                       </div>
@@ -752,11 +753,7 @@ export default function Shipping() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`w-full py-3 rounded-xl font-medium transition-colors ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
-          }`}
+          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
@@ -767,11 +764,7 @@ export default function Shipping() {
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-xl'
-          }`}
+          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
         >
           {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>

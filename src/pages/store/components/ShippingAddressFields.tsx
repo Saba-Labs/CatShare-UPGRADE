@@ -1,7 +1,5 @@
 import type { ShippingAddress } from '../../../integrations/core/types';
-
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+import { STORE_FIELD_CLASS } from '../storeTypography';
 
 interface ShippingAddressFieldsProps {
   value: ShippingAddress;
@@ -32,7 +30,7 @@ export default function ShippingAddressFields({
           value={value.contactName}
           onChange={(e) => update('contactName', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
           placeholder="Warehouse manager"
         />
       </div>
@@ -47,7 +45,7 @@ export default function ShippingAddressFields({
           value={value.phone}
           onChange={(e) => update('phone', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
           placeholder="+91 98765 43210"
         />
       </div>
@@ -62,7 +60,7 @@ export default function ShippingAddressFields({
           value={value.line1}
           onChange={(e) => update('line1', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
           placeholder="Building, street"
         />
       </div>
@@ -77,7 +75,7 @@ export default function ShippingAddressFields({
           value={value.line2}
           onChange={(e) => update('line2', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
           placeholder="Area, landmark (optional)"
         />
       </div>
@@ -92,7 +90,7 @@ export default function ShippingAddressFields({
           value={value.city}
           onChange={(e) => update('city', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
         />
       </div>
 
@@ -106,7 +104,7 @@ export default function ShippingAddressFields({
           value={value.state}
           onChange={(e) => update('state', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
         />
       </div>
 
@@ -121,7 +119,7 @@ export default function ShippingAddressFields({
           value={value.pincode}
           onChange={(e) => update('pincode', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
           placeholder="110001"
         />
       </div>
@@ -136,7 +134,7 @@ export default function ShippingAddressFields({
           value={value.country}
           onChange={(e) => update('country', e.target.value)}
           disabled={disabled}
-          className={fieldClassName}
+          className={STORE_FIELD_CLASS}
         />
       </div>
     </div>

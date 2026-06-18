@@ -30,6 +30,12 @@ import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
 import {
+  STORE_CHIP_CLASS,
+  STORE_FIELD_CLASS,
+  STORE_SAVE_BTN_DISABLED,
+  STORE_SAVE_BTN_ENABLED,
+} from './storeTypography';
+import {
   FiAlertCircle,
   FiCheck,
   FiCopy,
@@ -134,11 +140,6 @@ const COUNTRIES = [
 const REGIONS = [
   'worldwide', 'north-america', 'europe', 'asia-pacific', 'middle-east', 'africa', 'south-america'
 ];
-
-const fieldClassName =
-  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
-const chipBaseClassName =
-  'px-4 py-3 rounded-xl font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60';
 
 export default function StoreSettings() {
   const { user, loading: authLoading } = useAuth();
@@ -390,10 +391,15 @@ export default function StoreSettings() {
 
       const behaviorChanged =
         JSON.stringify(behaviorFromStoreSettingsState(settings)) !==
-        JSON.stringify(behaviorFromStoreSettingsState(originalSettings));
+          JSON.stringify(behaviorFromStoreSettingsState(originalSettings)) ||
+        settings.catalogueId !== originalSettings.catalogueId;
 
       if (behaviorChanged) {
-        const behavior = behaviorFromStoreSettingsState(settings);
+        const behavior = behaviorFromStoreSettingsState({
+          ...settings,
+          productsToShow:
+            settings.catalogueId !== originalSettings.catalogueId ? 'all' : settings.productsToShow,
+        });
         const behaviorResult = await updateBehaviorSettings(sellerId, behavior);
         if (behaviorResult.error) {
           failures.push('Failed to save catalogue and display preferences');
@@ -552,7 +558,7 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('storeSlug', e.target.value.toLowerCase())}
                   placeholder="my-store"
                   disabled={saving}
-                  className={`${fieldClassName} ${
+                  className={`${STORE_FIELD_CLASS} ${
                     validationErrors.storeSlug
                       ? 'border-red-300 bg-red-50 text-gray-900'
                       : ''
@@ -651,7 +657,7 @@ export default function StoreSettings() {
                   value={settings.catalogueId}
                   onChange={(e) => handleChange('catalogueId', e.target.value)}
                   disabled={saving || catalogues.length === 0}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   <option value="">Select a catalogue...</option>
                   {catalogues.map((cat) => (
@@ -670,7 +676,7 @@ export default function StoreSettings() {
                   value={settings.defaultSorting}
                   onChange={(e) => handleChange('defaultSorting', e.target.value as any)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
@@ -698,7 +704,7 @@ export default function StoreSettings() {
                       key={mode}
                       onClick={() => handleChange('viewMode', mode)}
                       disabled={saving}
-                      className={`${chipBaseClassName} flex-1 ${
+                      className={`${STORE_CHIP_CLASS} flex-1 ${
                         settings.viewMode === mode
                           ? 'bg-blue-600 border-blue-600 text-white'
                           : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -720,7 +726,7 @@ export default function StoreSettings() {
                       key={ratio}
                       onClick={() => handleChange('productImageRatio', ratio)}
                       disabled={saving}
-                      className={`${chipBaseClassName} ${
+                      className={`${STORE_CHIP_CLASS} ${
                         settings.productImageRatio === ratio
                           ? 'bg-blue-600 border-blue-600 text-white'
                           : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -779,7 +785,7 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('whatsappNumber', e.target.value)}
                   placeholder="+1 (555) 000-0000"
                   disabled={saving}
-                  className={`${fieldClassName} ${
+                  className={`${STORE_FIELD_CLASS} ${
                     validationErrors.whatsappNumber
                       ? 'border-red-300 bg-red-50 text-gray-900'
                       : ''
@@ -802,7 +808,7 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('minimumOrderValue', e.target.value)}
                   placeholder="0"
                   disabled={saving}
-                  className={`${fieldClassName} ${
+                  className={`${STORE_FIELD_CLASS} ${
                     validationErrors.minimumOrderValue
                       ? 'border-red-300 bg-red-50 text-gray-900'
                       : ''
@@ -821,7 +827,7 @@ export default function StoreSettings() {
                   value={settings.defaultCurrency}
                   onChange={(e) => handleChange('defaultCurrency', e.target.value)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   {CURRENCIES.map((cur) => (
                     <option key={cur} value={cur}>
@@ -839,7 +845,7 @@ export default function StoreSettings() {
                   value={settings.defaultLanguage}
                   onChange={(e) => handleChange('defaultLanguage', e.target.value)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   {LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
@@ -901,7 +907,7 @@ export default function StoreSettings() {
                   value={settings.timeZone}
                   onChange={(e) => handleChange('timeZone', e.target.value)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   {TIME_ZONES.map((tz) => (
                     <option key={tz} value={tz}>
@@ -919,7 +925,7 @@ export default function StoreSettings() {
                   value={settings.businessCountry}
                   onChange={(e) => handleChange('businessCountry', e.target.value)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   {COUNTRIES.map((country) => (
                     <option key={country} value={country}>
@@ -937,7 +943,7 @@ export default function StoreSettings() {
                   value={settings.defaultShippingRegion}
                   onChange={(e) => handleChange('defaultShippingRegion', e.target.value)}
                   disabled={saving}
-                  className={fieldClassName}
+                  className={STORE_FIELD_CLASS}
                 >
                   {REGIONS.map((region) => (
                     <option key={region} value={region}>
@@ -976,11 +982,7 @@ export default function StoreSettings() {
         <button
           onClick={handleSave}
           disabled={!canSave}
-          className={`w-full py-3 rounded-xl font-medium transition-colors ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
-          }`}
+          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
         >
           {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>
@@ -991,11 +993,7 @@ export default function StoreSettings() {
         <button
           onClick={handleSave}
           disabled={!canSave}
-          className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${
-            !canSave
-              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-xl'
-          }`}
+          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
         >
           {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
         </button>

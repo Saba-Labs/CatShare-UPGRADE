@@ -26,7 +26,7 @@ export default function DangerActionCard({
             {icon}
           </span>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-red-900 dark:text-red-100">{title}</h3>
+            <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">{title}</h3>
             <p className="mt-1.5 text-sm text-red-800/80 dark:text-red-200/70 leading-relaxed">
               {description}
             </p>

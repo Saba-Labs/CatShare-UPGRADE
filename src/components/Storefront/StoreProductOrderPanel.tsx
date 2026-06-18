@@ -97,8 +97,9 @@ export default function StoreProductOrderPanel({
   ctaStyle = 'solid',
   showQuantitySelector = true,
 }: StoreProductOrderPanelProps) {
-  const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
-  const variantData = getVariantCombinationData(product, variantSelection, store.catalogueId);
+  const catalogueId = catalogue?.id ?? store.catalogueId ?? '';
+  const catData = catalogueId ? getCatalogueData(product, catalogueId) : null;
+  const variantData = getVariantCombinationData(product, variantSelection, catalogueId);
   const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
   const qstep = rules.step;
   const minQty = rules.minQty;
@@ -113,7 +114,7 @@ export default function StoreProductOrderPanel({
   const calcDetail = quantity > 0 ? fmtCalc(quantity, price, priceUnit, currencySymbol, qstep) : null;
   const fields = buildStorefrontDetailFields(
     product,
-    store.catalogueId,
+    catalogueId,
     sellerFieldsDefinition,
     variantSelection
   );

@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { STORE_SECTION_DESCRIPTION, STORE_SECTION_TITLE } from '../storeTypography';
 
 interface SettingsCardProps {
   title: string;
@@ -15,10 +16,10 @@ export default function SettingsCard({
 }: SettingsCardProps) {
   return (
     <section className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm ${className}`}>
-      <div className="p-4 sm:p-6">
-        {title && <h2 style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>{title}</h2>}
-        {description && <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</p>}
-        <div className="mt-4">{children}</div>
+      <div className="p-4 sm:p-5">
+        {title ? <h2 className={STORE_SECTION_TITLE}>{title}</h2> : null}
+        {description ? <p className={STORE_SECTION_DESCRIPTION}>{description}</p> : null}
+        <div className={title || description ? 'mt-3 sm:mt-4' : ''}>{children}</div>
       </div>
     </section>
   );
