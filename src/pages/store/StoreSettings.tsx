@@ -148,6 +148,7 @@ export default function StoreSettings() {
   const [validationErrors, setValidationErrors] = useState<Partial<Record<SettingsKey, string>>>({});
   const [slugValidation, setSlugValidation] = useState<'available' | 'taken' | 'invalid' | null>(null);
   const [slugValidating, setSlugValidating] = useState(false);
+  const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
 
   // Load initial settings
   useEffect(() => {
@@ -169,6 +170,10 @@ export default function StoreSettings() {
           if (store.checkoutSettings?.experience) {
             checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
             checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
+          }
+
+          if (store.cataloguesDefinition && store.cataloguesDefinition.length > 0) {
+            setCatalogues(store.cataloguesDefinition);
           }
 
           const loadedSettings: StoreSettingsState = {
@@ -628,14 +633,15 @@ export default function StoreSettings() {
                 <select
                   value={settings.productsToShow}
                   onChange={(e) => handleChange('productsToShow', e.target.value as any)}
-                  disabled={saving}
+                  disabled={saving || catalogues.length === 0}
                   className={fieldClassName}
                 >
-                  <option value="all">All Products</option>
-                  <option value="wholesale">Wholesale</option>
-                  <option value="reseller">Reseller</option>
-                  <option value="featured">Featured Collection</option>
-                  <option value="category">Category</option>
+                  <option value="">Select a catalogue...</option>
+                  {catalogues.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
