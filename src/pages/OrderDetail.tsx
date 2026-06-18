@@ -2636,11 +2636,11 @@ useEffect(() => {
                                   {item.subtitle}
                                 </div>
                               )}
-                              {item.variantSummary && parseVariantSummary(item.variantSummary).map((pill, idx) => (
-                                <div key={idx} style={{ fontSize: 12, color: COLORS.green, fontWeight: 500 }}>
-                                  {pill}
+                              {item.variantSummary && (
+                                <div style={{ fontSize: 12, color: COLORS.green, fontWeight: 500 }}>
+                                  {parseVariantSummary(item.variantSummary).join(', ')}
                                 </div>
-                              ))}
+                              )}
                             </div>
                           </div>
                           <div
