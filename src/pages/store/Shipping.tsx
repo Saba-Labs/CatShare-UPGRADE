@@ -274,7 +274,6 @@ export default function Shipping() {
       <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 max-w-3xl">
         <PageHeader
           title="Shipping"
-          description="Manage carriers, delivery charges, addresses, and customer tracking."
           sticky
           actions={(
             <button

@@ -107,7 +107,6 @@ export default function DangerZone() {
       <div className="max-w-2xl pb-8">
         <PageHeader
           title="Danger Zone"
-          description="Irreversible actions that affect your entire store. Proceed with caution."
           backTo="/store"
         />
 

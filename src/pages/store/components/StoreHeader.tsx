@@ -34,7 +34,7 @@ export default function StoreHeader({
     <div className="mb-8">
       {/* Title and Status */}
       <div className="mb-6">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-3">{storeName}</h1>
+        <h1 style={{ fontSize: 30, fontWeight: 700, color: '#1f2937', lineHeight: 1.2, marginBottom: 8 }}>{storeName}</h1>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
             isLive
@@ -55,7 +55,8 @@ export default function StoreHeader({
               href={storeUrl || undefined}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-lg sm:text-xl font-mono font-semibold text-white break-all hover:text-blue-50 transition-colors cursor-pointer"
+              style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: 'monospace', wordBreak: 'break-all' }}
+              className="hover:text-blue-50 transition-colors cursor-pointer"
             >
               {storeUrl || 'Not configured'}
             </a>

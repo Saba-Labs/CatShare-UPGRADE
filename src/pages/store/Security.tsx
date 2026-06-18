@@ -202,7 +202,6 @@ export default function Security() {
       <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 max-w-3xl">
         <PageHeader
           title="Security"
-          description="Control store access, monitor activity, and protect your account."
           sticky
           actions={(
             <button

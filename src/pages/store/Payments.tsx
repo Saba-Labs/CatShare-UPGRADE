@@ -82,7 +82,6 @@ export default function Payments() {
     <StoreLayout>
       <PageHeader
         title="Payments"
-        description="Connect payment gateways to accept online payments from customers."
       />
 
       <div className="space-y-6 max-w-3xl">

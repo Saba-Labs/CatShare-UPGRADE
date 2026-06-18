@@ -457,7 +457,6 @@ export default function StoreSettings() {
       <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
         <PageHeader
           title="Store Settings"
-          description="Configure how your store behaves and how customers interact with it."
           sticky
           actions={(
             <button
