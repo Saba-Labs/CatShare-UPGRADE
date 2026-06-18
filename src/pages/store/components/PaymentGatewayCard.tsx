@@ -1,4 +1,5 @@
 import { FiExternalLink, FiLink2, FiSettings, FiX } from 'react-icons/fi';
+import type { IntegrationConnectionStatus } from '../../../integrations/core/types';
 import { STORE_CARD_TITLE } from '../storeTypography';
 import {
   canConnect,

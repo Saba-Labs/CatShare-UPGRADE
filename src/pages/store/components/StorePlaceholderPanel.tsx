@@ -1,3 +1,4 @@
+import { FiClock, FiLoader, FiRefreshCw } from 'react-icons/fi';
 import { STORE_SECTION_TITLE, STORE_BODY } from '../storeTypography';
 
 interface StorePlaceholderPanelProps {
