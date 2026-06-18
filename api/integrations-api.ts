@@ -33,15 +33,51 @@ function routeKey(req: VercelRequest): string {
   return '';
 }
 
+async function handleRazorpayWebhook(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // TODO: verify Razorpay webhook signature (x-razorpay-signature)
+  // TODO: map event type → upsert order_payments via service role
+  console.info('[webhook stub] razorpay', {
+    event: (req.body as { event?: string })?.event,
+    receivedAt: new Date().toISOString(),
+  });
+
+  return res.status(200).json({ received: true, stub: true });
+}
+
+async function handleShiprocketWebhook(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // TODO: verify Shiprocket webhook authenticity
+  // TODO: map tracking events → order_shipments.timeline
+  console.info('[webhook stub] shiprocket', {
+    receivedAt: new Date().toISOString(),
+  });
+
+  return res.status(200).json({ received: true, stub: true });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyApiCors(req, res, 'GET, POST, OPTIONS')) return;
+
+  const key = routeKey(req);
+
+  if (key === 'webhooks/razorpay') {
+    return handleRazorpayWebhook(req, res);
+  }
+  if (key === 'webhooks/shiprocket') {
+    return handleShiprocketWebhook(req, res);
+  }
 
   const auth = await getSupabaseUserFromRequest(req.headers.authorization);
   if (auth.ok === false) {
     return res.status(401).json({ error: auth.error });
   }
-
-  const key = routeKey(req);
 
   if (key === '' && req.method === 'GET') {
     try {
