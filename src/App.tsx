@@ -64,6 +64,18 @@ const EmailConfirmed = lazy(() => import("./pages/EmailConfirmed"));
 const Account = lazy(() => import("./pages/Account"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Store = lazy(() => import("./pages/Store"));
+const StoreDashboard = lazy(() => import("./pages/store/StoreDashboard"));
+const StoreSettings = lazy(() => import("./pages/store/StoreSettings"));
+const BusinessProfile = lazy(() => import("./pages/store/BusinessProfile"));
+const Payments = lazy(() => import("./pages/store/Payments"));
+const Shipping = lazy(() => import("./pages/store/Shipping"));
+const Checkout = lazy(() => import("./pages/store/Checkout"));
+const CustomDomain = lazy(() => import("./pages/store/CustomDomain"));
+const Analytics = lazy(() => import("./pages/store/Analytics"));
+const Marketing = lazy(() => import("./pages/store/Marketing"));
+const StoreIntegrations = lazy(() => import("./pages/store/Integrations"));
+const Security = lazy(() => import("./pages/store/Security"));
+const DangerZone = lazy(() => import("./pages/store/DangerZone"));
 const CreateOrder = lazy(() => import("./pages/CreateOrder"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const TrackOrder = lazy(() => import("./pages/TrackOrder"));
@@ -2610,14 +2622,115 @@ if (user?.uid && !authService.isOfflineGuest()) {
             </ProtectedRoute>
           }
         />
+        {/* Old Store route - kept for backwards compatibility */}
         <Route
-          path="/store"
+          path="/store-legacy"
           element={
             <ProtectedRoute>
               <Store />
             </ProtectedRoute>
           }
         />
+
+        {/* New Modular Store Routes */}
+        <Route
+          path="/store"
+          element={
+            <ProtectedRoute>
+              <StoreDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/settings"
+          element={
+            <ProtectedRoute>
+              <StoreSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/business"
+          element={
+            <ProtectedRoute>
+              <BusinessProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/payments"
+          element={
+            <ProtectedRoute>
+              <Payments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/shipping"
+          element={
+            <ProtectedRoute>
+              <Shipping />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/checkout"
+          element={
+            <ProtectedRoute>
+              <Checkout />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/domain"
+          element={
+            <ProtectedRoute>
+              <CustomDomain />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/marketing"
+          element={
+            <ProtectedRoute>
+              <Marketing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/integrations"
+          element={
+            <ProtectedRoute>
+              <StoreIntegrations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/security"
+          element={
+            <ProtectedRoute>
+              <Security />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store/danger"
+          element={
+            <ProtectedRoute>
+              <DangerZone />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Preserve existing homepage editor and custom domain routes */}
         <Route
           path="/store/homepage"
           element={
@@ -2639,14 +2752,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <StoreCheckoutSettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/store/integrations"
-          element={
-            <ProtectedRoute>
-              <IntegrationsPage />
             </ProtectedRoute>
           }
         />
