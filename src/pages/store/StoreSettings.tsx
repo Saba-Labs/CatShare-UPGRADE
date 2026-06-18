@@ -11,6 +11,7 @@ import {
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
   updateStoreCheckoutSettings,
+  updateStoreCatalogue,
   normalizeStoreWhatsappInput,
   normalizeStoreMinimumOrderValueInput,
   validateStoreSlug,
@@ -23,6 +24,7 @@ import {
 } from '../../types/storeBehaviorSettings';
 import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
+import { getAllCatalogues } from '../../config/catalogueConfig';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -44,6 +46,7 @@ interface StoreSettingsState {
   storeSlug: string;
 
   // Catalogue Settings
+  catalogueId: string;
   productsToShow: 'all' | 'wholesale' | 'reseller' | 'featured' | 'category';
   maxProducts: number;
   defaultSorting: 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical';
@@ -79,6 +82,7 @@ const INITIAL_STATE: StoreSettingsState = {
   storeEnabled: true,
   maintenanceMode: false,
   storeSlug: '',
+  catalogueId: '',
   productsToShow: 'all',
   maxProducts: 100,
   defaultSorting: 'newest',
@@ -148,6 +152,7 @@ export default function StoreSettings() {
   const [validationErrors, setValidationErrors] = useState<Partial<Record<SettingsKey, string>>>({});
   const [slugValidation, setSlugValidation] = useState<'available' | 'taken' | 'invalid' | null>(null);
   const [slugValidating, setSlugValidating] = useState(false);
+  const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
 
   // Load initial settings
   useEffect(() => {
@@ -164,6 +169,11 @@ export default function StoreSettings() {
         let checkoutRequireLogin = behavior.requireLoginBeforeCheckout;
         let checkoutAllowGuest = behavior.allowGuestBrowsing;
 
+        const cataloguesList = getAllCatalogues(user.uid);
+        if (cataloguesList && cataloguesList.length > 0) {
+          setCatalogues(cataloguesList.map(cat => ({ id: cat.id, label: cat.label })));
+        }
+
         if (storeResult.success && storeResult.data) {
           const store = storeResult.data;
           if (store.checkoutSettings?.experience) {
@@ -174,6 +184,7 @@ export default function StoreSettings() {
           const loadedSettings: StoreSettingsState = {
             ...INITIAL_STATE,
             ...behavior,
+            catalogueId: store.catalogueId || '',
             storeSlug: store.storeSlug || '',
             storeEnabled: store.isLive !== false,
             maintenanceMode: store.maintenanceMode === true,
@@ -367,6 +378,13 @@ export default function StoreSettings() {
         const result = await updateStoreViewMode(sellerId, settings.viewMode);
         if (!result.success) {
           failures.push(result.error || 'Failed to update view mode');
+        }
+      }
+
+      if (settings.catalogueId !== originalSettings.catalogueId) {
+        const result = await updateStoreCatalogue(sellerId, settings.catalogueId);
+        if (!result.success) {
+          failures.push(result.error || 'Failed to update catalogue');
         }
       }
 
@@ -626,16 +644,17 @@ export default function StoreSettings() {
                   Products to Show
                 </label>
                 <select
-                  value={settings.productsToShow}
-                  onChange={(e) => handleChange('productsToShow', e.target.value as any)}
-                  disabled={saving}
+                  value={settings.catalogueId}
+                  onChange={(e) => handleChange('catalogueId', e.target.value)}
+                  disabled={saving || catalogues.length === 0}
                   className={fieldClassName}
                 >
-                  <option value="all">All Products</option>
-                  <option value="featured">Featured Products</option>
-                  <option value="category">Products with Categories</option>
-                  <option value="wholesale">Wholesale Catalogue</option>
-                  <option value="reseller">Reseller Catalogue</option>
+                  <option value="">Select a catalogue...</option>
+                  {catalogues.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
