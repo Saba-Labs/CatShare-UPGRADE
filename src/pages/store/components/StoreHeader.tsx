@@ -52,12 +52,12 @@ export default function StoreHeader({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-blue-100 mb-2 uppercase tracking-wider">Your Store URL</p>
             <a
-              href={storeUrl ? `https://${storeUrl}` : undefined}
+              href={storeUrl || undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="text-lg sm:text-xl font-mono font-semibold text-white break-all hover:text-blue-50 transition-colors cursor-pointer"
             >
-              {storeUrl ? `https://${storeUrl}` : 'Not configured'}
+              {storeUrl || 'Not configured'}
             </a>
           </div>
           {storeUrl && (
