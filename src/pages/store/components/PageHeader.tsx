@@ -37,7 +37,7 @@ export default function PageHeader({
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{title}</h1>
             {description && <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-3xl">{description}</p>}
           </div>
         </div>
