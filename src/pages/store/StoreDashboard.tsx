@@ -8,18 +8,9 @@ import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
 import type { Store } from '../../services/storeService';
 import StoreLayout from './components/StoreLayout';
 import StoreHeader from './components/StoreHeader';
-import StoreHealthCard from './components/StoreHealthCard';
-import QuickActionButton from './components/QuickActionButton';
 import NavigationCard from './components/NavigationCard';
 import StoreIconTile from './components/StoreIconTile';
 import { STORE_NAVIGATION } from './config/storeNavigation';
-import {
-  FiHome,
-  FiShoppingCart,
-  FiEye,
-  FiPackage,
-  FiShoppingBag,
-} from 'react-icons/fi';
 
 function isToday(dateStr: string): boolean {
   const date = new Date(dateStr);
@@ -138,53 +129,6 @@ export default function StoreDashboard() {
         storeUrl={storeUrl}
         isLive={store?.isLive ?? false}
       />
-
-      <StoreHealthCard metrics={metrics} />
-
-      <div className="mb-12">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <QuickActionButton
-            icon={<FiEye className="h-8 w-8" />}
-            title="Preview Store"
-            description="View as customer"
-            onClick={() => storeUrl && window.open(storeUrl, '_blank')}
-          />
-          <QuickActionButton
-            icon={<FiHome className="h-8 w-8" />}
-            title="Edit Homepage"
-            description="Design storefront"
-            onClick={() => navigate('/store/homepage')}
-          />
-          <QuickActionButton
-            icon={<FiPackage className="h-8 w-8" />}
-            title="Manage Products"
-            description="View & edit items"
-            onClick={() => navigate('/')}
-          />
-          <QuickActionButton
-            icon={<FiShoppingBag className="h-8 w-8" />}
-            title="Orders"
-            description="See all orders"
-            onClick={() => navigate('/orders')}
-          />
-          <QuickActionButton
-            icon={<FiShoppingCart className="h-8 w-8" />}
-            title="Share Store"
-            description="Share with customers"
-            onClick={() => {
-              if (!storeUrl) return;
-              if (navigator.share) {
-                void navigator.share({
-                  title: store?.storeSlug || 'My Store',
-                  text: 'Check out my store!',
-                  url: storeUrl,
-                }).catch(() => {});
-              }
-            }}
-          />
-        </div>
-      </div>
 
       <div className="space-y-10">
         {STORE_NAVIGATION.map((category) => (
