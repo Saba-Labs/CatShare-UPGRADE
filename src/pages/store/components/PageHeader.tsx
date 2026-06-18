@@ -30,11 +30,10 @@ export default function PageHeader({
           {showBackButton && (
             <button
               onClick={() => navigate(backTo)}
-              className="mb-4 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/30 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="mb-4 flex items-center justify-center h-9 w-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
               aria-label="Go back"
             >
-              <FiArrowLeft className="h-4 w-4" />
-              Back
+              <FiArrowLeft className="h-5 w-5" />
             </button>
           )}
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">{title}</h1>
