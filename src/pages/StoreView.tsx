@@ -25,7 +25,6 @@ import { productImageDisplayUrl } from '../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
 import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '../utils/productCategoryUtils';
 import {
-  applyMaxProducts,
   filterProductsByBehaviorScope,
   productImageAspectRatio,
   productsPerRowCount,
@@ -1310,14 +1309,11 @@ export default function StoreView() {
       }
     }
 
-    return applyMaxProducts(
-      sortStorefrontProducts(
-        listed,
-        behavior.defaultSorting,
-        listingCatalogueId,
-        effectiveCatalogue
-      ),
-      behavior.maxProducts
+    return sortStorefrontProducts(
+      listed,
+      behavior.defaultSorting,
+      listingCatalogueId,
+      effectiveCatalogue
     );
   }, [
     listingCatalogueId,
@@ -1328,7 +1324,6 @@ export default function StoreView() {
     resolvedInventoryId,
     behavior.productsToShow,
     behavior.defaultSorting,
-    behavior.maxProducts,
   ]);
   const availableCategories = useMemo(
     () => buildStorefrontCategoryFilterList(store?.productCategories, storeProducts),

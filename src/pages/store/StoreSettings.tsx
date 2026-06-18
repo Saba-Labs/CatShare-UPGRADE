@@ -641,21 +641,6 @@ export default function StoreSettings() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Maximum Products
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={settings.maxProducts}
-                  onChange={(e) => handleChange('maxProducts', parseInt(e.target.value) || 100)}
-                  disabled={saving}
-                  className={fieldClassName}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Default Sorting
                 </label>
                 <select
