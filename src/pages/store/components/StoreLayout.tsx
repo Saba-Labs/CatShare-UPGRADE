@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainAppBottomNav from '../../../components/MainAppBottomNav';
-import { FiEye, FiExternalLink } from 'react-icons/fi';
 
 /** Matches legacy store / orders status bar height. */
 export const STORE_STATUS_BAR_HEIGHT_PX = 40;
@@ -36,24 +35,6 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
           </div>
         </main>
 
-        {storeUrl ? (
-          <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:hidden left-0 right-0 bg-white/95 dark:bg-gray-950/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-3 space-y-2 z-40">
-            <button
-              onClick={() => window.open(`https://${storeUrl}`, '_blank')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-xl active:scale-[0.99] active:bg-blue-700 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              <FiExternalLink className="h-4 w-4" />
-              Open Store
-            </button>
-            <button
-              onClick={() => navigate('/store/homepage')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded-xl active:scale-[0.99] active:bg-gray-50 dark:active:bg-gray-800 transition-all text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
-              <FiEye className="h-4 w-4" />
-              Edit Homepage
-            </button>
-          </div>
-        ) : null}
 
         <MainAppBottomNav active="store" />
       </div>
