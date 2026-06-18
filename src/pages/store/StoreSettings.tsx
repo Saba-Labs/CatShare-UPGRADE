@@ -724,28 +724,6 @@ export default function StoreSettings() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-                  Products Per Row
-                </label>
-                <div className="grid grid-cols-4 gap-3">
-                  {(['1', '2', '3', '4'] as const).map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => handleChange('productsPerRow', num)}
-                      disabled={saving}
-                      className={`${chipBaseClassName} ${
-                        settings.productsPerRow === num
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex items-start justify-between">
                   <label className="font-medium text-gray-900 dark:text-gray-100">Show Product Price</label>
