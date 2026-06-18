@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { FiCopy } from 'react-icons/fi';
 import { useToast } from '../../../context/ToastContext';
 
 interface StoreHeaderProps {
@@ -11,6 +13,22 @@ export default function StoreHeader({
   storeUrl,
   isLive = false,
 }: StoreHeaderProps) {
+  const { showToast } = useToast();
+  const [copying, setCopying] = useState(false);
+
+  const handleCopyLink = async () => {
+    if (!storeUrl) return;
+
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(`https://${storeUrl}`);
+      showToast('Store link copied!', 'success');
+    } catch (error) {
+      showToast('Failed to copy link', 'error');
+    } finally {
+      setCopying(false);
+    }
+  };
 
   return (
     <div className="mb-8">
@@ -31,7 +49,26 @@ export default function StoreHeader({
       {/* Store URL */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 rounded-2xl p-4 sm:p-5 mb-6 border border-blue-100 dark:border-blue-900/40">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Store URL</p>
-        <p className="text-base sm:text-lg font-mono text-blue-700 dark:text-blue-300 font-semibold break-all">{storeUrl || 'Not configured'}</p>
+        <div className="flex items-center justify-between gap-3">
+          <a
+            href={storeUrl ? `https://${storeUrl}` : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-base sm:text-lg font-mono text-blue-700 dark:text-blue-300 font-semibold break-all hover:underline cursor-pointer"
+          >
+            {storeUrl || 'Not configured'}
+          </a>
+          {storeUrl && (
+            <button
+              onClick={handleCopyLink}
+              disabled={copying}
+              className="flex-shrink-0 p-2 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
+              title="Copy link"
+            >
+              <FiCopy className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
 
     </div>
