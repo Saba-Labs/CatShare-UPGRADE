@@ -121,35 +121,42 @@ export default function HomepageEditorPage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            border: '2px solid #e5e7eb',
-            borderTop: '2px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <span>Loading...</span>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+          <div className="animate-pulse space-y-4">
+            <div className="h-4 w-28 rounded bg-gray-200 dark:bg-gray-800" />
+            <div className="h-24 rounded-xl bg-gray-100 dark:bg-gray-800" />
+            <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
+          </div>
+          <div className="mt-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-blue-500 animate-spin" />
+            Preparing homepage builder...
+          </div>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (!effectiveUid) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', padding: 24 }}>
-        <div style={{ textAlign: 'center', maxWidth: 400 }}>
-          <h2 style={{ margin: '0 0 8px' }}>Sign in to edit your website</h2>
-          <p style={{ color: '#666', marginBottom: 16 }}>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Sign in to edit your website</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             Or open the app once while online so your account is cached on this device.
           </p>
-          <button type="button" onClick={() => navigate('/login')} style={{ padding: '10px 20px', marginRight: 8 }}>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+          >
             Log in
           </button>
-          <button type="button" onClick={() => navigate('/store')}>
+          <button
+            type="button"
+            onClick={() => navigate('/store')}
+            className="ml-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
             Back
           </button>
         </div>
@@ -159,23 +166,14 @@ export default function HomepageEditorPage() {
 
   if (!store) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center', maxWidth: '400px' }}>
-          <div style={{ fontSize: '48px' }}>⚠️</div>
-          <h2 style={{ margin: '0 0 8px 0' }}>Unable to Load Store</h2>
-          <p style={{ margin: '0 0 24px 0', color: '#666' }}>There was an error loading your store. Please try refreshing the page or go back to the store page.</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+          <div className="text-4xl mb-2" aria-hidden>⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Unable to Load Store</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">There was an error loading your store. Please try refreshing the page or go back to the store page.</p>
           <button
             onClick={() => navigate('/store')}
-            style={{
-              padding: '10px 20px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}
+            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
           >
             Go Back to Store
           </button>

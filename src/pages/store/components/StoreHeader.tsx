@@ -66,19 +66,22 @@ export default function StoreHeader({
     <div className="mb-8">
       {/* Title and Status */}
       <div className="mb-6">
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">{storeName}</h1>
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-3">{storeName}</h1>
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{isLive ? '🟢' : '🔴'}</span>
-          <span className={`text-lg font-semibold ${isLive ? 'text-green-600' : 'text-gray-500'}`}>
+          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+            isLive
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+              : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+          }`}>
             {isLive ? 'Live' : 'Offline'}
           </span>
         </div>
       </div>
 
       {/* Store URL */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 mb-6 border border-blue-100">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Store URL</p>
-        <p className="text-lg font-mono text-blue-600 font-semibold break-all">{storeUrl || 'Not configured'}</p>
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 rounded-2xl p-4 sm:p-5 mb-6 border border-blue-100 dark:border-blue-900/40">
+        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Store URL</p>
+        <p className="text-base sm:text-lg font-mono text-blue-700 dark:text-blue-300 font-semibold break-all">{storeUrl || 'Not configured'}</p>
       </div>
 
       {/* Action Buttons */}
@@ -87,7 +90,7 @@ export default function StoreHeader({
           <button
             onClick={handleCopyLink}
             disabled={copyLoading}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <FiCopy className="h-5 w-5" />
             <span className="hidden sm:inline">Copy Link</span>
@@ -96,7 +99,7 @@ export default function StoreHeader({
 
           <button
             onClick={handleOpenStore}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <FiExternalLink className="h-5 w-5" />
             <span className="hidden sm:inline">Open Store</span>
@@ -105,7 +108,7 @@ export default function StoreHeader({
 
           <button
             onClick={handleShareStore}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 rounded-lg font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 rounded-xl font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           >
             <FiShare2 className="h-5 w-5" />
             <span className="hidden sm:inline">Share Store</span>

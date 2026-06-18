@@ -137,14 +137,69 @@ export interface OrderShipment {
 
 export type ShippingPreferenceMode = 'actual' | 'free' | 'flat';
 
+export interface ShippingAddress {
+  contactName: string;
+  phone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+}
+
+export interface ShippingZoneRule {
+  id: string;
+  name: string;
+  regions: string;
+  enabled: boolean;
+}
+
 export interface ShippingPreferences {
   mode: ShippingPreferenceMode;
   flatAmount?: number;
   freeAboveAmount?: number;
+  warehouseAddress: ShippingAddress;
+  pickupAddress: ShippingAddress;
+  useSameAddressForPickup: boolean;
+  serviceCharge: number;
+  packagingCharge: number;
+  handlingCharge: number;
+  estimatedDeliveryMinDays: number;
+  estimatedDeliveryMaxDays: number;
+  trackingEnabled: boolean;
+  notifyCustomerOnShip: boolean;
+  showTrackingLink: boolean;
+  shippingZones: ShippingZoneRule[];
 }
+
+export const EMPTY_SHIPPING_ADDRESS: ShippingAddress = {
+  contactName: '',
+  phone: '',
+  line1: '',
+  line2: '',
+  city: '',
+  state: '',
+  pincode: '',
+  country: 'IN',
+};
 
 export const DEFAULT_SHIPPING_PREFERENCES: ShippingPreferences = {
   mode: 'actual',
+  warehouseAddress: { ...EMPTY_SHIPPING_ADDRESS },
+  pickupAddress: { ...EMPTY_SHIPPING_ADDRESS },
+  useSameAddressForPickup: true,
+  serviceCharge: 0,
+  packagingCharge: 0,
+  handlingCharge: 0,
+  estimatedDeliveryMinDays: 3,
+  estimatedDeliveryMaxDays: 7,
+  trackingEnabled: true,
+  notifyCustomerOnShip: true,
+  showTrackingLink: true,
+  shippingZones: [
+    { id: 'domestic', name: 'Domestic', regions: 'India', enabled: true },
+  ],
 };
 
 export interface WebhookEvent {

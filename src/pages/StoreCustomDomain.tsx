@@ -553,7 +553,7 @@ export default function StoreCustomDomainPage() {
             type="button"
             className="cd-back"
             aria-label="Back to My Store"
-            onClick={() => navigate('/store')}
+            onClick={() => navigate('/store/domain')}
           >
             <IconBack />
           </button>

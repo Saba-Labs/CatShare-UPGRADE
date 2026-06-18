@@ -1,8 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { getSellerStore } from '../../services/storeService';
+import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
+import {
+  getSellerStore,
+  updateStoreSlug,
+  updateStoreLiveStatus,
+  updateStoreMaintenanceMode,
+  updateStoreViewMode,
+  updateStoreWhatsapp,
+  updateStoreMinimumOrderValue,
+  updateStoreCheckoutSettings,
+  normalizeStoreWhatsappInput,
+  normalizeStoreMinimumOrderValueInput,
+  validateStoreSlug,
+  isStoreSlugAvailable,
+} from '../../services/storeService';
+import { fetchBehaviorSettings, updateBehaviorSettings } from '../../services/storeBehaviorService';
+import {
+  behaviorFromStoreSettingsState,
+  normalizeBehaviorSettings,
+} from '../../types/storeBehaviorSettings';
+import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
+import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -111,10 +131,15 @@ const REGIONS = [
   'worldwide', 'north-america', 'europe', 'asia-pacific', 'middle-east', 'africa', 'south-america'
 ];
 
+const fieldClassName =
+  'w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed';
+const chipBaseClassName =
+  'px-4 py-3 rounded-xl font-medium border transition-all disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60';
+
 export default function StoreSettings() {
   const { user, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
   const { showToast } = useToast();
+  const { guardCloudWrite } = useCloudWriteGate();
 
   const [settings, setSettings] = useState<StoreSettingsState>(INITIAL_STATE);
   const [originalSettings, setOriginalSettings] = useState<StoreSettingsState>(INITIAL_STATE);
@@ -130,16 +155,41 @@ export default function StoreSettings() {
 
     const loadSettings = async () => {
       try {
-        const result = await getSellerStore(user.uid);
-        if (result.success && result.data) {
-          const store = result.data;
+        const [storeResult, behaviorResult] = await Promise.all([
+          getSellerStore(user.uid),
+          fetchBehaviorSettings(user.uid),
+        ]);
+
+        const behavior = normalizeBehaviorSettings(behaviorResult.data);
+        let checkoutRequireLogin = behavior.requireLoginBeforeCheckout;
+        let checkoutAllowGuest = behavior.allowGuestBrowsing;
+
+        if (storeResult.success && storeResult.data) {
+          const store = storeResult.data;
+          if (store.checkoutSettings?.experience) {
+            checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
+            checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
+          }
+
           const loadedSettings: StoreSettingsState = {
             ...INITIAL_STATE,
+            ...behavior,
             storeSlug: store.storeSlug || '',
             storeEnabled: store.isLive !== false,
+            maintenanceMode: store.maintenanceMode === true,
             whatsappNumber: store.storeWhatsapp || '',
-            minimumOrderValue: store.minimumOrderValue?.toString() || '0',
+            minimumOrderValue:
+              store.minimumOrderValue != null ? String(store.minimumOrderValue) : '0',
             viewMode: store.viewMode || 'grid',
+            requireLoginBeforeCheckout: checkoutRequireLogin,
+            allowGuestBrowsing: checkoutAllowGuest,
+          };
+          setSettings(loadedSettings);
+          setOriginalSettings(loadedSettings);
+        } else if (behaviorResult.data) {
+          const loadedSettings: StoreSettingsState = {
+            ...INITIAL_STATE,
+            ...behavior,
           };
           setSettings(loadedSettings);
           setOriginalSettings(loadedSettings);
@@ -157,36 +207,42 @@ export default function StoreSettings() {
 
   // Check for unsaved changes
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  const canSave = hasChanges && !saving && slugValidation !== 'taken';
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
 
   // Validate store slug
   const validateSlug = useCallback(async (slug: string) => {
-    if (!slug.trim()) {
+    if (!user?.uid) return;
+
+    const validation = validateStoreSlug(slug);
+    if (!validation.valid) {
       setSlugValidation('invalid');
       return;
     }
 
-    if (!/^[a-z0-9-]{3,50}$/.test(slug)) {
-      setSlugValidation('invalid');
+    if (slug === originalSettings.storeSlug) {
+      setSlugValidation(null);
       return;
     }
 
     setSlugValidating(true);
     try {
-      // Simulate slug availability check
-      // In production, this would call a real API endpoint
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      if (slug === originalSettings.storeSlug) {
-        setSlugValidation(null);
-      } else {
-        // Simulate checking against existing slugs
-        const takenSlugs = ['admin', 'store', 'api', 'dashboard'];
-        setSlugValidation(takenSlugs.includes(slug.toLowerCase()) ? 'taken' : 'available');
-      }
+      const result = await isStoreSlugAvailable(slug, user.uid);
+      setSlugValidation(result.available ? 'available' : 'taken');
     } finally {
       setSlugValidating(false);
     }
-  }, [originalSettings.storeSlug]);
+  }, [originalSettings.storeSlug, user?.uid]);
 
   // Debounced slug validation
   useEffect(() => {
@@ -247,17 +303,115 @@ export default function StoreSettings() {
 
   // Handle save
   const handleSave = async () => {
+    if (!user?.uid || !guardCloudWrite()) return;
+
     if (!validateForm()) {
       showToast('Please fix validation errors', 'error');
       return;
     }
 
     setSaving(true);
-    try {
-      // Simulate API call to save settings
-      await new Promise(resolve => setTimeout(resolve, 800));
+    const sellerId = user.uid;
+    const failures: string[] = [];
 
-      // Update original settings to mark as no longer changed
+    try {
+      if (settings.storeSlug !== originalSettings.storeSlug) {
+        const result = await updateStoreSlug(sellerId, settings.storeSlug);
+        if (!result.success) {
+          failures.push(result.error || 'Failed to update store URL');
+        }
+      }
+
+      if (settings.storeEnabled !== originalSettings.storeEnabled) {
+        const result = await updateStoreLiveStatus(sellerId, settings.storeEnabled);
+        if (!result.success) {
+          failures.push(result.error || 'Failed to update store live status');
+        }
+      }
+
+      const maintenanceActive = settings.maintenanceMode && settings.storeEnabled;
+      const originalMaintenanceActive =
+        originalSettings.maintenanceMode && originalSettings.storeEnabled;
+      if (maintenanceActive !== originalMaintenanceActive) {
+        const result = await updateStoreMaintenanceMode(sellerId, maintenanceActive);
+        if (!result.success) {
+          failures.push(result.error || 'Failed to update maintenance mode');
+        }
+      }
+
+      if (settings.minimumOrderValue !== originalSettings.minimumOrderValue) {
+        const normalized = normalizeStoreMinimumOrderValueInput(settings.minimumOrderValue);
+        if (!normalized.ok) {
+          failures.push(normalized.error);
+        } else {
+          const result = await updateStoreMinimumOrderValue(sellerId, normalized.value);
+          if (!result.success) {
+            failures.push(result.error || 'Failed to update minimum order value');
+          }
+        }
+      }
+
+      if (settings.whatsappNumber !== originalSettings.whatsappNumber) {
+        const normalized = normalizeStoreWhatsappInput(settings.whatsappNumber);
+        if (!normalized.ok) {
+          failures.push(normalized.error);
+        } else {
+          const result = await updateStoreWhatsapp(sellerId, normalized.value);
+          if (!result.success) {
+            failures.push(result.error || 'Failed to update WhatsApp number');
+          }
+        }
+      }
+
+      if (settings.viewMode !== originalSettings.viewMode) {
+        const result = await updateStoreViewMode(sellerId, settings.viewMode);
+        if (!result.success) {
+          failures.push(result.error || 'Failed to update view mode');
+        }
+      }
+
+      const behaviorChanged =
+        JSON.stringify(behaviorFromStoreSettingsState(settings)) !==
+        JSON.stringify(behaviorFromStoreSettingsState(originalSettings));
+
+      if (behaviorChanged) {
+        const behavior = behaviorFromStoreSettingsState(settings);
+        const behaviorResult = await updateBehaviorSettings(sellerId, behavior);
+        if (behaviorResult.error) {
+          failures.push('Failed to save catalogue and display preferences');
+        }
+      }
+
+      const loginPrefsChanged =
+        settings.requireLoginBeforeCheckout !== originalSettings.requireLoginBeforeCheckout ||
+        settings.allowGuestBrowsing !== originalSettings.allowGuestBrowsing;
+
+      if (loginPrefsChanged) {
+        const storeResult = await getSellerStore(sellerId);
+        if (storeResult.success && storeResult.data) {
+          const checkout = normalizeCheckoutSettings(storeResult.data.checkoutSettings);
+          const nextCheckout = {
+            ...checkout,
+            experience: {
+              ...checkout.experience,
+              requireLoginBeforeCheckout: settings.requireLoginBeforeCheckout,
+              allowGuestCheckout: settings.requireLoginBeforeCheckout
+                ? false
+                : settings.allowGuestBrowsing,
+            },
+          };
+          const checkoutResult = await updateStoreCheckoutSettings(sellerId, nextCheckout);
+          if (!checkoutResult.success) {
+            failures.push(checkoutResult.error || 'Failed to update checkout login preferences');
+          }
+        }
+      }
+
+      if (failures.length > 0) {
+        showToast(failures[0], 'error');
+        return;
+      }
+
       setOriginalSettings(settings);
       showToast('Settings saved successfully', 'success');
     } catch (error) {
@@ -268,20 +422,19 @@ export default function StoreSettings() {
     }
   };
 
-  // Handle copy store URL
+  const storefrontUrl = settings.storeSlug
+    ? buildStorefrontPublicUrl(settings.storeSlug)
+    : '';
+
   const copyStoreUrl = () => {
-    if (settings.storeSlug) {
-      const url = `my.catshare.app/${settings.storeSlug}`;
-      navigator.clipboard.writeText(url);
-      showToast('Store URL copied to clipboard', 'success');
-    }
+    if (!storefrontUrl) return;
+    void navigator.clipboard.writeText(storefrontUrl);
+    showToast('Store link copied to clipboard', 'success');
   };
 
-  // Handle open store
   const openStore = () => {
-    if (settings.storeSlug) {
-      window.open(`https://my.catshare.app/${settings.storeSlug}`, '_blank');
-    }
+    if (!storefrontUrl) return;
+    window.open(storefrontUrl, '_blank');
   };
 
   if (loading || authLoading) {
@@ -301,10 +454,25 @@ export default function StoreSettings() {
 
   return (
     <StoreLayout>
-      <div className="pb-24 md:pb-6">
+      <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
         <PageHeader
           title="Store Settings"
           description="Configure how your store behaves and how customers interact with it."
+          sticky
+          actions={(
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!canSave}
+              className={`hidden sm:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                canSave
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
+                  : 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          )}
         />
 
         <div className="space-y-6">
@@ -314,31 +482,34 @@ export default function StoreSettings() {
             description="Control store visibility and maintenance mode"
           >
             <div className="space-y-5">
-              <div className="flex items-start justify-between pb-5 border-b border-gray-200">
+              <div className="flex items-start justify-between pb-5 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Store Live</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Store Live</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Customers can access your store when enabled.
                   </p>
                 </div>
                 <ToggleSwitch
                   checked={settings.storeEnabled}
-                  onChange={(value) => handleChange('storeEnabled', value)}
+                  onChange={(value) => {
+                    handleChange('storeEnabled', value);
+                    if (!value) handleChange('maintenanceMode', false);
+                  }}
                   disabled={saving}
                 />
               </div>
 
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Maintenance Mode</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Maintenance Mode</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Temporarily disable customer access while keeping the store available for editing.
                   </p>
                 </div>
                 <ToggleSwitch
                   checked={settings.maintenanceMode}
                   onChange={(value) => handleChange('maintenanceMode', value)}
-                  disabled={saving}
+                  disabled={saving || !settings.storeEnabled}
                 />
               </div>
             </div>
@@ -351,7 +522,7 @@ export default function StoreSettings() {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Store Slug
                 </label>
                 <input
@@ -360,18 +531,18 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('storeSlug', e.target.value.toLowerCase())}
                   placeholder="my-store"
                   disabled={saving}
-                  className={`w-full px-4 py-3 border rounded-lg font-medium transition-colors ${
+                  className={`${fieldClassName} ${
                     validationErrors.storeSlug
                       ? 'border-red-300 bg-red-50 text-gray-900'
-                      : 'border-gray-300 bg-white text-gray-900'
-                  } disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      : ''
+                  }`}
                 />
 
                 {/* Slug validation message */}
                 {settings.storeSlug && (
                   <div className="mt-2 flex items-center gap-2">
                     {slugValidating ? (
-                      <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
                         <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                         Checking availability...
                       </div>
@@ -401,12 +572,12 @@ export default function StoreSettings() {
 
               {/* Full URL display */}
               {settings.storeSlug && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
+                <div className="bg-gray-50 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">
                     Your Store URL
                   </p>
-                  <p className="font-medium text-gray-900 break-all">
-                    my.catshare.app/{settings.storeSlug}
+                  <p className="font-medium text-gray-900 dark:text-gray-100 break-all">
+                    {storefrontUrl || 'Configure your store slug above'}
                   </p>
                 </div>
               )}
@@ -416,7 +587,7 @@ export default function StoreSettings() {
                 <button
                   onClick={copyStoreUrl}
                   disabled={!settings.storeSlug || saving}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   <FiCopy className="h-4 w-4" />
                   Copy Link
@@ -424,10 +595,22 @@ export default function StoreSettings() {
                 <button
                   onClick={openStore}
                   disabled={!settings.storeSlug || saving}
-                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   <FiExternalLink className="h-4 w-4" />
                   Open Store
+                </button>
+                <button
+                  onClick={() => {
+                    const base = settings.storeSlug.replace(/-?\d+$/, '');
+                    const suggestion = `${base || 'my-store'}-${Math.floor(Math.random() * 900 + 100)}`;
+                    handleChange('storeSlug', suggestion);
+                    showToast('Suggested slug generated', 'success');
+                  }}
+                  disabled={saving}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  Generate Suggestions
                 </button>
               </div>
             </div>
@@ -440,14 +623,14 @@ export default function StoreSettings() {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Products to Show
                 </label>
                 <select
                   value={settings.productsToShow}
                   onChange={(e) => handleChange('productsToShow', e.target.value as any)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   <option value="all">All Products</option>
                   <option value="wholesale">Wholesale</option>
@@ -458,7 +641,7 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Maximum Products
                 </label>
                 <input
@@ -468,19 +651,19 @@ export default function StoreSettings() {
                   value={settings.maxProducts}
                   onChange={(e) => handleChange('maxProducts', parseInt(e.target.value) || 100)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Default Sorting
                 </label>
                 <select
                   value={settings.defaultSorting}
                   onChange={(e) => handleChange('defaultSorting', e.target.value as any)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   <option value="newest">Newest</option>
                   <option value="oldest">Oldest</option>
@@ -499,7 +682,7 @@ export default function StoreSettings() {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-3">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   View Mode
                 </label>
                 <div className="flex gap-3">
@@ -508,10 +691,10 @@ export default function StoreSettings() {
                       key={mode}
                       onClick={() => handleChange('viewMode', mode)}
                       disabled={saving}
-                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                      className={`${chipBaseClassName} flex-1 ${
                         settings.viewMode === mode
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
                       } disabled:opacity-50 disabled:cursor-not-allowed capitalize`}
                     >
                       {mode}
@@ -521,7 +704,7 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-3">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   Default Product Image Ratio
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -530,10 +713,10 @@ export default function StoreSettings() {
                       key={ratio}
                       onClick={() => handleChange('productImageRatio', ratio)}
                       disabled={saving}
-                      className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                      className={`${chipBaseClassName} ${
                         settings.productImageRatio === ratio
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
                       } disabled:opacity-50 disabled:cursor-not-allowed capitalize text-sm`}
                     >
                       {ratio}
@@ -543,7 +726,7 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-3">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   Products Per Row
                 </label>
                 <div className="grid grid-cols-4 gap-3">
@@ -552,10 +735,10 @@ export default function StoreSettings() {
                       key={num}
                       onClick={() => handleChange('productsPerRow', num)}
                       disabled={saving}
-                      className={`px-4 py-3 rounded-lg font-medium transition-colors ${
+                      className={`${chipBaseClassName} ${
                         settings.productsPerRow === num
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {num}
@@ -564,9 +747,9 @@ export default function StoreSettings() {
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-gray-200">
+              <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Show Product Price</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Product Price</label>
                   <ToggleSwitch
                     checked={settings.showPrice}
                     onChange={(value) => handleChange('showPrice', value)}
@@ -575,7 +758,7 @@ export default function StoreSettings() {
                 </div>
 
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Show Product Availability</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Product Availability</label>
                   <ToggleSwitch
                     checked={settings.showAvailability}
                     onChange={(value) => handleChange('showAvailability', value)}
@@ -584,7 +767,7 @@ export default function StoreSettings() {
                 </div>
 
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Show Categories</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Categories</label>
                   <ToggleSwitch
                     checked={settings.showCategories}
                     onChange={(value) => handleChange('showCategories', value)}
@@ -602,7 +785,7 @@ export default function StoreSettings() {
           >
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Customer WhatsApp Number
                 </label>
                 <input
@@ -611,11 +794,11 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('whatsappNumber', e.target.value)}
                   placeholder="+1 (555) 000-0000"
                   disabled={saving}
-                  className={`w-full px-4 py-3 border rounded-lg font-medium transition-colors ${
+                  className={`${fieldClassName} ${
                     validationErrors.whatsappNumber
                       ? 'border-red-300 bg-red-50 text-gray-900'
-                      : 'border-gray-300 bg-white text-gray-900'
-                  } disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      : ''
+                  }`}
                 />
                 {validationErrors.whatsappNumber && (
                   <p className="text-red-600 text-sm mt-2">{validationErrors.whatsappNumber}</p>
@@ -623,7 +806,7 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Minimum Order Value
                 </label>
                 <input
@@ -634,11 +817,11 @@ export default function StoreSettings() {
                   onChange={(e) => handleChange('minimumOrderValue', e.target.value)}
                   placeholder="0"
                   disabled={saving}
-                  className={`w-full px-4 py-3 border rounded-lg font-medium transition-colors ${
+                  className={`${fieldClassName} ${
                     validationErrors.minimumOrderValue
                       ? 'border-red-300 bg-red-50 text-gray-900'
-                      : 'border-gray-300 bg-white text-gray-900'
-                  } disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      : ''
+                  }`}
                 />
                 {validationErrors.minimumOrderValue && (
                   <p className="text-red-600 text-sm mt-2">{validationErrors.minimumOrderValue}</p>
@@ -646,14 +829,14 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Default Currency
                 </label>
                 <select
                   value={settings.defaultCurrency}
                   onChange={(e) => handleChange('defaultCurrency', e.target.value)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   {CURRENCIES.map((cur) => (
                     <option key={cur} value={cur}>
@@ -664,14 +847,14 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Default Language
                 </label>
                 <select
                   value={settings.defaultLanguage}
                   onChange={(e) => handleChange('defaultLanguage', e.target.value)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   {LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
@@ -681,9 +864,9 @@ export default function StoreSettings() {
                 </select>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-gray-200">
+              <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Customer Notifications</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Customer Notifications</label>
                   <ToggleSwitch
                     checked={settings.customerNotifications}
                     onChange={(value) => handleChange('customerNotifications', value)}
@@ -692,7 +875,7 @@ export default function StoreSettings() {
                 </div>
 
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Allow Guest Browsing</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Allow Guest Browsing</label>
                   <ToggleSwitch
                     checked={settings.allowGuestBrowsing}
                     onChange={(value) => handleChange('allowGuestBrowsing', value)}
@@ -701,7 +884,7 @@ export default function StoreSettings() {
                 </div>
 
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Require Login Before Checkout</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Require Login Before Checkout</label>
                   <ToggleSwitch
                     checked={settings.requireLoginBeforeCheckout}
                     onChange={(value) => handleChange('requireLoginBeforeCheckout', value)}
@@ -718,22 +901,22 @@ export default function StoreSettings() {
             description="For experienced users and developers"
           >
             <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-xl p-4 flex gap-3">
                 <FiInfo className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
                   These settings are for future functionality and developer use.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Store Time Zone
                 </label>
                 <select
                   value={settings.timeZone}
                   onChange={(e) => handleChange('timeZone', e.target.value)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   {TIME_ZONES.map((tz) => (
                     <option key={tz} value={tz}>
@@ -744,14 +927,14 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Business Country
                 </label>
                 <select
                   value={settings.businessCountry}
                   onChange={(e) => handleChange('businessCountry', e.target.value)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   {COUNTRIES.map((country) => (
                     <option key={country} value={country}>
@@ -762,14 +945,14 @@ export default function StoreSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Default Shipping Region
                 </label>
                 <select
                   value={settings.defaultShippingRegion}
                   onChange={(e) => handleChange('defaultShippingRegion', e.target.value)}
                   disabled={saving}
-                  className="w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={fieldClassName}
                 >
                   {REGIONS.map((region) => (
                     <option key={region} value={region}>
@@ -779,9 +962,9 @@ export default function StoreSettings() {
                 </select>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-gray-200">
+              <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Enable Debug Mode</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Enable Debug Mode</label>
                   <ToggleSwitch
                     checked={settings.debugMode}
                     onChange={(value) => handleChange('debugMode', value)}
@@ -790,7 +973,7 @@ export default function StoreSettings() {
                 </div>
 
                 <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900">Developer Mode</label>
+                  <label className="font-medium text-gray-900 dark:text-gray-100">Developer Mode</label>
                   <ToggleSwitch
                     checked={settings.developerMode}
                     onChange={(value) => handleChange('developerMode', value)}
@@ -804,13 +987,13 @@ export default function StoreSettings() {
       </div>
 
       {/* Sticky Save Button (Mobile) */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-gray-200 p-4 space-y-2">
+      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 md:hidden bg-white/95 dark:bg-gray-950/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-4 space-y-2 z-[55]">
         <button
           onClick={handleSave}
-          disabled={!hasChanges || saving || slugValidation === 'taken'}
-          className={`w-full py-3 rounded-lg font-medium transition-colors ${
-            !hasChanges || saving || slugValidation === 'taken'
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          disabled={!canSave}
+          className={`w-full py-3 rounded-xl font-medium transition-colors ${
+            !canSave
+              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
           }`}
         >
@@ -822,10 +1005,10 @@ export default function StoreSettings() {
       <div className="hidden md:block fixed bottom-6 right-6">
         <button
           onClick={handleSave}
-          disabled={!hasChanges || saving || slugValidation === 'taken'}
-          className={`px-6 py-3 rounded-lg font-medium transition-all shadow-lg ${
-            !hasChanges || saving || slugValidation === 'taken'
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          disabled={!canSave}
+          className={`px-6 py-3 rounded-xl font-medium transition-all shadow-lg ${
+            !canSave
+              ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-xl'
           }`}
         >
@@ -835,7 +1018,7 @@ export default function StoreSettings() {
 
       {/* Unsaved changes warning */}
       {hasChanges && (
-        <div className="hidden md:block fixed bottom-20 right-6 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg border border-gray-200">
+        <div className="hidden md:block fixed bottom-20 right-6 text-sm text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700">
           You have unsaved changes
         </div>
       )}

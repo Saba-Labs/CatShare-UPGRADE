@@ -65,7 +65,48 @@ export interface StoreCheckoutSettings {
   allowCouponEntry: boolean;
   /** Offer COD when any cod_charge rule exists */
   enableCod: boolean;
+  /** Offer online / prepaid payment methods at checkout */
+  enablePrepaid: boolean;
+  experience: CheckoutExperienceSettings;
 }
+
+export type CheckoutTheme = 'default' | 'minimal' | 'premium' | 'contrast';
+
+export interface CheckoutExperienceSettings {
+  enableGiftNotes: boolean;
+  giftNotesPlaceholder: string;
+  enableOrderNotes: boolean;
+  orderNotesPlaceholder: string;
+  allowGuestCheckout: boolean;
+  requireLoginBeforeCheckout: boolean;
+  validateAddress: boolean;
+  termsUrl: string;
+  privacyUrl: string;
+  returnPolicyUrl: string;
+  refundPolicyUrl: string;
+  orderConfirmationTitle: string;
+  orderConfirmationMessage: string;
+  showOrderSummaryOnConfirmation: boolean;
+  checkoutTheme: CheckoutTheme;
+}
+
+export const DEFAULT_CHECKOUT_EXPERIENCE: CheckoutExperienceSettings = {
+  enableGiftNotes: false,
+  giftNotesPlaceholder: 'Add a gift message for the recipient',
+  enableOrderNotes: true,
+  orderNotesPlaceholder: 'Special instructions for your order',
+  allowGuestCheckout: true,
+  requireLoginBeforeCheckout: false,
+  validateAddress: true,
+  termsUrl: '',
+  privacyUrl: '',
+  returnPolicyUrl: '',
+  refundPolicyUrl: '',
+  orderConfirmationTitle: 'Thank you for your order!',
+  orderConfirmationMessage: 'We have received your order and will notify you when it ships.',
+  showOrderSummaryOnConfirmation: true,
+  checkoutTheme: 'default',
+};
 
 export interface CheckoutLineItem {
   ruleId: string;
@@ -92,6 +133,8 @@ export const DEFAULT_CHECKOUT_SETTINGS: StoreCheckoutSettings = {
   showBreakdown: true,
   allowCouponEntry: true,
   enableCod: false,
+  enablePrepaid: true,
+  experience: { ...DEFAULT_CHECKOUT_EXPERIENCE },
 };
 
 export interface CheckoutRulePreset {
@@ -190,6 +233,48 @@ function coerceRule(raw: unknown): CheckoutRule | null {
   };
 }
 
+function normalizeExperience(raw: unknown): CheckoutExperienceSettings {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ...DEFAULT_CHECKOUT_EXPERIENCE };
+  }
+  const o = raw as Record<string, unknown>;
+  const theme = (['default', 'minimal', 'premium', 'contrast'] as const).includes(
+    o.checkoutTheme as CheckoutTheme
+  )
+    ? (o.checkoutTheme as CheckoutTheme)
+    : 'default';
+
+  return {
+    enableGiftNotes: o.enableGiftNotes === true,
+    giftNotesPlaceholder:
+      typeof o.giftNotesPlaceholder === 'string' && o.giftNotesPlaceholder.trim()
+        ? o.giftNotesPlaceholder
+        : DEFAULT_CHECKOUT_EXPERIENCE.giftNotesPlaceholder,
+    enableOrderNotes: o.enableOrderNotes !== false,
+    orderNotesPlaceholder:
+      typeof o.orderNotesPlaceholder === 'string' && o.orderNotesPlaceholder.trim()
+        ? o.orderNotesPlaceholder
+        : DEFAULT_CHECKOUT_EXPERIENCE.orderNotesPlaceholder,
+    allowGuestCheckout: o.requireLoginBeforeCheckout === true ? false : o.allowGuestCheckout !== false,
+    requireLoginBeforeCheckout: o.requireLoginBeforeCheckout === true,
+    validateAddress: o.validateAddress !== false,
+    termsUrl: typeof o.termsUrl === 'string' ? o.termsUrl : '',
+    privacyUrl: typeof o.privacyUrl === 'string' ? o.privacyUrl : '',
+    returnPolicyUrl: typeof o.returnPolicyUrl === 'string' ? o.returnPolicyUrl : '',
+    refundPolicyUrl: typeof o.refundPolicyUrl === 'string' ? o.refundPolicyUrl : '',
+    orderConfirmationTitle:
+      typeof o.orderConfirmationTitle === 'string' && o.orderConfirmationTitle.trim()
+        ? o.orderConfirmationTitle
+        : DEFAULT_CHECKOUT_EXPERIENCE.orderConfirmationTitle,
+    orderConfirmationMessage:
+      typeof o.orderConfirmationMessage === 'string' && o.orderConfirmationMessage.trim()
+        ? o.orderConfirmationMessage
+        : DEFAULT_CHECKOUT_EXPERIENCE.orderConfirmationMessage,
+    showOrderSummaryOnConfirmation: o.showOrderSummaryOnConfirmation !== false,
+    checkoutTheme: theme,
+  };
+}
+
 export function normalizeCheckoutSettings(raw: unknown): StoreCheckoutSettings {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ...DEFAULT_CHECKOUT_SETTINGS, rules: [] };
@@ -204,6 +289,8 @@ export function normalizeCheckoutSettings(raw: unknown): StoreCheckoutSettings {
     showBreakdown: o.showBreakdown !== false,
     allowCouponEntry: o.allowCouponEntry !== false,
     enableCod: o.enableCod === true,
+    enablePrepaid: o.enablePrepaid !== false,
+    experience: normalizeExperience(o.experience),
   };
 }
 

@@ -24,6 +24,15 @@ import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldCon
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
 import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '../utils/productCategoryUtils';
+import {
+  applyMaxProducts,
+  filterProductsByBehaviorScope,
+  productImageAspectRatio,
+  productsPerRowCount,
+  resolveBehaviorCatalogueId,
+  resolveStoreBehaviorSettings,
+  sortStorefrontProducts,
+} from '../utils/storefrontBehavior';
 import ProductImageGallery from '../components/ProductImageGallery';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import {
@@ -201,6 +210,8 @@ const CSS = `
 .sv-pcard:hover { border-color: var(--c-border2); box-shadow: var(--shadow-md); }
 .sv-pcard.selected { border-color: var(--c-accent); box-shadow: 0 0 0 1.5px var(--c-accent), var(--shadow-md); }
 .sv-pcard-img-wrap { width: 100%; aspect-ratio: 1/1; background: var(--c-surface2); position: relative; overflow: hidden; cursor: pointer; flex-shrink: 0; }
+.sv-pcard-stock { position: absolute; bottom: 8px; left: 8px; z-index: 2; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: var(--r-full); background: rgba(15,23,42,0.72); color: #fff; letter-spacing: 0.02em; }
+.sv-pcard-stock--oos { background: rgba(185,28,28,0.88); }
 .sv-pcard-img-wrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; transition: transform 0.35s ease; display: block; }
 .sv-pcard-img-wrap:hover img { transform: scale(1.05); }
 .sv-pcard-img-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
@@ -1054,7 +1065,7 @@ export default function StoreView() {
 
   useEffect(() => {
     if (!store?.sellerUserId) return;
-    if (store.isLive === false) {
+    if (store.isLive === false || store.maintenanceMode === true) {
       setAllProducts([]);
       setProductsLoading(false);
       return;
@@ -1067,7 +1078,7 @@ export default function StoreView() {
       }
       setProductsLoading(false);
     });
-  }, [store?.sellerUserId, store?.isLive, store?.catalogueId, store?.cataloguesDefinition]);
+  }, [store?.sellerUserId, store?.isLive, store?.maintenanceMode, store?.catalogueId, store?.cataloguesDefinition]);
 
   // Safety check: custom website layout only applies when website mode is on.
   useEffect(() => {
@@ -1189,6 +1200,27 @@ export default function StoreView() {
     () => ensureCataloguesForStorefront(store?.cataloguesDefinition, store?.catalogueId),
     [store?.cataloguesDefinition, store?.catalogueId]
   );
+  const behavior = useMemo(
+    () => resolveStoreBehaviorSettings(store?.behaviorSettings),
+    [store?.behaviorSettings]
+  );
+  const listingCatalogueId = useMemo(
+    () =>
+      store?.catalogueId
+        ? resolveBehaviorCatalogueId(behavior.productsToShow, store.catalogueId, catalogues)
+        : '',
+    [behavior.productsToShow, store?.catalogueId, catalogues]
+  );
+  const storefrontGridStyle = useMemo(
+    () => ({
+      gridTemplateColumns: `repeat(${productsPerRowCount(behavior.productsPerRow)}, minmax(0, 1fr))`,
+    }),
+    [behavior.productsPerRow]
+  );
+  const storefrontImageAspectRatio = useMemo(
+    () => productImageAspectRatio(behavior.productImageRatio),
+    [behavior.productImageRatio]
+  );
   const currencySymbol = useMemo(() => getSymbolForCurrencyCode(store?.sellerCurrencyCode || 'INR'), [store?.sellerCurrencyCode]);
 
   /** Same order as `public.products.position` (int8), even if RPC returns rows out of order. */
@@ -1199,7 +1231,7 @@ export default function StoreView() {
 
   /** Prefer cloud definition; if custom `cat…` id is missing there, infer `priceField` from `catalogueData[id]` on a real product row (matches Supabase JSON). */
   const catalogue = useMemo((): Catalogue | null => {
-    const id = store?.catalogueId;
+    const id = listingCatalogueId;
     if (!id) return null;
     const fromDef = catalogues.find((c) => c.id === id);
     if (fromDef) return fromDef;
@@ -1209,7 +1241,7 @@ export default function StoreView() {
     });
     const raw = sample?.catalogueData?.[id] as Record<string, unknown> | undefined;
     return inferCatalogueStubFromRowData(id, raw);
-  }, [catalogues, store?.catalogueId, productsInTableOrder]);
+  }, [catalogues, listingCatalogueId, productsInTableOrder]);
 
   const effectiveCatalogue = useMemo((): Catalogue | null => {
     if (!catalogue) return null;
@@ -1224,27 +1256,27 @@ export default function StoreView() {
   );
 
   const reloadStoreInventory = useCallback(() => {
-    if (!store?.sellerUserId || !store?.catalogueId) return;
-    void getStorefrontInventory(store.sellerUserId, store.catalogueId).then((res) => {
+    if (!store?.sellerUserId || !listingCatalogueId) return;
+    void getStorefrontInventory(store.sellerUserId, listingCatalogueId).then((res) => {
       setInventoryMap(buildInventoryAvailabilityMap(res.data.lines));
       setResolvedInventoryId(res.data.inventoryId);
     });
-  }, [store?.sellerUserId, store?.catalogueId]);
+  }, [store?.sellerUserId, listingCatalogueId]);
 
   useEffect(() => {
     reloadStoreInventory();
   }, [reloadStoreInventory]);
 
   const storeProducts = useMemo(() => {
-    if (!store?.catalogueId) return [];
+    if (!listingCatalogueId) return [];
 
     const productInStockForStore = (p: ProductWithCatalogueData) => {
-      const legacy = isProductInStockForCatalogue(p, store.catalogueId, effectiveCatalogue);
+      const legacy = isProductInStockForCatalogue(p, listingCatalogueId, effectiveCatalogue);
       if (!inventoryTracked) {
         const groups = getProductVariantGroups(p);
         if (groups.length === 0) return legacy;
         return getAllVariantCombinations(groups).some((combo) =>
-          getVariantLegacyInStock(p, store.catalogueId, combo.id, legacy)
+          getVariantLegacyInStock(p, listingCatalogueId, combo.id, legacy)
         );
       }
       const groups = getProductVariantGroups(p);
@@ -1257,24 +1289,53 @@ export default function StoreView() {
           inventoryMap,
           p.id,
           combo.id || null,
-          getVariantLegacyInStock(p, store.catalogueId, combo.id, legacy),
+          getVariantLegacyInStock(p, listingCatalogueId, combo.id, legacy),
           resolvedInventoryId
         )
       );
     };
 
-    const enabledProducts = productsInTableOrder.filter((p) => isProductEnabledForCatalogue(p, store.catalogueId));
+    const enabledProducts = productsInTableOrder.filter((p) =>
+      isProductEnabledForCatalogue(p, listingCatalogueId)
+    );
 
-    const enabledInStock = enabledProducts.filter(productInStockForStore);
+    const scoped = filterProductsByBehaviorScope(
+      enabledProducts,
+      behavior.productsToShow,
+      listingCatalogueId
+    );
 
-    if (enabledInStock.length > 0) return enabledInStock;
+    const enabledInStock = scoped.filter(productInStockForStore);
 
-    if (enabledProducts.length === 0 && productsInTableOrder.length > 0) {
-      return productsInTableOrder.filter(productInStockForStore);
+    let listed = enabledInStock;
+    if (enabledInStock.length === 0) {
+      if (enabledProducts.length === 0 && productsInTableOrder.length > 0) {
+        listed = productsInTableOrder.filter(productInStockForStore);
+      } else {
+        listed = enabledInStock;
+      }
     }
 
-    return enabledInStock;
-  }, [store?.catalogueId, productsInTableOrder, effectiveCatalogue, inventoryMap, inventoryTracked, resolvedInventoryId]);
+    return applyMaxProducts(
+      sortStorefrontProducts(
+        listed,
+        behavior.defaultSorting,
+        listingCatalogueId,
+        effectiveCatalogue
+      ),
+      behavior.maxProducts
+    );
+  }, [
+    listingCatalogueId,
+    productsInTableOrder,
+    effectiveCatalogue,
+    inventoryMap,
+    inventoryTracked,
+    resolvedInventoryId,
+    behavior.productsToShow,
+    behavior.defaultSorting,
+    behavior.maxProducts,
+  ]);
   const availableCategories = useMemo(
     () => buildStorefrontCategoryFilterList(store?.productCategories, storeProducts),
     [store?.productCategories, storeProducts]
@@ -1303,17 +1364,17 @@ export default function StoreView() {
   );
 
   const orderSummary = useMemo(() => {
-    if (!store?.catalogueId) return { items: [] as any[], total: 0 };
+    if (!listingCatalogueId) return { items: [] as any[], total: 0 };
     const items: any[] = []; let total = 0;
     activeCartLines(cartLines).forEach((line) => {
       const productId = line.productId;
       const quantity = line.quantity;
       const product = allProducts.find((p) => p.id === productId); if (!product) return;
       const selection = line.variantSelection;
-      const catData = getCatalogueData(product, store.catalogueId);
+      const catData = getCatalogueData(product, listingCatalogueId);
       const variantData =
         Object.keys(selection).length > 0
-          ? getVariantCombinationData(product, selection, store.catalogueId)
+          ? getVariantCombinationData(product, selection, listingCatalogueId)
           : undefined;
       const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
         catData,
@@ -1352,7 +1413,7 @@ export default function StoreView() {
       total += rowTotal;
     });
     return { items, total };
-  }, [cartLines, store, catalogue, allProducts]);
+  }, [cartLines, listingCatalogueId, catalogue, allProducts]);
 
   const selectedProductCount = useMemo(() => totalCartLineCount(cartLines), [cartLines]);
   const minimumOrderValue = useMemo(() => {
@@ -1385,16 +1446,16 @@ export default function StoreView() {
       return;
     }
 
-    const catData = store?.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+    const catData = listingCatalogueId ? getCatalogueData(product, listingCatalogueId) : null;
     const variantData =
       Object.keys(draftSelection).length > 0
-        ? getVariantCombinationData(product, draftSelection, store.catalogueId)
+        ? getVariantCombinationData(product, draftSelection, listingCatalogueId)
         : undefined;
     const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
     const current = getCartLineQty(cartLines, productId, draftSelection);
     let rounded = applyQuantityDelta(current, delta, rules.step, rules.moq);
 
-    if (inventoryTracked && store?.catalogueId) {
+    if (inventoryTracked && listingCatalogueId) {
       const variantId =
         groups.length > 0 && Object.keys(draftSelection).length > 0
           ? generateVariantCombinationId(draftSelection)
@@ -1417,7 +1478,7 @@ export default function StoreView() {
     storeProducts,
     draftVariantSelections,
     cartLines,
-    store?.catalogueId,
+    listingCatalogueId,
     inventoryTracked,
     openProductPage,
     effectiveCatalogue,
@@ -1427,15 +1488,15 @@ export default function StoreView() {
 
   const changeCartLineQty = (lineId: string, delta: number) => {
     const line = cartLines.find((l) => l.lineId === lineId);
-    if (!line || !store?.catalogueId) return;
+    if (!line || !listingCatalogueId) return;
     const product = allProducts.find((p) => p.id === line.productId);
     if (!product) return;
     const selection = line.variantSelection;
     const groups = getProductVariantGroups(product);
-    const catData = getCatalogueData(product, store.catalogueId);
+    const catData = getCatalogueData(product, listingCatalogueId);
     const variantData =
       Object.keys(selection).length > 0
-        ? getVariantCombinationData(product, selection, store.catalogueId)
+        ? getVariantCombinationData(product, selection, listingCatalogueId)
         : undefined;
     const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
     let rounded = applyQuantityDelta(line.quantity, delta, rules.step, rules.moq);
@@ -1599,7 +1660,7 @@ export default function StoreView() {
   const hasCheckoutRules = checkoutSettings.rules.some((r) => r.enabled);
 
   const handlePlaceOrder = async () => {
-    if (!store?.catalogueId) return;
+    if (!listingCatalogueId) return;
     for (const item of reviewSummary.items) {
       const product = allProducts.find((p) => p.id === item.productId);
       if (!product) continue;
@@ -1663,7 +1724,7 @@ export default function StoreView() {
       const orderItems: OrderItem[] = [];
       reviewSummary.items.forEach((item) => {
         const product = allProducts.find((p) => p.id === item.productId); if (!product) return;
-        const catData = getCatalogueData(product, store.catalogueId);
+        const catData = getCatalogueData(product, listingCatalogueId);
         const { price: unitPrice, priceUnit } = getStorefrontPriceAndUnit(
           catData,
           catalogue,
@@ -1850,6 +1911,33 @@ export default function StoreView() {
               <div className="sv-error-title">Store unavailable</div>
               <div className="sv-error-desc">{storeError || 'This store could not be found.'}</div>
               <button className="sv-error-btn" onClick={() => navigate('/')}>Go home</button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  /* ── Seller maintenance break ── */
+  if (store.maintenanceMode === true) {
+    const maintName =
+      store.sellerBusinessName?.trim() ||
+      (store.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'This store');
+    return (
+      <>
+        <style>{CSS}</style>
+        <div className="sv sv-fullscreen">
+          <div className="sv-error-card">
+            <div className="sv-error-stripe" style={{ background: 'linear-gradient(90deg,#f59e0b,#d97706)' }} />
+            <div className="sv-error-body">
+              <div className="sv-offline-icon" aria-hidden>🔧</div>
+              <div className="sv-offline-title">Under maintenance</div>
+              <div className="sv-offline-desc">
+                {maintName} is temporarily unavailable while we make improvements. Please check back soon.
+              </div>
+              <button type="button" className="sv-error-btn" onClick={() => navigate('/')}>
+                Go home
+              </button>
             </div>
           </div>
         </div>
@@ -2056,8 +2144,8 @@ export default function StoreView() {
                       applyDraftVariantSelection(catalogActiveProduct.id, groupId, option)
                     }
                     onQtyChange={(delta) => {
-                      const catData = store.catalogueId
-                        ? getCatalogueData(catalogActiveProduct, store.catalogueId)
+                      const catData = listingCatalogueId
+                        ? getCatalogueData(catalogActiveProduct, listingCatalogueId)
                         : null;
                       const qstep = normalizeOrderQuantityStep(catData?.orderQuantityStep);
                       changeQty(catalogActiveProduct.id, delta, qstep);
@@ -2123,7 +2211,7 @@ export default function StoreView() {
                 {searchQuery && <button className="sv-search-clear" onClick={() => setSearchQuery('')}>×</button>}
               </div>
             )}
-            {availableCategories.length > 0 && (
+            {behavior.showCategories && availableCategories.length > 0 && (
               <div className="sv-cats">
                 <button className={`sv-cat${selectedCategory === 'all' ? ' active' : ''}`} onClick={() => setSelectedCategory('all')}>All</button>
                 {availableCategories.map((cat) => (
@@ -2137,7 +2225,10 @@ export default function StoreView() {
           </div>
 
           {/* ══ PRODUCT LISTING (grid / OrderForm-style list) ══ */}
-          <div className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}>
+          <div
+            className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}
+            style={storefrontViewMode === 'grid' ? storefrontGridStyle : undefined}
+          >
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (
               <div className="sv-empty"><div className="sv-empty-icon"><IconShoppingBag size={40} /></div><strong>No items yet</strong><p>Products will appear here once the seller adds them.</p></div>
@@ -2150,10 +2241,10 @@ export default function StoreView() {
               const variantGroups = getProductVariantGroups(product);
               const quantity = getCartLineQty(cartLines, product.id, draftSelection);
               const isSelected = productHasCartLines(cartLines, product.id);
-              const catData = store.catalogueId ? getCatalogueData(product, store.catalogueId) : null;
+              const catData = listingCatalogueId ? getCatalogueData(product, listingCatalogueId) : null;
               const variantData =
                 Object.keys(draftSelection).length > 0
-                  ? getVariantCombinationData(product, draftSelection, store.catalogueId)
+                  ? getVariantCombinationData(product, draftSelection, listingCatalogueId)
                   : undefined;
               const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
               const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
@@ -2173,6 +2264,11 @@ export default function StoreView() {
                 hasParsedPrice && quantity > 0
                   ? formatStorefrontLineCalculationDetail(quantity, price, priceUnit, currencySymbol)
                   : null;
+              const legacyInStock = isProductInStockForCatalogue(
+                product,
+                listingCatalogueId,
+                effectiveCatalogue
+              );
 
               if (storefrontViewMode === 'list') {
                 return (
@@ -2195,7 +2291,7 @@ export default function StoreView() {
                             ) : null}
                           </div>
                           <div className="of-item-price-row">
-                            {Number.isFinite(price) ? (
+                            {behavior.showPrice && Number.isFinite(price) ? (
                               <div className="of-price-tag">
                                 {priceFrom ? 'From ' : ''}
                                 {fmt(price, currencySymbol)}
@@ -2204,6 +2300,9 @@ export default function StoreView() {
                                 ) : null}
                                 {priceUnit ? ` ${priceUnit}` : ''}
                               </div>
+                            ) : null}
+                            {behavior.showAvailability && !legacyInStock ? (
+                              <div className="of-step-hint of-step-hint--next-to-qty">Out of stock</div>
                             ) : null}
                           </div>
                         </div>
@@ -2256,7 +2355,7 @@ export default function StoreView() {
                               </span>
                             </>
                           ) : null}
-                          {hasParsedPrice ? (
+                          {behavior.showPrice && hasParsedPrice ? (
                             <span className="of-line-total-val">{fmt(lineAmt, currencySymbol)}</span>
                           ) : (
                             <span className="of-line-total-na">—</span>
@@ -2274,8 +2373,11 @@ export default function StoreView() {
                   key={product.id}
                   className={`sv-pcard${isSelected ? ' selected' : ''}`}
                 >
-                  <div className="sv-pcard-img-wrap" onClick={() => openProductPage(product)}>
+                  <div className="sv-pcard-img-wrap" style={{ aspectRatio: storefrontImageAspectRatio }} onClick={() => openProductPage(product)}>
                     <StoreProductImageArea product={product} variant="card" />
+                    {behavior.showAvailability && !legacyInStock ? (
+                      <span className="sv-pcard-stock sv-pcard-stock--oos">Out of stock</span>
+                    ) : null}
                     {isSelected && <div className="sv-pcard-sel"><IconCheck /></div>}
                   </div>
                   <div className="sv-pcard-body">
@@ -2285,7 +2387,7 @@ export default function StoreView() {
                       const summary = formatVariantSelectionSummary(variantGroups, draftSelection);
                       return summary && quantity > 0 ? <VariantPills summary={summary} /> : null;
                     })()}
-                    {Number.isFinite(price) && (
+                    {behavior.showPrice && Number.isFinite(price) && (
                       <div className="sv-pcard-price">
                         {priceFrom ? 'From ' : ''}
                         {fmt(price, currencySymbol)}
@@ -2322,7 +2424,7 @@ export default function StoreView() {
                     {qstep > 1 && <PackHint step={qstep} />}
                     {rules.moq > 1 && <MoqHint minQty={minQty} />}
                   </div>
-                  {isSelected && (
+                  {isSelected && behavior.showPrice && (
                     <div className="sv-pcard-subtotal">
                       {calcDetail && <span className="sv-pcard-subtotal-calc">{calcDetail}</span>}
                       <span className="sv-pcard-subtotal-val">{fmt(price * quantity, currencySymbol)}</span>
@@ -2552,7 +2654,9 @@ export default function StoreView() {
                         <h2 className="sv-checkout-card-title">Your order</h2>
                         <div className="sv-review-list">
                           {orderSummary.items.map((item: any) => {
-                            const catData = store?.catalogueId ? getCatalogueData(allProducts.find(p => p.id === item.productId), store.catalogueId) : null;
+                            const catData = listingCatalogueId
+                              ? getCatalogueData(allProducts.find((p) => p.id === item.productId), listingCatalogueId)
+                              : null;
                             const qstep = catData ? normalizeOrderQuantityStep(catData.orderQuantityStep) : 1;
                             const cd = item.quantity > 0 ? fmtCalc(item.quantity, item.unitPrice, item.priceUnit, currencySymbol, item.quantityStep) : null;
                             return (

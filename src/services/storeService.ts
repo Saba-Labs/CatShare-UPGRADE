@@ -29,6 +29,10 @@ import {
   normalizeStoreIntegrationFlags,
   type StoreIntegrationFlags,
 } from '../types/storeIntegrationFlags';
+import {
+  normalizeBehaviorSettings,
+  type StoreBehaviorSettings,
+} from '../types/storeBehaviorSettings';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -211,6 +215,8 @@ export interface Store {
   updatedAt?: string;
   /** When false, public storefront is hidden (persisted as `stores.is_live`). */
   isLive: boolean;
+  /** When true, public storefront shows maintenance screen (`stores.maintenance_mode`). */
+  maintenanceMode: boolean;
   /** Optional WhatsApp for public storefront (persisted as `stores.store_whatsapp`). */
   storeWhatsapp: string | null;
   /** Optional minimum order total required to place orders on storefront. */
@@ -262,6 +268,8 @@ export interface StorePublic {
   viewMode?: 'grid' | 'list';
   /** False = seller paused the storefront (from `get_store_by_slug`). */
   isLive?: boolean;
+  /** True = public sees maintenance break screen. */
+  maintenanceMode?: boolean;
   /** Whether the custom homepage is enabled and visible to customers. */
   homepageEnabled?: boolean;
   /** Whether website-mode runtime should be used by storefront. */
@@ -273,6 +281,8 @@ export interface StorePublic {
   checkoutSettings?: StoreCheckoutSettings;
   /** Which seller integrations affect public checkout. */
   integrationFlags?: StoreIntegrationFlags;
+  /** Catalogue/display preferences from `stores.behavior_settings`. */
+  behaviorSettings?: StoreBehaviorSettings;
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -313,6 +323,7 @@ function mapStoreRow(row: Record<string, unknown>): Store {
     createdAt: String(row.created_at ?? ''),
     updatedAt: row.updated_at != null ? String(row.updated_at) : undefined,
     isLive: row.is_live !== false,
+    maintenanceMode: row.maintenance_mode === true,
     storeWhatsapp: typeof wa === 'string' && wa.trim() !== '' ? wa.trim() : null,
     minimumOrderValue,
     viewMode,
@@ -678,9 +689,11 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     let websiteModeEnabled = coerceOptionalBoolean(row.websiteModeEnabled ?? row.website_mode_enabled);
     let checkoutSettingsRaw: unknown = row.checkout_settings ?? row.checkoutSettings;
     let integrationFlagsRaw: unknown = row.integration_flags ?? row.integrationFlags;
+    let maintenanceMode = coerceOptionalBoolean(row.maintenanceMode ?? row.maintenance_mode);
+    let behaviorSettingsRaw: unknown = row.behavior_settings ?? row.behaviorSettings;
 
     /* RPC may be older than `stores.store_whatsapp`; public RLS often allows read by slug. */
-    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null || integrationFlagsRaw == null) {
+    if (!whatsapp || minimumOrderValue == null || viewMode == null || homepageEnabled == null || websiteModeEnabled == null || checkoutSettingsRaw == null || integrationFlagsRaw == null || maintenanceMode == null || behaviorSettingsRaw == null) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
@@ -718,12 +731,21 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       if (integrationFlagsRaw == null) {
         integrationFlagsRaw = storeRecord?.integration_flags ?? storeRecord?.integrationFlags;
       }
+      if (maintenanceMode == null) {
+        maintenanceMode = coerceOptionalBoolean(
+          storeRecord?.maintenance_mode ?? storeRecord?.maintenanceMode
+        );
+      }
+      if (behaviorSettingsRaw == null) {
+        behaviorSettingsRaw = storeRecord?.behavior_settings ?? storeRecord?.behaviorSettings;
+      }
     }
 
     const normalized: StorePublic = {
       ...(parsed as StorePublic),
       id: firstNonEmptyString(row.id, row.storeId) ?? '',
       isLive: typeof row.isLive === 'boolean' ? row.isLive : row.is_live !== false,
+      maintenanceMode: maintenanceMode === true,
       websiteModeEnabled: websiteModeEnabled ?? false,
       homepageEnabled:
         (websiteModeEnabled ?? false) && (homepageEnabled ?? true),
@@ -787,6 +809,7 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       viewMode: viewMode ?? 'grid',
       checkoutSettings: normalizeCheckoutSettings(checkoutSettingsRaw),
       integrationFlags: normalizeStoreIntegrationFlags(integrationFlagsRaw),
+      behaviorSettings: normalizeBehaviorSettings(behaviorSettingsRaw),
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;
@@ -1193,6 +1216,79 @@ export async function updateStoreLiveStatus(
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in updateStoreLiveStatus:', errorMessage);
     return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+export async function updateStoreMaintenanceMode(
+  sellerUserId: string,
+  maintenanceMode: boolean
+): Promise<{ success: boolean; data?: Store; error?: string }> {
+  try {
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        maintenance_mode: maintenanceMode,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('seller_user_id', sellerUserId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('maintenance_mode')) {
+        return { success: false, error: 'Maintenance mode column missing — run sql/store_behavior_settings.sql' };
+      }
+      console.error('❌ Error updating store maintenance mode:', error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: mapStoreRow(data as Record<string, unknown>),
+    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in updateStoreMaintenanceMode:', errorMessage);
+    return { success: false, error: errorMessage };
+  } finally {
+    setSupabaseRlsUserId(null);
+  }
+}
+
+/** True when slug is unused or already owned by this seller. */
+export async function isStoreSlugAvailable(
+  slug: string,
+  sellerUserId: string
+): Promise<{ available: boolean; error?: string }> {
+  try {
+    const validation = validateStoreSlug(slug);
+    if (!validation.valid) {
+      return { available: false, error: validation.error };
+    }
+
+    const client = getSupabaseClient();
+    setSupabaseRlsUserId(sellerUserId);
+
+    const { data, error } = await client
+      .from('stores')
+      .select('seller_user_id, store_slug')
+      .eq('store_slug', slug.toLowerCase().trim())
+      .maybeSingle();
+
+    if (error) {
+      return { available: false, error: error.message };
+    }
+
+    if (!data) return { available: true };
+    return { available: String(data.seller_user_id) === sellerUserId };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return { available: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);
   }

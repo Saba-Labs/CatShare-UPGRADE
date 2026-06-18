@@ -11,6 +11,40 @@ import type {
 } from '../core/types';
 import { readCachedIntegrationsList, cacheIntegrationsList } from './integrationsCache';
 
+export function formatIntegrationFetchError(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = String((error as { message?: string }).message ?? '');
+    if (msg.includes('Failed to fetch')) {
+      return 'Could not reach Supabase. Check your internet connection and VITE_SUPABASE_URL in .env.local.';
+    }
+    if ('code' in error) {
+      const code = String((error as { code?: string }).code ?? '');
+      if (code === '42P01' || msg.includes('seller_integrations')) {
+        return 'Integrations tables are missing. Run sql/seller_integrations.sql in the Supabase SQL editor.';
+      }
+      if (code === '42501' || msg.toLowerCase().includes('row-level security')) {
+        return 'Permission denied. Sign in again, then retry.';
+      }
+    }
+    return msg || 'Could not load integrations';
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Could not load integrations';
+}
+
+export function isMissingIntegrationsTable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const msg = String((error as { message?: string }).message ?? '').toLowerCase();
+  const code = String((error as { code?: string }).code ?? '');
+  return (
+    code === '42P01' ||
+    msg.includes('seller_integrations') ||
+    (msg.includes('relation') && msg.includes('does not exist'))
+  );
+}
+
 export type SellerIntegrationRow = Record<string, unknown>;
 
 export function mapRowToSellerIntegration(row: SellerIntegrationRow): SellerIntegration {
@@ -61,16 +95,22 @@ export async function fetchSellerIntegrations(
       .order('updated_at', { ascending: false });
 
     if (error) {
+      if (isMissingIntegrationsTable(error)) {
+        return { data: [], error: null };
+      }
       const cached = readCachedIntegrationsList(sellerUserId);
       if (cached.length > 0) return { data: cached, error: null };
-      return { data: null, error };
+      return { data: [], error };
     }
 
     const rows = (data ?? []).map((r) => mapRowToSellerIntegration(r as SellerIntegrationRow));
     cacheIntegrationsList(sellerUserId, rows);
     return { data: rows, error: null };
   } catch (e) {
-    return { data: null, error: e };
+    if (isMissingIntegrationsTable(e)) {
+      return { data: [], error: null };
+    }
+    return { data: [], error: e };
   }
 }
 

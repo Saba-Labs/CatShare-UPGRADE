@@ -1,8 +1,9 @@
 import type { IntegrationProviderId, SellerIntegrationView, IntegrationConnectOptions } from './types';
-import { getProvider } from './registry';
+import { getProvider, isIntegrationProviderId } from './registry';
 import {
   fetchSellerIntegrations,
   mapRowToSellerIntegration,
+  isMissingIntegrationsTable,
 } from '../services/sellerIntegrationsService';
 import { cacheIntegrationsList, readCachedIntegrationsList } from '../services/integrationsCache';
 
@@ -11,12 +12,21 @@ export async function listSellerIntegrationViews(
 ): Promise<{ data: SellerIntegrationView[]; error: unknown }> {
   const res = await fetchSellerIntegrations(sellerId);
   if (res.error) {
+    if (isMissingIntegrationsTable(res.error)) {
+      return { data: [], error: null };
+    }
     const cached = readCachedIntegrationsList(sellerId);
     if (cached.length > 0) {
-      const views = cached.map((row) => {
-        const provider = getProvider(row.provider);
-        return provider.normalizeConnection(row);
-      });
+      const views: SellerIntegrationView[] = [];
+      for (const row of cached) {
+        if (!isIntegrationProviderId(row.provider)) continue;
+        try {
+          const provider = getProvider(row.provider);
+          views.push(provider.normalizeConnection(row));
+        } catch {
+          /* skip */
+        }
+      }
       return { data: views, error: null };
     }
     return { data: [], error: res.error };
@@ -25,10 +35,16 @@ export async function listSellerIntegrationViews(
   const rows = res.data ?? [];
   cacheIntegrationsList(sellerId, rows);
 
-  const views = rows.map((row) => {
-    const provider = getProvider(row.provider);
-    return provider.normalizeConnection(row);
-  });
+  const views: SellerIntegrationView[] = [];
+  for (const row of rows) {
+    if (!isIntegrationProviderId(row.provider)) continue;
+    try {
+      const provider = getProvider(row.provider);
+      views.push(provider.normalizeConnection(row));
+    } catch {
+      /* skip unknown or broken provider rows */
+    }
+  }
 
   return { data: views, error: null };
 }

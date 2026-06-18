@@ -4,8 +4,11 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../../supabaseClient';
 import {
   DEFAULT_SHIPPING_PREFERENCES,
+  EMPTY_SHIPPING_ADDRESS,
+  type ShippingAddress,
   type ShippingPreferences,
   type ShippingPreferenceMode,
+  type ShippingZoneRule,
 } from '../core/types';
 
 function normalizeMode(raw: unknown): ShippingPreferenceMode {
@@ -13,21 +16,91 @@ function normalizeMode(raw: unknown): ShippingPreferenceMode {
   return 'actual';
 }
 
+function normalizeAddress(raw: unknown): ShippingAddress {
+  if (!raw || typeof raw !== 'object') {
+    return { ...EMPTY_SHIPPING_ADDRESS };
+  }
+  const r = raw as Record<string, unknown>;
+  return {
+    contactName: typeof r.contactName === 'string' ? r.contactName : '',
+    phone: typeof r.phone === 'string' ? r.phone : '',
+    line1: typeof r.line1 === 'string' ? r.line1 : '',
+    line2: typeof r.line2 === 'string' ? r.line2 : '',
+    city: typeof r.city === 'string' ? r.city : '',
+    state: typeof r.state === 'string' ? r.state : '',
+    pincode: typeof r.pincode === 'string' ? r.pincode : '',
+    country: typeof r.country === 'string' && r.country.trim() ? r.country : 'IN',
+  };
+}
+
+function normalizeZone(raw: unknown, index: number): ShippingZoneRule | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const name = typeof r.name === 'string' ? r.name.trim() : '';
+  if (!name) return null;
+  return {
+    id: typeof r.id === 'string' && r.id.trim() ? r.id : `zone-${index}`,
+    name,
+    regions: typeof r.regions === 'string' ? r.regions : '',
+    enabled: r.enabled !== false,
+  };
+}
+
+function normalizeNonNegativeNumber(raw: unknown, fallback = 0): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+function normalizePositiveInt(raw: unknown, fallback: number): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.round(n);
+}
+
 export function normalizeShippingPreferences(raw: unknown): ShippingPreferences {
   if (!raw || typeof raw !== 'object') {
     return { ...DEFAULT_SHIPPING_PREFERENCES };
   }
+
   const r = raw as Record<string, unknown>;
   const mode = normalizeMode(r.mode);
-  const prefs: ShippingPreferences = { mode };
+  const prefs: ShippingPreferences = {
+    ...DEFAULT_SHIPPING_PREFERENCES,
+    mode,
+    warehouseAddress: normalizeAddress(r.warehouseAddress),
+    pickupAddress: normalizeAddress(r.pickupAddress),
+    useSameAddressForPickup: r.useSameAddressForPickup !== false,
+    serviceCharge: normalizeNonNegativeNumber(r.serviceCharge),
+    packagingCharge: normalizeNonNegativeNumber(r.packagingCharge),
+    handlingCharge: normalizeNonNegativeNumber(r.handlingCharge),
+    estimatedDeliveryMinDays: normalizePositiveInt(r.estimatedDeliveryMinDays, 3),
+    estimatedDeliveryMaxDays: normalizePositiveInt(r.estimatedDeliveryMaxDays, 7),
+    trackingEnabled: r.trackingEnabled !== false,
+    notifyCustomerOnShip: r.notifyCustomerOnShip !== false,
+    showTrackingLink: r.showTrackingLink !== false,
+    shippingZones: Array.isArray(r.shippingZones)
+      ? r.shippingZones
+          .map((zone, index) => normalizeZone(zone, index))
+          .filter((zone): zone is ShippingZoneRule => zone !== null)
+      : [...DEFAULT_SHIPPING_PREFERENCES.shippingZones],
+  };
+
   if (mode === 'flat' && r.flatAmount != null) {
-    const n = Number(r.flatAmount);
-    if (Number.isFinite(n) && n >= 0) prefs.flatAmount = n;
+    prefs.flatAmount = normalizeNonNegativeNumber(r.flatAmount);
   }
   if (mode === 'free' && r.freeAboveAmount != null) {
-    const n = Number(r.freeAboveAmount);
-    if (Number.isFinite(n) && n >= 0) prefs.freeAboveAmount = n;
+    prefs.freeAboveAmount = normalizeNonNegativeNumber(r.freeAboveAmount);
   }
+
+  if (prefs.estimatedDeliveryMinDays > prefs.estimatedDeliveryMaxDays) {
+    prefs.estimatedDeliveryMaxDays = prefs.estimatedDeliveryMinDays;
+  }
+
+  if (prefs.shippingZones.length === 0) {
+    prefs.shippingZones = [...DEFAULT_SHIPPING_PREFERENCES.shippingZones];
+  }
+
   return prefs;
 }
 

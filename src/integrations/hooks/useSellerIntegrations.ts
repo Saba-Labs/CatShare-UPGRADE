@@ -5,6 +5,7 @@ import {
   listSellerIntegrationViews,
   countConnectedIntegrations,
 } from '../core/IntegrationConnectionService';
+import { formatIntegrationFetchError } from '../services/sellerIntegrationsService';
 import type { SellerIntegrationView } from '../core/types';
 
 export function useSellerIntegrations() {
@@ -25,9 +26,9 @@ export function useSellerIntegrations() {
     setError(null);
     const res = await listSellerIntegrationViews(sellerId);
     if (res.error && !res.data.length) {
-      setError(
-        res.error instanceof Error ? res.error.message : 'Could not load integrations'
-      );
+      setError(formatIntegrationFetchError(res.error));
+    } else {
+      setError(null);
     }
     setViews(res.data);
     setLoading(false);

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { FiPackage, FiGrid, FiShoppingCart, FiShoppingBag } from 'react-icons/fi';
@@ -50,9 +51,9 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
     { id: 'store', label: 'Store', icon: FiShoppingBag },
   ];
 
-  return (
+  const nav = (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-30 flex justify-around text-xs font-medium pb-[env(safe-area-inset-bottom,0px)] border-t border-gray-200 bg-white sm:text-sm"
+      className="fixed inset-x-0 bottom-0 z-50 flex justify-around text-xs font-medium border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:text-sm"
       aria-label="Main navigation"
     >
       {tabs.map(({ id, label, icon: Icon }) => (
@@ -70,4 +71,10 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
       ))}
     </nav>
   );
+
+  if (typeof document === 'undefined') {
+    return nav;
+  }
+
+  return createPortal(nav, document.body);
 }

@@ -11,8 +11,11 @@ export default function ToggleSwitch({ checked, onChange, disabled }: ToggleSwit
     <motion.button
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
-      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-        checked ? 'bg-blue-600' : 'bg-gray-300'
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
+        checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-700'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'}`}
       whileTap={!disabled ? { scale: 0.95 } : {}}
     >
