@@ -47,22 +47,24 @@ export default function StoreHeader({
       </div>
 
       {/* Store URL */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 rounded-2xl p-4 sm:p-5 mb-6 border border-blue-100 dark:border-blue-900/40">
-        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Store URL</p>
-        <div className="flex items-center justify-between gap-3">
-          <a
-            href={storeUrl ? `https://${storeUrl}` : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-base sm:text-lg font-mono text-blue-700 dark:text-blue-300 font-semibold break-all hover:underline cursor-pointer"
-          >
-            {storeUrl || 'Not configured'}
-          </a>
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-800 rounded-2xl p-6 sm:p-8 mb-8 shadow-lg hover:shadow-xl transition-shadow">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-blue-100 mb-2 uppercase tracking-wider">Your Store URL</p>
+            <a
+              href={storeUrl ? `https://${storeUrl}` : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-lg sm:text-xl font-mono font-semibold text-white break-all hover:text-blue-50 transition-colors cursor-pointer"
+            >
+              {storeUrl ? `https://${storeUrl}` : 'Not configured'}
+            </a>
+          </div>
           {storeUrl && (
             <button
               onClick={handleCopyLink}
               disabled={copying}
-              className="flex-shrink-0 p-2 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors disabled:opacity-50"
+              className="flex-shrink-0 p-3 text-white bg-white/20 hover:bg-white/30 rounded-xl transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               title="Copy link"
             >
               <FiCopy className="h-5 w-5" />
