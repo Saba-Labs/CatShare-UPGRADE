@@ -34,7 +34,7 @@ export default function StoreHeader({
     <div className="mb-8">
       {/* Title and Status */}
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl md:text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-3">{storeName}</h1>
+        <h1 className="text-base sm:text-lg md:text-lg font-bold tracking-tight text-gray-900 dark:text-gray-100 mb-3">{storeName}</h1>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
             isLive
