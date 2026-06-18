@@ -23,7 +23,6 @@ import {
 } from '../../types/storeBehaviorSettings';
 import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
-import { getAllCatalogues } from '../../config/catalogueConfig';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -149,7 +148,6 @@ export default function StoreSettings() {
   const [validationErrors, setValidationErrors] = useState<Partial<Record<SettingsKey, string>>>({});
   const [slugValidation, setSlugValidation] = useState<'available' | 'taken' | 'invalid' | null>(null);
   const [slugValidating, setSlugValidating] = useState(false);
-  const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
 
   // Load initial settings
   useEffect(() => {
@@ -171,11 +169,6 @@ export default function StoreSettings() {
           if (store.checkoutSettings?.experience) {
             checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
             checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
-          }
-
-          const cataloguesList = getAllCatalogues(user.uid);
-          if (cataloguesList && cataloguesList.length > 0) {
-            setCatalogues(cataloguesList.map(cat => ({ id: cat.id, label: cat.label })));
           }
 
           const loadedSettings: StoreSettingsState = {
@@ -635,15 +628,14 @@ export default function StoreSettings() {
                 <select
                   value={settings.productsToShow}
                   onChange={(e) => handleChange('productsToShow', e.target.value as any)}
-                  disabled={saving || catalogues.length === 0}
+                  disabled={saving}
                   className={fieldClassName}
                 >
-                  <option value="">Select a catalogue...</option>
-                  {catalogues.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.label}
-                    </option>
-                  ))}
+                  <option value="all">All Products</option>
+                  <option value="featured">Featured Products</option>
+                  <option value="category">Products with Categories</option>
+                  <option value="wholesale">Wholesale Catalogue</option>
+                  <option value="reseller">Reseller Catalogue</option>
                 </select>
               </div>
 
