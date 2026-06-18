@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getSellerStore } from '../../services/storeService';
 import StoreLayout from './components/StoreLayout';
-import PageHeader from './components/PageHeader';
+import StoreHeader from './components/StoreHeader';
+import StoreHealthCard from './components/StoreHealthCard';
+import QuickActionButton from './components/QuickActionButton';
 import NavigationCard from './components/NavigationCard';
-import SettingsCard from './components/SettingsCard';
 import {
   FiSettings,
   FiUser,
@@ -18,10 +20,14 @@ import {
   FiCode,
   FiLock,
   FiAlertTriangle,
+  FiEye,
+  FiPackage,
+  FiShoppingBag,
 } from 'react-icons/fi';
 
 export default function StoreDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [store, setStore] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,27 +51,55 @@ export default function StoreDashboard() {
   if (loading) {
     return (
       <StoreLayout>
-        <div className="text-center py-12">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="space-y-8 py-8">
+          {/* Header skeleton */}
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 w-40 bg-gray-200 rounded"></div>
+            <div className="h-6 w-32 bg-gray-200 rounded"></div>
+          </div>
+
+          {/* Health card skeleton */}
+          <div className="h-32 bg-gray-200 rounded-xl animate-pulse"></div>
+
+          {/* Quick actions skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-28 bg-gray-200 rounded-xl animate-pulse"></div>
+            ))}
+          </div>
         </div>
       </StoreLayout>
     );
   }
 
-  const navigationSections = [
+  // Generate store URL
+  const storeUrl = store?.slug ? `catshare.app/${store.slug}` : null;
+
+  // Prepare metrics
+  const metrics = [
+    { label: 'Products Published', value: '0', icon: '📦' },
+    { label: 'Orders Today', value: '0', icon: '📋' },
+    { label: 'Visitors Today', value: '0', icon: '👥' },
+    { label: 'Revenue Today', value: '$0', icon: '💰' },
+    { label: 'Pending Orders', value: '0', icon: '⏳' },
+    { label: 'Conversion Rate', value: '0%', icon: '📈' },
+  ];
+
+  // Navigation categories
+  const settingsCategories = [
     {
       title: 'Core Settings',
       cards: [
         {
           title: 'Store Settings',
-          description: 'Manage store name, slug, and basic info',
-          icon: <FiSettings className="h-6 w-6" />,
+          description: 'Manage store behaviour and visibility',
+          icon: '🏬',
           href: '/store/settings',
         },
         {
           title: 'Business Profile',
-          description: 'Add logo, hours, contact info',
-          icon: <FiUser className="h-6 w-6" />,
+          description: 'Business information and branding',
+          icon: '👤',
           href: '/store/business',
         },
       ],
@@ -75,14 +109,14 @@ export default function StoreDashboard() {
       cards: [
         {
           title: 'Homepage Builder',
-          description: 'Design your store homepage',
-          icon: <FiHome className="h-6 w-6" />,
+          description: 'Design your storefront',
+          icon: '🎨',
           href: '/store/homepage',
         },
         {
-          title: 'Checkout Settings',
-          description: 'Configure checkout flow',
-          icon: <FiShoppingCart className="h-6 w-6" />,
+          title: 'Checkout',
+          description: 'Customer checkout experience',
+          icon: '🛒',
           href: '/store/checkout',
         },
       ],
@@ -92,14 +126,14 @@ export default function StoreDashboard() {
       cards: [
         {
           title: 'Payments',
-          description: 'Set up payment gateways',
-          icon: <FiCreditCard className="h-6 w-6" />,
+          description: 'Payment gateways and methods',
+          icon: '💳',
           href: '/store/payments',
         },
         {
           title: 'Shipping',
-          description: 'Configure shipping methods',
-          icon: <FiTruck className="h-6 w-6" />,
+          description: 'Shipping providers and delivery rules',
+          icon: '🚚',
           href: '/store/shipping',
         },
       ],
@@ -110,25 +144,25 @@ export default function StoreDashboard() {
         {
           title: 'Custom Domain',
           description: 'Connect your own domain',
-          icon: <FiGlobe className="h-6 w-6" />,
+          icon: '🌐',
           href: '/store/domain',
         },
         {
           title: 'Analytics',
-          description: 'View sales and customer insights',
-          icon: <FiBarChart2 className="h-6 w-6" />,
+          description: 'Sales and visitor insights',
+          icon: '📊',
           href: '/store/analytics',
         },
         {
           title: 'Marketing',
-          description: 'Promote your store',
-          icon: <FiTrendingUp className="h-6 w-6" />,
+          description: 'SEO, promotions and announcements',
+          icon: '📣',
           href: '/store/marketing',
         },
         {
           title: 'Integrations',
-          description: 'Connect third-party services',
-          icon: <FiCode className="h-6 w-6" />,
+          description: 'Third-party services',
+          icon: '🔗',
           href: '/store/integrations',
         },
       ],
@@ -138,14 +172,14 @@ export default function StoreDashboard() {
       cards: [
         {
           title: 'Security',
-          description: 'Manage access and security',
-          icon: <FiLock className="h-6 w-6" />,
+          description: 'Store protection and permissions',
+          icon: '🔐',
           href: '/store/security',
         },
         {
           title: 'Danger Zone',
-          description: 'Advanced actions and deletions',
-          icon: <FiAlertTriangle className="h-6 w-6" />,
+          description: 'Archive or delete store',
+          icon: '🗑',
           href: '/store/danger',
         },
       ],
@@ -153,44 +187,86 @@ export default function StoreDashboard() {
   ];
 
   return (
-    <StoreLayout>
-      <PageHeader
-        title="My Store"
-        description="Manage all aspects of your store"
-        showBackButton={false}
+    <StoreLayout storeUrl={storeUrl}>
+      {/* Header Section */}
+      <StoreHeader
+        storeName={store?.name || 'My Store'}
+        storeUrl={storeUrl}
+        isLive={store?.live || false}
       />
 
-      {store && (
-        <div className="mb-8">
-          <SettingsCard
-            title="Store Status"
-            description={`Store: ${store.live ? '🟢 Live' : '🔴 Offline'}`}
-          >
-            <div className="text-sm text-gray-600">
-              <p>URL: {store.slug || 'Not configured'}</p>
-            </div>
-          </SettingsCard>
-        </div>
-      )}
+      {/* Store Health Card */}
+      <StoreHealthCard metrics={metrics} isLoading={false} />
 
-      <div className="space-y-8">
-        {navigationSections.map((section, index) => (
-          <div key={index}>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{section.title}</h2>
+      {/* Quick Actions Section */}
+      <div className="mb-12">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <QuickActionButton
+            icon={<FiEye className="h-8 w-8" />}
+            title="Preview Store"
+            description="View as customer"
+            onClick={() => storeUrl && window.open(`https://${storeUrl}`, '_blank')}
+          />
+          <QuickActionButton
+            icon={<FiHome className="h-8 w-8" />}
+            title="Edit Homepage"
+            description="Design storefront"
+            onClick={() => navigate('/store/homepage')}
+          />
+          <QuickActionButton
+            icon={<FiPackage className="h-8 w-8" />}
+            title="Manage Products"
+            description="View & edit items"
+            onClick={() => navigate('/')}
+          />
+          <QuickActionButton
+            icon={<FiShoppingBag className="h-8 w-8" />}
+            title="Orders"
+            description="See all orders"
+            onClick={() => navigate('/orders')}
+          />
+          <QuickActionButton
+            icon={<FiShoppingCart className="h-8 w-8" />}
+            title="Share Store"
+            description="Share with customers"
+            onClick={() => {
+              if (storeUrl) {
+                if (navigator.share) {
+                  navigator.share({
+                    title: store?.name || 'My Store',
+                    text: 'Check out my store!',
+                    url: `https://${storeUrl}`,
+                  }).catch(() => {});
+                }
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Settings Categories */}
+      <div className="space-y-10">
+        {settingsCategories.map((category, sectionIdx) => (
+          <section key={sectionIdx}>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">{category.title}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {section.cards.map((card, cardIndex) => (
+              {category.cards.map((card, cardIdx) => (
                 <NavigationCard
-                  key={cardIndex}
+                  key={cardIdx}
                   title={card.title}
                   description={card.description}
-                  icon={card.icon}
+                  icon={<span className="text-xl">{card.icon}</span>}
                   href={card.href}
                 />
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
+
+      {/* Spacer for mobile sticky area */}
+      <div className="h-20 md:h-0"></div>
     </StoreLayout>
   );
 }

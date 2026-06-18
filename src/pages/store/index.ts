@@ -17,3 +17,6 @@ export { default as PageHeader } from './components/PageHeader';
 export { default as SettingsCard } from './components/SettingsCard';
 export { default as SectionCard } from './components/SectionCard';
 export { default as NavigationCard } from './components/NavigationCard';
+export { default as StoreHeader } from './components/StoreHeader';
+export { default as StoreHealthCard } from './components/StoreHealthCard';
+export { default as QuickActionButton } from './components/QuickActionButton';
