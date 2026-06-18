@@ -181,6 +181,7 @@ export async function ensureShiprocketToken(
 import {
   normalizeShippingAddress,
   type ShippingAddress,
+  type ShippingAddressInput,
 } from './shippingAddressUtils.js';
 
 export type OrderShippingAddress = ShippingAddress;
@@ -217,7 +218,7 @@ export async function createShiprocketShipmentForOrder(
   supabase: SupabaseClient,
   sellerUserId: string,
   orderId: string,
-  shippingAddressOverride?: OrderShippingAddress | null
+  shippingAddressOverride?: ShippingAddressInput | null
 ): Promise<Record<string, unknown>> {
   const integrationRow = await getIntegration(supabase, sellerUserId, 'shiprocket');
   if (!integrationRow || integrationRow.status !== 'connected') {
