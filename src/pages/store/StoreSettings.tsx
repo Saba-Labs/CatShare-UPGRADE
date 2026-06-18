@@ -341,7 +341,7 @@ export default function StoreSettings() {
 
       if (settings.minimumOrderValue !== originalSettings.minimumOrderValue) {
         const normalized = normalizeStoreMinimumOrderValueInput(settings.minimumOrderValue);
-        if (!normalized.ok) {
+        if (normalized.ok === false) {
           failures.push(normalized.error);
         } else {
           const result = await updateStoreMinimumOrderValue(sellerId, normalized.value);
@@ -353,7 +353,7 @@ export default function StoreSettings() {
 
       if (settings.whatsappNumber !== originalSettings.whatsappNumber) {
         const normalized = normalizeStoreWhatsappInput(settings.whatsappNumber);
-        if (!normalized.ok) {
+        if (normalized.ok === false) {
           failures.push(normalized.error);
         } else {
           const result = await updateStoreWhatsapp(sellerId, normalized.value);

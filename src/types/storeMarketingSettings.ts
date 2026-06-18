@@ -84,7 +84,7 @@ function bool(raw: unknown, fallback: boolean): boolean {
   return typeof raw === 'boolean' ? raw : fallback;
 }
 
-function normalizeSection<T extends Record<string, unknown>>(
+function normalizeSection<T extends object>(
   raw: unknown,
   defaults: T
 ): T {

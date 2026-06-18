@@ -29,6 +29,7 @@ function buildLocalFallbackStore(uid: string): Store {
     websiteModeEnabled: true,
     customHostname: null,
     customDomainStatus: null,
+    maintenanceMode: false,
     checkoutSettings: { ...DEFAULT_CHECKOUT_SETTINGS },
   };
 }
