@@ -23,6 +23,7 @@ import {
 } from '../../types/storeBehaviorSettings';
 import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
+import { getAllCatalogues } from '../../config/catalogueConfig';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -172,8 +173,9 @@ export default function StoreSettings() {
             checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
           }
 
-          if (store.cataloguesDefinition && store.cataloguesDefinition.length > 0) {
-            setCatalogues(store.cataloguesDefinition);
+          const cataloguesList = getAllCatalogues(user.uid);
+          if (cataloguesList && cataloguesList.length > 0) {
+            setCatalogues(cataloguesList.map(cat => ({ id: cat.id, label: cat.label })));
           }
 
           const loadedSettings: StoreSettingsState = {
