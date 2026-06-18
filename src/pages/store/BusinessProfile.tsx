@@ -165,7 +165,6 @@ export default function BusinessProfile() {
       <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 max-w-3xl">
         <PageHeader
           title="Business Profile"
-          description="Logo, contact details, and brand copy shown on your storefront and shared links."
           sticky
           actions={(
             <button

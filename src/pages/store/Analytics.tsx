@@ -59,7 +59,6 @@ export default function Analytics() {
       <div className="max-w-6xl pb-8">
         <PageHeader
           title="Analytics"
-          description="Track store performance from your real order data."
           actions={(
             <AnalyticsDateFilter
               value={dateRange}

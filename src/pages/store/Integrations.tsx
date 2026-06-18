@@ -91,7 +91,6 @@ export default function Integrations() {
     <StoreLayout>
       <PageHeader
         title="Integrations"
-        description="Connect apps and services to extend your store."
       />
 
       <div className="max-w-6xl space-y-8 pb-8">

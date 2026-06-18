@@ -301,7 +301,6 @@ export default function CustomDomain() {
       <div className="max-w-3xl space-y-6 pb-8">
         <PageHeader
           title="Custom Domain"
-          description="Connect your own domain and serve your store over HTTPS with automatic SSL."
         />
 
         {error ? (
