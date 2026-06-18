@@ -1211,12 +1211,6 @@ export default function StoreView() {
         : '',
     [behavior.productsToShow, store?.catalogueId, catalogues]
   );
-  const storefrontGridStyle = useMemo(
-    () => ({
-      gridTemplateColumns: `repeat(${productsPerRowCount(behavior.productsPerRow)}, minmax(0, 1fr))`,
-    }),
-    [behavior.productsPerRow]
-  );
   const storefrontImageAspectRatio = useMemo(
     () => productImageAspectRatio(behavior.productImageRatio),
     [behavior.productImageRatio]
@@ -2227,7 +2221,6 @@ export default function StoreView() {
           {/* ══ PRODUCT LISTING (grid / OrderForm-style list) ══ */}
           <div
             className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}
-            style={storefrontViewMode === 'grid' ? storefrontGridStyle : undefined}
           >
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (
