@@ -885,34 +885,6 @@ export default function StoreSettings() {
                 </select>
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Customer Notifications</label>
-                  <ToggleSwitch
-                    checked={settings.customerNotifications}
-                    onChange={(value) => handleChange('customerNotifications', value)}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Allow Guest Browsing</label>
-                  <ToggleSwitch
-                    checked={settings.allowGuestBrowsing}
-                    onChange={(value) => handleChange('allowGuestBrowsing', value)}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Require Login Before Checkout</label>
-                  <ToggleSwitch
-                    checked={settings.requireLoginBeforeCheckout}
-                    onChange={(value) => handleChange('requireLoginBeforeCheckout', value)}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
             </div>
           </SettingsCard>
 
