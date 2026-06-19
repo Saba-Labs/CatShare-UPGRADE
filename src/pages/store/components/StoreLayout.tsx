@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainAppBottomNav from '../../../components/MainAppBottomNav';
+import SupportWhatsAppFab from '../../../components/SupportWhatsAppFab';
 
 /** Matches legacy store / orders status bar height. */
 export const STORE_STATUS_BAR_HEIGHT_PX = 40;
@@ -40,6 +41,7 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
 
 
         <MainAppBottomNav active="store" />
+        <SupportWhatsAppFab bottomOffsetPx={80} alignCenterWithHeightPx={0} />
       </div>
     </>
   );
