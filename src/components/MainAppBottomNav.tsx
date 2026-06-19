@@ -20,7 +20,7 @@ const pathForTab = (tab: MainAppTab): string => {
   }
 };
 
-export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
+export default function MainAppBottomNav({ active, sideDrawerOpen = false }: { active: MainAppTab; sideDrawerOpen?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -53,7 +53,9 @@ export default function MainAppBottomNav({ active }: { active: MainAppTab }) {
 
   const nav = (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-around text-xs font-medium border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:text-sm"
+      className={`fixed inset-x-0 bottom-0 z-50 flex justify-around text-xs font-medium border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom,0px)] sm:text-sm transition-opacity ${
+        sideDrawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}
       aria-label="Main navigation"
     >
       {tabs.map(({ id, label, icon: Icon }) => (

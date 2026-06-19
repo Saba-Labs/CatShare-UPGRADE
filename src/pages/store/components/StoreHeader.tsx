@@ -58,7 +58,7 @@ export default function StoreHeader({
               href={storeUrl || undefined}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm font-medium text-white font-mono break-all hover:text-blue-50 transition-colors"
+              className="text-sm font-medium text-white font-mono break-all hover:text-blue-50 transition-colors tracking-normal"
             >
               {storeUrl || 'Not configured'}
             </a>
