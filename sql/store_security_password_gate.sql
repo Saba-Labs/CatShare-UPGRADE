@@ -1,21 +1,17 @@
--- Store marketing settings (SEO, Google Search Console, catalog announcement bar)
--- Apply in Supabase SQL editor or add as a migration.
+-- Simplified store security: password gate + verify RPC for public storefront.
+-- Run in Supabase SQL editor after stores.security_settings exists.
 
+-- Trim default to password fields only
 alter table public.stores
-  add column if not exists marketing_settings jsonb not null default '{
+  alter column security_settings set default '{
     "version": 1,
-    "seo": {"metaTitle":"","metaDescription":"","keywords":"","ogImageUrl":""},
-    "tracking": {"googleSearchConsoleVerification":""},
-    "promotions": {
-      "announcementBarEnabled": false,
-      "announcementText": "Free shipping on orders over ₹999",
-      "announcementLink": ""
-    }
+    "passwordProtected": false,
+    "storePassword": ""
   }'::jsonb;
 
-comment on column public.stores.marketing_settings is 'Seller marketing: SEO, Google Search Console, and catalog announcement bar';
+comment on column public.stores.security_settings is 'Store password gate for public storefront';
 
--- Expose marketing settings on public store payload (catalog storefront SEO + announcement)
+-- Expose passwordProtected flag on public store payload (never the password itself)
 create or replace function public.get_store_by_slug(p_slug text)
 returns jsonb
 language plpgsql
@@ -42,8 +38,7 @@ begin
     s.store_whatsapp,
     coalesce(s.homepage_enabled, true) as homepage_enabled,
     coalesce(s.website_mode_enabled, false) as website_mode_enabled,
-    coalesce(s.security_settings, '{}'::jsonb) as security_settings,
-    coalesce(s.marketing_settings, '{}'::jsonb) as marketing_settings
+    coalesce(s.security_settings, '{}'::jsonb) as security_settings
   into rec
   from public.stores s
   where lower(s.store_slug) = lower(trim(p_slug))
@@ -87,7 +82,6 @@ begin
     'homepageEnabled', coalesce(rec.website_mode_enabled, false) and coalesce(rec.homepage_enabled, true),
     'websiteModeEnabled', coalesce(rec.website_mode_enabled, false),
     'passwordProtected', pwd_protected,
-    'marketingSettings', rec.marketing_settings,
     'cataloguesDefinitionUserSettings', us_data -> 'cataloguesDefinition',
     'cataloguesDefinitionManaged', (
       select cd.data
@@ -101,3 +95,39 @@ $$;
 
 revoke all on function public.get_store_by_slug(text) from public;
 grant execute on function public.get_store_by_slug(text) to anon, authenticated;
+
+create or replace function public.verify_store_password(p_slug text, p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  sec jsonb;
+  expected text;
+begin
+  select coalesce(s.security_settings, '{}'::jsonb)
+  into sec
+  from public.stores s
+  where lower(s.store_slug) = lower(trim(p_slug))
+  limit 1;
+
+  if sec is null then
+    return false;
+  end if;
+
+  if coalesce(sec ->> 'passwordProtected', 'false') <> 'true' then
+    return true;
+  end if;
+
+  expected := coalesce(sec ->> 'storePassword', '');
+  if length(trim(expected)) = 0 then
+    return false;
+  end if;
+
+  return trim(coalesce(p_password, '')) = trim(expected);
+end;
+$$;
+
+revoke all on function public.verify_store_password(text, text) from public;
+grant execute on function public.verify_store_password(text, text) to anon, authenticated;

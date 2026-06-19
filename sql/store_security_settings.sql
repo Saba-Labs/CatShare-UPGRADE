@@ -1,15 +1,9 @@
--- Store security settings (visibility, access control, geo restrictions)
--- Apply in Supabase SQL editor or add as a migration.
-
+-- Store security settings (password gate for public storefront)
 alter table public.stores
   add column if not exists security_settings jsonb not null default '{
     "version": 1,
-    "visibility": "public",
     "passwordProtected": false,
-    "storePassword": "",
-    "blockedCustomers": [],
-    "allowedCountries": [],
-    "twoFactorEnabled": false
+    "storePassword": ""
   }'::jsonb;
 
-comment on column public.stores.security_settings is 'Seller security: visibility, password gate, blocked customers, geo allowlist, 2FA toggle';
+comment on column public.stores.security_settings is 'Store password gate for public storefront';

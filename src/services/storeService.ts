@@ -35,6 +35,11 @@ import {
   normalizeBehaviorSettings,
   type StoreBehaviorSettings,
 } from '../types/storeBehaviorSettings';
+import {
+  normalizeMarketingSettings,
+  type StoreMarketingSettings,
+} from '../types/storeMarketingSettings';
+import { isStorePasswordGateActive } from '../types/storeSecuritySettings';
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
   for (const v of values) {
@@ -71,6 +76,98 @@ function parseUserSettingsDataColumn(raw: unknown): Record<string, unknown> | un
 
 const debugStorefrontCatalogue =
   import.meta.env.DEV === true || String(import.meta.env.VITE_DEBUG_STOREFRONT || '') === 'true';
+
+type PublicStoreFieldsRow = {
+  securitySettings?: unknown;
+  marketingSettings?: unknown;
+  passwordProtected?: boolean;
+};
+
+function parseRpcJsonRecord(raw: unknown): Record<string, unknown> | null {
+  let value = raw;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/** Authoritative security + marketing JSON (security-definer RPC, then table fallback). */
+async function loadPublicStoreFields(
+  client: ReturnType<typeof getSupabaseClient>,
+  slug: string,
+  sellerUserId?: string
+): Promise<PublicStoreFieldsRow | null> {
+  const normalizedSlug = slug.toLowerCase().trim();
+  if (!normalizedSlug) return null;
+
+  try {
+    const { data, error } = await client.rpc('get_store_public_extras', {
+      p_slug: normalizedSlug,
+    });
+    const row = !error ? parseRpcJsonRecord(data) : null;
+    if (row) {
+      return {
+        securitySettings: row.securitySettings ?? row.security_settings,
+        marketingSettings: row.marketingSettings ?? row.marketing_settings,
+        passwordProtected: coerceOptionalBoolean(row.passwordProtected ?? row.password_protected) ?? undefined,
+      };
+    }
+  } catch {
+    /* RPC may not exist until migration is applied */
+  }
+
+  const readRow = (record: Record<string, unknown> | null | undefined): PublicStoreFieldsRow | null => {
+    if (!record) return null;
+    return {
+      securitySettings: record.security_settings ?? record.securitySettings,
+      marketingSettings: record.marketing_settings ?? record.marketingSettings,
+    };
+  };
+
+  if (sellerUserId) {
+    const { data, error } = await client
+      .from('stores')
+      .select('security_settings, marketing_settings')
+      .eq('seller_user_id', sellerUserId)
+      .maybeSingle();
+    if (!error && data) {
+      return readRow(data as Record<string, unknown>);
+    }
+  }
+
+  const { data, error } = await client
+    .from('stores')
+    .select('security_settings, marketing_settings')
+    .ilike('store_slug', normalizedSlug)
+    .maybeSingle();
+
+  if (!error && data) {
+    return readRow(data as Record<string, unknown>);
+  }
+
+  const missingColumn =
+    error?.code === '42703' ||
+    String(error?.message ?? '').includes('marketing_settings') ||
+    String(error?.message ?? '').includes('security_settings');
+
+  if (missingColumn) {
+    const { data: secOnly, error: secErr } = await client
+      .from('stores')
+      .select('security_settings')
+      .ilike('store_slug', normalizedSlug)
+      .maybeSingle();
+    if (!secErr && secOnly) {
+      return readRow(secOnly as Record<string, unknown>);
+    }
+  }
+
+  return null;
+}
 
 /**
  * `get_store_by_slug` (security definer) can embed catalogue JSON so anon clients do not rely on RLS `user_settings` / `catalogues_definition` reads.
@@ -285,6 +382,10 @@ export interface StorePublic {
   integrationFlags?: StoreIntegrationFlags;
   /** Catalogue/display preferences from `stores.behavior_settings`. */
   behaviorSettings?: StoreBehaviorSettings;
+  /** True when customers must enter the store password before browsing. */
+  passwordProtected?: boolean;
+  /** SEO, Google Search Console, and catalog announcement bar from `stores.marketing_settings`. */
+  marketingSettings?: StoreMarketingSettings;
 }
 
 function normalizeOptionalNonNegativeNumber(raw: unknown): number | null {
@@ -693,6 +794,8 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
     let integrationFlagsRaw: unknown = row.integration_flags ?? row.integrationFlags;
     let maintenanceMode = coerceOptionalBoolean(row.maintenanceMode ?? row.maintenance_mode);
     let behaviorSettingsRaw: unknown = row.behavior_settings ?? row.behaviorSettings;
+    let passwordProtected = coerceOptionalBoolean(row.passwordProtected ?? row.password_protected);
+    let marketingSettingsRaw: unknown = row.marketingSettings ?? row.marketing_settings;
     let catalogueId = firstNonEmptyString(
       row.catalogueId,
       row.catalogue_id,
@@ -710,12 +813,14 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       checkoutSettingsRaw == null ||
       integrationFlagsRaw == null ||
       maintenanceMode == null ||
-      behaviorSettingsRaw == null
+      behaviorSettingsRaw == null ||
+      passwordProtected == null ||
+      marketingSettingsRaw == null
     ) {
       const { data: storeRow } = await client
         .from('stores')
         .select('*')
-        .eq('store_slug', normalizedSlug)
+        .ilike('store_slug', normalizedSlug)
         .maybeSingle();
       const storeRecord = storeRow as Record<string, unknown> | null;
       const col = storeRecord?.store_whatsapp;
@@ -757,6 +862,12 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       if (behaviorSettingsRaw == null) {
         behaviorSettingsRaw = storeRecord?.behavior_settings ?? storeRecord?.behaviorSettings;
       }
+      if (passwordProtected == null) {
+        const secRaw = storeRecord?.security_settings ?? storeRecord?.securitySettings;
+        if (secRaw != null) {
+          passwordProtected = isStorePasswordGateActive(secRaw);
+        }
+      }
       const catalogueFromStore = firstNonEmptyString(
         storeRecord?.catalogue_id,
         storeRecord?.catalogueId
@@ -764,7 +875,22 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       if (catalogueFromStore) {
         catalogueId = catalogueFromStore;
       }
+      if (marketingSettingsRaw == null) {
+        marketingSettingsRaw = storeRecord?.marketing_settings ?? storeRecord?.marketingSettings;
+      }
     }
+
+    const authoritativeFields = await loadPublicStoreFields(client, normalizedSlug, sellerUserId);
+    if (authoritativeFields?.marketingSettings != null) {
+      marketingSettingsRaw = authoritativeFields.marketingSettings;
+    }
+
+    const passwordGateActive =
+      authoritativeFields?.passwordProtected != null
+        ? authoritativeFields.passwordProtected === true
+        : authoritativeFields?.securitySettings !== undefined
+          ? isStorePasswordGateActive(authoritativeFields.securitySettings)
+          : passwordProtected === true;
 
     const normalized: StorePublic = {
       ...(parsed as StorePublic),
@@ -836,6 +962,8 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       checkoutSettings: normalizeCheckoutSettings(checkoutSettingsRaw),
       integrationFlags: normalizeStoreIntegrationFlags(integrationFlagsRaw),
       behaviorSettings: normalizeBehaviorSettings(behaviorSettingsRaw),
+      passwordProtected: passwordGateActive,
+      marketingSettings: normalizeMarketingSettings(marketingSettingsRaw),
     };
     if (whatsapp) {
       normalized.whatsapp = whatsapp;

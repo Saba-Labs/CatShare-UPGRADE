@@ -1,5 +1,4 @@
--- Store marketing settings (SEO, Google Search Console, catalog announcement bar)
--- Apply in Supabase SQL editor or add as a migration.
+-- Wire marketing_settings to public storefront (catalog SEO + announcement bar).
 
 alter table public.stores
   add column if not exists marketing_settings jsonb not null default '{
@@ -15,7 +14,6 @@ alter table public.stores
 
 comment on column public.stores.marketing_settings is 'Seller marketing: SEO, Google Search Console, and catalog announcement bar';
 
--- Expose marketing settings on public store payload (catalog storefront SEO + announcement)
 create or replace function public.get_store_by_slug(p_slug text)
 returns jsonb
 language plpgsql

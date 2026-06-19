@@ -68,6 +68,16 @@ import {
   getStorefrontPriceAndUnit,
 } from '../components/Storefront/storefrontOrderHelpers';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { useAuth } from '../context/AuthContext';
+import StorePasswordGate from '../components/Storefront/StorePasswordGate';
+import CatalogAnnouncementBar from '../components/Storefront/CatalogAnnouncementBar';
+import StorefrontSeo from '../components/WebsiteBuilder/StorefrontSeo';
+import { DEFAULT_MARKETING_SETTINGS } from '../types/storeMarketingSettings';
+import {
+  resolveCatalogGoogleSiteVerification,
+  resolveCatalogStorefrontSeo,
+} from '../utils/catalogStorefrontSeo';
+import { isStorePasswordUnlocked } from '../utils/storePasswordAccess';
 import { getPublishedHomepageConfig } from '../services/homepageService';
 import '../components/HomepageBuilder/sites-theme-button.css';
 import { HomepageLayout } from '../types/homepage';
@@ -896,6 +906,7 @@ function SkeletonCard() {
 export default function StoreView() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { guardOnline } = useCloudWriteGate();
   const { slug } = useParams<{ slug: string }>();
   const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
@@ -945,6 +956,12 @@ export default function StoreView() {
   const [sellerFieldsDefinition, setSellerFieldsDefinition] = useState<any>(null);
   const [homepageLayout, setHomepageLayout] = useState<HomepageLayout | null>(null);
   const [homepageLoading, setHomepageLoading] = useState(false);
+  const [passwordUnlocked, setPasswordUnlocked] = useState(false);
+
+  useEffect(() => {
+    const slugForUnlock = String(effectiveSlug || store?.storeSlug || '').trim().toLowerCase();
+    setPasswordUnlocked(slugForUnlock ? isStorePasswordUnlocked(slugForUnlock) : false);
+  }, [effectiveSlug, store?.storeSlug]);
 
   // Fetch the seller's custom field names from Supabase
   useEffect(() => {
@@ -1068,6 +1085,11 @@ export default function StoreView() {
       setProductsLoading(false);
       return;
     }
+    if (store.passwordProtected && !passwordUnlocked) {
+      setAllProducts([]);
+      setProductsLoading(false);
+      return;
+    }
     setProductsLoading(true);
     const cats = ensureCataloguesForStorefront(store.cataloguesDefinition, store.catalogueId);
     getStoreProducts(store.sellerUserId, cats).then((result) => {
@@ -1076,7 +1098,7 @@ export default function StoreView() {
       }
       setProductsLoading(false);
     });
-  }, [store?.sellerUserId, store?.isLive, store?.maintenanceMode, store?.catalogueId, store?.cataloguesDefinition]);
+  }, [store?.sellerUserId, store?.isLive, store?.maintenanceMode, store?.passwordProtected, passwordUnlocked, store?.catalogueId, store?.cataloguesDefinition]);
 
   // Safety check: custom website layout only applies when website mode is on.
   useEffect(() => {
@@ -1132,7 +1154,9 @@ export default function StoreView() {
     if (!on || !store) return;
     console.warn('[StoreView] catalogueId:', store.catalogueId);
     console.warn('[StoreView] cataloguesDefinition length:', store.cataloguesDefinition?.length ?? 0, store.cataloguesDefinition);
-  }, [store]);
+    console.warn('[StoreView] passwordProtected:', store.passwordProtected, 'passwordUnlocked:', passwordUnlocked);
+    console.warn('[StoreView] marketingSettings:', store.marketingSettings);
+  }, [store, passwordUnlocked]);
 
   /** Re-hit Supabase when user returns to the tab or restores from bfcache — no local product/store cache in StoreView. */
   useEffect(() => {
@@ -1351,6 +1375,35 @@ export default function StoreView() {
     () => (catalogProductHandle ? findProductByHandle(storeProducts, catalogProductHandle) : null),
     [catalogProductHandle, storeProducts]
   );
+
+  const catalogMarketing = store?.marketingSettings ?? DEFAULT_MARKETING_SETTINGS;
+
+  const catalogSeo = useMemo(() => {
+    if (!store || store.websiteModeEnabled) return null;
+    const storeSlug = effectiveSlug || store.storeSlug || '';
+    return resolveCatalogStorefrontSeo({
+      slug: storeSlug,
+      storeName: store.sellerBusinessName?.trim() || store.storeSlug || storeSlug,
+      storeDescription: store.sellerDescription || store.sellerAbout || undefined,
+      logoUrl: store.sellerLogoUrl || undefined,
+      marketing: catalogMarketing,
+      pageKind: catalogProductHandle && catalogActiveProduct ? 'product' : 'home',
+      product: catalogActiveProduct,
+      onSubdomain: dedicatedHost,
+    });
+  }, [
+    store,
+    effectiveSlug,
+    catalogMarketing,
+    catalogProductHandle,
+    catalogActiveProduct,
+    dedicatedHost,
+  ]);
+
+  const catalogGoogleVerification = useMemo(() => {
+    if (!store || store.websiteModeEnabled) return undefined;
+    return resolveCatalogGoogleSiteVerification(catalogMarketing);
+  }, [store, catalogMarketing]);
 
   const orderSummary = useMemo(() => {
     if (!listingCatalogueId) return { items: [] as any[], total: 0 };
@@ -1969,6 +2022,24 @@ export default function StoreView() {
     );
   }
 
+  const passwordGateSlug = String(effectiveSlug || store.storeSlug || '').trim().toLowerCase();
+  const passwordGateStoreName =
+    store.sellerBusinessName?.trim() ||
+    (store.storeSlug ? store.storeSlug.charAt(0).toUpperCase() + store.storeSlug.slice(1) : 'Store');
+
+  if (store.passwordProtected && !passwordUnlocked) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <StorePasswordGate
+          storeSlug={passwordGateSlug}
+          storeName={passwordGateStoreName}
+          onUnlocked={() => setPasswordUnlocked(true)}
+        />
+      </>
+    );
+  }
+
   /* ── Social links ── */
   type SocialLink = { label: string; url: string; icon: React.ReactNode };
   const ig = store.instagram?.trim();
@@ -2084,11 +2155,29 @@ export default function StoreView() {
   );
 
   /* ── Main render ── */
+  const showCatalogAnnouncement =
+    !store.websiteModeEnabled &&
+    catalogMarketing.promotions.announcementBarEnabled &&
+    catalogMarketing.promotions.announcementText.trim().length > 0;
+
   return (
     <>
       <style>{CSS}</style>
+      {catalogSeo ? (
+        <StorefrontSeo
+          seo={catalogSeo}
+          googleSiteVerification={catalogGoogleVerification}
+        />
+      ) : null}
       <div className="sv">
         <div className={`sv-page${store?.websiteModeEnabled ? ' website-mode-full' : ''}`}>
+
+          {showCatalogAnnouncement ? (
+            <CatalogAnnouncementBar
+              text={catalogMarketing.promotions.announcementText}
+              link={catalogMarketing.promotions.announcementLink}
+            />
+          ) : null}
 
           {store?.websiteModeEnabled && websiteOrderBridge ? (
             <WebsiteOrderBridgeProvider value={websiteOrderBridge}>

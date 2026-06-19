@@ -8,7 +8,6 @@ export { default as CustomDomain } from './CustomDomain';
 export { default as Analytics } from './Analytics';
 export { default as Marketing } from './Marketing';
 export { default as Security } from './Security';
-export { default as DangerZone } from './DangerZone';
 export { default as Integrations } from './Integrations';
 
 // Layout components

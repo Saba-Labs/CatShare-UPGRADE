@@ -16,8 +16,6 @@ import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
-import MarketingIntegrationCard from './components/MarketingIntegrationCard';
-import { getActiveMarketingIntegrations } from './config/marketingIntegrations';
 import {
   STORE_FIELD_CLASS,
   STORE_SAVE_BTN_DISABLED,
@@ -63,8 +61,6 @@ export default function Marketing() {
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const activeMarketingIntegrations = getActiveMarketingIntegrations();
 
   useLayoutEffect(() => {
     if (!sellerId) return;
@@ -140,7 +136,7 @@ export default function Marketing() {
       <StoreLayout>
         <div className="animate-pulse space-y-6 py-8 max-w-3xl">
           <div className="h-12 w-48 rounded bg-gray-200 dark:bg-gray-800" />
-          {[...Array(5)].map((_, i) => (
+          {[...Array(3)].map((_, i) => (
             <div key={i} className="h-48 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
         </div>
@@ -173,7 +169,7 @@ export default function Marketing() {
         <div className="space-y-6">
           <SettingsCard
             title="SEO"
-            description="Help customers find your store on search engines and social platforms."
+            description="Help customers find your general store on search engines and when links are shared."
           >
             <div className="space-y-4">
               <div>
@@ -257,80 +253,43 @@ export default function Marketing() {
           </SettingsCard>
 
           <SettingsCard
-            title="Tracking & Analytics"
-            description="Connect verification and analytics tools to measure performance."
+            title="Google Search Console"
+            description="Verify your general store with Google Search Console."
           >
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Google Search Console
-                </label>
-                <input
-                  type="text"
-                  value={settings.tracking.googleSearchConsoleVerification}
-                  disabled={saving}
-                  onChange={(e) =>
-                    patch({
-                      tracking: {
-                        ...settings.tracking,
-                        googleSearchConsoleVerification: e.target.value,
-                      },
-                    })
-                  }
-                  placeholder="google-site-verification=..."
-                  className={STORE_FIELD_CLASS}
-                />
-                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  Paste your Google Search Console verification meta tag content.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Facebook Pixel ID
-                </label>
-                <input
-                  type="text"
-                  value={settings.tracking.facebookPixelId}
-                  disabled={saving}
-                  onChange={(e) =>
-                    patch({
-                      tracking: { ...settings.tracking, facebookPixelId: e.target.value },
-                    })
-                  }
-                  placeholder="123456789012345"
-                  className={STORE_FIELD_CLASS}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Google Analytics ID
-                </label>
-                <input
-                  type="text"
-                  value={settings.tracking.googleAnalyticsId}
-                  disabled={saving}
-                  onChange={(e) =>
-                    patch({
-                      tracking: { ...settings.tracking, googleAnalyticsId: e.target.value },
-                    })
-                  }
-                  placeholder="G-XXXXXXXXXX or UA-XXXXXXXX-X"
-                  className={STORE_FIELD_CLASS}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                Verification token
+              </label>
+              <input
+                type="text"
+                value={settings.tracking.googleSearchConsoleVerification}
+                disabled={saving}
+                onChange={(e) =>
+                  patch({
+                    tracking: {
+                      ...settings.tracking,
+                      googleSearchConsoleVerification: e.target.value,
+                    },
+                  })
+                }
+                placeholder="google-site-verification=…"
+                className={STORE_FIELD_CLASS}
+              />
+              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Paste the meta tag content from Google Search Console. Applies to your general
+                store only; custom website pages use Homepage Builder SEO.
+              </p>
             </div>
           </SettingsCard>
 
           <SettingsCard
             title="Announcement Bar"
-            description="Display a slim banner at the top of your storefront."
+            description="Display a slim banner at the top of your general store (catalog mode)."
           >
             <div className="space-y-4">
               <ToggleRow
                 title="Enable announcement bar"
-                description="Show a scrolling or static message above your store header."
+                description="Shown on your general store. Custom website stores use Homepage Builder announcement settings instead."
                 checked={settings.promotions.announcementBarEnabled}
                 onChange={(announcementBarEnabled) =>
                   patch({
@@ -385,177 +344,6 @@ export default function Marketing() {
               ) : null}
             </div>
           </SettingsCard>
-
-          <SettingsCard
-            title="Promo Banner"
-            description="Highlight promotions with a prominent storefront banner."
-          >
-            <div className="space-y-4">
-              <ToggleRow
-                title="Enable promo banner"
-                description="Show a promotional banner on your store homepage."
-                checked={settings.promotions.promoBannerEnabled}
-                onChange={(promoBannerEnabled) =>
-                  patch({
-                    promotions: { ...settings.promotions, promoBannerEnabled },
-                  })
-                }
-                disabled={saving}
-              />
-
-              {settings.promotions.promoBannerEnabled ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      Banner title
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.promotions.promoBannerTitle}
-                      disabled={saving}
-                      onChange={(e) =>
-                        patch({
-                          promotions: {
-                            ...settings.promotions,
-                            promoBannerTitle: e.target.value,
-                          },
-                        })
-                      }
-                      className={STORE_FIELD_CLASS}
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      Banner message
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.promotions.promoBannerMessage}
-                      disabled={saving}
-                      onChange={(e) =>
-                        patch({
-                          promotions: {
-                            ...settings.promotions,
-                            promoBannerMessage: e.target.value,
-                          },
-                        })
-                      }
-                      className={STORE_FIELD_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      CTA button text
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.promotions.promoBannerCta}
-                      disabled={saving}
-                      onChange={(e) =>
-                        patch({
-                          promotions: {
-                            ...settings.promotions,
-                            promoBannerCta: e.target.value,
-                          },
-                        })
-                      }
-                      className={STORE_FIELD_CLASS}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
-            title="WhatsApp Share"
-            description="Make it easy for customers to share your store on WhatsApp."
-          >
-            <div className="space-y-4">
-              <ToggleRow
-                title="Enable WhatsApp share"
-                description="Show a share button that opens WhatsApp with a pre-filled message."
-                checked={settings.sharing.whatsappShareEnabled}
-                onChange={(whatsappShareEnabled) =>
-                  patch({
-                    sharing: { ...settings.sharing, whatsappShareEnabled },
-                  })
-                }
-                disabled={saving}
-              />
-
-              {settings.sharing.whatsappShareEnabled ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    Default share message
-                  </label>
-                  <textarea
-                    value={settings.sharing.whatsappShareMessage}
-                    disabled={saving}
-                    onChange={(e) =>
-                      patch({
-                        sharing: {
-                          ...settings.sharing,
-                          whatsappShareMessage: e.target.value,
-                        },
-                      })
-                    }
-                    rows={2}
-                    className={STORE_FIELD_CLASS}
-                  />
-                </div>
-              ) : null}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
-            title="Campaigns"
-            description="Discount and email marketing tools for your store."
-          >
-            <div className="space-y-4 divide-y divide-gray-200 dark:divide-gray-800">
-              <ToggleRow
-                title="Discount campaigns"
-                description="Run time-limited discounts and promotional offers."
-                checked={settings.campaigns.discountCampaignsEnabled}
-                onChange={(discountCampaignsEnabled) =>
-                  patch({
-                    campaigns: { ...settings.campaigns, discountCampaignsEnabled },
-                  })
-                }
-                disabled={saving}
-              />
-              <div className="pt-4">
-                <ToggleRow
-                  title="Email marketing"
-                  description="Collect subscribers and send promotional emails."
-                  checked={settings.campaigns.emailMarketingEnabled}
-                  onChange={(emailMarketingEnabled) =>
-                    patch({
-                      campaigns: { ...settings.campaigns, emailMarketingEnabled },
-                    })
-                  }
-                  disabled={saving}
-                />
-              </div>
-              <p className="pt-4 text-sm text-gray-600 dark:text-gray-400">
-                Campaign automation will connect to your storefront in a future release. Settings
-                are saved now for when features go live.
-              </p>
-            </div>
-          </SettingsCard>
-
-          {activeMarketingIntegrations.length > 0 ? (
-            <SettingsCard
-              title="Advertising Integrations"
-              description="Connect paid ad platforms to promote your store."
-            >
-              <div className="space-y-4">
-                {activeMarketingIntegrations.map((integration) => (
-                  <MarketingIntegrationCard key={integration.id} integration={integration} />
-                ))}
-              </div>
-            </SettingsCard>
-          ) : null}
         </div>
       </div>
 

@@ -89,3 +89,29 @@ export async function updateSecuritySettings(
     return { data: null, error: e };
   }
 }
+
+/** Verify storefront password server-side (password never exposed on public store payload). */
+export async function verifyStorePassword(
+  storeSlug: string,
+  password: string
+): Promise<{ ok: boolean; error: unknown }> {
+  const slug = String(storeSlug ?? '').trim().toLowerCase();
+  if (!slug) {
+    return { ok: false, error: new Error('store_slug_required') };
+  }
+
+  try {
+    const { data, error } = await getSupabaseClient().rpc('verify_store_password', {
+      p_slug: slug,
+      p_password: password,
+    });
+
+    if (error) {
+      return { ok: false, error };
+    }
+
+    return { ok: data === true, error: null };
+  } catch (e) {
+    return { ok: false, error: e };
+  }
+}

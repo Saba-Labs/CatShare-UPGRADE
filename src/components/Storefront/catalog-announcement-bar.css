@@ -1,0 +1,23 @@
+.catalog-announcement-bar {
+  background: #111827;
+  color: #ffffff;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.catalog-announcement-bar__inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+}
+
+.catalog-announcement-bar__link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.catalog-announcement-bar__link:hover {
+  opacity: 0.9;
+}

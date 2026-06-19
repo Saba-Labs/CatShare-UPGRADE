@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainAppBottomNav from '../../components/MainAppBottomNav';
 import { useToast } from '../../context/ToastContext';
@@ -9,18 +9,12 @@ import {
   refreshIntegrationStatus,
 } from '../core/IntegrationConnectionService';
 import { isConnectedStatus } from '../core/IntegrationStatusService';
-import { DEFAULT_SHIPPING_PREFERENCES, type ShippingPreferences } from '../core/types';
-import {
-  fetchShippingPreferences,
-  updateShippingPreferences,
-} from '../services/shippingPreferencesService';
 import { IntegrationActionBar } from '../components/IntegrationActionBar';
 import { IntegrationDemoBanner } from '../components/IntegrationDemoBanner';
 import { IntegrationDetailsPanel } from '../components/IntegrationDetailsPanel';
 import { IntegrationGuideCard } from '../components/IntegrationGuideCard';
 import { IntegrationStatusBadge } from '../components/IntegrationStatusBadge';
 import { ShiprocketConnectForm } from '../components/ShiprocketConnectForm';
-import { ShippingPreferencesEditor } from '../components/ShippingPreferencesEditor';
 import { useIntegrationProvider } from '../hooks/useIntegrationProvider';
 import {
   INTEGRATIONS_PAGE_CSS,
@@ -46,24 +40,9 @@ export default function ShiprocketIntegrationPage() {
   const [showDetails, setShowDetails] = useState(false);
   const [apiEmail, setApiEmail] = useState('');
   const [apiPassword, setApiPassword] = useState('');
-  const [shippingPrefs, setShippingPrefs] = useState<ShippingPreferences>(
-    DEFAULT_SHIPPING_PREFERENCES
-  );
-  const [prefsLoading, setPrefsLoading] = useState(true);
-  const [savingPrefs, setSavingPrefs] = useState(false);
 
   const status = view?.status ?? 'not_connected';
   const canConnect = status === 'not_connected' || status === 'error';
-
-  useEffect(() => {
-    if (!sellerId) return;
-    void (async () => {
-      setPrefsLoading(true);
-      const res = await fetchShippingPreferences(sellerId);
-      setShippingPrefs(res.data);
-      setPrefsLoading(false);
-    })();
-  }, [sellerId]);
 
   const handleConnect = async () => {
     if (!guardCloudWrite()) return;
@@ -123,19 +102,6 @@ export default function ShiprocketIntegrationPage() {
     setApiEmail('');
     setApiPassword('');
     await reload();
-  };
-
-  const handleSavePrefs = async () => {
-    if (!guardCloudWrite()) return;
-    setSavingPrefs(true);
-    const res = await updateShippingPreferences(sellerId, shippingPrefs);
-    setSavingPrefs(false);
-    if (res.error) {
-      showToast('Could not save shipping preferences', 'error');
-      return;
-    }
-    if (res.data) setShippingPrefs(res.data);
-    showToast('Shipping preferences saved', 'success');
   };
 
   const securityNote = provider.getSecurityNote();
@@ -224,28 +190,6 @@ export default function ShiprocketIntegrationPage() {
                 onToggleDetails={() => setShowDetails((v) => !v)}
               />
             ) : null}
-
-            <h2 className="int-section-title">Shipping settings</h2>
-            {prefsLoading ? (
-              <div className="int-loading">Loading preferences…</div>
-            ) : (
-              <>
-                <ShippingPreferencesEditor
-                  value={shippingPrefs}
-                  onChange={setShippingPrefs}
-                  disabled={savingPrefs}
-                />
-                <button
-                  type="button"
-                  className="int-btn int-btn-primary"
-                  style={{ marginTop: 8 }}
-                  disabled={savingPrefs}
-                  onClick={handleSavePrefs}
-                >
-                  {savingPrefs ? 'Saving…' : 'Save preferences'}
-                </button>
-              </>
-            )}
           </>
         )}
       </main>

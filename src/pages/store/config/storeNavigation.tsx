@@ -58,7 +58,7 @@ export const STORE_NAVIGATION: StoreNavCategory[] = [
       },
       {
         title: 'Shipping',
-        description: 'Shipping providers and delivery rules',
+        description: 'Connect logistics providers',
         iconKey: 'shipping',
         href: '/store/shipping',
       },
@@ -98,15 +98,9 @@ export const STORE_NAVIGATION: StoreNavCategory[] = [
     cards: [
       {
         title: 'Security',
-        description: 'Store protection and access control',
+        description: 'Password protection and delete store',
         iconKey: 'security',
         href: '/store/security',
-      },
-      {
-        title: 'Danger Zone',
-        description: 'Archive or delete store',
-        iconKey: 'danger',
-        href: '/store/danger',
       },
     ],
   },

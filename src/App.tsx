@@ -75,7 +75,6 @@ const Analytics = lazy(() => import("./pages/store/Analytics"));
 const Marketing = lazy(() => import("./pages/store/Marketing"));
 const StoreIntegrations = lazy(() => import("./pages/store/Integrations"));
 const Security = lazy(() => import("./pages/store/Security"));
-const DangerZone = lazy(() => import("./pages/store/DangerZone"));
 const CreateOrder = lazy(() => import("./pages/CreateOrder"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail"));
 const TrackOrder = lazy(() => import("./pages/TrackOrder"));
@@ -2728,14 +2727,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <Security />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/store/danger"
-          element={
-            <ProtectedRoute>
-              <DangerZone />
             </ProtectedRoute>
           }
         />

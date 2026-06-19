@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
+import { deleteStore, getSellerStore } from '../../services/storeService';
 import {
   fetchSecuritySettings,
   updateSecuritySettings,
@@ -10,46 +12,25 @@ import {
 import {
   DEFAULT_SECURITY_SETTINGS,
   type StoreSecuritySettings,
-  type StoreVisibility,
 } from '../../types/storeSecuritySettings';
-import { readCachedSecuritySettings } from '../../utils/storePageCache';
+import {
+  clearStorePageCaches,
+  readCachedSecuritySettings,
+  readCachedSellerStore,
+} from '../../utils/storePageCache';
+import { invalidateSellerStoreSessionFetch } from '../../utils/catalogueSessionHydration';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
-import { SECURITY_COUNTRY_OPTIONS } from './config/securityPlaceholders';
+import ConfirmDialog from './components/ConfirmDialog';
+import DangerActionCard from './components/DangerActionCard';
+import { FiAlertTriangle, FiShield, FiTrash2 } from 'react-icons/fi';
 import {
-  FiCheck,
-  FiGlobe,
-  FiPlus,
-  FiShield,
-  FiTrash2,
-  FiUserX,
-} from 'react-icons/fi';
-import {
-  STORE_CHIP_CLASS,
   STORE_FIELD_CLASS,
   STORE_SAVE_BTN_DISABLED,
   STORE_SAVE_BTN_ENABLED,
 } from './storeTypography';
-
-const VISIBILITY_OPTIONS: { value: StoreVisibility; label: string; description: string }[] = [
-  {
-    value: 'public',
-    label: 'Public',
-    description: 'Anyone with your store link can browse and order.',
-  },
-  {
-    value: 'unlisted',
-    label: 'Unlisted',
-    description: 'Store is accessible via direct link but hidden from discovery.',
-  },
-  {
-    value: 'private',
-    label: 'Private',
-    description: 'Storefront is hidden. Only you can preview it.',
-  },
-];
 
 function ToggleRow({
   title,
@@ -78,6 +59,7 @@ function ToggleRow({
 }
 
 export default function Security() {
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
@@ -88,18 +70,24 @@ export default function Security() {
   const [originalSettings, setOriginalSettings] = useState<StoreSecuritySettings>(
     DEFAULT_SECURITY_SETTINGS
   );
+  const [storeSlug, setStoreSlug] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const [blockedInput, setBlockedInput] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useLayoutEffect(() => {
     if (!sellerId) return;
     const cached = readCachedSecuritySettings(sellerId);
+    const cachedStore = readCachedSellerStore(sellerId);
     if (cached) {
       setSettings(cached);
       setOriginalSettings(cached);
       setLoading(false);
+    }
+    if (cachedStore?.storeSlug) {
+      setStoreSlug(cachedStore.storeSlug);
     }
   }, [sellerId]);
 
@@ -114,12 +102,21 @@ export default function Security() {
       setLoading(true);
     }
 
-    const result = await fetchSecuritySettings(sellerId);
-    if (result.error && !cached) {
+    const [securityResult, storeResult] = await Promise.all([
+      fetchSecuritySettings(sellerId),
+      getSellerStore(sellerId),
+    ]);
+
+    if (securityResult.error && !cached) {
       showToast('Failed to load security settings', 'error');
     }
-    setSettings(result.data);
-    setOriginalSettings(result.data);
+    setSettings(securityResult.data);
+    setOriginalSettings(securityResult.data);
+
+    if (storeResult.success && storeResult.data?.storeSlug) {
+      setStoreSlug(storeResult.data.storeSlug);
+    }
+
     setLoading(false);
   }, [sellerId, showToast]);
 
@@ -167,45 +164,34 @@ export default function Security() {
     showToast('Security settings saved', 'success');
   };
 
-  const toggleCountry = (code: string) => {
-    setSettings((prev) => {
-      const exists = prev.allowedCountries.includes(code);
-      return {
-        ...prev,
-        allowedCountries: exists
-          ? prev.allowedCountries.filter((c) => c !== code)
-          : [...prev.allowedCountries, code],
-      };
-    });
-  };
+  const handleDeleteStore = async () => {
+    if (!sellerId || !guardCloudWrite()) return;
 
-  const addBlockedCustomer = () => {
-    const value = blockedInput.trim().toLowerCase();
-    if (!value) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      showToast('Enter a valid email address', 'error');
+    setDeleting(true);
+    const result = await deleteStore(sellerId);
+    setDeleting(false);
+
+    if (!result.success) {
+      showToast(result.error || 'Failed to delete store', 'error');
       return;
     }
-    if (settings.blockedCustomers.includes(value)) {
-      showToast('Customer is already blocked', 'error');
-      return;
-    }
-    patch({ blockedCustomers: [...settings.blockedCustomers, value] });
-    setBlockedInput('');
+
+    clearStorePageCaches(sellerId);
+    invalidateSellerStoreSessionFetch(sellerId);
+    setDeleteOpen(false);
+    setDeleteConfirmText('');
+    showToast('Store deleted', 'success');
+    navigate('/store', { replace: true });
   };
 
-  const removeBlockedCustomer = (email: string) => {
-    patch({
-      blockedCustomers: settings.blockedCustomers.filter((item) => item !== email),
-    });
-  };
+  const deleteConfirmPhrase = storeSlug ? `delete ${storeSlug}` : 'DELETE STORE';
 
   if (loading || authLoading) {
     return (
       <StoreLayout>
         <div className="animate-pulse space-y-6 py-8 max-w-3xl">
           <div className="h-12 w-48 rounded bg-gray-200 dark:bg-gray-800" />
-          {[...Array(6)].map((_, i) => (
+          {[...Array(2)].map((_, i) => (
             <div key={i} className="h-48 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
         </div>
@@ -237,38 +223,6 @@ export default function Security() {
 
         <div className="space-y-6">
           <SettingsCard
-            title="Store Visibility"
-            description="Choose who can discover and access your storefront."
-          >
-            <div className="space-y-3">
-              {VISIBILITY_OPTIONS.map((option) => {
-                const selected = settings.visibility === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => patch({ visibility: option.value })}
-                    className={`w-full text-left rounded-xl border p-4 transition-all ${STORE_CHIP_CLASS} ${
-                      selected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{option.label}</p>
-                        <p className="text-sm mt-1 opacity-80">{option.description}</p>
-                      </div>
-                      {selected ? <FiCheck className="h-5 w-5 flex-shrink-0" /> : null}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
             title="Password Protected Store"
             description="Require visitors to enter a password before viewing your catalogue."
           >
@@ -281,149 +235,56 @@ export default function Security() {
                 disabled={saving}
               />
               {settings.passwordProtected ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                    Store Password
-                  </label>
-                  <input
-                    type="password"
-                    value={settings.storePassword}
-                    disabled={saving}
-                    onChange={(e) => patch({ storePassword: e.target.value })}
-                    placeholder="Enter a secure password"
-                    className={STORE_FIELD_CLASS}
-                    autoComplete="new-password"
-                  />
-                </div>
-              ) : null}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
-            title="Blocked Customers"
-            description="Prevent specific customers from placing orders on your store."
-          >
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="email"
-                  value={blockedInput}
-                  disabled={saving}
-                  onChange={(e) => setBlockedInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addBlockedCustomer();
-                    }
-                  }}
-                  placeholder="customer@email.com"
-                  className={STORE_FIELD_CLASS}
-                />
-                <button
-                  type="button"
-                  onClick={addBlockedCustomer}
-                  disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex-shrink-0"
-                >
-                  <FiPlus className="h-4 w-4" />
-                  Block
-                </button>
-              </div>
-
-              {settings.blockedCustomers.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
-                  No blocked customers yet.
-                </p>
-              ) : (
-                <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-                  {settings.blockedCustomers.map((email) => (
-                    <li
-                      key={email}
-                      className="flex items-center justify-between gap-3 px-4 py-3 bg-gray-50/80 dark:bg-gray-900/60"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FiUserX className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                          {email}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeBlockedCustomer(email)}
-                        disabled={saving}
-                        className="rounded-lg p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                        aria-label={`Unblock ${email}`}
-                      >
-                        <FiTrash2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
-            title="Allowed Countries"
-            description="Restrict checkout to selected countries. Leave empty to allow worldwide orders."
-          >
-            <div className="flex flex-wrap gap-2">
-              {SECURITY_COUNTRY_OPTIONS.map((country) => {
-                const selected = settings.allowedCountries.includes(country.code);
-                return (
-                  <button
-                    key={country.code}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => toggleCountry(country.code)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
-                      selected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-800 dark:text-blue-200'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300'
-                    }`}
-                  >
-                    <FiGlobe className="h-3.5 w-3.5" />
-                    {country.name}
-                  </button>
-                );
-              })}
-            </div>
-            {settings.allowedCountries.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                Worldwide — all countries allowed.
-              </p>
-            ) : (
-              <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-                {settings.allowedCountries.length} countr
-                {settings.allowedCountries.length === 1 ? 'y' : 'ies'} selected.
-              </p>
-            )}
-          </SettingsCard>
-
-          <SettingsCard
-            title="Two Factor Authentication"
-            description="Add an extra layer of protection when signing in to your merchant account."
-          >
-            <div className="space-y-4">
-              <ToggleRow
-                title="Enable two-factor authentication"
-                description="Require a verification code from your authenticator app at sign in."
-                checked={settings.twoFactorEnabled}
-                onChange={(value) => patch({ twoFactorEnabled: value })}
-                disabled={saving}
-              />
-              {settings.twoFactorEnabled ? (
-                <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-                  <div className="flex items-start gap-2">
-                    <FiShield className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <p>
-                      Complete authenticator setup to activate 2FA. Until then, your account uses
-                      standard password protection only.
-                    </p>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      Store Password
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.storePassword}
+                      disabled={saving}
+                      onChange={(e) => patch({ storePassword: e.target.value })}
+                      placeholder="Enter a secure password"
+                      className={STORE_FIELD_CLASS}
+                      autoComplete="new-password"
+                    />
                   </div>
-                </div>
+                  <div className="rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/20 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
+                    <div className="flex items-start gap-2">
+                      <FiShield className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <p>
+                        Share this password with customers you want to allow in. You can browse your
+                        own store without entering it while signed in.
+                      </p>
+                    </div>
+                  </div>
+                </>
               ) : null}
             </div>
+          </SettingsCard>
+
+          <SettingsCard
+            title="Delete Store"
+            description="Permanently remove your store and its public link."
+            className="border-red-200 dark:border-red-900/50"
+          >
+            <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 mb-4">
+              <div className="flex items-start gap-2">
+                <FiAlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p>
+                  Deleting your store removes the storefront link immediately. Products and orders in
+                  your account are not deleted.
+                </p>
+              </div>
+            </div>
+            <DangerActionCard
+              icon={<FiTrash2 className="h-5 w-5" />}
+              title="Delete Store"
+              description="Remove this store from CatShare. You can create a new store later with a different slug."
+              actionLabel="Delete Store"
+              onAction={() => setDeleteOpen(true)}
+            />
           </SettingsCard>
         </div>
       </div>
@@ -455,6 +316,24 @@ export default function Security() {
           You have unsaved changes
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete store permanently?"
+        description="This will remove your store and its public link. Customers will no longer be able to open your storefront. This cannot be undone."
+        confirmLabel="Delete Store"
+        variant="danger"
+        loading={deleting}
+        requireConfirmText={deleteConfirmPhrase}
+        confirmTextValue={deleteConfirmText}
+        onConfirmTextChange={setDeleteConfirmText}
+        confirmHint={`Type "${deleteConfirmPhrase}" to confirm`}
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeleteConfirmText('');
+        }}
+        onConfirm={() => void handleDeleteStore()}
+      />
     </StoreLayout>
   );
 }
