@@ -203,114 +203,79 @@ export default function BusinessProfile() {
                     className="hidden"
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-8 md:gap-12">
-                    {/* Logo Preview Card */}
-                    <div className="flex flex-col items-center md:items-start">
-                      <button
-                        type="button"
-                        onClick={() => logoInputRef.current?.click()}
-                        disabled={logoUploading || saving}
-                        className="relative group w-32 h-32 md:w-36 md:h-36 rounded-3xl overflow-hidden flex-shrink-0"
-                      >
-                        {/* Gradient Border Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 via-purple-400/20 to-pink-400/20 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-pink-500/10 rounded-3xl"></div>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+                    {/* Logo Preview */}
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={logoUploading || saving}
+                      className="group relative h-32 w-32 rounded-xl overflow-hidden flex-shrink-0 transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed"
+                    >
+                      <div className="absolute inset-0 bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"></div>
 
-                        {/* Main Content */}
-                        <div className="absolute inset-0.5 bg-gradient-to-br from-gray-50/95 via-white/95 to-gray-50/95 dark:from-gray-900/95 dark:via-gray-800/95 dark:to-gray-900/95 rounded-3xl overflow-hidden flex items-center justify-center border border-gray-200/50 dark:border-gray-700/50">
-                          {profile.logoUrl ? (
-                            <>
-                              <img
-                                src={profile.logoUrl}
-                                alt="Business Logo"
-                                className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
-                              />
-                              {/* Overlay on hover */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                <div className="flex flex-col items-center gap-2">
-                                  <div className="p-2.5 bg-white/90 dark:bg-gray-800/90 rounded-full backdrop-blur">
-                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                  </div>
-                                  <span className="text-xs font-semibold text-white drop-shadow">Change</span>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center text-center px-3 py-6">
-                              <div className="p-3 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl mb-2 group-hover:scale-110 transition-transform duration-300">
-                                <svg className="w-7 h-7 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-300">Click to upload</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Loading state */}
-                        {logoUploading && (
-                          <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-3xl flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+                      {profile.logoUrl ? (
+                        <>
+                          <img
+                            src={profile.logoUrl}
+                            alt="Business Logo"
+                            className="relative h-full w-full object-cover group-hover:opacity-75 transition-opacity duration-200"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
                           </div>
-                        )}
-                      </button>
-
-                      {profile.logoUrl && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 font-medium">Current logo</p>
-                      )}
-                    </div>
-
-                    {/* Upload Info & Buttons */}
-                    <div className="flex flex-col justify-center">
-                      <div className="space-y-4">
-                        {/* Info Box */}
-                        <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-blue-900/10 dark:to-purple-900/10 border border-blue-100/50 dark:border-blue-800/30 backdrop-blur-sm">
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-2">Upload your business logo</p>
-                          <ul className="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
-                            <li className="flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600/20 text-blue-600 text-xs font-bold">✓</span>
-                              PNG, JPG, or GIF format
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600/20 text-blue-600 text-xs font-bold">✓</span>
-                              Maximum 5MB file size
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-600/20 text-blue-600 text-xs font-bold">✓</span>
-                              Recommended: Square image
-                            </li>
-                          </ul>
+                        </>
+                      ) : (
+                        <div className="relative h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <svg className="w-6 h-6 text-gray-400 dark:text-gray-500 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Upload</p>
+                          </div>
                         </div>
+                      )}
 
-                        {/* Upload Button */}
+                      {logoUploading && (
+                        <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-600"></div>
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Buttons Section */}
+                    <div className="flex-grow">
+                      <div className="space-y-3">
                         <button
                           type="button"
                           disabled={logoUploading || saving}
                           onClick={() => logoInputRef.current?.click()}
-                          className="relative group w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-6 py-4 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] overflow-hidden"
+                          className="w-full sm:w-auto flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                          <svg className="w-5 h-5 flex-shrink-0 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                           </svg>
-                          <span className="relative z-10">{logoUploading ? 'Uploading…' : 'Choose logo'}</span>
+                          <span>{logoUploading ? 'Uploading…' : 'Upload logo'}</span>
                         </button>
 
-                        {/* Remove Button */}
-                        {profile.logoUrl ? (
+                        {profile.logoUrl && (
                           <button
                             type="button"
                             disabled={logoUploading || saving}
                             onClick={() => updateProfile({ logoUrl: '' })}
-                            className="w-full flex items-center justify-center gap-2.5 rounded-2xl border-2 border-gray-300 dark:border-gray-600 px-6 py-3.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-900/10 hover:border-red-300 dark:hover:border-red-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                            className="w-full sm:w-auto flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 px-5 py-2.5 text-sm font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            <span>Remove logo</span>
+                            <span>Remove</span>
                           </button>
-                        ) : null}
+                        )}
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 pt-1">
+                          PNG, JPG or GIF up to 5MB
+                        </p>
                       </div>
                     </div>
                   </div>
