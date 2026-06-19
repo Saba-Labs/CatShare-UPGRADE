@@ -9,10 +9,8 @@ alter table public.stores
   add column if not exists behavior_settings jsonb not null default '{
     "version": 1,
     "productsToShow": "all",
-    "maxProducts": 100,
     "defaultSorting": "newest",
     "productImageRatio": "square",
-    "productsPerRow": "2",
     "showPrice": true,
     "showAvailability": true,
     "showCategories": true,

@@ -58,13 +58,11 @@ interface StoreSettingsState {
   // Catalogue Settings
   catalogueId: string;
   productsToShow: 'all' | 'wholesale' | 'reseller' | 'featured' | 'category';
-  maxProducts: number;
   defaultSorting: 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical';
 
   // Display Settings
   viewMode: 'grid' | 'list';
   productImageRatio: 'square' | 'portrait' | 'landscape';
-  productsPerRow: '1' | '2' | '3' | '4';
   showPrice: boolean;
   showAvailability: boolean;
   showCategories: boolean;
@@ -94,11 +92,9 @@ const INITIAL_STATE: StoreSettingsState = {
   storeSlug: '',
   catalogueId: '',
   productsToShow: 'all',
-  maxProducts: 100,
   defaultSorting: 'newest',
   viewMode: 'grid',
   productImageRatio: 'square',
-  productsPerRow: '2',
   showPrice: true,
   showAvailability: true,
   showCategories: true,

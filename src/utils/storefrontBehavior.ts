@@ -10,7 +10,6 @@ import {
   DEFAULT_BEHAVIOR_SETTINGS,
   type DefaultSorting,
   type ProductImageRatio,
-  type ProductsPerRow,
   type ProductsToShow,
   type StoreBehaviorSettings,
 } from '../types/storeBehaviorSettings';
@@ -99,14 +98,6 @@ export function sortStorefrontProducts(
   }
 }
 
-export function applyMaxProducts(
-  products: ProductWithCatalogueData[],
-  maxProducts: number
-): ProductWithCatalogueData[] {
-  const limit = Math.max(1, Math.floor(maxProducts));
-  return products.length > limit ? products.slice(0, limit) : products;
-}
-
 export function productImageAspectRatio(ratio: ProductImageRatio): string {
   switch (ratio) {
     case 'portrait':
@@ -117,11 +108,6 @@ export function productImageAspectRatio(ratio: ProductImageRatio): string {
     default:
       return '1 / 1';
   }
-}
-
-export function productsPerRowCount(perRow: ProductsPerRow): number {
-  const n = Number(perRow);
-  return Number.isFinite(n) && n >= 1 && n <= 4 ? n : 2;
 }
 
 export function resolveStoreBehaviorSettings(

@@ -6,15 +6,12 @@
 export type ProductsToShow = 'all' | 'wholesale' | 'reseller' | 'featured' | 'category';
 export type DefaultSorting = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical';
 export type ProductImageRatio = 'square' | 'portrait' | 'landscape';
-export type ProductsPerRow = '1' | '2' | '3' | '4';
 
 export interface StoreBehaviorSettings {
   version: 1;
   productsToShow: ProductsToShow;
-  maxProducts: number;
   defaultSorting: DefaultSorting;
   productImageRatio: ProductImageRatio;
-  productsPerRow: ProductsPerRow;
   showPrice: boolean;
   showAvailability: boolean;
   showCategories: boolean;
@@ -33,10 +30,8 @@ export interface StoreBehaviorSettings {
 export const DEFAULT_BEHAVIOR_SETTINGS: StoreBehaviorSettings = {
   version: 1,
   productsToShow: 'all',
-  maxProducts: 100,
   defaultSorting: 'newest',
   productImageRatio: 'square',
-  productsPerRow: '2',
   showPrice: true,
   showAvailability: true,
   showCategories: true,
@@ -60,11 +55,6 @@ function bool(raw: unknown, fallback: boolean): boolean {
   return typeof raw === 'boolean' ? raw : fallback;
 }
 
-function num(raw: unknown, fallback: number): number {
-  const n = typeof raw === 'number' ? raw : Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
 function productsToShow(raw: unknown): ProductsToShow {
   const v = str(raw, 'all');
   if (v === 'wholesale' || v === 'reseller' || v === 'featured' || v === 'category') return v;
@@ -83,12 +73,6 @@ function imageRatio(raw: unknown): ProductImageRatio {
   return 'square';
 }
 
-function productsPerRow(raw: unknown): ProductsPerRow {
-  const v = str(raw, '2');
-  if (v === '1' || v === '3' || v === '4') return v;
-  return '2';
-}
-
 export function normalizeBehaviorSettings(raw: unknown): StoreBehaviorSettings {
   const source =
     raw && typeof raw === 'object' && !Array.isArray(raw)
@@ -98,10 +82,8 @@ export function normalizeBehaviorSettings(raw: unknown): StoreBehaviorSettings {
   return {
     version: 1,
     productsToShow: productsToShow(source.productsToShow),
-    maxProducts: num(source.maxProducts, DEFAULT_BEHAVIOR_SETTINGS.maxProducts),
     defaultSorting: defaultSorting(source.defaultSorting),
     productImageRatio: imageRatio(source.productImageRatio),
-    productsPerRow: productsPerRow(source.productsPerRow),
     showPrice: bool(source.showPrice, DEFAULT_BEHAVIOR_SETTINGS.showPrice),
     showAvailability: bool(source.showAvailability, DEFAULT_BEHAVIOR_SETTINGS.showAvailability),
     showCategories: bool(source.showCategories, DEFAULT_BEHAVIOR_SETTINGS.showCategories),
@@ -129,10 +111,8 @@ export function normalizeBehaviorSettings(raw: unknown): StoreBehaviorSettings {
 
 export function behaviorFromStoreSettingsState(state: {
   productsToShow: ProductsToShow;
-  maxProducts: number;
   defaultSorting: DefaultSorting;
   productImageRatio: ProductImageRatio;
-  productsPerRow: ProductsPerRow;
   showPrice: boolean;
   showAvailability: boolean;
   showCategories: boolean;

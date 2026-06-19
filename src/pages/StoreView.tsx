@@ -27,7 +27,6 @@ import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '.
 import {
   filterProductsByBehaviorScope,
   productImageAspectRatio,
-  productsPerRowCount,
   resolveListingCatalogueId,
   resolveStoreBehaviorSettings,
   sortStorefrontProducts,
@@ -1211,12 +1210,6 @@ export default function StoreView() {
       ),
     [store?.cataloguesDefinition, listingCatalogueId, store?.catalogueId]
   );
-  const storefrontGridStyle = useMemo(
-    () => ({
-      gridTemplateColumns: `repeat(${productsPerRowCount(behavior.productsPerRow)}, minmax(0, 1fr))`,
-    }),
-    [behavior.productsPerRow]
-  );
   const storefrontImageAspectRatio = useMemo(
     () => productImageAspectRatio(behavior.productImageRatio),
     [behavior.productImageRatio]
@@ -2231,7 +2224,6 @@ export default function StoreView() {
           {/* ══ PRODUCT LISTING (grid / OrderForm-style list) ══ */}
           <div
             className={storefrontViewMode === 'list' ? 'of-items sv-of-items--store' : 'sv-grid'}
-            style={storefrontViewMode === 'grid' ? storefrontGridStyle : undefined}
           >
             {productsLoading && <><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
             {!productsLoading && storeProducts.length === 0 && (
