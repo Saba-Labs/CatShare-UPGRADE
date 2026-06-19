@@ -15,7 +15,7 @@ export default function SettingsCard({
   className = '',
 }: SettingsCardProps) {
   return (
-    <section className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm ${className}`}>
+    <section className={`bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 border border-gray-100 dark:border-gray-800/50 rounded-2xl shadow-md hover:shadow-lg transition-shadow ${className}`}>
       <div className="p-4 sm:p-5">
         {title ? <h2 className={STORE_SECTION_TITLE}>{title}</h2> : null}
         {description ? <p className={STORE_SECTION_DESCRIPTION}>{description}</p> : null}
