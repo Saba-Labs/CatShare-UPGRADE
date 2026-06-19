@@ -41,7 +41,7 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
 
 
         <MainAppBottomNav active="store" />
-        <SupportWhatsAppFab bottomOffsetPx={80} alignCenterWithHeightPx={0} />
+        <SupportWhatsAppFab />
       </div>
     </>
   );
