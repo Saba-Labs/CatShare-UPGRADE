@@ -24,13 +24,6 @@ import {
   STORE_SAVE_BTN_ENABLED,
 } from './storeTypography';
 
-const CHECKOUT_THEMES: { id: CheckoutTheme; label: string; description: string }[] = [
-  { id: 'default', label: 'Default', description: 'Balanced layout with clear hierarchy.' },
-  { id: 'minimal', label: 'Minimal', description: 'Clean and distraction-free checkout.' },
-  { id: 'premium', label: 'Premium', description: 'Polished spacing and elevated card styling.' },
-  { id: 'contrast', label: 'High Contrast', description: 'Strong contrast for accessibility.' },
-];
-
 function ToggleRow({
   title,
   description,
@@ -512,37 +505,6 @@ export default function Checkout() {
             </div>
           </SettingsCard>
 
-          <SettingsCard
-            title="Checkout Theme"
-            description="Choose the visual style for your storefront checkout experience."
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {CHECKOUT_THEMES.map((theme) => (
-                <button
-                  key={theme.id}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => patchExperience({ checkoutTheme: theme.id })}
-                  className={`${STORE_CHIP_CLASS} text-left ${
-                    settings.experience.checkoutTheme === theme.id
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <span className="block text-sm font-semibold">{theme.label}</span>
-                  <span
-                    className={`mt-1 block text-xs normal-case ${
-                      settings.experience.checkoutTheme === theme.id
-                        ? 'text-blue-100'
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}
-                  >
-                    {theme.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </SettingsCard>
         </div>
       </div>
 
