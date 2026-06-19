@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
@@ -12,6 +12,7 @@ import {
   type StoreSecuritySettings,
   type StoreVisibility,
 } from '../../types/storeSecuritySettings';
+import { readCachedSecuritySettings } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -92,15 +93,29 @@ export default function Security() {
 
   const [blockedInput, setBlockedInput] = useState('');
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSecuritySettings(sellerId);
+    if (cached) {
+      setSettings(cached);
+      setOriginalSettings(cached);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   const loadSettings = useCallback(async () => {
     if (!sellerId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = readCachedSecuritySettings(sellerId);
+    if (!cached) {
+      setLoading(true);
+    }
+
     const result = await fetchSecuritySettings(sellerId);
-    if (result.error) {
+    if (result.error && !cached) {
       showToast('Failed to load security settings', 'error');
     }
     setSettings(result.data);

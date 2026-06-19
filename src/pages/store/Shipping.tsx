@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiPlus, FiTrash2 } from 'react-icons/fi';
 import StoreLayout from './components/StoreLayout';
@@ -24,6 +24,7 @@ import {
   fetchShippingPreferences,
   updateShippingPreferences,
 } from '../../integrations/services/shippingPreferencesService';
+import { readCachedShippingPreferences } from '../../utils/storePageCache';
 import {
   STORE_CHIP_CLASS,
   STORE_FIELD_CLASS,
@@ -65,6 +66,16 @@ export default function Shipping() {
   const [disconnectingId, setDisconnectingId] = useState<ShippingProviderId | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedShippingPreferences(sellerId);
+    if (cached) {
+      setSettings(cached);
+      setOriginalSettings(cached);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   useEffect(() => {
     if (!sellerId) {
       setLoading(false);
@@ -72,9 +83,13 @@ export default function Shipping() {
     }
 
     const load = async () => {
-      setLoading(true);
+      const cached = readCachedShippingPreferences(sellerId);
+      if (!cached) {
+        setLoading(true);
+      }
+
       const result = await fetchShippingPreferences(sellerId);
-      if (result.error) {
+      if (result.error && !cached) {
         showToast('Failed to load shipping settings', 'error');
       }
       const loaded = result.data;

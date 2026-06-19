@@ -1,4 +1,9 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import {
+  readCachedBehaviorSettings,
+  writeCachedBehaviorSettings,
+} from '../utils/storePageCache';
 import {
   DEFAULT_BEHAVIOR_SETTINGS,
   normalizeBehaviorSettings,
@@ -8,26 +13,43 @@ import {
 export async function fetchBehaviorSettings(
   sellerUserId: string
 ): Promise<{ data: StoreBehaviorSettings; error: unknown }> {
+  const trimmed = String(sellerUserId ?? '').trim();
+  const cached = trimmed ? readCachedBehaviorSettings(trimmed) : null;
+
+  if (!trimmed) {
+    return { data: { ...DEFAULT_BEHAVIOR_SETTINGS }, error: new Error('Seller user ID is required') };
+  }
+
+  if (!isBrowserOnline()) {
+    return { data: cached ?? { ...DEFAULT_BEHAVIOR_SETTINGS }, error: null };
+  }
+
   try {
-    setSupabaseRlsUserId(sellerUserId);
+    setSupabaseRlsUserId(trimmed);
     const { data, error } = await getSupabaseClient()
       .from('stores')
       .select('behavior_settings')
-      .eq('seller_user_id', sellerUserId)
+      .eq('seller_user_id', trimmed)
       .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('behavior_settings')) {
-        return { data: { ...DEFAULT_BEHAVIOR_SETTINGS }, error: null };
+        const fallback = cached ?? { ...DEFAULT_BEHAVIOR_SETTINGS };
+        writeCachedBehaviorSettings(trimmed, fallback);
+        return { data: fallback, error: null };
       }
+      if (cached) return { data: cached, error: null };
       return { data: { ...DEFAULT_BEHAVIOR_SETTINGS }, error };
     }
 
+    const normalized = normalizeBehaviorSettings(data?.behavior_settings);
+    writeCachedBehaviorSettings(trimmed, normalized);
     return {
-      data: normalizeBehaviorSettings(data?.behavior_settings),
+      data: normalized,
       error: null,
     };
   } catch (e) {
+    if (cached) return { data: cached, error: null };
     return { data: { ...DEFAULT_BEHAVIOR_SETTINGS }, error: e };
   }
 }
@@ -51,13 +73,16 @@ export async function updateBehaviorSettings(
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('behavior_settings')) {
+        writeCachedBehaviorSettings(sellerUserId, normalized);
         return { data: normalized, error: null };
       }
       return { data: null, error };
     }
 
+    const saved = normalizeBehaviorSettings(data?.behavior_settings);
+    writeCachedBehaviorSettings(sellerUserId, saved);
     return {
-      data: normalizeBehaviorSettings(data?.behavior_settings),
+      data: saved,
       error: null,
     };
   } catch (e) {

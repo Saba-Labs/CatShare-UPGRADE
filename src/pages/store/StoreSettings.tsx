@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
@@ -25,6 +25,10 @@ import {
 import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
 import { getAllCatalogues } from '../../config/catalogueConfig';
+import {
+  readCachedBehaviorSettings,
+  readCachedSellerStore,
+} from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -155,11 +159,79 @@ export default function StoreSettings() {
   const [slugValidating, setSlugValidating] = useState(false);
   const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
 
+  const applyLoadedSettings = useCallback(
+    (
+      store: Awaited<ReturnType<typeof getSellerStore>>['data'] | null | undefined,
+      behavior: ReturnType<typeof normalizeBehaviorSettings>
+    ) => {
+      let checkoutRequireLogin = behavior.requireLoginBeforeCheckout;
+      let checkoutAllowGuest = behavior.allowGuestBrowsing;
+
+      if (store?.checkoutSettings?.experience) {
+        checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
+        checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
+      }
+
+      if (store) {
+        const loadedSettings: StoreSettingsState = {
+          ...INITIAL_STATE,
+          ...behavior,
+          catalogueId: store.catalogueId || '',
+          storeSlug: store.storeSlug || '',
+          storeEnabled: store.isLive !== false,
+          maintenanceMode: store.maintenanceMode === true,
+          whatsappNumber: store.storeWhatsapp || '',
+          minimumOrderValue:
+            store.minimumOrderValue != null ? String(store.minimumOrderValue) : '0',
+          viewMode: store.viewMode || 'grid',
+          requireLoginBeforeCheckout: checkoutRequireLogin,
+          allowGuestBrowsing: checkoutAllowGuest,
+        };
+        setSettings(loadedSettings);
+        setOriginalSettings(loadedSettings);
+      } else {
+        const loadedSettings: StoreSettingsState = {
+          ...INITIAL_STATE,
+          ...behavior,
+        };
+        setSettings(loadedSettings);
+        setOriginalSettings(loadedSettings);
+      }
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    if (!user?.uid) return;
+
+    const cataloguesList = getAllCatalogues(user.uid);
+    if (cataloguesList && cataloguesList.length > 0) {
+      setCatalogues(cataloguesList.map((cat) => ({ id: cat.id, label: cat.label })));
+    }
+
+    const cachedStore = readCachedSellerStore(user.uid);
+    const cachedBehavior = readCachedBehaviorSettings(user.uid);
+    if (cachedStore || cachedBehavior) {
+      applyLoadedSettings(
+        cachedStore,
+        normalizeBehaviorSettings(cachedBehavior ?? undefined)
+      );
+      setLoading(false);
+    }
+  }, [user?.uid, applyLoadedSettings]);
+
   // Load initial settings
   useEffect(() => {
     if (!user?.uid) return;
 
     const loadSettings = async () => {
+      const hadCache =
+        Boolean(readCachedSellerStore(user.uid)) || Boolean(readCachedBehaviorSettings(user.uid));
+
+      if (!hadCache) {
+        setLoading(true);
+      }
+
       try {
         const [storeResult, behaviorResult] = await Promise.all([
           getSellerStore(user.uid),
@@ -167,45 +239,7 @@ export default function StoreSettings() {
         ]);
 
         const behavior = normalizeBehaviorSettings(behaviorResult.data);
-        let checkoutRequireLogin = behavior.requireLoginBeforeCheckout;
-        let checkoutAllowGuest = behavior.allowGuestBrowsing;
-
-        const cataloguesList = getAllCatalogues(user.uid);
-        if (cataloguesList && cataloguesList.length > 0) {
-          setCatalogues(cataloguesList.map(cat => ({ id: cat.id, label: cat.label })));
-        }
-
-        if (storeResult.success && storeResult.data) {
-          const store = storeResult.data;
-          if (store.checkoutSettings?.experience) {
-            checkoutRequireLogin = store.checkoutSettings.experience.requireLoginBeforeCheckout;
-            checkoutAllowGuest = store.checkoutSettings.experience.allowGuestCheckout;
-          }
-
-          const loadedSettings: StoreSettingsState = {
-            ...INITIAL_STATE,
-            ...behavior,
-            catalogueId: store.catalogueId || '',
-            storeSlug: store.storeSlug || '',
-            storeEnabled: store.isLive !== false,
-            maintenanceMode: store.maintenanceMode === true,
-            whatsappNumber: store.storeWhatsapp || '',
-            minimumOrderValue:
-              store.minimumOrderValue != null ? String(store.minimumOrderValue) : '0',
-            viewMode: store.viewMode || 'grid',
-            requireLoginBeforeCheckout: checkoutRequireLogin,
-            allowGuestBrowsing: checkoutAllowGuest,
-          };
-          setSettings(loadedSettings);
-          setOriginalSettings(loadedSettings);
-        } else if (behaviorResult.data) {
-          const loadedSettings: StoreSettingsState = {
-            ...INITIAL_STATE,
-            ...behavior,
-          };
-          setSettings(loadedSettings);
-          setOriginalSettings(loadedSettings);
-        }
+        applyLoadedSettings(storeResult.data, behavior);
       } catch (error) {
         console.error('Failed to load store settings:', error);
         showToast('Failed to load settings', 'error');
@@ -215,7 +249,7 @@ export default function StoreSettings() {
     };
 
     loadSettings();
-  }, [user?.uid, showToast]);
+  }, [user?.uid, showToast, applyLoadedSettings]);
 
   // Check for unsaved changes
   const hasChanges = JSON.stringify(settings) !== JSON.stringify(originalSettings);

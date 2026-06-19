@@ -1,11 +1,16 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect, useLayoutEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getSellerStore } from '../../services/storeService';
 import { fetchSellerOrders } from '../../services/orderService';
 import { fetchSellerCatalogue } from '../../services/sellerCatalogueService';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
 import type { Store } from '../../services/storeService';
+import {
+  readCachedSellerOrders,
+  readCachedSellerStore,
+  writeCachedSellerOrders,
+} from '../../utils/storePageCache';
+import { readProductsWithLegacyFallback } from '../../utils/safeStorage';
 import StoreLayout from './components/StoreLayout';
 import StoreHeader from './components/StoreHeader';
 import NavigationCard from './components/NavigationCard';
@@ -26,9 +31,28 @@ function currencySymbol(code?: string): string {
   return '₹';
 }
 
+function applyDashboardMetrics(
+  orders: ReturnType<typeof readCachedSellerOrders>,
+  setOrdersToday: (n: number) => void,
+  setRevenueToday: (n: number) => void,
+  setPendingOrders: (n: number) => void,
+  setCurrencyCode: (c: string) => void
+) {
+  const todayOrders = orders.filter((order) => isToday(order.created_at));
+  const todayCompleted = todayOrders.filter((order) => order.status === 'completed');
+  const todayRevenue = todayCompleted.reduce(
+    (sum, order) => sum + (order.total_amount || 0),
+    0
+  );
+
+  setOrdersToday(todayOrders.length);
+  setRevenueToday(todayRevenue);
+  setPendingOrders(orders.filter((order) => order.status === 'pending').length);
+  setCurrencyCode(todayCompleted[0]?.currency_code || orders[0]?.currency_code || 'INR');
+}
+
 export default function StoreDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [store, setStore] = useState<Store | null>(null);
   const [productCount, setProductCount] = useState(0);
   const [ordersToday, setOrdersToday] = useState(0);
@@ -37,6 +61,39 @@ export default function StoreDashboard() {
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [loading, setLoading] = useState(true);
 
+  useLayoutEffect(() => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    const uid = user.uid;
+    const cachedStore = readCachedSellerStore(uid);
+    if (cachedStore) {
+      setStore(cachedStore);
+    }
+
+    const cachedOrders = readCachedSellerOrders(uid);
+    if (cachedOrders.length > 0) {
+      applyDashboardMetrics(
+        cachedOrders,
+        setOrdersToday,
+        setRevenueToday,
+        setPendingOrders,
+        setCurrencyCode
+      );
+    }
+
+    const cachedProducts = readProductsWithLegacyFallback(uid);
+    if (cachedProducts.length > 0) {
+      setProductCount(cachedProducts.length);
+    }
+
+    if (cachedStore || cachedOrders.length > 0 || cachedProducts.length > 0) {
+      setLoading(false);
+    }
+  }, [user?.uid]);
+
   useEffect(() => {
     if (!user?.uid) {
       setLoading(false);
@@ -44,11 +101,21 @@ export default function StoreDashboard() {
     }
 
     const load = async () => {
+      const uid = user.uid;
+      const hadCache =
+        Boolean(readCachedSellerStore(uid)) ||
+        readCachedSellerOrders(uid).length > 0 ||
+        readProductsWithLegacyFallback(uid).length > 0;
+
+      if (!hadCache) {
+        setLoading(true);
+      }
+
       try {
         const [storeResult, ordersResult, catalogueResult] = await Promise.all([
-          getSellerStore(user.uid),
-          fetchSellerOrders(user.uid),
-          fetchSellerCatalogue(user.uid),
+          getSellerStore(uid),
+          fetchSellerOrders(uid),
+          fetchSellerCatalogue(uid),
         ]);
 
         if (storeResult.success && storeResult.data) {
@@ -59,18 +126,13 @@ export default function StoreDashboard() {
         setProductCount(products.length);
 
         const orders = ordersResult.data ?? [];
-        const todayOrders = orders.filter((order) => isToday(order.created_at));
-        const todayCompleted = todayOrders.filter((order) => order.status === 'completed');
-        const todayRevenue = todayCompleted.reduce(
-          (sum, order) => sum + (order.total_amount || 0),
-          0
-        );
-
-        setOrdersToday(todayOrders.length);
-        setRevenueToday(todayRevenue);
-        setPendingOrders(orders.filter((order) => order.status === 'pending').length);
-        setCurrencyCode(
-          todayCompleted[0]?.currency_code || orders[0]?.currency_code || 'INR'
+        writeCachedSellerOrders(uid, orders);
+        applyDashboardMetrics(
+          orders,
+          setOrdersToday,
+          setRevenueToday,
+          setPendingOrders,
+          setCurrencyCode
         );
       } catch (error) {
         console.error('Failed to load store dashboard:', error);

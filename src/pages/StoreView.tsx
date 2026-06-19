@@ -15,7 +15,7 @@ import {
   inferCatalogueStubFromRowData,
   type Catalogue,
 } from '../config/catalogueConfig';
-import { createOrder, type OrderItem } from '../services/orderService';
+import { createOrder, formatStoreOrderError, type OrderItem } from '../services/orderService';
 import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import OrderPlacedSuccessModal from '../components/OrderPlacedSuccessModal';
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
@@ -1715,6 +1715,10 @@ export default function StoreView() {
       return;
     }
     if (!guardOnline()) return;
+    if (!store.sellerUserId?.trim()) {
+      alert('Store configuration error. Please refresh and try again.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
@@ -1743,6 +1747,10 @@ export default function StoreView() {
           variantCombinationId: item.variantCombinationId || undefined,
         });
       });
+      if (orderItems.length === 0) {
+        alert('Could not build order — refresh the page and try again.');
+        return;
+      }
       setSupabaseRlsUserId(store.sellerUserId);
       const fullWhatsappNumber = customerWhatsappNumber.trim() ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}` : undefined;
       const storeSlugForOrder = (effectiveSlug || store.storeSlug || '').trim().toLowerCase();
@@ -1776,12 +1784,10 @@ export default function StoreView() {
         }
       );
       if (error) {
-        const msg = String((error as { message?: string })?.message ?? error ?? '');
-        if (msg.includes('insufficient_stock')) {
-          alert('Some items are no longer in stock. Please review your cart and try again.');
-        } else {
-          alert('Failed to place order. Please try again.');
-        }
+        console.error('Store order placement failed:', error);
+        alert(formatStoreOrderError(error));
+      } else if (!createdOrder) {
+        alert('Failed to place order. Please try again.');
       } else {
         if (effectivePaymentMethod === 'prepaid' && razorpayActive && createdOrder?.id) {
           try {
@@ -1811,8 +1817,10 @@ export default function StoreView() {
         setOrderSuccess({ trackingUrl });
         reloadStoreInventory();
       }
-    } catch { alert('Error placing order. Please try again.'); }
-    finally {
+    } catch (err) {
+      console.error('Store order placement threw:', err);
+      alert(formatStoreOrderError(err));
+    } finally {
       setSupabaseRlsUserId(null);
       void getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
         if (session?.user?.id) setSupabaseRlsUserId(session.user.id);

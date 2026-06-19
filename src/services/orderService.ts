@@ -5,6 +5,195 @@ import { generateOrderTrackingToken, isLikelyMissingTrackingColumnsError } from 
 import type { CheckoutTotals } from '../types/checkoutSettings';
 import { applyOrderInventory, restoreOrderInventory } from './inventoryService';
 
+function isMissingStorefrontOrderRpc(error: unknown): boolean {
+  const msg = String((error as { message?: string })?.message ?? error ?? '').toLowerCase();
+  const code = String((error as { code?: string })?.code ?? '');
+  return (
+    code === 'PGRST202' ||
+    msg.includes('create_storefront_order') ||
+    (msg.includes('function') && msg.includes('does not exist'))
+  );
+}
+
+function shouldFallbackFromStoreRpc(error: unknown): boolean {
+  if (!error) return false;
+  if (isMissingStorefrontOrderRpc(error)) return true;
+  const code = String((error as { code?: string })?.code ?? '');
+  const msg = String((error as { message?: string })?.message ?? error ?? '').toLowerCase();
+  if (code === '42501' || code === 'PGRST301' || msg.includes('permission denied')) return true;
+  if (msg.includes('invalid order response')) return true;
+  return false;
+}
+
+function parseStorefrontOrderRpcData(data: unknown): Order | null {
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return normalizeOrderRow(data as Record<string, unknown>);
+  }
+  if (Array.isArray(data) && data.length === 1 && data[0] && typeof data[0] === 'object') {
+    return normalizeOrderRow(data[0] as Record<string, unknown>);
+  }
+  return null;
+}
+
+function normalizeOrderRow(row: Record<string, unknown>): Order {
+  return {
+    id: String(row.id ?? ''),
+    share_link_token: String(row.share_link_token ?? ''),
+    seller_user_id: String(row.seller_user_id ?? ''),
+    customer_name: String(row.customer_name ?? ''),
+    customer_whatsapp: row.customer_whatsapp != null ? String(row.customer_whatsapp) : undefined,
+    items: Array.isArray(row.items) ? (row.items as OrderItem[]) : [],
+    total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
+    currency_code: String(row.currency_code ?? 'INR'),
+    status: (row.status as Order['status']) ?? 'pending',
+    order_source: row.order_source as Order['order_source'],
+    tracking_token: row.tracking_token != null ? String(row.tracking_token) : undefined,
+    store_slug: row.store_slug != null ? String(row.store_slug) : undefined,
+    customer_edited_at: row.customer_edited_at != null ? String(row.customer_edited_at) : undefined,
+    payment_method: row.payment_method as Order['payment_method'],
+    checkout_adjustments: (row.checkout_adjustments as CheckoutTotals | null) ?? null,
+    shipping_address: (row.shipping_address as Order['shipping_address']) ?? null,
+    created_at: String(row.created_at ?? new Date().toISOString()),
+    updated_at: String(row.updated_at ?? new Date().toISOString()),
+  };
+}
+
+/** User-facing message for storefront order failures. */
+export function formatStoreOrderError(error: unknown): string {
+  const msg = String((error as { message?: string })?.message ?? error ?? '').toLowerCase();
+  const code = String((error as { code?: string })?.code ?? '');
+  if (msg.includes('insufficient_stock')) {
+    return 'Some items are no longer in stock. Please review your cart and try again.';
+  }
+  if (msg.includes('items_required') || msg.includes('items') && msg.includes('empty')) {
+    return 'Your cart is empty. Add items before placing the order.';
+  }
+  if (code === '42501' || msg.includes('row-level security')) {
+    return 'Could not save your order (permissions). Run sql/create_storefront_order.sql in Supabase, then try again.';
+  }
+  if (code === 'PGRST116' || msg.includes('0 rows')) {
+    return 'Order may not have saved correctly. Please check your orders list before trying again.';
+  }
+  if (msg.includes('seller_required') || msg.includes('customer_name_required')) {
+    return 'Missing order details. Please fill in your name and try again.';
+  }
+  const detail = String((error as { message?: string })?.message ?? '').trim();
+  if (detail && import.meta.env.DEV) {
+    return `Failed to place order: ${detail}`;
+  }
+  return 'Failed to place order. Please try again.';
+}
+
+async function insertStoreOrderViaRpc(
+  trimmedSeller: string,
+  storeSlug: string | undefined,
+  storeShareToken: string,
+  customerName: string,
+  customerWhatsapp: string | undefined,
+  items: OrderItem[],
+  totalAmount: number | undefined,
+  currencyCode: string,
+  trackingToken: string,
+  checkoutExtras?: {
+    paymentMethod?: 'prepaid' | 'cod';
+    checkoutAdjustments?: CheckoutTotals;
+    shippingAddress?: Order['shipping_address'];
+  }
+): Promise<{ data: Order | null; error: unknown }> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('create_storefront_order', {
+    p_seller_user_id: trimmedSeller,
+    p_store_slug: storeSlug?.trim().toLowerCase() ?? '',
+    p_share_link_token: storeShareToken,
+    p_customer_name: customerName,
+    p_customer_whatsapp: customerWhatsapp ?? '',
+    p_items: items,
+    p_total_amount: totalAmount ?? null,
+    p_currency_code: currencyCode,
+    p_tracking_token: trackingToken,
+    p_payment_method: checkoutExtras?.paymentMethod ?? null,
+    p_checkout_adjustments: checkoutExtras?.checkoutAdjustments ?? null,
+    p_shipping_address: checkoutExtras?.shippingAddress ?? null,
+  });
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  const parsed = parseStorefrontOrderRpcData(data);
+  if (parsed) {
+    return { data: parsed, error: null };
+  }
+
+  return { data: null, error: new Error('Invalid order response') };
+}
+
+async function insertOrderRow(
+  client: ReturnType<typeof getSupabaseClient>,
+  baseRow: Record<string, unknown>
+): Promise<{ data: Order | null; error: unknown }> {
+  const row = { ...baseRow };
+  const now = new Date().toISOString();
+
+  const tryInsert = async () => client.from('orders').insert(row);
+
+  let insertResult = await tryInsert();
+  let error = insertResult.error;
+
+  if (error && isLikelyMissingTrackingColumnsError(error as { message?: string; code?: string })) {
+    delete row.tracking_token;
+    delete row.store_slug;
+    insertResult = await tryInsert();
+    error = insertResult.error;
+  }
+
+  if (
+    error &&
+    (String((error as { message?: string }).message || '').includes('checkout_adjustments') ||
+      String((error as { message?: string }).message || '').includes('payment_method'))
+  ) {
+    delete row.checkout_adjustments;
+    delete row.payment_method;
+    insertResult = await tryInsert();
+    error = insertResult.error;
+  }
+
+  if (error && String((error as { message?: string }).message || '').includes('shipping_address')) {
+    delete row.shipping_address;
+    insertResult = await tryInsert();
+    error = insertResult.error;
+  }
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  return {
+    data: normalizeOrderRow({
+      ...row,
+      created_at: now,
+      updated_at: now,
+    }),
+    error: null,
+  };
+}
+
+async function applyStoreOrderInventoryBestEffort(orderId: string): Promise<void> {
+  try {
+    const inv = await applyOrderInventory(orderId);
+    if (inv.error) {
+      console.warn('[createOrder] Inventory apply error (order kept):', inv.error);
+      return;
+    }
+    const invPayload = inv.data as { applied?: boolean; reason?: string } | null;
+    if (invPayload?.applied === false) {
+      console.warn('[createOrder] Inventory not applied (order kept):', invPayload.reason);
+    }
+  } catch (e) {
+    console.warn('[createOrder] Inventory apply threw (order kept):', e);
+  }
+}
+
 /** Orders RLS (see SUPABASE_ORDERS_SQL.md) uses `x-user-id`. Restore from session before seller mutations when header was cleared (e.g. after StoreView order). */
 async function ensureOrdersRlsHeaderFromSession(): Promise<void> {
   const { data: { session } } = await getSupabaseClient().auth.getSession();
@@ -78,71 +267,92 @@ export async function createOrder(
   }
 ): Promise<{ data: Order | null; error: any }> {
   try {
+    const trimmedSeller = String(sellerUserId ?? '').trim();
+    if (!trimmedSeller) {
+      return { data: null, error: new Error('seller_required') };
+    }
+    if (!customerName?.trim()) {
+      return { data: null, error: new Error('customer_name_required') };
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+      return { data: null, error: new Error('items_required') };
+    }
+
+    setSupabaseRlsUserId(trimmedSeller);
     const client = getSupabaseClient();
     const trackingToken = generateOrderTrackingToken();
 
-    const row: Record<string, unknown> = {
-      share_link_token: shareLinkToken,
-      seller_user_id: sellerUserId,
-      customer_name: customerName,
-      customer_whatsapp: customerWhatsapp,
-      items: items,
-      total_amount: totalAmount,
-      currency_code: currencyCode,
-      status: 'pending',
-      order_source: orderSource,
-      tracking_token: trackingToken,
-    };
-    if (storeSlug?.trim()) {
-      row.store_slug = storeSlug.trim().toLowerCase();
-    }
-    if (checkoutExtras?.paymentMethod) {
-      row.payment_method = checkoutExtras.paymentMethod;
-    }
-    if (checkoutExtras?.checkoutAdjustments) {
-      row.checkout_adjustments = checkoutExtras.checkoutAdjustments;
-    }
-    if (checkoutExtras?.shippingAddress) {
-      row.shipping_address = checkoutExtras.shippingAddress;
-    }
+    const storeShareToken =
+      orderSource === 'store'
+        ? `store:${(storeSlug?.trim() || trimmedSeller || 'order').toLowerCase()}`
+        : shareLinkToken;
 
-    let { data, error } = await client.from('orders').insert(row).select().maybeSingle();
+    let data: Order | null = null;
+    let error: unknown = null;
 
-    if (error && isLikelyMissingTrackingColumnsError(error)) {
-      delete row.tracking_token;
-      ({ data, error } = await client.from('orders').insert(row).select().maybeSingle());
-    }
+    if (orderSource === 'store') {
+      const rpcResult = await insertStoreOrderViaRpc(
+        trimmedSeller,
+        storeSlug,
+        storeShareToken,
+        customerName.trim(),
+        customerWhatsapp,
+        items,
+        totalAmount,
+        currencyCode,
+        trackingToken,
+        checkoutExtras
+      );
+      data = rpcResult.data;
+      error = rpcResult.error;
 
-    if (error && (String(error.message || '').includes('checkout_adjustments') || String(error.message || '').includes('payment_method'))) {
-      delete row.checkout_adjustments;
-      delete row.payment_method;
-      ({ data, error } = await client.from('orders').insert(row).select().maybeSingle());
-    }
-
-    if (!error && data?.id && orderSource === 'store') {
-      const inv = await applyOrderInventory(String(data.id));
-      if (inv.error) {
-        const msg = String((inv.error as { message?: string })?.message ?? inv.error ?? '');
-        await client.from('orders').delete().eq('id', data.id);
-        return {
-          data: null,
-          error: {
-            message: msg.includes('insufficient_stock') ? 'insufficient_stock' : 'inventory_failed',
-            code: msg.includes('insufficient_stock') ? 'insufficient_stock' : 'inventory_failed',
-          },
-        };
-      }
-      const invPayload = inv.data as { applied?: boolean; reason?: string } | null;
-      if (invPayload?.applied === false && invPayload.reason !== 'no_inventory_link') {
-        await client.from('orders').delete().eq('id', data.id);
-        return {
-          data: null,
-          error: { message: 'inventory_failed', code: 'inventory_failed' },
-        };
+      if (!data && error && shouldFallbackFromStoreRpc(error)) {
+        error = null;
       }
     }
 
-    return { data: (data as Order | null) ?? null, error };
+    if (!data) {
+      const orderId = crypto.randomUUID();
+      const row: Record<string, unknown> = {
+        id: orderId,
+        share_link_token: storeShareToken,
+        seller_user_id: trimmedSeller,
+        customer_name: customerName.trim(),
+        customer_whatsapp: customerWhatsapp,
+        items: items,
+        total_amount: totalAmount,
+        currency_code: currencyCode,
+        status: 'pending',
+        order_source: orderSource,
+        tracking_token: trackingToken,
+      };
+      if (storeSlug?.trim()) {
+        row.store_slug = storeSlug.trim().toLowerCase();
+      }
+      if (checkoutExtras?.paymentMethod) {
+        row.payment_method = checkoutExtras.paymentMethod;
+      }
+      if (checkoutExtras?.checkoutAdjustments) {
+        row.checkout_adjustments = checkoutExtras.checkoutAdjustments;
+      }
+      if (checkoutExtras?.shippingAddress) {
+        row.shipping_address = checkoutExtras.shippingAddress;
+      }
+
+      const insertOutcome = await insertOrderRow(client, row);
+      data = insertOutcome.data;
+      error = insertOutcome.error;
+    }
+
+    if (error) {
+      return { data: null, error };
+    }
+
+    if (data?.id && orderSource === 'store') {
+      await applyStoreOrderInventoryBestEffort(String(data.id));
+    }
+
+    return { data, error: null };
   } catch (err) {
     return { data: null, error: err };
   }

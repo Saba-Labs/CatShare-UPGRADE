@@ -23,7 +23,11 @@ import { buildStorefrontPublicUrl, buildStorefrontUrl, getStorefrontRootHost } f
 import { syncUserSettings } from '../services/supabaseSync';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { uploadProductImageToR2 } from '../services/r2Upload';
-import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import {
+  clearStorePageCaches,
+  readCachedSellerStore,
+  writeCachedSellerStore,
+} from '../utils/storePageCache';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import {
   type BusinessProfile,
@@ -42,7 +46,6 @@ import { normalizeCheckoutSettings } from '../types/checkoutSettings';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
 const STORE_FETCH_TIMEOUT_MS = 14_000;
-const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
 
 function summarizeCheckoutSettings(raw: unknown): string {
   const s = normalizeCheckoutSettings(raw);
@@ -1120,15 +1123,14 @@ export default function StorePage() {
 
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
-    const cacheKey = sellerStoreCacheKey(user.uid);
     if (store) {
-      safeSetInStorage(cacheKey, store);
+      writeCachedSellerStore(user.uid, store);
     }
   }, [store, user?.uid, user?.isAnonymous]);
 
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
-    const cached = safeGetFromStorage<Store | null>(sellerStoreCacheKey(user.uid), null);
+    const cached = readCachedSellerStore(user.uid);
     if (!cached) return;
     applyStoreState(cached);
     setLoading(false);
@@ -1146,9 +1148,8 @@ export default function StorePage() {
     let cancelled = false;
     const uid = user.uid;
     const load = async () => {
-      const cacheKey = sellerStoreCacheKey(uid);
       if (hasSellerStoreRowFetched(uid)) {
-        const cachedSkip = safeGetFromStorage<Store | null>(cacheKey, null);
+        const cachedSkip = readCachedSellerStore(uid);
         if (cachedSkip) {
           applyStoreState(cachedSkip);
           setLoading(false);
@@ -1156,7 +1157,7 @@ export default function StorePage() {
         }
       }
 
-      const cached = safeGetFromStorage<Store | null>(cacheKey, null);
+      const cached = readCachedSellerStore(uid);
       if (!cached) {
         setLoading(true);
       }
@@ -1173,10 +1174,10 @@ export default function StorePage() {
 
       if (result.success && result.data) {
         applyStoreState(result.data);
-        safeSetInStorage(cacheKey, result.data);
+        writeCachedSellerStore(uid, result.data);
         markSellerStoreRowFetched(uid);
       } else {
-        const fallback = cached ?? safeGetFromStorage<Store | null>(cacheKey, null);
+        const fallback = cached ?? readCachedSellerStore(uid);
         if (fallback) {
           applyStoreState(fallback);
           markSellerStoreRowFetched(uid);
@@ -1267,7 +1268,7 @@ export default function StorePage() {
       setShowCreateForm(false);
       setFormSlug(''); setFormCatalogue('');
       try {
-        safeSetInStorage(sellerStoreCacheKey(user.uid), result.data);
+        writeCachedSellerStore(user.uid, result.data);
       } catch {
         /* ignore */
       }
@@ -2161,7 +2162,7 @@ export default function StorePage() {
     const result = await deleteStore(user.uid);
     if (result.success) {
       setStore(null); setShowCreateForm(true); setConfirmDelete(false);
-      localStorage.removeItem(sellerStoreCacheKey(user.uid));
+      clearStorePageCaches(user.uid);
       invalidateSellerStoreSessionFetch(user.uid);
       showToast('Store deleted', 'success');
     } else showToast(result.error || 'Failed', 'error');

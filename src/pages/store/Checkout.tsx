@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
 import { getSellerStore, updateStoreCheckoutSettings } from '../../services/storeService';
+import { readCachedSellerStore } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -68,16 +69,37 @@ export default function Checkout() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSellerStore(sellerId);
+    if (cached) {
+      const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      setSettings(loaded);
+      setOriginalSettings(loaded);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   const loadSettings = useCallback(async () => {
     if (!sellerId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = readCachedSellerStore(sellerId);
+    if (!cached) {
+      setLoading(true);
+    }
+
     const result = await getSellerStore(sellerId);
     if (!result.success || !result.data) {
-      showToast(result.error || 'Failed to load checkout settings', 'error');
+      if (cached) {
+        const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+        setSettings(loaded);
+        setOriginalSettings(loaded);
+      } else {
+        showToast(result.error || 'Failed to load checkout settings', 'error');
+      }
       setLoading(false);
       return;
     }

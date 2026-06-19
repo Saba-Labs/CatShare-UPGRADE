@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -9,6 +9,7 @@ import {
   type Store,
 } from '../services/storeService';
 import { getPersistedAuthUserId } from '../utils/authUserId';
+import { readCachedSellerStore } from '../utils/storePageCache';
 import StoreCheckoutSettingsEditor, { emptyCheckoutSettings } from '../components/StoreCheckoutSettingsEditor';
 import { normalizeCheckoutSettings, type StoreCheckoutSettings } from '../types/checkoutSettings';
 import MainAppBottomNav from '../components/MainAppBottomNav';
@@ -184,12 +185,26 @@ export default function StoreCheckoutSettingsPage() {
     [user?.uid]
   );
 
+  useLayoutEffect(() => {
+    if (!effectiveUid) return;
+    const cached = readCachedSellerStore(effectiveUid);
+    if (cached) {
+      setStore(cached);
+      setCheckoutSettings(normalizeCheckoutSettings(cached.checkoutSettings));
+      setPageLoading(false);
+    }
+  }, [effectiveUid]);
+
   const loadPage = useCallback(async () => {
     if (!effectiveUid) {
       setPageLoading(false);
       return;
     }
-    setPageLoading(true);
+
+    const cached = readCachedSellerStore(effectiveUid);
+    if (!cached) {
+      setPageLoading(true);
+    }
     setLocalError('');
     try {
       const storeRes = await withTimeout(
@@ -198,15 +213,25 @@ export default function StoreCheckoutSettingsPage() {
         'Store load timed out. Check your connection and try again.'
       );
       if (!storeRes.success || !storeRes.data) {
-        setLocalError(storeRes.error || 'Store not found');
-        setStore(null);
+        if (cached) {
+          setStore(cached);
+          setCheckoutSettings(normalizeCheckoutSettings(cached.checkoutSettings));
+        } else {
+          setLocalError(storeRes.error || 'Store not found');
+          setStore(null);
+        }
         return;
       }
       setStore(storeRes.data);
       setCheckoutSettings(normalizeCheckoutSettings(storeRes.data.checkoutSettings));
     } catch (e) {
-      setLocalError(e instanceof Error ? e.message : 'Could not load store');
-      setStore(null);
+      if (cached) {
+        setStore(cached);
+        setCheckoutSettings(normalizeCheckoutSettings(cached.checkoutSettings));
+      } else {
+        setLocalError(e instanceof Error ? e.message : 'Could not load store');
+        setStore(null);
+      }
     } finally {
       setPageLoading(false);
     }

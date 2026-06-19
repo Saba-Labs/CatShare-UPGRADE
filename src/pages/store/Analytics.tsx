@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchSellerOrders } from '../../services/orderService';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
+import { readCachedSellerOrders, writeCachedSellerOrders } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import AnalyticsMetricCard from './components/AnalyticsMetricCard';
@@ -21,15 +22,32 @@ export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof fetchSellerOrders>>['data']>([]);
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSellerOrders(sellerId);
+    if (cached.length > 0) {
+      setOrders(cached);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   const loadOrders = useCallback(async () => {
     if (!sellerId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = readCachedSellerOrders(sellerId);
+    if (cached.length === 0) {
+      setLoading(true);
+    }
+
     const result = await fetchSellerOrders(sellerId);
-    setOrders(result.data ?? []);
+    const list = result.data ?? [];
+    setOrders(list);
+    if (list.length > 0) {
+      writeCachedSellerOrders(sellerId, list);
+    }
     setLoading(false);
   }, [sellerId]);
 

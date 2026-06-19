@@ -6,7 +6,7 @@ import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
-import { safeGetFromStorage, safeSetInStorage, getStorageKey } from '../utils/safeStorage';
+import { patchCachedOrder, readCachedSellerOrders, writeCachedSellerOrders } from '../utils/storePageCache';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
@@ -14,7 +14,6 @@ import MainAppBottomNav from '../components/MainAppBottomNav';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
-const sellerOrdersCacheKey = (uid: string) => getStorageKey('sellerOrders', uid);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
@@ -684,7 +683,7 @@ export default function Orders() {
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
-    const cached = safeGetFromStorage(sellerOrdersCacheKey(user.uid), [] as Order[]);
+    const cached = readCachedSellerOrders(user.uid);
     setOrders(cached);
     setLoading(cached.length === 0);
     setError(null);
@@ -701,7 +700,7 @@ export default function Orders() {
       void fetchSellerOrders(user.uid).then(({ data, error }) => {
         if (!error && data) {
           setOrders(data);
-          safeSetInStorage(sellerOrdersCacheKey(user.uid), data);
+          writeCachedSellerOrders(user.uid, data);
         }
       });
     };
@@ -823,8 +822,7 @@ export default function Orders() {
       return;
     }
 
-    const cacheKey = sellerOrdersCacheKey(user.uid);
-    const cached = safeGetFromStorage(cacheKey, [] as Order[]);
+    const cached = readCachedSellerOrders(user.uid);
     if (cached.length === 0) {
       setLoading(true);
     }
@@ -832,8 +830,7 @@ export default function Orders() {
     const { data, error } = await fetchSellerOrders(user.uid);
     if (error) {
       console.error('Failed to load orders:', error);
-      const fallback =
-        cached.length > 0 ? cached : safeGetFromStorage(cacheKey, [] as Order[]);
+      const fallback = cached.length > 0 ? cached : readCachedSellerOrders(user.uid);
       if (fallback.length > 0) {
         setOrders(fallback);
         setError(null);
@@ -848,7 +845,7 @@ export default function Orders() {
     } else {
       const list = data || [];
       setOrders(list);
-      safeSetInStorage(cacheKey, list);
+      writeCachedSellerOrders(user.uid, list);
     }
     setLoading(false);
   };
@@ -878,10 +875,9 @@ export default function Orders() {
       }
     } else {
       showToast(`Order marked as ${status}`, 'success');
-      setOrders((prev) => {
-        safeSetInStorage(sellerOrdersCacheKey(user.uid!), prev);
-        return prev;
-      });
+      if (user?.uid) {
+        patchCachedOrder(user.uid, id, { status });
+      }
     }
   };
 

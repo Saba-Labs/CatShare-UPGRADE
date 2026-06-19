@@ -567,7 +567,7 @@ begin
       and coalesce(variant_combination_id, '') = coalesce(v_variant, '');
 
     if not found then
-      raise exception 'insufficient_stock';
+      continue;
     end if;
 
     if v_level.on_hand < v_qty then

@@ -20,6 +20,8 @@ import {
   type Catalogue,
 } from '../config/catalogueConfig';
 import { RESERVED_STORE_SLUGS } from '../utils/storefrontDomain';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import { readCachedSellerStore, writeCachedSellerStore } from '../utils/storePageCache';
 import { normalizeProductCategories } from '../utils/productCategoryUtils';
 import {
   normalizeCheckoutSettings,
@@ -914,35 +916,51 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
  * Get a seller's own store (authenticated)
  */
 export async function getSellerStore(sellerUserId: string): Promise<{ success: boolean; data?: Store; error?: string }> {
+  const trimmed = String(sellerUserId ?? '').trim();
+  const cached = trimmed ? readCachedSellerStore(trimmed) : null;
+
+  if (!trimmed) {
+    return { success: false, error: 'Seller user ID is required' };
+  }
+
+  if (!isBrowserOnline()) {
+    if (cached) return { success: true, data: cached };
+    return { success: false, error: 'Store not available offline' };
+  }
+
   try {
     const client = getSupabaseClient();
 
     // Set RLS user ID for the request
-    setSupabaseRlsUserId(sellerUserId);
+    setSupabaseRlsUserId(trimmed);
 
     const { data, error } = await client
       .from('stores')
       .select('*')
-      .eq('seller_user_id', sellerUserId)
+      .eq('seller_user_id', trimmed)
       .limit(1);
     
     if (error) {
       console.error('❌ Error fetching seller store:', error);
+      if (cached) return { success: true, data: cached };
       return { success: false, error: error.message };
     }
     
     if (!data || data.length === 0) {
+      if (cached) return { success: true, data: cached };
       return { success: false, error: 'Store not found' };
     }
     
-    const store = data[0];
+    const store = mapStoreRow(data[0] as Record<string, unknown>);
+    writeCachedSellerStore(trimmed, store);
     return {
       success: true,
-      data: mapStoreRow(store as Record<string, unknown>),
+      data: store,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in getSellerStore:', errorMessage);
+    if (cached) return { success: true, data: cached };
     return { success: false, error: errorMessage };
   } finally {
     setSupabaseRlsUserId(null);

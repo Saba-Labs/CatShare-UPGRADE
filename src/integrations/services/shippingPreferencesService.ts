@@ -2,6 +2,11 @@
  * Shipping preferences stored on stores.shipping_preferences JSONB.
  */
 import { getSupabaseClient, setSupabaseRlsUserId } from '../../supabaseClient';
+import { isBrowserOnline } from '../../utils/cloudWritePolicy';
+import {
+  readCachedShippingPreferences,
+  writeCachedShippingPreferences,
+} from '../../utils/storePageCache';
 import {
   DEFAULT_SHIPPING_PREFERENCES,
   EMPTY_SHIPPING_ADDRESS,
@@ -107,26 +112,43 @@ export function normalizeShippingPreferences(raw: unknown): ShippingPreferences 
 export async function fetchShippingPreferences(
   sellerUserId: string
 ): Promise<{ data: ShippingPreferences; error: unknown }> {
+  const trimmed = String(sellerUserId ?? '').trim();
+  const cached = trimmed ? readCachedShippingPreferences(trimmed) : null;
+
+  if (!trimmed) {
+    return { data: { ...DEFAULT_SHIPPING_PREFERENCES }, error: new Error('Seller user ID is required') };
+  }
+
+  if (!isBrowserOnline()) {
+    return { data: cached ?? { ...DEFAULT_SHIPPING_PREFERENCES }, error: null };
+  }
+
   try {
-    setSupabaseRlsUserId(sellerUserId);
+    setSupabaseRlsUserId(trimmed);
     const { data, error } = await getSupabaseClient()
       .from('stores')
       .select('shipping_preferences')
-      .eq('seller_user_id', sellerUserId)
+      .eq('seller_user_id', trimmed)
       .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('shipping_preferences')) {
-        return { data: { ...DEFAULT_SHIPPING_PREFERENCES }, error: null };
+        const fallback = cached ?? { ...DEFAULT_SHIPPING_PREFERENCES };
+        writeCachedShippingPreferences(trimmed, fallback);
+        return { data: fallback, error: null };
       }
+      if (cached) return { data: cached, error: null };
       return { data: { ...DEFAULT_SHIPPING_PREFERENCES }, error };
     }
 
+    const normalized = normalizeShippingPreferences(data?.shipping_preferences);
+    writeCachedShippingPreferences(trimmed, normalized);
     return {
-      data: normalizeShippingPreferences(data?.shipping_preferences),
+      data: normalized,
       error: null,
     };
   } catch (e) {
+    if (cached) return { data: cached, error: null };
     return { data: { ...DEFAULT_SHIPPING_PREFERENCES }, error: e };
   }
 }
@@ -149,8 +171,10 @@ export async function updateShippingPreferences(
       .single();
 
     if (error) return { data: null, error };
+    const saved = normalizeShippingPreferences(data?.shipping_preferences);
+    writeCachedShippingPreferences(sellerUserId, saved);
     return {
-      data: normalizeShippingPreferences(data?.shipping_preferences),
+      data: saved,
       error: null,
     };
   } catch (e) {

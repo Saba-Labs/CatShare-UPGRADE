@@ -5,7 +5,7 @@ import type { ProductWithCatalogueData } from '../../config/catalogueProductUtil
 import type { StorePublic } from '../../services/storeService';
 import { createDefaultWebsiteModeConfig } from '../../config/homepageBuilderConfig';
 import { resolveStorefrontSeo, type StorefrontPageKind } from '../../utils/storefrontSeo';
-import { slugifyStorefront } from '../../utils/websiteStorefront';
+import { findProductByHandle, slugifyStorefront } from '../../utils/websiteStorefront';
 import StorefrontSeo from './StorefrontSeo';
 import { WebsiteStoreProvider } from './WebsiteStoreContext';
 import WebsiteHeader from './WebsiteHeader';
@@ -45,7 +45,7 @@ export default function WebsiteRuntime({
   const handle = pageSegments[1] || '';
 
   const product = section === 'products'
-    ? products.find((p) => slugifyStorefront(p.name || p.id) === handle) || null
+    ? findProductByHandle(products, handle)
     : null;
   const customPage = section
     ? customPages.find((page) => page.slug === section || slugifyStorefront(page.slug) === section)

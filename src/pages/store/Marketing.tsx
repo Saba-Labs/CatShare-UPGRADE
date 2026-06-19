@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
@@ -11,6 +11,7 @@ import {
   DEFAULT_MARKETING_SETTINGS,
   type StoreMarketingSettings,
 } from '../../types/storeMarketingSettings';
+import { readCachedMarketingSettings } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -65,15 +66,29 @@ export default function Marketing() {
 
   const activeMarketingIntegrations = getActiveMarketingIntegrations();
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedMarketingSettings(sellerId);
+    if (cached) {
+      setSettings(cached);
+      setOriginalSettings(cached);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   const loadSettings = useCallback(async () => {
     if (!sellerId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = readCachedMarketingSettings(sellerId);
+    if (!cached) {
+      setLoading(true);
+    }
+
     const result = await fetchMarketingSettings(sellerId);
-    if (result.error) {
+    if (result.error && !cached) {
       showToast('Failed to load marketing settings', 'error');
     }
     setSettings(result.data);

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
 import { getSellerStore } from '../../services/storeService';
+import { readCachedSellerStore } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -35,16 +36,31 @@ export default function DangerZone() {
   const [transferEmail, setTransferEmail] = useState('');
   const [processing, setProcessing] = useState(false);
 
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSellerStore(sellerId);
+    if (cached?.storeSlug) {
+      setStoreSlug(cached.storeSlug);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
   const loadStore = useCallback(async () => {
     if (!sellerId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = readCachedSellerStore(sellerId);
+    if (!cached) {
+      setLoading(true);
+    }
+
     const result = await getSellerStore(sellerId);
     if (result.success && result.data?.storeSlug) {
       setStoreSlug(result.data.storeSlug);
+    } else if (cached?.storeSlug) {
+      setStoreSlug(cached.storeSlug);
     }
     setLoading(false);
   }, [sellerId]);

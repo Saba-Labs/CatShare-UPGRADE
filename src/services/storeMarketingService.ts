@@ -1,4 +1,9 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import {
+  readCachedMarketingSettings,
+  writeCachedMarketingSettings,
+} from '../utils/storePageCache';
 import {
   DEFAULT_MARKETING_SETTINGS,
   normalizeMarketingSettings,
@@ -8,26 +13,43 @@ import {
 export async function fetchMarketingSettings(
   sellerUserId: string
 ): Promise<{ data: StoreMarketingSettings; error: unknown }> {
+  const trimmed = String(sellerUserId ?? '').trim();
+  const cached = trimmed ? readCachedMarketingSettings(trimmed) : null;
+
+  if (!trimmed) {
+    return { data: { ...DEFAULT_MARKETING_SETTINGS }, error: new Error('Seller user ID is required') };
+  }
+
+  if (!isBrowserOnline()) {
+    return { data: cached ?? { ...DEFAULT_MARKETING_SETTINGS }, error: null };
+  }
+
   try {
-    setSupabaseRlsUserId(sellerUserId);
+    setSupabaseRlsUserId(trimmed);
     const { data, error } = await getSupabaseClient()
       .from('stores')
       .select('marketing_settings')
-      .eq('seller_user_id', sellerUserId)
+      .eq('seller_user_id', trimmed)
       .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('marketing_settings')) {
-        return { data: { ...DEFAULT_MARKETING_SETTINGS }, error: null };
+        const fallback = cached ?? { ...DEFAULT_MARKETING_SETTINGS };
+        writeCachedMarketingSettings(trimmed, fallback);
+        return { data: fallback, error: null };
       }
+      if (cached) return { data: cached, error: null };
       return { data: { ...DEFAULT_MARKETING_SETTINGS }, error };
     }
 
+    const normalized = normalizeMarketingSettings(data?.marketing_settings);
+    writeCachedMarketingSettings(trimmed, normalized);
     return {
-      data: normalizeMarketingSettings(data?.marketing_settings),
+      data: normalized,
       error: null,
     };
   } catch (e) {
+    if (cached) return { data: cached, error: null };
     return { data: { ...DEFAULT_MARKETING_SETTINGS }, error: e };
   }
 }
@@ -51,13 +73,16 @@ export async function updateMarketingSettings(
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('marketing_settings')) {
+        writeCachedMarketingSettings(sellerUserId, normalized);
         return { data: normalized, error: null };
       }
       return { data: null, error };
     }
 
+    const saved = normalizeMarketingSettings(data?.marketing_settings);
+    writeCachedMarketingSettings(sellerUserId, saved);
     return {
-      data: normalizeMarketingSettings(data?.marketing_settings),
+      data: saved,
       error: null,
     };
   } catch (e) {

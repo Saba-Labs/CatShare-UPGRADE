@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FiCheck,
@@ -22,6 +22,11 @@ import {
 } from '../../services/storeCustomDomainApi';
 import { buildStorefrontPublicUrl, buildStorefrontUrl } from '../../utils/storefrontDomain';
 import { validateStoreHostnameInput } from '../../utils/normalizeStoreHostname';
+import {
+  readCachedCustomDomainState,
+  readCachedSellerStore,
+  writeCachedCustomDomainState,
+} from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -112,12 +117,39 @@ export default function CustomDomain() {
       setDomainState(result);
       if (result.hostname) setHostnameInput(result.hostname);
       if (!result.ok && result.error) setError(result.error);
+      if (sellerId) {
+        writeCachedCustomDomainState(sellerId, result);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load domain settings');
+      if (sellerId) {
+        const cached = readCachedCustomDomainState(sellerId);
+        if (cached) {
+          setDomainState(cached);
+          if (cached.hostname) setHostnameInput(cached.hostname);
+        } else {
+          setError(e instanceof Error ? e.message : 'Could not load domain settings');
+        }
+      } else {
+        setError(e instanceof Error ? e.message : 'Could not load domain settings');
+      }
     } finally {
       setDomainLoading(false);
     }
-  }, []);
+  }, [sellerId]);
+
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cachedStore = readCachedSellerStore(sellerId);
+    if (cachedStore) {
+      setStore(cachedStore);
+      setLoading(false);
+    }
+    const cachedDomain = readCachedCustomDomainState(sellerId);
+    if (cachedDomain) {
+      setDomainState(cachedDomain);
+      if (cachedDomain.hostname) setHostnameInput(cachedDomain.hostname);
+    }
+  }, [sellerId]);
 
   const loadPage = useCallback(async () => {
     if (!sellerId) {
@@ -125,17 +157,26 @@ export default function CustomDomain() {
       return;
     }
 
-    setLoading(true);
+    const cachedStore = readCachedSellerStore(sellerId);
+    if (!cachedStore) {
+      setLoading(true);
+    }
     setError('');
+
     const storeResult = await getSellerStore(sellerId);
     if (!storeResult.success || !storeResult.data) {
-      setError(storeResult.error || 'Store not found');
-      setStore(null);
-      setLoading(false);
-      return;
+      if (cachedStore) {
+        setStore(cachedStore);
+      } else {
+        setError(storeResult.error || 'Store not found');
+        setStore(null);
+        setLoading(false);
+        return;
+      }
+    } else {
+      setStore(storeResult.data);
     }
 
-    setStore(storeResult.data);
     setLoading(false);
     await loadDomainState();
   }, [sellerId, loadDomainState]);

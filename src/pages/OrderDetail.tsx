@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
@@ -29,6 +29,14 @@ import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { isBrowserOnline } from '../utils/cloudWritePolicy';
+import {
+  patchCachedOrder,
+  readCachedOrderById,
+  removeCachedOrder,
+  upsertCachedOrder,
+  writeCachedSellerOrders,
+} from '../utils/storePageCache';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
 import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
@@ -1391,33 +1399,73 @@ useEffect(() => {
     delta: 50,
   });
 
+  const applyOrderToView = useCallback(
+    (raw: Order, uid: string) => {
+      const normalized = normalizeOrderFromApi(raw);
+      const hydrated = {
+        ...normalized,
+        items: hydrateOrderItemImagesFromLocalProducts(normalized.items, uid),
+      };
+      setOrder(hydrated);
+      setEditName(hydrated.customer_name || '');
+      setEditPhone((hydrated as { customer_whatsapp?: string }).customer_whatsapp || '');
+      const addr = hydrated.shipping_address;
+      setEditShipLine1(addr?.line1 || '');
+      setEditShipCity(addr?.city || '');
+      setEditShipState(addr?.state || '');
+      setEditShipPincode(addr?.pincode || '');
+      setEditItems((hydrated.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    if (!user?.uid || !id) return;
+    const cached = readCachedOrderById(user.uid, id);
+    if (cached) {
+      applyOrderToView(cached, user.uid);
+      setLoading(false);
+    }
+  }, [user?.uid, id, applyOrderToView]);
+
   useEffect(() => {
     if (!user?.uid || !id) return;
+
+    let cancelled = false;
+    const uid = user.uid;
+
     (async () => {
-      setLoading(true);
-      const { data, error } = await fetchSellerOrders(user.uid);
+      const cached = readCachedOrderById(uid, id);
+      if (!cached) {
+        setLoading(true);
+      }
+
+      const { data, error } = await fetchSellerOrders(uid);
+      if (cancelled) return;
+
       if (!error && data) {
+        writeCachedSellerOrders(uid, data);
         const found = data.find((o: Order) => o.id === id);
         if (found) {
-          const normalized = normalizeOrderFromApi(found);
-          const hydrated = {
-            ...normalized,
-            items: hydrateOrderItemImagesFromLocalProducts(normalized.items, user.uid),
-          };
-          setOrder(hydrated);
-          setEditName(hydrated.customer_name || '');
-          setEditPhone((hydrated as any).customer_whatsapp || '');
-          const addr = hydrated.shipping_address;
-          setEditShipLine1(addr?.line1 || '');
-          setEditShipCity(addr?.city || '');
-          setEditShipState(addr?.state || '');
-          setEditShipPincode(addr?.pincode || '');
-          setEditItems((hydrated.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
-        } else showToast('Order not found', 'error');
-      } else showToast('Failed to load order', 'error');
+          applyOrderToView(found, uid);
+        } else if (!cached) {
+          showToast('Order not found', 'error');
+        }
+      } else if (cached) {
+        showToast(
+          isBrowserOnline() ? 'Could not refresh order. Showing saved copy.' : 'Showing saved order',
+          'info'
+        );
+      } else {
+        showToast('Failed to load order', 'error');
+      }
       setLoading(false);
     })();
-  }, [user?.uid, id]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, id, applyOrderToView, showToast]);
 
   const handleBack = async () => {
     await safeHapticsLight();
@@ -1447,6 +1495,9 @@ useEffect(() => {
       // Revert on error
       setOrder(prev => prev ? { ...prev, status: oldStatus } : null);
     } else {
+      if (user?.uid) {
+        patchCachedOrder(user.uid, order.id, { status });
+      }
       showToast(`Marked as ${status}`, 'success');
     }
   };
@@ -1504,14 +1555,18 @@ useEffect(() => {
         rowTotal: (item.unitPrice || 0) * item.quantity,
       }));
       setEditItems(updatedItems.map((it, i) => ({ ...it, _key: String(i) })));
-      setOrder({
+      const updatedOrder = {
         ...order,
         items: updatedItems,
         customer_name: editName,
         customer_whatsapp: editPhone,
         total_amount: total,
         shipping_address,
-      } as any);
+      } as Order;
+      setOrder(updatedOrder);
+      if (user?.uid) {
+        upsertCachedOrder(user.uid, updatedOrder);
+      }
       setEditModeSync(false);
       showToast('Order saved', 'success');
     } catch (err) {
@@ -1899,6 +1954,9 @@ useEffect(() => {
       if (error) {
         showToast('Failed to delete order', 'error');
         return;
+      }
+      if (user?.uid) {
+        removeCachedOrder(user.uid, order.id);
       }
       showToast('Order deleted', 'success');
       navigate('/orders');
@@ -2824,6 +2882,9 @@ useEffect(() => {
                   shippingAddress={order.shipping_address ?? null}
                   onShippingAddressSaved={(address) => {
                     setOrder((prev) => (prev ? { ...prev, shipping_address: address } : prev));
+                    if (user?.uid && order) {
+                      patchCachedOrder(user.uid, order.id, { shipping_address: address });
+                    }
                   }}
                 />
                 <OrderCustomerTrackingSection

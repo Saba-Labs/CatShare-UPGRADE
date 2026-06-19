@@ -1,17 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import { getSellerStore, type Store } from '../services/storeService';
 import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
 import { isOfflineBuilderMode } from '../config/offlineBuilder';
-import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { readCachedSellerStore } from '../utils/storePageCache';
 import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
-const sellerStoreCacheKey = (uid: string) => getStorageKey('sellerStore', uid);
 
 /** Minimal local store so the editor can open without a Supabase round-trip. */
 function buildLocalFallbackStore(uid: string): Store {
@@ -43,6 +42,15 @@ export default function HomepageEditorPage() {
 
   const effectiveUid = user?.uid ?? getPersistedAuthUserId() ?? null;
 
+  useLayoutEffect(() => {
+    if (!effectiveUid) return;
+    const cached = readCachedSellerStore(effectiveUid);
+    if (cached) {
+      setStore(cached);
+      setLoading(false);
+    }
+  }, [effectiveUid]);
+
   const catalogues = useMemo(
     () =>
       store && effectiveUid
@@ -60,8 +68,7 @@ export default function HomepageEditorPage() {
         return;
       }
 
-      const cacheKey = sellerStoreCacheKey(effectiveUid);
-      const cached = safeGetFromStorage<Store | null>(cacheKey, null);
+      const cached = readCachedSellerStore(effectiveUid);
 
       if (isOfflineBuilderMode()) {
         setStore(cached ?? buildLocalFallbackStore(effectiveUid));

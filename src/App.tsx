@@ -116,6 +116,7 @@ import GlassThemeProGate from "./components/GlassThemeProGate";
 import { SyncProgressModal } from "./components/SyncProgressModal";
 import { SyncBusyOverlay } from "./components/SyncBusyOverlay";
 import { resolveStoreSlugFromHostname } from "./utils/storefrontDomain";
+import { isSellerStorefrontHost } from "./utils/sellerStorefrontHost";
 import { isHomepageEditorPath, isOfflineBuilderMode } from "./config/offlineBuilder";
 
 /** Run non-critical work after first paint to shorten time-to-interactive. */
@@ -194,6 +195,7 @@ function AppWithBackHandler() {
   const shouldDeferCloudSyncNow = () =>
     isEditFlowRoute || (typeof document !== 'undefined' && document.visibilityState !== 'visible');
   const isStoreSubdomainHost = Boolean(resolveStoreSlugFromHostname());
+  const isSellerStorefrontHostActive = isSellerStorefrontHost();
   const isStorefrontRootRoute = isStoreSubdomainHost && location.pathname === '/';
   const isPublicStoreOrOrderRoute =
     isStoreSubdomainHost ||
@@ -2441,6 +2443,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/email-confirmed" element={<EmailConfirmed />} />
 
         {/* Public Routes */}
+        {isSellerStorefrontHostActive ? (
+          <>
+            <Route path="/" element={<StoreView />} />
+            <Route path="/products/*" element={<StoreView />} />
+            <Route path="/collections/*" element={<StoreView />} />
+            <Route path="/:customPageSlug" element={<StoreView />} />
+          </>
+        ) : null}
         <Route path="/o/:token/*" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
         <Route path="/track/:token" element={<TrackOrder />} />
