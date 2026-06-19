@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainAppBottomNav from '../../../components/MainAppBottomNav';
 import SupportWhatsAppFab from '../../../components/SupportWhatsAppFab';
 
@@ -25,6 +25,8 @@ export function StoreStatusBar() {
 
 export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMainStorePage = location.pathname === '/store';
 
   return (
     <>
@@ -41,7 +43,7 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
 
 
         <MainAppBottomNav active="store" />
-        <SupportWhatsAppFab />
+        {isMainStorePage && <SupportWhatsAppFab />}
       </div>
     </>
   );
