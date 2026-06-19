@@ -386,44 +386,6 @@ export default function Checkout() {
           </SettingsCard>
 
           <SettingsCard
-            title="Customer Access"
-            description="Control whether guests can checkout or login is required."
-          >
-            <div className="space-y-4 divide-y divide-gray-200 dark:divide-gray-800">
-              <ToggleRow
-                title="Allow guest checkout"
-                description="Customers can place orders without creating an account."
-                checked={settings.experience.allowGuestCheckout}
-                onChange={(allowGuestCheckout) =>
-                  patchExperience({
-                    allowGuestCheckout,
-                    requireLoginBeforeCheckout: allowGuestCheckout
-                      ? settings.experience.requireLoginBeforeCheckout
-                      : false,
-                  })
-                }
-                disabled={saving || settings.experience.requireLoginBeforeCheckout}
-              />
-              <div className="pt-4">
-                <ToggleRow
-                  title="Require login before checkout"
-                  description="Customers must sign in before completing an order."
-                  checked={settings.experience.requireLoginBeforeCheckout}
-                  onChange={(requireLoginBeforeCheckout) =>
-                    patchExperience({
-                      requireLoginBeforeCheckout,
-                      allowGuestCheckout: requireLoginBeforeCheckout
-                        ? false
-                        : settings.experience.allowGuestCheckout,
-                    })
-                  }
-                  disabled={saving}
-                />
-              </div>
-            </div>
-          </SettingsCard>
-
-          <SettingsCard
             title="Address Validation"
             description="Validate customer shipping details before order submission."
           >
