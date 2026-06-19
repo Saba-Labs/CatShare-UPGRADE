@@ -194,44 +194,73 @@ export default function BusinessProfile() {
                 <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
                   Logo
                 </label>
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="h-20 w-20 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
-                    {profile.logoUrl ? (
-                      <img
-                        src={profile.logoUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">No logo</span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      ref={logoInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => void handleLogoFile(e)}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      disabled={logoUploading || saving}
-                      onClick={() => logoInputRef.current?.click()}
-                      className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {logoUploading ? 'Uploading…' : 'Upload logo'}
-                    </button>
-                    {profile.logoUrl ? (
-                      <button
-                        type="button"
-                        disabled={logoUploading || saving}
-                        onClick={() => updateProfile({ logoUrl: '' })}
-                        className="inline-flex items-center rounded-xl border border-gray-300 dark:border-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
+                <div className="relative">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => void handleLogoFile(e)}
+                    className="hidden"
+                  />
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                    {/* Logo Preview */}
+                    <div className="flex flex-col items-center">
+                      <div className="h-32 w-32 rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden flex items-center justify-center shadow-sm hover:shadow-md transition-shadow duration-200">
+                        {profile.logoUrl ? (
+                          <img
+                            src={profile.logoUrl}
+                            alt="Business Logo"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-center px-4">
+                            <svg className="w-8 h-8 text-gray-400 dark:text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">No logo</span>
+                          </div>
+                        )}
+                      </div>
+                      {profile.logoUrl && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Current logo</p>
+                      )}
+                    </div>
+
+                    {/* Upload/Action Buttons */}
+                    <div className="flex flex-col gap-3 flex-grow">
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          disabled={logoUploading || saving}
+                          onClick={() => logoInputRef.current?.click()}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          <span>{logoUploading ? 'Uploading…' : 'Upload logo'}</span>
+                        </button>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+                          PNG, JPG or GIF up to 5MB
+                        </p>
+                      </div>
+
+                      {profile.logoUrl ? (
+                        <button
+                          type="button"
+                          disabled={logoUploading || saving}
+                          onClick={() => updateProfile({ logoUrl: '' })}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-gray-600 px-6 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Remove logo</span>
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
