@@ -541,10 +541,17 @@ export default function StoreSettings() {
             <div className="space-y-5">
               <div className="flex items-start justify-between pb-5 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Store Live</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Customers can access your store when enabled.
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">Store Live</h3>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      aria-label="Store Live information"
+                      title="Customers can access your store when enabled."
+                    >
+                      <FiInfo className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 <ToggleSwitch
                   checked={settings.storeEnabled}
