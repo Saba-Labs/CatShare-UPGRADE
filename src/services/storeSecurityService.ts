@@ -69,7 +69,7 @@ export async function updateSecuritySettings(
       })
       .eq('seller_user_id', sellerUserId)
       .select('security_settings')
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('security_settings')) {
@@ -77,6 +77,10 @@ export async function updateSecuritySettings(
         return { data: normalized, error: null };
       }
       return { data: null, error };
+    }
+
+    if (!data) {
+      return { data: null, error: 'Store not found' };
     }
 
     const saved = normalizeSecuritySettings(data?.security_settings);

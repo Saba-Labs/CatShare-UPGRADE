@@ -69,7 +69,7 @@ export async function updateBehaviorSettings(
       })
       .eq('seller_user_id', sellerUserId)
       .select('behavior_settings')
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('behavior_settings')) {
@@ -77,6 +77,10 @@ export async function updateBehaviorSettings(
         return { data: normalized, error: null };
       }
       return { data: null, error };
+    }
+
+    if (!data) {
+      return { data: null, error: 'Store not found' };
     }
 
     const saved = normalizeBehaviorSettings(data?.behavior_settings);
