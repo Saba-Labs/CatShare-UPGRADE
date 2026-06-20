@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
@@ -142,6 +143,7 @@ const REGIONS = [
 ];
 
 export default function StoreSettings() {
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
@@ -528,12 +530,12 @@ export default function StoreSettings() {
               <FiAlertCircle className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Store Yet</h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">You need to create a store first before you can configure settings.</p>
-              <a
-                href="/store"
+              <button
+                onClick={() => navigate('/store')}
                 className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
               >
                 Create Store
-              </a>
+              </button>
             </div>
           </div>
         </div>
