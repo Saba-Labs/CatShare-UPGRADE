@@ -184,7 +184,7 @@ export default function Security() {
     navigate('/store', { replace: true });
   };
 
-  const deleteConfirmPhrase = storeSlug ? `delete ${storeSlug}` : 'DELETE STORE';
+  const deleteConfirmPhrase = storeSlug ? `DELETE ${storeSlug.toUpperCase()}` : 'DELETE STORE';
 
   if (loading || authLoading) {
     return (

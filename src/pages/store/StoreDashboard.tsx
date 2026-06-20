@@ -15,6 +15,7 @@ import StoreLayout from './components/StoreLayout';
 import StoreHeader from './components/StoreHeader';
 import NavigationCard from './components/NavigationCard';
 import StoreIconTile from './components/StoreIconTile';
+import CreateStoreForm from './components/CreateStoreForm';
 import { STORE_NAVIGATION } from './config/storeNavigation';
 import { STORE_CATEGORY_TITLE } from './storeTypography';
 
@@ -60,6 +61,7 @@ export default function StoreDashboard() {
   const [pendingOrders, setPendingOrders] = useState(0);
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useLayoutEffect(() => {
     if (!user?.uid) {
@@ -71,6 +73,9 @@ export default function StoreDashboard() {
     const cachedStore = readCachedSellerStore(uid);
     if (cachedStore) {
       setStore(cachedStore);
+      setShowCreateForm(false);
+    } else {
+      setShowCreateForm(true);
     }
 
     const cachedOrders = readCachedSellerOrders(uid);
@@ -120,6 +125,9 @@ export default function StoreDashboard() {
 
         if (storeResult.success && storeResult.data) {
           setStore(storeResult.data);
+          setShowCreateForm(false);
+        } else {
+          setShowCreateForm(true);
         }
 
         const products = catalogueResult.data?.products ?? [];
@@ -180,6 +188,30 @@ export default function StoreDashboard() {
               <div key={i} className="h-28 bg-gray-200 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
             ))}
           </div>
+        </div>
+      </StoreLayout>
+    );
+  }
+
+  if (showCreateForm) {
+    return (
+      <StoreLayout>
+        <div className="py-6 sm:py-8 md:py-12 px-4 sm:px-6">
+          <CreateStoreForm
+            onStoreCreated={() => {
+              setShowCreateForm(false);
+              setLoading(true);
+              const uid = user?.uid;
+              if (uid) {
+                getSellerStore(uid).then((result) => {
+                  if (result.success && result.data) {
+                    setStore(result.data);
+                  }
+                  setLoading(false);
+                });
+              }
+            }}
+          />
         </div>
       </StoreLayout>
     );
