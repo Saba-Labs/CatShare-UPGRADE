@@ -1890,7 +1890,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         )}
       </main>
 
-      <MainAppBottomNav active={pathname === "/catalogues" ? "catalogues" : "products"} sideDrawerOpen={menuOpen} />
+      <MainAppBottomNav active={pathname === "/catalogues" ? "catalogues" : "products"} sideDrawerOpen={menuOpen} modalOpen={!!previewProduct} />
 
       {tab === "products" && (
         <>
