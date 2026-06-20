@@ -346,7 +346,14 @@ export default function StoreSettings() {
 
   // Handle save
   const handleSave = async () => {
-    if (!user?.uid || !guardCloudWrite()) return;
+    if (!user?.uid) return;
+
+    if (!originalSettings.storeSlug) {
+      showToast('Please create a store first', 'error');
+      return;
+    }
+
+    if (!guardCloudWrite()) return;
 
     if (!validateForm()) {
       showToast('Please fix validation errors', 'error');
@@ -505,6 +512,29 @@ export default function StoreSettings() {
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-64 bg-gray-200 rounded-xl"></div>
             ))}
+          </div>
+        </div>
+      </StoreLayout>
+    );
+  }
+
+  if (!originalSettings.storeSlug && !loading) {
+    return (
+      <StoreLayout>
+        <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+          <PageHeader title="Store Settings" sticky />
+          <div className="mt-8 flex items-center justify-center">
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-8 max-w-md text-center">
+              <FiAlertCircle className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No Store Yet</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">You need to create a store first before you can configure settings.</p>
+              <a
+                href="/store"
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              >
+                Create Store
+              </a>
+            </div>
           </div>
         </div>
       </StoreLayout>
