@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { FiAlertTriangle, FiX } from 'react-icons/fi';
 import { STORE_SECTION_TITLE } from '../storeTypography';
 
@@ -38,6 +38,7 @@ export default function ConfirmDialog({
   const titleId = useId();
   const descId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const isDanger = variant === 'danger';
   const textRequired = Boolean(requireConfirmText);
   const textMatches =
@@ -53,13 +54,19 @@ export default function ConfirmDialog({
 
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', handleKeyDown);
-    cancelRef.current?.focus();
+
+    // Focus input if text confirmation is required, otherwise focus cancel button
+    if (textRequired && inputRef.current) {
+      inputRef.current.focus();
+    } else {
+      cancelRef.current?.focus();
+    }
 
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, textRequired]);
 
   if (!open) return null;
 
@@ -131,13 +138,13 @@ export default function ConfirmDialog({
                 {confirmHint ?? `Type ${requireConfirmText} to confirm`}
               </label>
               <input
+                ref={inputRef}
                 type="text"
                 value={confirmTextValue}
                 onChange={(e) => onConfirmTextChange?.(e.target.value)}
                 placeholder={requireConfirmText}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-transparent"
                 autoComplete="off"
-                autoFocus
               />
             </div>
           ) : null}
