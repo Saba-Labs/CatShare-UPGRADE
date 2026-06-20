@@ -941,8 +941,6 @@ export default function WarehousePage() {
             </>
           )}
         </main>
-
-        <MainAppBottomNav active="products" />
       </div>
     </>
   );
