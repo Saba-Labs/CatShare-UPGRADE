@@ -10,6 +10,7 @@ import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
 import CheckoutRulesSection from './components/CheckoutRulesSection';
+import { FiInfo } from 'react-icons/fi';
 import {
   DEFAULT_CHECKOUT_SETTINGS,
   normalizeCheckoutSettings,
@@ -30,20 +31,43 @@ function ToggleRow({
   checked,
   onChange,
   disabled,
+  tooltipOpen,
+  onTooltipToggle,
+  tooltipKey,
 }: {
   title: string;
   description?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  tooltipOpen?: string | null;
+  onTooltipToggle?: (key: string) => void;
+  tooltipKey?: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
       <div>
-        <h3 className="font-medium text-gray-900 dark:text-gray-100">{title}</h3>
-        {description ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{description}</p>
-        ) : null}
+        <div className="flex items-center gap-2 relative">
+          <h3 className="font-medium text-gray-900 dark:text-gray-100">{title}</h3>
+          {description && onTooltipToggle && tooltipKey ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onTooltipToggle(tooltipKey)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                aria-label={`${title} information`}
+                title={description}
+              >
+                <FiInfo className="w-4 h-4" />
+              </button>
+              {tooltipOpen === tooltipKey && (
+                <div className="absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-700 text-white text-sm px-2 py-1 rounded whitespace-nowrap z-10">
+                  {description}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
       </div>
       <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
@@ -61,6 +85,7 @@ export default function Checkout() {
   const [originalSettings, setOriginalSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     if (!sellerId) return;
@@ -213,6 +238,9 @@ export default function Checkout() {
                 checked={settings.enablePrepaid}
                 onChange={(enablePrepaid) => patchSettings({ enablePrepaid })}
                 disabled={saving}
+                tooltipOpen={tooltipOpen}
+                onTooltipToggle={setTooltipOpen}
+                tooltipKey="prepaid"
               />
               <div className="pt-4">
                 <ToggleRow
@@ -221,6 +249,9 @@ export default function Checkout() {
                   checked={settings.enableCod}
                   onChange={(enableCod) => patchSettings({ enableCod })}
                   disabled={saving}
+                  tooltipOpen={tooltipOpen}
+                  onTooltipToggle={setTooltipOpen}
+                  tooltipKey="cod"
                 />
               </div>
               <div className="pt-4">
@@ -230,6 +261,9 @@ export default function Checkout() {
                   checked={settings.showBreakdown}
                   onChange={(showBreakdown) => patchSettings({ showBreakdown })}
                   disabled={saving}
+                  tooltipOpen={tooltipOpen}
+                  onTooltipToggle={setTooltipOpen}
+                  tooltipKey="breakdown"
                 />
               </div>
             </div>
@@ -268,6 +302,9 @@ export default function Checkout() {
                 checked={settings.allowCouponEntry}
                 onChange={(allowCouponEntry) => patchSettings({ allowCouponEntry })}
                 disabled={saving}
+                tooltipOpen={tooltipOpen}
+                onTooltipToggle={setTooltipOpen}
+                tooltipKey="coupon"
               />
               <CheckoutRulesSection
                 category="discount"
@@ -338,6 +375,9 @@ export default function Checkout() {
                 checked={settings.experience.enableGiftNotes}
                 onChange={(enableGiftNotes) => patchExperience({ enableGiftNotes })}
                 disabled={saving}
+                tooltipOpen={tooltipOpen}
+                onTooltipToggle={setTooltipOpen}
+                tooltipKey="giftnotes"
               />
               {settings.experience.enableGiftNotes ? (
                 <div>
@@ -367,6 +407,9 @@ export default function Checkout() {
                 checked={settings.experience.enableOrderNotes}
                 onChange={(enableOrderNotes) => patchExperience({ enableOrderNotes })}
                 disabled={saving}
+                tooltipOpen={tooltipOpen}
+                onTooltipToggle={setTooltipOpen}
+                tooltipKey="ordernotes"
               />
               {settings.experience.enableOrderNotes ? (
                 <div>
@@ -395,6 +438,9 @@ export default function Checkout() {
               checked={settings.experience.validateAddress}
               onChange={(validateAddress) => patchExperience({ validateAddress })}
               disabled={saving}
+              tooltipOpen={tooltipOpen}
+              onTooltipToggle={setTooltipOpen}
+              tooltipKey="validateaddress"
             />
           </SettingsCard>
 
@@ -463,6 +509,9 @@ export default function Checkout() {
                   patchExperience({ showOrderSummaryOnConfirmation })
                 }
                 disabled={saving}
+                tooltipOpen={tooltipOpen}
+                onTooltipToggle={setTooltipOpen}
+                tooltipKey="ordersummary"
               />
             </div>
           </SettingsCard>
