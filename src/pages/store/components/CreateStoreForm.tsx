@@ -110,9 +110,9 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
   const canCreate = storeSlug.trim() && catalogueId && slugValidation === 'available' && !loading;
 
   return (
-    <div className="flex flex-col gap-6 md:gap-12">
+    <div className="flex flex-col md:flex-row gap-6 md:gap-12">
       {/* Left side - Introduction (hidden on mobile, visible on desktop) */}
-      <div className="hidden md:flex md:flex-col md:justify-center">
+      <div className="hidden md:flex md:flex-1 md:flex-col md:justify-center">
         <div className="space-y-4">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
             Create Your Store
@@ -154,7 +154,7 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
       </div>
 
       {/* Form */}
-      <div className="w-full">
+      <div className="w-full md:flex-1">
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 sm:p-8">
           <div className="space-y-5 sm:space-y-6">
             {/* Store Name / Slug Input */}
