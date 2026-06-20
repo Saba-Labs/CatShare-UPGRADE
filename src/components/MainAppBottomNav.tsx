@@ -20,7 +20,7 @@ const pathForTab = (tab: MainAppTab): string => {
   }
 };
 
-export default function MainAppBottomNav({ active, sideDrawerOpen = false }: { active: MainAppTab; sideDrawerOpen?: boolean }) {
+export default function MainAppBottomNav({ active, sideDrawerOpen = false, modalOpen = false }: { active: MainAppTab; sideDrawerOpen?: boolean; modalOpen?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -50,6 +50,10 @@ export default function MainAppBottomNav({ active, sideDrawerOpen = false }: { a
     { id: 'orders', label: 'Orders', icon: FiShoppingCart },
     { id: 'store', label: 'Store', icon: FiShoppingBag },
   ];
+
+  if (modalOpen) {
+    return null;
+  }
 
   const nav = (
     <nav

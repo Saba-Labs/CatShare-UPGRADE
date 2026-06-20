@@ -154,6 +154,7 @@ export default function StoreSettings() {
   const [slugValidation, setSlugValidation] = useState<'available' | 'taken' | 'invalid' | null>(null);
   const [slugValidating, setSlugValidating] = useState(false);
   const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
+  const [tooltipOpen, setTooltipOpen] = useState<string | null>(null);
 
   const applyLoadedSettings = useCallback(
     (
@@ -541,10 +542,23 @@ export default function StoreSettings() {
             <div className="space-y-5">
               <div className="flex items-start justify-between pb-5 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Store Live</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Customers can access your store when enabled.
-                  </p>
+                  <div className="flex items-center gap-2 relative">
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">Store Live</h3>
+                    <button
+                      type="button"
+                      onClick={() => setTooltipOpen(tooltipOpen === 'storeLive' ? null : 'storeLive')}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      aria-label="Store Live information"
+                      title="Customers can access your store when enabled."
+                    >
+                      <FiInfo className="w-4 h-4" />
+                    </button>
+                    {tooltipOpen === 'storeLive' && (
+                      <div className="absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-700 text-white text-sm px-2 py-1 rounded whitespace-nowrap z-10">
+                        Customers can access your store when enabled.
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <ToggleSwitch
                   checked={settings.storeEnabled}
@@ -558,10 +572,23 @@ export default function StoreSettings() {
 
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Maintenance Mode</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Temporarily disable customer access while keeping the store available for editing.
-                  </p>
+                  <div className="flex items-center gap-2 relative">
+                    <h3 className="font-medium text-gray-900 dark:text-gray-100">Maintenance Mode</h3>
+                    <button
+                      type="button"
+                      onClick={() => setTooltipOpen(tooltipOpen === 'maintenanceMode' ? null : 'maintenanceMode')}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                      aria-label="Maintenance Mode information"
+                      title="Temporarily disable customer access while keeping the store available for editing."
+                    >
+                      <FiInfo className="w-4 h-4" />
+                    </button>
+                    {tooltipOpen === 'maintenanceMode' && (
+                      <div className="absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-700 text-white text-sm px-2 py-1 rounded whitespace-nowrap z-10">
+                        Temporarily disable customer access while keeping the store available for editing.
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <ToggleSwitch
                   checked={settings.maintenanceMode}
