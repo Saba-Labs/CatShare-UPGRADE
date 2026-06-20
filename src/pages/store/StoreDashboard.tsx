@@ -196,7 +196,7 @@ export default function StoreDashboard() {
   if (showCreateForm) {
     return (
       <StoreLayout>
-        <div className="py-8 md:py-12">
+        <div className="py-6 sm:py-8 md:py-12 px-4 sm:px-6">
           <CreateStoreForm
             onStoreCreated={() => {
               setShowCreateForm(false);

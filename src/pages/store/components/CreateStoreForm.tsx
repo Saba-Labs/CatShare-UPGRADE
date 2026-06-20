@@ -110,14 +110,14 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
   const canCreate = storeSlug.trim() && catalogueId && slugValidation === 'available' && !loading;
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 md:gap-12">
-      {/* Left side - Introduction */}
-      <div className="flex-1 flex flex-col justify-center">
+    <div className="flex flex-col gap-6 md:gap-12">
+      {/* Left side - Introduction (hidden on mobile, visible on desktop) */}
+      <div className="hidden md:flex md:flex-col md:justify-center">
         <div className="space-y-4">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
             Create Your Store
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-base md:text-lg text-gray-600 dark:text-gray-400">
             Set up your online store in just a few steps. Choose a unique store name and select which products you want to showcase.
           </p>
           <ul className="space-y-3 mt-6">
@@ -125,31 +125,41 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
                 <FiCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-gray-700 dark:text-gray-300">Unique store name and URL</span>
+              <span className="text-sm md:text-base text-gray-700 dark:text-gray-300">Unique store name and URL</span>
             </li>
             <li className="flex items-center gap-3">
               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
                 <FiCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-gray-700 dark:text-gray-300">Choose your product catalogue</span>
+              <span className="text-sm md:text-base text-gray-700 dark:text-gray-300">Choose your product catalogue</span>
             </li>
             <li className="flex items-center gap-3">
               <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
                 <FiCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <span className="text-gray-700 dark:text-gray-300">Access full store management tools</span>
+              <span className="text-sm md:text-base text-gray-700 dark:text-gray-300">Access full store management tools</span>
             </li>
           </ul>
         </div>
       </div>
 
-      {/* Right side - Form */}
-      <div className="flex-1">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-8">
-          <div className="space-y-6">
+      {/* Mobile heading (visible only on mobile) */}
+      <div className="md:hidden">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Create Your Store
+        </h2>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+          Set up your online store in just a few steps.
+        </p>
+      </div>
+
+      {/* Form */}
+      <div className="w-full">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 sm:p-8">
+          <div className="space-y-5 sm:space-y-6">
             {/* Store Name / Slug Input */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 sm:mb-3">
                 Store Name
               </label>
               <div className="relative">
@@ -159,7 +169,7 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
                   onChange={(e) => setStoreSlug(e.target.value.toLowerCase())}
                   placeholder="my-store"
                   disabled={loading}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="w-full px-4 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-xl text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 />
               </div>
 
@@ -167,22 +177,22 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
               {storeSlug && (
                 <div className="mt-2 flex items-center gap-2">
                   {slugValidating ? (
-                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs sm:text-sm">
                       <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                       Checking availability...
                     </div>
                   ) : slugValidation === 'available' ? (
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-xs sm:text-sm font-medium">
                       <FiCheck className="h-4 w-4" />
                       Available
                     </div>
                   ) : slugValidation === 'taken' ? (
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm font-medium">
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">
                       <FiAlertCircle className="h-4 w-4" />
                       Name taken, try another
                     </div>
                   ) : slugValidation === 'invalid' ? (
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm font-medium">
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs sm:text-sm font-medium">
                       <FiAlertCircle className="h-4 w-4" />
                       Only lowercase letters, numbers, hyphens (3-50 chars)
                     </div>
@@ -197,14 +207,14 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
 
             {/* Catalogue Selection */}
             <div>
-              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 sm:mb-3">
                 Choose Catalogue
               </label>
               <select
                 value={catalogueId}
                 onChange={(e) => setCatalogueId(e.target.value)}
                 disabled={loading || catalogues.length === 0}
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full px-4 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-xl text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <option value="">Select a catalogue...</option>
                 {catalogues.map((cat) => (
@@ -222,7 +232,7 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
             <button
               onClick={handleCreate}
               disabled={!canCreate}
-              className={`w-full py-3 px-4 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+              className={`w-full py-4 px-4 rounded-xl font-semibold text-base transition-all flex items-center justify-center gap-2 ${
                 canCreate
                   ? 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 cursor-pointer'
                   : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
@@ -243,7 +253,7 @@ export default function CreateStoreForm({ onStoreCreated }: CreateStoreFormProps
 
             {catalogues.length === 0 && !loading && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/50 rounded-xl p-4">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <p className="text-xs sm:text-sm text-yellow-800 dark:text-yellow-200">
                   No catalogues found. Please create a catalogue first before creating a store.
                 </p>
               </div>
