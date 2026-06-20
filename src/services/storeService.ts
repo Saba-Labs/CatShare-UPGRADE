@@ -1122,11 +1122,11 @@ export async function updateStoreSlug(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
-    
+      .maybeSingle();
+
     if (error) {
       console.error('❌ Error updating store slug:', error);
-      
+
       if (error.code === '23505' && error.message.includes('store_slug')) {
         const suggestions = generateSlugAlternatives(normalizedSlug);
         return {
@@ -1135,10 +1135,14 @@ export async function updateStoreSlug(
           suggestedSlugs: suggestions,
         };
       }
-      
+
       return { success: false, error: error.message };
     }
-    
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
+    }
+
     console.log('✅ Store slug updated:', data);
     return {
       success: true,
@@ -1174,13 +1178,17 @@ export async function updateStoreCatalogue(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
-    
+      .maybeSingle();
+
     if (error) {
       console.error('❌ Error updating store catalogue:', error);
       return { success: false, error: error.message };
     }
-    
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
+    }
+
     console.log('✅ Store catalogue updated:', data);
     return {
       success: true,
@@ -1211,11 +1219,15 @@ export async function updateStoreViewMode(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('❌ Error updating store view mode:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
@@ -1254,11 +1266,15 @@ export async function updateStoreWhatsapp(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('❌ Error updating store WhatsApp:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
@@ -1290,11 +1306,15 @@ export async function updateStoreMinimumOrderValue(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('❌ Error updating store minimum order value:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
@@ -1327,11 +1347,15 @@ export async function updateStoreCheckoutSettings(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('❌ Error updating store checkout settings:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
@@ -1366,11 +1390,15 @@ export async function updateStoreLiveStatus(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('❌ Error updating store live status:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
@@ -1402,7 +1430,7 @@ export async function updateStoreMaintenanceMode(
       })
       .eq('seller_user_id', sellerUserId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       if (error.code === '42703' || error.message?.includes('maintenance_mode')) {
@@ -1410,6 +1438,10 @@ export async function updateStoreMaintenanceMode(
       }
       console.error('❌ Error updating store maintenance mode:', error);
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: 'Store not found' };
     }
 
     return {
