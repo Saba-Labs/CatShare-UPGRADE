@@ -42,7 +42,7 @@ export default function ConfirmDialog({
   const isDanger = variant === 'danger';
   const textRequired = Boolean(requireConfirmText);
   const textMatches =
-    !textRequired || confirmTextValue.trim() === requireConfirmText?.trim();
+    !textRequired || confirmTextValue.trim().toUpperCase() === requireConfirmText?.trim().toUpperCase();
   const canConfirm = !loading && textMatches;
 
   useEffect(() => {
