@@ -137,6 +137,7 @@ export default function ConfirmDialog({
                 placeholder={requireConfirmText}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:border-transparent"
                 autoComplete="off"
+                autoFocus
               />
             </div>
           ) : null}
