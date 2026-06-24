@@ -2,6 +2,7 @@ import React from 'react';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useNavigate } from 'react-router-dom';
 import { IoLockClosed } from 'react-icons/io5';
+import { FiArrowRight } from 'react-icons/fi';
 
 interface ProFeatureGateProps {
   children: React.ReactNode;
@@ -10,7 +11,7 @@ interface ProFeatureGateProps {
 }
 
 /**
- * Wraps a feature and shows a lock overlay if user is not Pro
+ * Wraps a feature and shows a modern lock overlay if user is not Pro
  */
 export function ProFeatureGate({ children, featureName, locked = false }: ProFeatureGateProps) {
   const { isPro } = useSubscription();
@@ -20,18 +21,32 @@ export function ProFeatureGate({ children, featureName, locked = false }: ProFea
 
   return (
     <div className="relative">
-      <div className="opacity-50 pointer-events-none select-none">
+      <div className="opacity-75 pointer-events-none select-none">
         {children}
       </div>
-      <div className="absolute inset-0 bg-black/20 rounded-lg flex flex-col items-center justify-center gap-2">
-        <IoLockClosed className="w-8 h-8 text-white" />
-        <p className="text-white text-xs font-semibold text-center px-2">{featureName}</p>
-        <button
-          onClick={() => navigate('/settings/pro')}
-          className="mt-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded font-semibold transition-colors"
-        >
-          Upgrade
-        </button>
+      <div className="fixed top-[40px] inset-x-0 bottom-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none">
+        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 max-w-md w-full mx-4 p-8 text-center pointer-events-auto">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 mb-6">
+            <IoLockClosed className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{featureName}</h2>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-8">
+            This feature is exclusive to Pro members. Upgrade your account to unlock it.
+          </p>
+
+          <button
+            onClick={() => navigate('/settings/pro')}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl active:scale-95"
+          >
+            Upgrade to Pro
+            <FiArrowRight className="w-5 h-5" />
+          </button>
+
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-6">
+            Pro members get access to premium features and priority support.
+          </p>
+        </div>
       </div>
     </div>
   );

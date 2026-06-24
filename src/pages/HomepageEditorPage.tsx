@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import { getSellerStore, type Store } from '../services/storeService';
 import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
@@ -9,6 +10,7 @@ import { readCachedSellerStore } from '../utils/storePageCache';
 import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
+import { ProFeatureGate } from '../components/ProFeatureGate';
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 
@@ -37,6 +39,7 @@ export default function HomepageEditorPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { isPro } = useSubscription();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -186,6 +189,16 @@ export default function HomepageEditorPage() {
             Go Back to Store
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <ProFeatureGate featureName="Homepage Builder" locked={true}>
+          <div className="min-h-[600px]" />
+        </ProFeatureGate>
       </div>
     );
   }
