@@ -124,16 +124,19 @@ export default function CustomDomain() {
         writeCachedCustomDomainState(sellerId, result);
       }
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Could not load domain settings';
+      console.error('Load domain state error:', e);
       if (sellerId) {
         const cached = readCachedCustomDomainState(sellerId);
         if (cached) {
           setDomainState(cached);
           if (cached.hostname) setHostnameInput(cached.hostname);
+          setError(''); // Clear error if we have cached data
         } else {
-          setError(e instanceof Error ? e.message : 'Could not load domain settings');
+          setError(errorMsg);
         }
       } else {
-        setError(e instanceof Error ? e.message : 'Could not load domain settings');
+        setError(errorMsg);
       }
     } finally {
       setDomainLoading(false);
@@ -224,22 +227,29 @@ export default function CustomDomain() {
 
     setError('');
     setBusy(true);
-    const result = await connectCustomDomain(validation.hostname);
-    setBusy(false);
+    try {
+      const result = await connectCustomDomain(validation.hostname);
+      if (!result.ok) {
+        setError(result.error || 'Could not connect domain');
+        showToast(result.error || 'Could not connect domain', 'error');
+        return;
+      }
 
-    if (!result.ok) {
-      setError(result.error || 'Could not connect domain');
-      showToast(result.error || 'Could not connect domain', 'error');
-      return;
-    }
-
-    setDomainState(result);
-    setHostnameInput(result.hostname || validation.hostname);
-    showToast('Domain connected — configure DNS below', 'success');
-    await loadDomainState();
-    if (sellerId) {
-      const storeResult = await getSellerStore(sellerId);
-      if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      setDomainState(result);
+      setHostnameInput(result.hostname || validation.hostname);
+      showToast('Domain connected — configure DNS below', 'success');
+      await loadDomainState();
+      if (sellerId) {
+        const storeResult = await getSellerStore(sellerId);
+        if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Connection failed. Please try again.';
+      setError(msg);
+      showToast(msg, 'error');
+      console.error('Connect domain error:', e);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -247,22 +257,29 @@ export default function CustomDomain() {
     if (!guardCloudWrite()) return;
     setBusy(true);
     setError('');
-    const result = await refreshCustomDomainStatus();
-    setBusy(false);
+    try {
+      const result = await refreshCustomDomainStatus();
+      if (!result.ok) {
+        setError(result.error || 'Could not check status');
+        showToast(result.error || 'Could not check status', 'error');
+        return;
+      }
 
-    if (!result.ok) {
-      setError(result.error || 'Could not check status');
-      showToast(result.error || 'Could not check status', 'error');
-      return;
-    }
+      setDomainState(result);
+      if (result.verified) showToast('Domain verified successfully', 'success');
+      else showToast('Still waiting for DNS propagation', 'warning');
 
-    setDomainState(result);
-    if (result.verified) showToast('Domain verified successfully', 'success');
-    else showToast('Still waiting for DNS propagation', 'warning');
-
-    if (sellerId) {
-      const storeResult = await getSellerStore(sellerId);
-      if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      if (sellerId) {
+        const storeResult = await getSellerStore(sellerId);
+        if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Status check failed. Please try again.';
+      setError(msg);
+      showToast(msg, 'error');
+      console.error('Refresh status error:', e);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -280,27 +297,33 @@ export default function CustomDomain() {
     if (!window.confirm('Remove this custom domain from your store?')) return;
 
     setBusy(true);
-    const result = await disconnectCustomDomain();
-    setBusy(false);
+    try {
+      const result = await disconnectCustomDomain();
+      if (!result.ok) {
+        showToast(result.error || 'Could not remove domain', 'error');
+        return;
+      }
 
-    if (!result.ok) {
-      showToast(result.error || 'Could not remove domain', 'error');
-      return;
-    }
+      setHostnameInput('');
+      setDomainState({
+        configured: true,
+        hostname: null,
+        status: null,
+        verified: false,
+        verification: [],
+      });
+      showToast('Custom domain removed', 'success');
 
-    setHostnameInput('');
-    setDomainState({
-      configured: true,
-      hostname: null,
-      status: null,
-      verified: false,
-      verification: [],
-    });
-    showToast('Custom domain removed', 'success');
-
-    if (sellerId) {
-      const storeResult = await getSellerStore(sellerId);
-      if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      if (sellerId) {
+        const storeResult = await getSellerStore(sellerId);
+        if (storeResult.success && storeResult.data) setStore(storeResult.data);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Removal failed. Please try again.';
+      showToast(msg, 'error');
+      console.error('Remove domain error:', e);
+    } finally {
+      setBusy(false);
     }
   };
 
