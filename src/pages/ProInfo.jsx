@@ -655,6 +655,10 @@ useEffect(() => {
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Stock Control</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Watermark Control</span>
                     </li>
                     <li className="flex items-start gap-3">
