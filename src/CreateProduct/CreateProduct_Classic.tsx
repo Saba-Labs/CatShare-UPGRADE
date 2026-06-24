@@ -46,7 +46,7 @@ import { parseImageVersionFromUrl } from "../utils/imageUrl";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
 import { useSubscription } from "../context/SubscriptionContext";
-import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
+import { FREE_MAX_PRODUCTS, FREE_MAX_IMAGES } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import { normalizeProductCategories } from "../utils/productCategoryUtils";
@@ -952,8 +952,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
   };
 
   const handleSelectImage = async () => {
-    if (imageSlots.length >= MAX_PRODUCT_IMAGES) {
-      showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+    const imageLimit = isPro ? MAX_PRODUCT_IMAGES : FREE_MAX_IMAGES;
+    if (imageSlots.length >= imageLimit) {
+      const message = isPro
+        ? `You can add up to ${MAX_PRODUCT_IMAGES} images per product.`
+        : `Free tier allows ${FREE_MAX_IMAGES} image. Upgrade to Pro for up to ${MAX_PRODUCT_IMAGES} images.`;
+      showToast(message, "warning");
       return;
     }
     cropModeRef.current = "append";
@@ -1044,8 +1048,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const reader = new FileReader();
       reader.onload = () => {
         const base64Data = reader.result as string;
-        if (cropModeRef.current === "append" && imageSlotsRef.current.length >= MAX_PRODUCT_IMAGES) {
-          showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+        const imageLimit = isPro ? MAX_PRODUCT_IMAGES : FREE_MAX_IMAGES;
+        if (cropModeRef.current === "append" && imageSlotsRef.current.length >= imageLimit) {
+          const message = isPro
+            ? `You can add up to ${MAX_PRODUCT_IMAGES} images per product.`
+            : `Free tier allows ${FREE_MAX_IMAGES} image. Upgrade to Pro for up to ${MAX_PRODUCT_IMAGES} images.`;
+          showToast(message, "warning");
           return;
         }
 
@@ -1958,10 +1966,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         Gallery
                       </label>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                        {imageSlots.length} of {!isPro ? '1' : MAX_PRODUCT_IMAGES} images
+                        {imageSlots.length} of {!isPro ? FREE_MAX_IMAGES : MAX_PRODUCT_IMAGES} images
                       </p>
                     </div>
-                    <ProLockIndicator show={!isPro && imageSlots.length > 1} />
+                    <ProLockIndicator show={!isPro && imageSlots.length >= FREE_MAX_IMAGES} />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -2059,7 +2067,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       </div>
                     </div>
                   ))}
-                  {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 1) && (
+                  {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < FREE_MAX_IMAGES) && (
                     <button
                       type="button"
                       onClick={handleSelectImage}
@@ -2069,6 +2077,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
                     </button>
+                  )}
+                  {!isPro && imageSlots.length >= FREE_MAX_IMAGES && (
+                    <div className="h-24 w-24 rounded-xl border-2 border-dashed border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 flex flex-col items-center justify-center p-2 cursor-not-allowed">
+                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mb-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM14 4a1 1 0 01.82.4l.6.8.6-.8A1 1 0 1115 7v1a1 1 0 11-2 0V7a1 1 0 01.18-1.6zM17 13a1 1 0 01.82.4l.6.8.6-.8a1 1 0 11.76 1.6L19 15v1a1 1 0 11-2 0v-1a1 1 0 01.18-1.6z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-[10px] font-medium text-amber-700 dark:text-amber-300 text-center leading-tight">
+                        Upgrade to add more
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>

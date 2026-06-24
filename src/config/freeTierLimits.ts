@@ -7,6 +7,8 @@ export const FREE_MAX_PRODUCTS = 50;
 
 export const FREE_MAX_CATALOGUES = 3;
 
+export const FREE_MAX_IMAGES = 1;
+
 /** Default watermark when Free tier forces a fixed text (must match app defaults). */
 export const FREE_WATERMARK_TEXT = "Created using CatShare";
 
