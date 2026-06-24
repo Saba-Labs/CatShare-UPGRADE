@@ -2539,8 +2539,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   })()}
 
                   <div className="flex gap-3 items-start">
-                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
-                      Slab pricing
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        Slab pricing
+                      </label>
                       {!isPro && <ProLockIndicator show />}
                       <InfoTooltip content={
                         <div className="space-y-2">
@@ -2552,7 +2554,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                           </ul>
                         </div>
                       } />
-                    </label>
+                    </div>
                     <div className="flex-1 min-w-0">
                       {!isPro ? (
                         <div className="opacity-50 pointer-events-none">
