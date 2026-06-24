@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useSubscription } from '../context/SubscriptionContext';
 import { useEffect, useMemo, useState, useLayoutEffect } from 'react';
 import { getSellerStore, type Store } from '../services/storeService';
 import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
@@ -9,6 +10,7 @@ import { readCachedSellerStore } from '../utils/storePageCache';
 import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
+import { ProFeatureGate } from '../components/ProFeatureGate';
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 
@@ -37,6 +39,7 @@ export default function HomepageEditorPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { isPro } = useSubscription();
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -187,6 +190,24 @@ export default function HomepageEditorPage() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <ProFeatureGate featureName="Homepage Builder" locked={true}>
+        <div className="opacity-50 pointer-events-none">
+          <HomepageBuilder
+            storeId={store.id}
+            storeSlug={store.storeSlug}
+            sellerUserId={store.sellerUserId || effectiveUid}
+            catalogues={catalogues}
+            catalogueId={store.catalogueId}
+            storeWhatsapp={store.storeWhatsapp}
+            onClose={() => navigate('/store')}
+          />
+        </div>
+      </ProFeatureGate>
     );
   }
 

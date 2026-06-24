@@ -12,7 +12,9 @@ import {
   type StoreIntegrationId,
 } from './config/storeIntegrations';
 import { useToast } from '../../context/ToastContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
+import { ProFeatureGate } from '../../components/ProFeatureGate';
 import { useSellerIntegrations } from '../../integrations/hooks/useSellerIntegrations';
 import { disconnectIntegration } from '../../integrations/core/IntegrationConnectionService';
 import { isConnectedStatus } from '../../integrations/core/IntegrationStatusService';
@@ -21,6 +23,7 @@ import { STORE_CATEGORY_TITLE, STORE_SECTION_DESCRIPTION } from './storeTypograp
 export default function Integrations() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { isPro } = useSubscription();
   const { guardCloudWrite } = useCloudWriteGate();
   const { sellerId, views, loading, error, connectedCount, reload } = useSellerIntegrations();
   const [disconnectingId, setDisconnectingId] = useState<StoreIntegrationId | null>(null);
@@ -87,6 +90,18 @@ export default function Integrations() {
     showToast(`${app.name} disconnected`, 'success');
     await reload();
   };
+
+  if (!isPro) {
+    return (
+      <StoreLayout>
+        <ProFeatureGate featureName="Integrations" locked={true}>
+          <div className="max-w-6xl space-y-8 pb-8 opacity-50 pointer-events-none">
+            <PageHeader title="Integrations" />
+          </div>
+        </ProFeatureGate>
+      </StoreLayout>
+    );
+  }
 
   return (
     <StoreLayout>
