@@ -1958,10 +1958,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                         Gallery
                       </label>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                        {imageSlots.length} of {!isPro ? '3' : MAX_PRODUCT_IMAGES} images
+                        {imageSlots.length} of {!isPro ? '1' : MAX_PRODUCT_IMAGES} images
                       </p>
                     </div>
-                    <ProLockIndicator show={!isPro && imageSlots.length > 3} />
+                    <ProLockIndicator show={!isPro && imageSlots.length > 1} />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -2059,7 +2059,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       </div>
                     </div>
                   ))}
-                  {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 3) && (
+                  {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 1) && (
                     <button
                       type="button"
                       onClick={handleSelectImage}

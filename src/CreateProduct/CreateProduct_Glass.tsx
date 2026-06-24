@@ -1947,9 +1947,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <div className="mb-5 space-y-2 pb-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
-                    Gallery (max {!isPro ? '3' : MAX_PRODUCT_IMAGES})
+                    Gallery (max {!isPro ? '1' : MAX_PRODUCT_IMAGES})
                   </label>
-                  {!isPro && imageSlots.length > 3 && <ProLockIndicator show />}
+                  {!isPro && imageSlots.length > 1 && <ProLockIndicator show />}
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
                   Mark one image as Primary for lists, share links, and catalogue renders.
@@ -1988,7 +1988,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     </div>
                   ))}
                 </div>
-                {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 3) && (
+                {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 1) && (
                   <button
                     type="button"
                     onClick={handleSelectImage}
