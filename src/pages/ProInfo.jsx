@@ -15,6 +15,7 @@ import {
   FREE_WATERMARK_TEXT,
   TRIAL_DAYS_UI_FALLBACK,
 } from "../config/freeTierLimits";
+import SupportWhatsAppFab from "../components/SupportWhatsAppFab";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 const ANDROID_PACKAGE_NAME = "com.catshare.official";
@@ -308,6 +309,7 @@ useEffect(() => {
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-gradient-to-br from-white via-gray-50 to-gray-100 relative">
+      <SupportWhatsAppFab bottomOffsetPx={0} alignCenterWithHeightPx={0} />
       {/* Status bar placeholder */}
       <div className="sticky top-0 h-[40px] bg-black z-50"></div>
 
