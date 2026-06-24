@@ -74,6 +74,7 @@ import {
   sanitizeDecimalPriceInput,
   getOfferVersusPriceValidationError,
 } from "../utils/offerPriceUtils";
+import { ProLockIndicator } from "../components/ProFeatureGate";
 
 // Helper function to get CSS styles based on watermark position
 const getWatermarkPositionStyles = (position) => {
@@ -1944,9 +1945,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
             </div>
 
               <div className="mb-5 space-y-2 pb-4 border-b border-gray-200 dark:border-gray-800">
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
-                  Gallery (max {MAX_PRODUCT_IMAGES})
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    Gallery (max {!isPro ? '1' : MAX_PRODUCT_IMAGES})
+                  </label>
+                  {!isPro && imageSlots.length > 1 && <ProLockIndicator show />}
+                </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
                   Mark one image as Primary for lists, share links, and catalogue renders.
                 </p>
@@ -1984,7 +1988,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     </div>
                   ))}
                 </div>
-                {imageSlots.length < MAX_PRODUCT_IMAGES && (
+                {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 1) && (
                   <button
                     type="button"
                     onClick={handleSelectImage}
@@ -2435,6 +2439,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div className="flex gap-3 items-start">
                     <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
                       Slab pricing
+                      {!isPro && <ProLockIndicator show />}
                       <InfoTooltip content={
                         <div className="space-y-2">
                           <p className="text-gray-700 dark:text-gray-300 font-medium">Volume pricing tiers for bulk orders:</p>
@@ -2447,12 +2452,23 @@ if (migratedProduct.suggestedColors?.length > 0) {
                       } />
                     </label>
                     <div className="flex-1 min-w-0">
-                      <QuantitySlabEditor
-                        key={selectedCatalogue}
-                        theme="glass"
-                        value={getCatalogueFormData().quantitySlabs}
-                        onChange={(slabs) => updateCatalogueData({ quantitySlabs: slabs })}
-                      />
+                      {!isPro ? (
+                        <div className="opacity-50 pointer-events-none">
+                          <QuantitySlabEditor
+                            key={selectedCatalogue}
+                            theme="glass"
+                            value={getCatalogueFormData().quantitySlabs}
+                            onChange={() => {}}
+                          />
+                        </div>
+                      ) : (
+                        <QuantitySlabEditor
+                          key={selectedCatalogue}
+                          theme="glass"
+                          value={getCatalogueFormData().quantitySlabs}
+                          onChange={(slabs) => updateCatalogueData({ quantitySlabs: slabs })}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -2482,27 +2498,57 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
           {formSection === 'variants' && (
             <div className="mb-5">
-              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">
-                Product variants
-              </h3>
-              <ProductVariantsEditor
-                groups={variantGroups}
-                onChange={setVariantGroups}
-                theme="glass"
-              />
-              {variantGroups.length > 0 && (
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-                  <button
-                    onClick={() => {
-                      setVariantConfig({ ...variantConfig, groups: variantGroups });
-                      setFormSection('variantDetails');
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-xs font-medium"
-                  >
-                    Manage Variant Details
-                  </button>
+              {!isPro && (
+                <div className="mb-5 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M13 10H3L10.236 3.764a1 1 0 011.528 1.31L5.528 9h7.472a1 1 0 110 2z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Product Variants are Pro only</p>
+                      <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">Upgrade to Pro to add sizes, colors, and other product variants.</p>
+                      <button
+                        onClick={() => navigate('/settings/pro')}
+                        className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline"
+                      >
+                        Upgrade to Pro
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
+              <h3 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100" style={!isPro ? { opacity: 0.6 } : {}}>
+                Product variants
+              </h3>
+              <div style={!isPro ? { opacity: 0.6, pointerEvents: 'none' } : {}}>
+                <ProductVariantsEditor
+                  groups={variantGroups}
+                  onChange={isPro ? setVariantGroups : () => {}}
+                  theme="glass"
+                />
+                {variantGroups.length > 0 && (
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <button
+                      onClick={() => {
+                        if (!isPro) {
+                          navigate('/settings/pro');
+                          return;
+                        }
+                        setVariantConfig({ ...variantConfig, groups: variantGroups });
+                        setFormSection('variantDetails');
+                      }}
+                      disabled={!isPro}
+                      className={`py-2 px-4 rounded text-xs font-medium ${
+                        !isPro
+                          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
+                    >
+                      Manage Variant Details
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2516,11 +2562,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
     groups: variantGroups,
     combinations: variantConfig.combinations,
   }}
-  onChange={(updated) => setVariantConfig(updated)}
+  onChange={isPro ? (updated) => setVariantConfig(updated) : () => {}}
   theme="glass"
   catalogues={catalogues}
   selectedCatalogue={selectedCatalogue}
-  onCatalogueChange={setSelectedCatalogue}
+  onCatalogueChange={isPro ? setSelectedCatalogue : () => {}}
   productId={stockProductId}
   onSave={(updatedConfig) => {
     if (!editingId) return;
