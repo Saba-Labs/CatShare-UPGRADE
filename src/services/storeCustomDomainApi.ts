@@ -1,7 +1,7 @@
 import { getSupabaseAccessToken } from '../supabaseClient';
 import { resolveApiBaseUrl } from '../utils/apiBaseUrl';
 
-const API_FETCH_TIMEOUT_MS = 12_000;
+const API_FETCH_TIMEOUT_MS = 30_000;
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -10,7 +10,10 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
     return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Request timed out. Check your connection or VITE_BACKEND_URL.');
+      throw new Error(`Request timed out after ${API_FETCH_TIMEOUT_MS / 1000}s. Check your connection or try again.`);
+    }
+    if (err instanceof TypeError && err.message === 'Failed to fetch') {
+      throw new Error('Network error. Check your connection and ensure VITE_BACKEND_URL is correct.');
     }
     throw err;
   } finally {
@@ -92,7 +95,8 @@ async function apiFetch(
       },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Network error';
+    const msg = err instanceof Error ? err.message : 'Network error. Please check your connection.';
+    console.error('Custom domain API error:', err);
     return {
       ok: false,
       httpStatus: 0,

@@ -25,11 +25,14 @@ export default function NavigationCard({
   const navigate = useNavigate();
   const { isPro } = useSubscription();
 
+  const isLocked = proOnly && !isPro;
+
   return (
     <button
-      onClick={() => navigate(href)}
-      className={`group w-full text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5 sm:p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.995] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 ${className}`}
-      aria-label={`Open ${title}`}
+      onClick={() => !isLocked && navigate(href)}
+      disabled={isLocked}
+      className={`group w-full text-left bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-3.5 sm:p-4 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.995] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:border-gray-200 dark:disabled:hover:border-gray-800 disabled:hover:-translate-y-0 ${className}`}
+      aria-label={`Open ${title}${isLocked ? ' (Pro only)' : ''}`}
     >
       <div className="flex items-center justify-between gap-4">
         {icon ? <div className="flex-shrink-0">{icon}</div> : null}
