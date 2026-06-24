@@ -24,7 +24,8 @@ export default function PageHeader({
 
   return (
     <div
-      className={`mb-5 sm:mb-6 ${sticky ? 'sticky top-0 z-20 -mx-4 px-4 py-2.5 sm:-mx-6 sm:px-6 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950/50 backdrop-blur border-b border-gray-100/80 dark:border-gray-800/50 shadow-sm' : ''}`}
+      className={`mb-5 sm:mb-6 relative ${sticky ? 'sticky top-0 z-50 -mx-4 px-4 py-2.5 sm:-mx-6 sm:px-6 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950/50 backdrop-blur border-b border-gray-100/80 dark:border-gray-800/50 shadow-sm' : ''}`}
+    style={{ zIndex: 51 }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
