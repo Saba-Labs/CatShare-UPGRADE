@@ -663,6 +663,34 @@ useEffect(() => {
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Multiple Product Images</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Slab Pricing</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Product Variants</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Homepage Builder</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Custom Domain</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Payment Integration</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Shipping Integration</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Share as Link</span>
                     </li>
                     <li className="flex items-start gap-3">
