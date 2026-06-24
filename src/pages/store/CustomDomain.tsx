@@ -346,12 +346,9 @@ export default function CustomDomain() {
         title="Custom Domain"
       />
 
-      {!isPro ? (
+      {!isPro && (
         <ProFeatureGate featureName="Custom Domain" locked={true}>
-          <div className="max-w-3xl space-y-6 pb-8 min-h-[500px]" />
-        </ProFeatureGate>
-      ) : (
-      <div className="max-w-3xl space-y-6 pb-8">
+          <div className="max-w-3xl space-y-6 pb-8">
 
         {error ? (
           <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
@@ -626,6 +623,7 @@ export default function CustomDomain() {
           ) : null}
         </SettingsCard>
       </div>
+        </ProFeatureGate>
       )}
     </StoreLayout>
   );
