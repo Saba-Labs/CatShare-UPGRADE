@@ -196,11 +196,12 @@ export default function HomepageEditorPage() {
 
   if (!isPro) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 relative">
         <button
           onClick={() => navigate('/store')}
-          className="absolute top-4 left-4 flex items-center justify-center h-8 w-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-blue-50 to-gray-50 dark:from-blue-950/40 dark:to-gray-900 text-blue-600 dark:text-blue-400 hover:from-blue-100 hover:to-gray-100 dark:hover:from-blue-900/50 dark:hover:to-gray-800 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 z-51"
+          className="fixed top-4 left-4 flex items-center justify-center h-8 w-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-blue-50 to-gray-50 dark:from-blue-950/40 dark:to-gray-900 text-blue-600 dark:text-blue-400 hover:from-blue-100 hover:to-gray-100 dark:hover:from-blue-900/50 dark:hover:to-gray-800 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
           aria-label="Go back"
+          style={{ zIndex: 51 }}
         >
           <FiArrowLeft className="h-4 w-4" />
         </button>
