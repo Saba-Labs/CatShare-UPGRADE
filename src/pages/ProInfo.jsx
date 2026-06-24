@@ -227,9 +227,33 @@ useEffect(() => {
       locked: true,
     },
     {
+      name: "Product Images",
+      free: "Limited",
+      pro: "Multiple Images",
+      locked: true,
+    },
+    {
+      name: "Slab Pricing",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Product Variants",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
       name: "Watermark Settings",
       free: `"${FREE_WATERMARK_TEXT}" (fixed)`,
       pro: "Full control",
+      locked: true,
+    },
+    {
+      name: "Stock Control",
+      free: "Not available",
+      pro: "Available",
       locked: true,
     },
     {
@@ -243,6 +267,36 @@ useEffect(() => {
       free: `${freePlanLimits.shareLinkPerDay}`,
       pro: "Unlimited",
       locked: false,
+    },
+    {
+      name: "Bulk Editor",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Homepage Builder",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Custom Domain",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Payment Integration",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Shipping Integration",
+      free: "Not available",
+      pro: "Available",
+      locked: true,
     },
     {
       name: "Glass Theme",
