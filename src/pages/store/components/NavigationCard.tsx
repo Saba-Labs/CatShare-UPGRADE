@@ -2,12 +2,15 @@ import type { ReactNode } from 'react';
 import { STORE_CARD_TITLE, STORE_SECTION_DESCRIPTION } from '../storeTypography';
 import { useNavigate } from 'react-router-dom';
 import { FiChevronRight } from 'react-icons/fi';
+import { useSubscription } from '../../../context/SubscriptionContext';
+import { ProLockIndicator } from '../../../components/ProFeatureGate';
 
 interface NavigationCardProps {
   title: string;
   description?: string;
   icon?: ReactNode;
   href: string;
+  proOnly?: boolean;
   className?: string;
 }
 
@@ -16,9 +19,11 @@ export default function NavigationCard({
   description,
   icon,
   href,
+  proOnly = false,
   className = '',
 }: NavigationCardProps) {
   const navigate = useNavigate();
+  const { isPro } = useSubscription();
 
   return (
     <button
@@ -29,7 +34,10 @@ export default function NavigationCard({
       <div className="flex items-center justify-between gap-4">
         {icon ? <div className="flex-shrink-0">{icon}</div> : null}
         <div className="flex-1 min-w-0">
-          <h3 className={STORE_CARD_TITLE}>{title}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className={STORE_CARD_TITLE}>{title}</h3>
+            {proOnly && !isPro && <ProLockIndicator show />}
+          </div>
           {description ? (
             <p className={STORE_SECTION_DESCRIPTION}>{description}</p>
           ) : null}

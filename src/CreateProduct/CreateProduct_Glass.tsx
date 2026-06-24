@@ -46,7 +46,7 @@ import { parseImageVersionFromUrl } from "../utils/imageUrl";
 import { getPriceUnits } from "../utils/priceUnitsUtils";
 import { logProductAdded, logCategoryManaged } from "../config/analyticsEvents";
 import { useSubscription } from "../context/SubscriptionContext";
-import { FREE_MAX_PRODUCTS } from "../config/freeTierLimits";
+import { FREE_MAX_PRODUCTS, FREE_MAX_IMAGES } from "../config/freeTierLimits";
 import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import { normalizeProductCategories } from "../utils/productCategoryUtils";
@@ -936,8 +936,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
   };
 
   const handleSelectImage = async () => {
-    if (imageSlots.length >= MAX_PRODUCT_IMAGES) {
-      showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+    const imageLimit = isPro ? MAX_PRODUCT_IMAGES : FREE_MAX_IMAGES;
+    if (imageSlots.length >= imageLimit) {
+      const message = isPro
+        ? `You can add up to ${MAX_PRODUCT_IMAGES} images per product.`
+        : `Free tier allows ${FREE_MAX_IMAGES} image. Upgrade to Pro for up to ${MAX_PRODUCT_IMAGES} images.`;
+      showToast(message, "warning");
       return;
     }
     cropModeRef.current = "append";
@@ -980,8 +984,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const reader = new FileReader();
       reader.onload = () => {
         const base64Data = reader.result as string;
-        if (cropModeRef.current === "append" && imageSlotsRef.current.length >= MAX_PRODUCT_IMAGES) {
-          showToast(`You can add up to ${MAX_PRODUCT_IMAGES} images per product.`, "warning");
+        const imageLimit = isPro ? MAX_PRODUCT_IMAGES : FREE_MAX_IMAGES;
+        if (cropModeRef.current === "append" && imageSlotsRef.current.length >= imageLimit) {
+          const message = isPro
+            ? `You can add up to ${MAX_PRODUCT_IMAGES} images per product.`
+            : `Free tier allows ${FREE_MAX_IMAGES} image. Upgrade to Pro for up to ${MAX_PRODUCT_IMAGES} images.`;
+          showToast(message, "warning");
           return;
         }
 
@@ -1947,9 +1955,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <div className="mb-5 space-y-2 pb-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
-                    Gallery (max {!isPro ? '1' : MAX_PRODUCT_IMAGES})
+                    Gallery (max {!isPro ? FREE_MAX_IMAGES : MAX_PRODUCT_IMAGES})
                   </label>
-                  {!isPro && imageSlots.length > 1 && <ProLockIndicator show />}
+                  {!isPro && imageSlots.length >= FREE_MAX_IMAGES && <ProLockIndicator show />}
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
                   Mark one image as Primary for lists, share links, and catalogue renders.
@@ -1988,13 +1996,22 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     </div>
                   ))}
                 </div>
-                {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < 1) && (
+                {imageSlots.length < MAX_PRODUCT_IMAGES && (isPro || imageSlots.length < FREE_MAX_IMAGES) && (
                   <button
                     type="button"
                     onClick={handleSelectImage}
                     className="mt-2 text-xs font-medium text-blue-600 hover:underline"
                   >
                     + Add another image
+                  </button>
+                )}
+                {!isPro && imageSlots.length >= FREE_MAX_IMAGES && (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400 cursor-not-allowed"
+                  >
+                    Upgrade to Pro to add more images
                   </button>
                 )}
               </div>
@@ -2437,8 +2454,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   })()}
 
                   <div className="flex gap-3 items-start">
-                    <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2 flex items-center gap-1">
-                      Slab pricing
+                    <div className="flex items-center gap-1.5 pt-2">
+                      <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                        Slab pricing
+                      </label>
                       {!isPro && <ProLockIndicator show />}
                       <InfoTooltip content={
                         <div className="space-y-2">
@@ -2450,7 +2469,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                           </ul>
                         </div>
                       } />
-                    </label>
+                    </div>
                     <div className="flex-1 min-w-0">
                       {!isPro ? (
                         <div className="opacity-50 pointer-events-none">

@@ -239,6 +239,7 @@ export default function StoreDashboard() {
                   description={card.description}
                   icon={<StoreIconTile iconKey={card.iconKey} />}
                   href={card.href}
+                  proOnly={card.proOnly}
                 />
               ))}
             </div>
