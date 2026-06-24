@@ -15,6 +15,7 @@ import {
   FREE_WATERMARK_TEXT,
   TRIAL_DAYS_UI_FALLBACK,
 } from "../config/freeTierLimits";
+import SupportWhatsAppFab from "../components/SupportWhatsAppFab";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
 const ANDROID_PACKAGE_NAME = "com.catshare.official";
@@ -227,9 +228,33 @@ useEffect(() => {
       locked: true,
     },
     {
+      name: "Product Images",
+      free: "Limited",
+      pro: "Multiple Images",
+      locked: true,
+    },
+    {
+      name: "Slab Pricing",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Product Variants",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
       name: "Watermark Settings",
       free: `"${FREE_WATERMARK_TEXT}" (fixed)`,
       pro: "Full control",
+      locked: true,
+    },
+    {
+      name: "Stock Control",
+      free: "-",
+      pro: "Available",
       locked: true,
     },
     {
@@ -245,6 +270,36 @@ useEffect(() => {
       locked: false,
     },
     {
+      name: "Bulk Editor",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Homepage Builder",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Custom Domain",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Payment Integration",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
+      name: "Shipping Integration",
+      free: "-",
+      pro: "Available",
+      locked: true,
+    },
+    {
       name: "Glass Theme",
       free: "Locked",
       pro: "Available",
@@ -254,6 +309,7 @@ useEffect(() => {
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-gradient-to-br from-white via-gray-50 to-gray-100 relative">
+      <SupportWhatsAppFab bottomOffsetPx={0} alignCenterWithHeightPx={0} />
       {/* Status bar placeholder */}
       <div className="sticky top-0 h-[40px] bg-black z-50"></div>
 
@@ -655,7 +711,39 @@ useEffect(() => {
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Stock Control</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
                       <span className="text-gray-700">Watermark Control</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Multiple Product Images</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Slab Pricing</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Product Variants</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Homepage Builder</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Custom Domain</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Payment Integration</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
+                      <span className="text-gray-700">Shipping Integration</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <span className="text-blue-600 font-bold text-lg leading-none mt-0.5">✓</span>
