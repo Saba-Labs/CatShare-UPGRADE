@@ -195,19 +195,11 @@ export default function HomepageEditorPage() {
 
   if (!isPro) {
     return (
-      <ProFeatureGate featureName="Homepage Builder" locked={true}>
-        <div className="opacity-50 pointer-events-none">
-          <HomepageBuilder
-            storeId={store.id}
-            storeSlug={store.storeSlug}
-            sellerUserId={store.sellerUserId || effectiveUid}
-            catalogues={catalogues}
-            catalogueId={store.catalogueId}
-            storeWhatsapp={store.storeWhatsapp}
-            onClose={() => navigate('/store')}
-          />
-        </div>
-      </ProFeatureGate>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+        <ProFeatureGate featureName="Homepage Builder" locked={true}>
+          <div className="min-h-[600px]" />
+        </ProFeatureGate>
+      </div>
     );
   }
 

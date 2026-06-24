@@ -91,24 +91,17 @@ export default function Integrations() {
     await reload();
   };
 
-  if (!isPro) {
-    return (
-      <StoreLayout>
-        <ProFeatureGate featureName="Integrations" locked={true}>
-          <div className="max-w-6xl space-y-8 pb-8 opacity-50 pointer-events-none">
-            <PageHeader title="Integrations" />
-          </div>
-        </ProFeatureGate>
-      </StoreLayout>
-    );
-  }
-
   return (
     <StoreLayout>
       <PageHeader
         title="Integrations"
       />
 
+      {!isPro ? (
+        <ProFeatureGate featureName="Integrations" locked={true}>
+          <div className="max-w-6xl space-y-8 pb-8 min-h-[500px]" />
+        </ProFeatureGate>
+      ) : (
       <div className="max-w-6xl space-y-8 pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-5">
@@ -214,6 +207,7 @@ export default function Integrations() {
           </SettingsCard>
         ) : null}
       </div>
+      )}
     </StoreLayout>
   );
 }
