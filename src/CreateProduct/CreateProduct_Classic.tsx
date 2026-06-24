@@ -2622,14 +2622,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   </div>
                 </div>
                 <motion.button
-                  onClick={() => setShowManageVariants(!showManageVariants)}
+                  onClick={() => !isPro ? navigate('/settings/pro') : setShowManageVariants(!showManageVariants)}
+                  disabled={!isPro}
                   className={`flex items-center gap-2 py-2 px-3.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                    showManageVariants
+                    !isPro
+                      ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                      : showManageVariants
                       ? 'bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600 text-white'
                       : 'bg-gray-700 hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 text-white'
                   }`}
-                  whileHover={{ scale: 1.02, y: -0.5 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={!isPro ? {} : { scale: 1.02, y: -0.5 }}
+                  whileTap={!isPro ? {} : { scale: 0.98 }}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {showManageVariants ? (
@@ -2651,21 +2654,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div className="space-y-4">
                     <VariantCombinationEditor
                       variantConfig={{ ...variantConfig, groups: variantGroups }}
-                      onChange={(updatedConfig) => {
+                      onChange={isPro ? (updatedConfig) => {
                         setVariantConfig(updatedConfig);
-                      }}
+                      } : () => {}}
                       theme="classic"
                       onBackClick={() => setShowManageVariants(false)}
                       catalogues={catalogues}
                       selectedCatalogue={selectedCatalogue}
-                      onCatalogueChange={setSelectedCatalogue}
+                      onCatalogueChange={isPro ? setSelectedCatalogue : () => {}}
                       productId={stockProductId}
                     />
                   </div>
                 ) : (
                   <ProductVariantsEditor
                     groups={variantGroups}
-                    onChange={setVariantGroups}
+                    onChange={isPro ? setVariantGroups : () => {}}
                     theme="classic"
                   />
                 )}

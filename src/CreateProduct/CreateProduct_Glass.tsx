@@ -2523,17 +2523,26 @@ if (migratedProduct.suggestedColors?.length > 0) {
               <div style={!isPro ? { opacity: 0.6, pointerEvents: 'none' } : {}}>
                 <ProductVariantsEditor
                   groups={variantGroups}
-                  onChange={setVariantGroups}
+                  onChange={isPro ? setVariantGroups : () => {}}
                   theme="glass"
                 />
                 {variantGroups.length > 0 && (
                   <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
                     <button
                       onClick={() => {
+                        if (!isPro) {
+                          navigate('/settings/pro');
+                          return;
+                        }
                         setVariantConfig({ ...variantConfig, groups: variantGroups });
                         setFormSection('variantDetails');
                       }}
-                      className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded text-xs font-medium"
+                      disabled={!isPro}
+                      className={`py-2 px-4 rounded text-xs font-medium ${
+                        !isPro
+                          ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
                     >
                       Manage Variant Details
                     </button>
@@ -2553,11 +2562,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
     groups: variantGroups,
     combinations: variantConfig.combinations,
   }}
-  onChange={(updated) => setVariantConfig(updated)}
+  onChange={isPro ? (updated) => setVariantConfig(updated) : () => {}}
   theme="glass"
   catalogues={catalogues}
   selectedCatalogue={selectedCatalogue}
-  onCatalogueChange={setSelectedCatalogue}
+  onCatalogueChange={isPro ? setSelectedCatalogue : () => {}}
   productId={stockProductId}
   onSave={(updatedConfig) => {
     if (!editingId) return;
