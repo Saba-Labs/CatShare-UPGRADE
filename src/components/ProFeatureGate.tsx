@@ -24,7 +24,7 @@ export function ProFeatureGate({ children, featureName, locked = false }: ProFea
       <div className="opacity-75 pointer-events-none select-none">
         {children}
       </div>
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 max-w-md w-full mx-4 p-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 mb-6">
             <IoLockClosed className="w-8 h-8 text-blue-600 dark:text-blue-400" />
