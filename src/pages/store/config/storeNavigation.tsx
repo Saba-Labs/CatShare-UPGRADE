@@ -5,6 +5,7 @@ export interface StoreNavCard {
   description: string;
   iconKey: StoreIconKey;
   href: string;
+  proOnly?: boolean;
 }
 
 export interface StoreNavCategory {
@@ -38,6 +39,7 @@ export const STORE_NAVIGATION: StoreNavCategory[] = [
         description: 'Design your storefront',
         iconKey: 'homepage',
         href: '/store/homepage',
+        proOnly: true,
       },
       {
         title: 'Checkout',
@@ -72,6 +74,7 @@ export const STORE_NAVIGATION: StoreNavCategory[] = [
         description: 'Connect your own domain',
         iconKey: 'domain',
         href: '/store/domain',
+        proOnly: true,
       },
       {
         title: 'Analytics',
@@ -90,6 +93,7 @@ export const STORE_NAVIGATION: StoreNavCategory[] = [
         description: 'Third-party services',
         iconKey: 'integrations',
         href: '/store/integrations',
+        proOnly: true,
       },
     ],
   },
