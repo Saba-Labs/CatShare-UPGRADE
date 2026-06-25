@@ -971,35 +971,20 @@ export async function deleteUserAccount(userId: string): Promise<SyncResult> {
       }
     }
 
-    // Step 2: Delete all user data from Supabase tables
+    // Step 2: Call Supabase SQL function to delete all user data
     console.log('🗑️ Deleting all user data from Supabase...');
 
-    const tablesToDelete = [
-      'products',
-      'deleted_products',
-      'categories',
-      'catalogues_definition',
-      'fields_definition',
-      'user_settings',
-      'user_push_tokens',
-      'r2_cleanup_queue'
-    ];
+    const { data, error } = await client.rpc('delete_user_account', {
+      user_id: userId
+    });
 
-    for (const table of tablesToDelete) {
-      const { error } = await client
-        .from(table)
-        .delete()
-        .eq('user_id', userId);
-
-      if (error && error.code !== 'PGRST116') {
-        console.warn(`⚠️ Error deleting from ${table}:`, error.message);
-      } else {
-        console.log(`✅ Deleted user data from ${table}`);
-      }
+    if (error) {
+      console.error('❌ Error deleting account via RPC:', error);
+      return { success: false, error: error.message };
     }
 
-    console.log(`✅ Account deletion complete for user ${userId}`);
-    return { success: true };
+    console.log(`✅ Account deletion complete for user ${userId}`, data);
+    return { success: true, data };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
     console.error('❌ Exception in deleteUserAccount:', errorMessage);
