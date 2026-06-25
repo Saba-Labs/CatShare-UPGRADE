@@ -919,3 +919,90 @@ export async function processR2CleanupQueue(userId: string): Promise<void> {
     console.warn('⚠️ processR2CleanupQueue error:', err);
   }
 }
+
+/**
+ * Completely delete a user account and all associated data from Supabase and R2.
+ * This is irreversible and removes all products, settings, and storage.
+ */
+export async function deleteUserAccount(userId: string): Promise<SyncResult> {
+  try {
+    if (!userId) {
+      return { success: false, error: 'Invalid user ID' };
+    }
+
+    const client = getSupabaseClient();
+    console.log(`🗑️ Starting complete account deletion for user ${userId}`);
+
+    // Step 1: Delete all images from R2 (both active products and deleted products)
+    console.log('📦 Fetching all product images for R2 cleanup...');
+
+    // Get active products
+    const { data: activeProducts, error: activeError } = await client
+      .from('products')
+      .select('product_id, data')
+      .eq('user_id', userId);
+
+    // Get deleted products
+    const { data: deletedProducts, error: deletedError } = await client
+      .from('deleted_products')
+      .select('product_id, data')
+      .eq('user_id', userId);
+
+    if (activeError && activeError.code !== 'PGRST116') {
+      console.warn('⚠️ Error fetching active products:', activeError);
+    }
+    if (deletedError && deletedError.code !== 'PGRST116') {
+      console.warn('⚠️ Error fetching deleted products:', deletedError);
+    }
+
+    const allProducts = [...(activeProducts || []), ...(deletedProducts || [])];
+    const imageRows = allProducts.filter((r: any) => getAllProductImageUrlsForDeletion(r.data).length > 0);
+
+    if (imageRows.length > 0) {
+      console.log(`🗑️ Deleting ${imageRows.length} product sets from R2`);
+      const results = await mapWithConcurrencyLimit(
+        imageRows,
+        4,
+        async (r: any) => deleteAllProductImagesFromR2(r.data)
+      );
+      const failed = results.filter((r) => !r.success);
+      if (failed.length > 0) {
+        console.warn(`⚠️ ${failed.length} R2 deletions failed during account deletion`);
+      }
+    }
+
+    // Step 2: Delete all user data from Supabase tables
+    console.log('🗑️ Deleting all user data from Supabase...');
+
+    const tablesToDelete = [
+      'products',
+      'deleted_products',
+      'categories',
+      'catalogues_definition',
+      'fields_definition',
+      'user_settings',
+      'user_push_tokens',
+      'r2_cleanup_queue'
+    ];
+
+    for (const table of tablesToDelete) {
+      const { error } = await client
+        .from(table)
+        .delete()
+        .eq('user_id', userId);
+
+      if (error && error.code !== 'PGRST116') {
+        console.warn(`⚠️ Error deleting from ${table}:`, error.message);
+      } else {
+        console.log(`✅ Deleted user data from ${table}`);
+      }
+    }
+
+    console.log(`✅ Account deletion complete for user ${userId}`);
+    return { success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ Exception in deleteUserAccount:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
