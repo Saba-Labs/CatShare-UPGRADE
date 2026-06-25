@@ -87,6 +87,7 @@ interface AuthContextType {
   /** Refetch cloud snapshot (e.g. after saving Account / business details). Returns the fetched row or null. */
   refreshSupabaseData: (opts?: { skipLoadingIndicator?: boolean }) => Promise<SupabaseUserData | null>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -784,6 +785,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const deleteAccount = async () => {
+    try {
+      setError(null);
+
+      if (!user?.uid) {
+        throw new Error('User not found');
+      }
+
+      // Delete user data from Supabase and R2
+      const { deleteUserAccount } = await import('../services/supabaseSync');
+      const result = await deleteUserAccount(user.uid);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete account');
+      }
+
+      // Sign out (note: Supabase auth user deletion requires server-side access)
+      if (!authService.isOfflineGuest()) {
+        await supabase.auth.signOut();
+      }
+
+      // Clear local state
+      setUser(null);
+      setSupabaseData(null);
+      if (user?.uid) clearSessionExpiredMark(user.uid);
+      clearAuthUserIdsFromStorage();
+      setSupabaseRlsUserId(null);
+
+      localStorage.removeItem('products');
+      localStorage.removeItem('deletedProducts');
+      localStorage.removeItem('retailProducts');
+      localStorage.removeItem(PUSH_REGISTERED_STORAGE_KEY);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete account';
+      setError(errorMessage);
+      throw err;
+    }
+  };
+
   const clearError = () => setError(null);
 
   return (
@@ -796,6 +836,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         supabaseDataLoading,
         refreshSupabaseData,
         logout,
+        deleteAccount,
         clearError,
       }}
     >

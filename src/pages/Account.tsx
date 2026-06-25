@@ -15,6 +15,7 @@ import {
   FiInstagram,
   FiFacebook,
   FiTwitter,
+  FiTrash2,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -49,7 +50,7 @@ function SectionCard({
 
 export default function Account() {
   const navigate = useNavigate();
-  const { user, logout, supabaseData, refreshSupabaseData } = useAuth();
+  const { user, logout, deleteAccount, supabaseData, refreshSupabaseData } = useAuth();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
   const { isPro, isPaidPro, isTrialActive, trialEndsAt } = useSubscription();
@@ -57,6 +58,8 @@ export default function Account() {
   const [isLoading, setIsLoading] = useState(false);
   const [businessSaving, setBusinessSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState('');
   const [whatsappCountryCode, setWhatsappCountryCode] = useState('');
   const [whatsappLocalNumber, setWhatsappLocalNumber] = useState('');
@@ -224,6 +227,24 @@ export default function Account() {
       // Don't show error toast - user will be redirected by ProtectedRoute anyway
     }
     // Don't reset isLoading - let ProtectedRoute redirect immediately
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      await deleteAccount();
+      showToast('Account deleted successfully', 'success');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete account';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+      console.warn('Delete account error:', err);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   const busy = isLoading || businessSaving || logoUploading;
@@ -684,6 +705,75 @@ export default function Account() {
               <p className="text-center text-xs text-gray-400 mt-3">Ends your session on this device</p>
             </div>
           </SectionCard>
+
+          {/* Delete account — separate, warning */}
+          <SectionCard>
+            <div className="p-4 sm:p-5">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl border border-red-600/30 bg-red-600/10 text-red-600 hover:bg-red-600/20 active:bg-red-600/15 disabled:opacity-50 font-semibold text-sm touch-manipulation"
+              >
+                <FiTrash2 className="w-5 h-5" />
+                Delete account
+              </button>
+              <p className="text-center text-xs text-gray-400 mt-3">Permanently delete all account data and stored files</p>
+            </div>
+          </SectionCard>
+
+          {/* Delete confirmation modal */}
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-2xl shadow-lg max-w-sm w-full p-6"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <FiAlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Delete account?</h3>
+                    <p className="text-sm text-gray-600 mt-1">This action cannot be undone.</p>
+                  </div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+                  <p className="text-sm text-red-900">
+                    All your products, settings, and uploaded images will be permanently deleted from our servers.
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Deleting…
+                      </>
+                    ) : (
+                      <>
+                        <FiTrash2 className="w-4 h-4" />
+                        Delete account
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </motion.div>
       </main>
     </div>
