@@ -2453,7 +2453,13 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />
 
-        {/* Protected Routes */}
+        {/* Protected Routes — only on the app host.
+            On a seller storefront host (subdomain / custom domain) every path must resolve to the
+            single `path="/*"` StoreView route above. If the static `/` protected route also matched,
+            navigating home ↔ product would swap StoreView between two different element positions
+            (one wrapped in ProtectedRoute, one not), remounting it and wiping the cart. */}
+        {!isSellerStorefrontHostActive ? (
+        <>
         <Route
           path="/welcome"
           element={
@@ -2791,6 +2797,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
             </ProtectedRoute>
           }
         />
+        </>
+        ) : null}
       </Routes>
       </Suspense>
     </div>
