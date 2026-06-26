@@ -2448,7 +2448,6 @@ if (user?.uid && !authService.isOfflineGuest()) {
         <Route path="/o/:token/*" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />
         <Route path="/track/:token" element={<TrackOrder />} />
-        <Route path="/store/:slug/*" element={<StoreView />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/website" element={<Website />} />
@@ -2799,6 +2798,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
         />
         </>
         ) : null}
+        {/* Public storefront by slug — after seller dashboard routes so `/store/integrations` etc. are not captured. */}
+        <Route path="/store/:slug/*" element={<StoreView />} />
       </Routes>
       </Suspense>
     </div>

@@ -12,7 +12,6 @@ import {
   type StoreIntegrationId,
 } from './config/storeIntegrations';
 import { useToast } from '../../context/ToastContext';
-import { useSubscription } from '../../context/SubscriptionContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { ProFeatureGate } from '../../components/ProFeatureGate';
 import { useSellerIntegrations } from '../../integrations/hooks/useSellerIntegrations';
@@ -23,7 +22,6 @@ import { STORE_CATEGORY_TITLE, STORE_SECTION_DESCRIPTION } from './storeTypograp
 export default function Integrations() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { isPro } = useSubscription();
   const { guardCloudWrite } = useCloudWriteGate();
   const { sellerId, views, loading, error, connectedCount, reload } = useSellerIntegrations();
   const [disconnectingId, setDisconnectingId] = useState<StoreIntegrationId | null>(null);
@@ -97,8 +95,7 @@ export default function Integrations() {
         title="Integrations"
       />
 
-      {!isPro && (
-        <ProFeatureGate featureName="Integrations" locked={true}>
+      <ProFeatureGate featureName="Integrations">
           <div className="max-w-6xl space-y-8 pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-5">
@@ -204,8 +201,7 @@ export default function Integrations() {
           </SettingsCard>
         ) : null}
       </div>
-        </ProFeatureGate>
-      )}
+      </ProFeatureGate>
     </StoreLayout>
   );
 }

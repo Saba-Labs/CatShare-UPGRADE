@@ -10,7 +10,6 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { useSubscription } from '../../context/SubscriptionContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { ProFeatureGate } from '../../components/ProFeatureGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
@@ -99,7 +98,6 @@ export default function CustomDomain() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const { isPro } = useSubscription();
   const { guardCloudWrite } = useCloudWriteGate();
 
   const sellerId = user?.uid ?? getPersistedAuthUserId() ?? '';
@@ -369,8 +367,7 @@ export default function CustomDomain() {
         title="Custom Domain"
       />
 
-      {!isPro && (
-        <ProFeatureGate featureName="Custom Domain" locked={true}>
+      <ProFeatureGate featureName="Custom Domain">
           <div className="max-w-3xl space-y-6 pb-8">
 
         {error ? (
@@ -646,8 +643,7 @@ export default function CustomDomain() {
           ) : null}
         </SettingsCard>
       </div>
-        </ProFeatureGate>
-      )}
+      </ProFeatureGate>
     </StoreLayout>
   );
 }
