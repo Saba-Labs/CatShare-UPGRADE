@@ -34,13 +34,15 @@ function QtyControl({
   accent?: boolean;
 }) {
   const s = Math.max(1, Math.floor(step) || 1);
+  const handleMinus = () => onChange(-s);
+  const handlePlus = () => onChange(s);
   return (
     <div className={`sv-qty${accent ? ' accent' : ''}`}>
-      <button type="button" className="sv-qty-btn" onClick={() => onChange(-s)}>
+      <button type="button" className="sv-qty-btn" onClick={handleMinus}>
         −
       </button>
       <span className="sv-qty-val">{value}</span>
-      <button type="button" className="sv-qty-btn" onClick={() => onChange(s)}>
+      <button type="button" className="sv-qty-btn" onClick={handlePlus}>
         +
       </button>
     </div>
