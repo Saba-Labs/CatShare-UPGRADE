@@ -2202,7 +2202,7 @@ export default function StoreView() {
           ) : (
             <>
           {catalogProductHandle ? (
-            <div className="sv-catalog-product-page website-product-runtime">
+            <div className="sv-catalog-product-page">
               <div className="sv-catalog-product-top">
                 <button type="button" className="sv-catalog-product-back" onClick={closeProductPage} aria-label="Back to items">
                   ←
