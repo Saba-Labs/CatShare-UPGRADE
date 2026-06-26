@@ -40,18 +40,22 @@ export function findProductByHandle(
   return products.find((p) => productHandle(p).toLowerCase() === normalized) ?? null;
 }
 
+/** Home route for navigate/Link — always a valid router path (never empty). */
 export function storeBasePath(slug: string, onSubdomain = false): string {
+  return onSubdomain ? '/' : `/store/${slug}`;
+}
+
+/** Prefix for building nested storefront paths (product, collection, etc.). */
+function storePathPrefix(slug: string, onSubdomain: boolean): string {
   return onSubdomain ? '' : `/store/${slug}`;
 }
 
 export function productPagePath(slug: string, product: ProductWithCatalogueData, onSubdomain = false): string {
-  const base = storeBasePath(slug, onSubdomain);
-  return `${base}/products/${productHandle(product)}`;
+  return `${storePathPrefix(slug, onSubdomain)}/products/${productHandle(product)}`;
 }
 
 export function collectionPagePath(slug: string, onSubdomain = false): string {
-  const base = storeBasePath(slug, onSubdomain);
-  return `${base}/collections/all`;
+  return `${storePathPrefix(slug, onSubdomain)}/collections/all`;
 }
 
 export function absoluteStoreUrl(slug: string, path: string): string {

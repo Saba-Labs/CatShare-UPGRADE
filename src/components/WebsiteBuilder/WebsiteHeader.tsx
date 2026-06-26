@@ -1,4 +1,5 @@
 import type { WebsiteSiteSettings } from '../../types/homepage';
+import { storeBasePath } from '../../utils/websiteStorefront';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
 
 interface WebsiteHeaderProps {
@@ -8,6 +9,6 @@ interface WebsiteHeaderProps {
 }
 
 export default function WebsiteHeader({ slug, siteSettings, onSubdomain }: WebsiteHeaderProps) {
-  const basePath = onSubdomain ? '' : `/store/${slug}`;
+  const basePath = storeBasePath(slug, onSubdomain);
   return <StorefrontSiteHeader siteSettings={siteSettings} basePath={basePath} />;
 }

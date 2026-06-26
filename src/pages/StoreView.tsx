@@ -1024,8 +1024,7 @@ export default function StoreView() {
 
   const closeProductPage = useCallback(() => {
     const slugForPath = effectiveSlug || store?.storeSlug || '';
-    const base = slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/';
-    navigate(base);
+    navigate(slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/');
   }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate]);
 
   // Listen for store-updated custom events from Store.tsx toggle
