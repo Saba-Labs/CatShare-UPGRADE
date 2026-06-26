@@ -2761,7 +2761,9 @@ export default function StoreView() {
                                       {item.subtitle ? <div className="sv-checkout-item-sub">{item.subtitle}</div> : null}
                                       {item.variantSummary ? <VariantPills summary={item.variantSummary} /> : null}
                                     </div>
-                                    <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeCartLineQty(item.lineId, delta)} accent={item.quantity > 0} />
+                                    <div style={{ alignSelf: 'flex-start' }}>
+                                      <QtyControl value={item.quantity} step={qstep} onChange={(delta) => changeCartLineQty(item.lineId, delta)} accent={item.quantity > 0} />
+                                    </div>
                                   </div>
                                 </div>
                                 {cd ? (
