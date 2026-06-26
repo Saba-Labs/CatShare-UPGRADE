@@ -252,7 +252,7 @@ body { background: var(--c-bg); }
 .sv-of-items--store.of-items { padding: 12px 12px 140px; }
 
 /* ── Qty ── */
-.sv-qty { display: inline-flex; align-items: center; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-full); overflow: hidden; }
+.sv-qty { display: inline-flex; align-items: center; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: var(--r-full); overflow: hidden; width: fit-content; }
 .sv-qty-btn { width: 28px; height: 28px; border: none; background: none; cursor: pointer; font-size: 16px; color: var(--c-text2); display: flex; align-items: center; justify-content: center; transition: background var(--trans), color var(--trans); font-family: var(--f-body); line-height: 1; }
 .sv-qty-btn:hover { background: var(--c-surface3); color: var(--c-text); }
 .sv-qty-val { min-width: 26px; text-align: center; font-size: 13px; font-weight: 600; color: var(--c-text); font-family: var(--f-body); }

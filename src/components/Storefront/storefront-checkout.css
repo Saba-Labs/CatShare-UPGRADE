@@ -191,6 +191,10 @@
   gap: 10px;
 }
 
+.sv-checkout-panel .sv-checkout-item-main .sv-qty {
+  width: auto;
+}
+
 .sv-checkout-panel .sv-checkout-item-name {
   font-size: 0.84375rem;
   font-weight: 600;
