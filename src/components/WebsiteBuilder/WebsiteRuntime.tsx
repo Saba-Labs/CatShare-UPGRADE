@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { HomepageLayout } from '../../types/homepage';
 import { buildWebsiteThemeVars } from '../../utils/websiteThemeVars';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StorePublic } from '../../services/storeService';
 import { createDefaultWebsiteModeConfig } from '../../config/homepageBuilderConfig';
 import { resolveStorefrontSeo, type StorefrontPageKind } from '../../utils/storefrontSeo';
-import { findProductByHandle, slugifyStorefront } from '../../utils/websiteStorefront';
+import { findProductByHandle, findProductById, slugifyStorefront, type StoreProductNavState } from '../../utils/websiteStorefront';
 import StorefrontSeo from './StorefrontSeo';
 import { WebsiteStoreProvider } from './WebsiteStoreContext';
 import WebsiteHeader from './WebsiteHeader';
@@ -32,6 +33,7 @@ export default function WebsiteRuntime({
   store,
   onSubdomain = false,
 }: WebsiteRuntimeProps) {
+  const location = useLocation();
   const fallback = createDefaultWebsiteModeConfig();
   const runtimeLayout = homepageLayout || { sections: [], theme: {}, websiteConfig: fallback };
   const websiteConfig = runtimeLayout.websiteConfig || fallback;
@@ -45,7 +47,14 @@ export default function WebsiteRuntime({
   const handle = pageSegments[1] || '';
 
   const product = section === 'products'
-    ? findProductByHandle(products, handle)
+    ? (() => {
+        const navState = location.state as StoreProductNavState | null;
+        if (navState?.storeProductId) {
+          const fromId = findProductById(products, navState.storeProductId);
+          if (fromId) return fromId;
+        }
+        return findProductByHandle(products, handle);
+      })()
     : null;
   const customPage = section
     ? customPages.find((page) => page.slug === section || slugifyStorefront(page.slug) === section)

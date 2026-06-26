@@ -14,6 +14,20 @@ export function slugifyStorefront(value: string): string {
 }
 
 export function productHandle(product: ProductWithCatalogueData): string {
+  const nameSlug = slugifyStorefront(product.name || '');
+  const id = String(product.id ?? '').trim();
+  if (!id) return nameSlug || 'product';
+  const idSlug = slugifyStorefront(id);
+  // Name slug alone collides when products share similar titles; id suffix keeps URLs unique.
+  return nameSlug ? `${nameSlug}--${idSlug}` : idSlug;
+}
+
+/** Passed on in-app product navigation so the correct row opens even if handles collide. */
+export type StoreProductNavState = {
+  storeProductId?: string;
+};
+
+export function legacyProductNameHandle(product: ProductWithCatalogueData): string {
   return slugifyStorefront(product.name || product.id);
 }
 
@@ -37,7 +51,31 @@ export function findProductByHandle(
   handle: string
 ): ProductWithCatalogueData | null {
   const normalized = handle.toLowerCase();
-  return products.find((p) => productHandle(p).toLowerCase() === normalized) ?? null;
+  const exact = products.find((p) => productHandle(p).toLowerCase() === normalized);
+  if (exact) return exact;
+
+  if (normalized.includes('--')) {
+    const idSlug = normalized.split('--').pop() || '';
+    const byIdSlug = products.find((p) => slugifyStorefront(String(p.id)).toLowerCase() === idSlug);
+    if (byIdSlug) return byIdSlug;
+  }
+
+  // Legacy share links that used name-only slugs (only when unambiguous).
+  const legacyMatches = products.filter(
+    (p) => legacyProductNameHandle(p).toLowerCase() === normalized
+  );
+  if (legacyMatches.length === 1) return legacyMatches[0];
+
+  return null;
+}
+
+export function findProductById(
+  products: ProductWithCatalogueData[],
+  productId: string
+): ProductWithCatalogueData | null {
+  const id = productId.trim();
+  if (!id) return null;
+  return products.find((p) => p.id === id) ?? null;
 }
 
 /** Home route for navigate/Link — always a valid router path (never empty). */
@@ -60,7 +98,8 @@ function storePathPrefix(slug: string, onSubdomain: boolean): string {
 }
 
 export function productPagePath(slug: string, product: ProductWithCatalogueData, onSubdomain = false): string {
-  return `${storePathPrefix(slug, onSubdomain)}/products/${productHandle(product)}`;
+  const prefix = storePathPrefix(slug, onSubdomain);
+  return `${prefix}/products/${encodeURIComponent(productHandle(product))}`;
 }
 
 export function collectionPagePath(slug: string, onSubdomain = false): string {

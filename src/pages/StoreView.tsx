@@ -83,7 +83,7 @@ import '../components/HomepageBuilder/sites-theme-button.css';
 import { HomepageLayout } from '../types/homepage';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
-import { collectionPagePath, findProductByHandle, parseStorefrontProductHandle, productPagePath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory } from '../utils/websiteStorefront';
+import { collectionPagePath, findProductByHandle, findProductById, parseStorefrontProductHandle, productPagePath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory, type StoreProductNavState } from '../utils/websiteStorefront';
 import StoreProductOrderPanel from '../components/Storefront/StoreProductOrderPanel';
 import '../components/Storefront/store-product-order-page.css';
 import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
@@ -1001,6 +1001,8 @@ export default function StoreView() {
   const [resolvedInventoryId, setResolvedInventoryId] = useState<string | null>(null);
   const [sellerCheckoutFeatures, setSellerCheckoutFeatures] = useState<SellerCheckoutFeatures | null>(null);
   const pathFallbackSentRef = useRef(false);
+  /** Listing scroll to restore after closing the catalog product page. */
+  const pendingListingScrollRef = useRef<number | null>(null);
   /** Latest slug for tab-visibility refetch (avoid stale closure). */
   const effectiveSlugRef = useRef(effectiveSlug);
   effectiveSlugRef.current = effectiveSlug;
@@ -1017,7 +1019,10 @@ export default function StoreView() {
     (product: ProductWithCatalogueData) => {
       const slugForPath = effectiveSlug || store?.storeSlug || '';
       if (!slugForPath) return;
-      navigate(productPagePath(slugForPath, product, dedicatedHost));
+      pendingListingScrollRef.current = window.scrollY;
+      navigate(productPagePath(slugForPath, product, dedicatedHost), {
+        state: { storeProductId: product.id } satisfies StoreProductNavState,
+      });
     },
     [effectiveSlug, store?.storeSlug, dedicatedHost, navigate]
   );
@@ -1030,6 +1035,34 @@ export default function StoreView() {
     const slugForPath = effectiveSlug || store?.storeSlug || '';
     navigate(slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/');
   }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate, location.key]);
+
+  // Catalog listing ↔ product page: keep scroll on the listing, start product page at top.
+  useEffect(() => {
+    if (store?.websiteModeEnabled) return;
+    if (typeof window === 'undefined' || !('scrollRestoration' in history)) return;
+    const previous = history.scrollRestoration;
+    history.scrollRestoration = 'manual';
+    return () => {
+      history.scrollRestoration = previous;
+    };
+  }, [store?.websiteModeEnabled]);
+
+  useEffect(() => {
+    if (store?.websiteModeEnabled || !catalogProductHandle) return;
+    window.scrollTo(0, 0);
+  }, [store?.websiteModeEnabled, catalogProductHandle]);
+
+  useEffect(() => {
+    if (store?.websiteModeEnabled || catalogProductHandle) return;
+    const y = pendingListingScrollRef.current;
+    if (y == null || y <= 0) return;
+
+    const restore = () => window.scrollTo(0, y);
+    requestAnimationFrame(restore);
+    const timers = [16, 50, 100, 200, 400, 800].map((ms) => window.setTimeout(restore, ms));
+    pendingListingScrollRef.current = null;
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [store?.websiteModeEnabled, catalogProductHandle]);
 
   // Listen for store-updated custom events from Store.tsx toggle
   useEffect(() => {
@@ -1374,10 +1407,14 @@ export default function StoreView() {
     });
   }, [searchQuery, selectedCategory, storeProducts]);
 
-  const catalogActiveProduct = useMemo(
-    () => (catalogProductHandle ? findProductByHandle(storeProducts, catalogProductHandle) : null),
-    [catalogProductHandle, storeProducts]
-  );
+  const catalogActiveProduct = useMemo(() => {
+    const navState = location.state as StoreProductNavState | null;
+    if (navState?.storeProductId) {
+      const fromId = findProductById(storeProducts, navState.storeProductId);
+      if (fromId) return fromId;
+    }
+    return catalogProductHandle ? findProductByHandle(storeProducts, catalogProductHandle) : null;
+  }, [location.state, catalogProductHandle, storeProducts]);
 
   const catalogMarketing = store?.marketingSettings ?? DEFAULT_MARKETING_SETTINGS;
 
@@ -1717,7 +1754,9 @@ export default function StoreView() {
         alert(`Please choose all variants for "${item.name}" before placing the order.`);
         if (store.websiteModeEnabled) {
           const slugForPath = effectiveSlug || store.storeSlug || '';
-          navigate(productPagePath(slugForPath, product, dedicatedHost));
+          navigate(productPagePath(slugForPath, product, dedicatedHost), {
+            state: { storeProductId: product.id } satisfies StoreProductNavState,
+          });
         } else {
           openProductPage(product);
           setStep('products');
@@ -1744,7 +1783,9 @@ export default function StoreView() {
           if (product) {
             if (store.websiteModeEnabled) {
               const slugForPath = effectiveSlug || store.storeSlug || '';
-              navigate(productPagePath(slugForPath, product, dedicatedHost));
+              navigate(productPagePath(slugForPath, product, dedicatedHost), {
+                state: { storeProductId: product.id } satisfies StoreProductNavState,
+              });
             } else {
               openProductPage(product);
               setStep('products');

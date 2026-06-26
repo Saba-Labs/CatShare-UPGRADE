@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
+import type { StoreProductNavState } from '../../utils/websiteStorefront';
 import {
   formatStorePrice,
   getWebsiteProductImageUrl,
@@ -79,7 +80,11 @@ export default function WebsiteProductCard({
   }
 
   return (
-    <Link to={productPath(product)} className={className}>
+    <Link
+      to={productPath(product)}
+      state={{ storeProductId: product.id } satisfies StoreProductNavState}
+      className={className}
+    >
       {body}
     </Link>
   );
