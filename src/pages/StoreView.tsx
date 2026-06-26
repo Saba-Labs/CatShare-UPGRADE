@@ -2577,7 +2577,7 @@ export default function StoreView() {
                     : isSubmitting || (minimumOrderValue > 0 && !minimumOrderMet)
                 }
               >
-                {step === 'customer' ? 'Review →' : isSubmitting ? 'Placing…' : 'Confirm'}
+                {step === 'customer' ? 'Continue →' : isSubmitting ? 'Placing…' : 'Confirm'}
               </button>
             </div>
 
@@ -2797,7 +2797,7 @@ export default function StoreView() {
                   onClick={handlePanelAction}
                   disabled={!customerDetailsComplete}
                 >
-                  Review →
+                  Continue →
                 </button>
               </div>
             ) : null}
