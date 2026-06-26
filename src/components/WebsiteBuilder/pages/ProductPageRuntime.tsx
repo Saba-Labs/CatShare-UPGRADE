@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import type { WebsiteProductTemplate } from '../../../types/homepage';
 import { getProductVariantGroups, isVariantSelectionComplete } from '../../../utils/productVariants';
 import { getCatalogueData, normalizeOrderQuantityStep } from '../../../config/catalogueProductUtils';
+import { canPopStorefrontHistory } from '../../../utils/websiteStorefront';
 import StoreProductOrderPanel from '../../Storefront/StoreProductOrderPanel';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import { useWebsiteStore } from '../WebsiteStoreContext';
@@ -30,6 +31,7 @@ export default function ProductPageRuntime({
   const { basePath, collectionPath, store, products } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const layoutVariant = template?.layoutVariant || 'minimal';
   const imageLook = template?.imageLook || 'clean';
@@ -90,6 +92,10 @@ export default function ProductPageRuntime({
     }
     if (quantity <= 0) {
       orderBridge.changeProductQty(product.id, qstep, qstep);
+    }
+    if (canPopStorefrontHistory(location.key)) {
+      navigate(-1);
+      return;
     }
     navigate(collectionPath);
   };

@@ -2443,12 +2443,7 @@ if (user?.uid && !authService.isOfflineGuest()) {
 
         {/* Public Routes */}
         {isSellerStorefrontHostActive ? (
-          <>
-            <Route path="/" element={<StoreView />} />
-            <Route path="/products/*" element={<StoreView />} />
-            <Route path="/collections/*" element={<StoreView />} />
-            <Route path="/:customPageSlug" element={<StoreView />} />
-          </>
+          <Route path="/*" element={<StoreView />} />
         ) : null}
         <Route path="/o/:token/*" element={<OrderForm />} />
         <Route path="/o/:token/confirm" element={<ConfirmOrder />} />

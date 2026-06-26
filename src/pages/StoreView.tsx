@@ -83,7 +83,7 @@ import '../components/HomepageBuilder/sites-theme-button.css';
 import { HomepageLayout } from '../types/homepage';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
-import { collectionPagePath, findProductByHandle, parseStorefrontProductHandle, productPagePath, resolveStoreWhatsapp, storeBasePath } from '../utils/websiteStorefront';
+import { collectionPagePath, findProductByHandle, parseStorefrontProductHandle, productPagePath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory } from '../utils/websiteStorefront';
 import StoreProductOrderPanel from '../components/Storefront/StoreProductOrderPanel';
 import '../components/Storefront/store-product-order-page.css';
 import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
@@ -1023,9 +1023,13 @@ export default function StoreView() {
   );
 
   const closeProductPage = useCallback(() => {
+    if (canPopStorefrontHistory(location.key)) {
+      navigate(-1);
+      return;
+    }
     const slugForPath = effectiveSlug || store?.storeSlug || '';
     navigate(slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/');
-  }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate]);
+  }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate, location.key]);
 
   // Listen for store-updated custom events from Store.tsx toggle
   useEffect(() => {

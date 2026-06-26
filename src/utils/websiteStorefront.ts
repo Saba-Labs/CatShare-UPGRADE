@@ -45,6 +45,15 @@ export function storeBasePath(slug: string, onSubdomain = false): string {
   return onSubdomain ? '/' : `/store/${slug}`;
 }
 
+/**
+ * Whether Back/Done can pop in-app history instead of replacing the URL with the store home.
+ * False on direct/refresh loads so we do not send users to an external referrer.
+ */
+export function canPopStorefrontHistory(locationKey: string | undefined): boolean {
+  if (!locationKey || locationKey === 'default') return false;
+  return typeof window !== 'undefined' && window.history.length > 1;
+}
+
 /** Prefix for building nested storefront paths (product, collection, etc.). */
 function storePathPrefix(slug: string, onSubdomain: boolean): string {
   return onSubdomain ? '' : `/store/${slug}`;
