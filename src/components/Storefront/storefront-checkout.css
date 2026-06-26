@@ -192,7 +192,8 @@
 }
 
 .sv-checkout-panel .sv-checkout-item-main .sv-qty {
-  width: auto;
+  width: auto !important;
+  flex: 0 0 auto !important;
 }
 
 .sv-checkout-panel .sv-checkout-item-name {
