@@ -63,7 +63,7 @@ import {
 } from '../utils/productVariants';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
-import { resolveOrderCatalogueId } from '../utils/resolveOrderCatalogue';
+import { getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import {
   ORDER_STATUSES,
   getStatusChangeLabel,
@@ -1298,11 +1298,7 @@ useEffect(() => {
   const orderCatalogueId = useMemo(
     () =>
       order
-        ? resolveOrderCatalogueId(
-            (order.items || []) as OrderItem[],
-            localProducts,
-            getAllCatalogues(user?.uid)
-          )
+        ? getOrderCatalogueId(order, localProducts, getAllCatalogues(user?.uid))
         : null,
     [order, localProducts, user?.uid]
   );
