@@ -911,7 +911,13 @@ export default function StoreView() {
   const { slug } = useParams<{ slug: string }>();
   const hostSlug = useMemo(() => resolveStoreSlugFromHostname(), []);
   const [customHostSlug, setCustomHostSlug] = useState<string | null>(null);
-  const [customHostResolved, setCustomHostResolved] = useState(!hostSlug);
+  /** False until custom-hostname lookup finishes (do not treat as "resolved" on first paint). */
+  const [customHostResolved, setCustomHostResolved] = useState(() => {
+    if (hostSlug) return true;
+    if (typeof window === 'undefined') return true;
+    const host = window.location.hostname.trim().toLowerCase();
+    return !host || isPlatformAppHostname(host);
+  });
 
   useEffect(() => {
     if (hostSlug) {
@@ -927,7 +933,6 @@ export default function StoreView() {
       return;
     }
     let cancelled = false;
-    setCustomHostResolved(false);
     getStoreSlugByCustomHostname(host).then((r) => {
       if (cancelled) return;
       setCustomHostSlug(r.success && r.slug ? r.slug : null);
@@ -1087,14 +1092,28 @@ export default function StoreView() {
 
   useEffect(() => {
     if (!customHostResolved) return;
-    if (!effectiveSlug) { setStoreError('Store not found'); setStoreLoading(false); return; }
+    if (!effectiveSlug) {
+      setStoreError('Store not found');
+      setStoreLoading(false);
+      return;
+    }
     setStoreLoading(true);
-    getStoreBySlug(effectiveSlug).then((r) => { if (!r.success || !r.data) setStoreError(r.error || 'Store not found'); else setStore(r.data); setStoreLoading(false); });
+    setStoreError(null);
+    getStoreBySlug(effectiveSlug).then((r) => {
+      if (!r.success || !r.data) {
+        setStoreError(r.error || 'Store not found');
+        setStore(null);
+      } else {
+        setStore(r.data);
+        setStoreError(null);
+      }
+      setStoreLoading(false);
+    });
   }, [effectiveSlug, customHostResolved]);
 
-  /** If the SPA loads on a seller subdomain but the store cannot be loaded, send users to the path-based URL on the public app host (edge middleware handles the hard 403 case). */
+  /** Subdomain failover only — custom domains should stay on the seller's domain. */
   useEffect(() => {
-    const fallbackSlug = hostSlug || customHostSlug;
+    const fallbackSlug = hostSlug;
     if (storeLoading || !storeError || !fallbackSlug || slug) return;
     if (pathFallbackSentRef.current) return;
     const base = getStorePathFallbackBaseUrl();
@@ -1108,7 +1127,7 @@ export default function StoreView() {
     if (!targetHost || targetHost === normalizeHost(window.location.hostname)) return;
     pathFallbackSentRef.current = true;
     window.location.replace(`${base}/store/${encodeURIComponent(fallbackSlug)}${window.location.search || ''}`);
-  }, [storeLoading, storeError, hostSlug, customHostSlug, slug]);
+  }, [storeLoading, storeError, hostSlug, slug]);
 
   useEffect(() => {
     setLogoFailed(false);
