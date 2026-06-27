@@ -25,6 +25,8 @@ import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { OrderPaymentSection } from '../integrations/components/OrderPaymentSection';
 import { OrderShipmentSection } from '../integrations/components/OrderShipmentSection';
 import { OrderCustomerTrackingSection } from '../integrations/components/OrderCustomerTrackingSection';
+import { OdIntegrationsStack } from '../integrations/components/orderDetailUi';
+import type { CheckoutTotals } from '../types/checkoutSettings';
 import './OrderDetail.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
@@ -45,6 +47,13 @@ import { isVariantOptionInStock } from '../utils/catalogueWarehouseStock';
 import { applyQuantityDelta } from '../utils/quantityPricingUtils';
 import TypedQuantityStepper from '../components/TypedQuantityStepper';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import ManualOrderAdjustmentsEditor from '../components/ManualOrderAdjustmentsEditor';
+import {
+  computeManualCheckoutTotals,
+  hasManualAdjustments,
+  manualAdjustmentsFromCheckoutTotals,
+  type ManualOrderAdjustment,
+} from '../utils/manualOrderAdjustments';
 import {
   formatVariantSelectionSummary,
   generateVariantCombinationId,
@@ -54,6 +63,13 @@ import {
 } from '../utils/productVariants';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
+import { resolveOrderCatalogueId } from '../utils/resolveOrderCatalogue';
+import {
+  ORDER_STATUSES,
+  getStatusChangeLabel,
+  orderStatusProgressWidth,
+  type OrderStatus,
+} from '../types/orderStatus';
 
 /** Haptics throws/rejects on desktop web — avoids dozens of console errors in DevTools. */
 async function safeHapticsLight() {
@@ -79,7 +95,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type StatusType = 'pending' | 'completed' | 'cancelled';
+type StatusType = OrderStatus;
 
 interface OrderItem {
   name: string;
@@ -144,6 +160,16 @@ function getStatusConfig(status: string) {
         label: 'Pending',
         icon: '⏳',
         accent: '#F59E0B',
+      };
+    case 'confirmed':
+      return {
+        bg: 'linear-gradient(135deg, #EFF6FF, #DBEAFE)',
+        border: '#BFDBFE',
+        text: '#1E40AF',
+        dot: '#2563EB',
+        label: 'Confirmed',
+        icon: '✓',
+        accent: '#2563EB',
       };
     case 'completed':
       return {
@@ -265,62 +291,6 @@ function normalizeOrderFromApi(o: Order): Order {
     ...o,
     items: (o.items || []).map((it) => normalizeOrderItemFromApi(it)),
   };
-}
-
-/**
- * Orders do not store catalogue_id. Infer the catalogue from line items: every line
- * must reference a product enabled in that catalogue; tie-break with price match.
- */
-function resolveOrderCatalogueId(
-  orderItems: OrderItem[],
-  products: ProductWithCatalogueData[],
-  catalogues: Catalogue[]
-): string | null {
-  const ids = orderItems.map((it) => it.productId).filter(Boolean) as string[];
-  if (ids.length === 0) return null;
-  const productById = new Map<string, ProductWithCatalogueData>();
-  for (const p of products) {
-    if (p?.id != null) productById.set(String(p.id), p);
-  }
-  const candidates: string[] = [];
-  for (const cat of catalogues) {
-    let ok = true;
-    for (const pid of ids) {
-      const p = productById.get(String(pid));
-      if (!p || !isProductEnabledForCatalogue(p, cat.id)) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) candidates.push(cat.id);
-  }
-  if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0];
-
-  let best = candidates[0];
-  let bestScore = Infinity;
-  for (const catId of candidates) {
-    const cat = catalogues.find((c) => c.id === catId);
-    if (!cat) continue;
-    let score = 0;
-    for (const it of orderItems) {
-      if (!it.productId) continue;
-      const p = productById.get(String(it.productId));
-      if (!p) continue;
-      const catData = getCatalogueData(p, catId);
-      const expected = resolveListOfferEffective(
-        catData,
-        cat.priceField,
-        p as Record<string, unknown>
-      ).effectiveUnitPrice;
-      score += Math.abs(expected - (it.unitPrice || 0));
-    }
-    if (score < bestScore) {
-      bestScore = score;
-      best = catId;
-    }
-  }
-  return best;
 }
 
 function buildOrderItemFromProduct(product: ProductWithCatalogueData, catalogue: Catalogue): OrderItem {
@@ -797,6 +767,90 @@ const COLORS = {
   red: '#FF3B30',
 };
 
+function sumOrderItemsSubtotal(items: OrderItem[]): number {
+  return items.reduce((sum, item) => {
+    const lineTotal = item.rowTotal ?? (item.unitPrice ?? 0) * item.quantity;
+    return sum + lineTotal;
+  }, 0);
+}
+
+function OrderItemsTotalsFooter({
+  items,
+  checkoutAdjustments,
+  totalAmount,
+  symbol,
+}: {
+  items: OrderItem[];
+  checkoutAdjustments?: CheckoutTotals | null;
+  totalAmount?: number | null;
+  symbol: string;
+}) {
+  const itemsSubtotal = sumOrderItemsSubtotal(items);
+  const hasLineBreakdown = Boolean(checkoutAdjustments?.lines?.length);
+  const subtotal = checkoutAdjustments?.subtotal ?? itemsSubtotal;
+  const grandTotal = checkoutAdjustments?.grandTotal ?? totalAmount ?? itemsSubtotal;
+
+  return (
+    <>
+      {hasLineBreakdown ? (
+        <div
+          data-order-snapshot-adjustments
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            paddingTop: 10,
+            marginTop: 4,
+            borderTop: `1px solid ${COLORS.border}`,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: COLORS.muted }}>
+            <span>Subtotal</span>
+            <span>{formatMoney(subtotal, symbol)}</span>
+          </div>
+          {checkoutAdjustments!.lines.map((line) => (
+            <div
+              key={`${line.ruleId}-${line.label}`}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                fontSize: 13,
+                color: line.amount < 0 ? COLORS.green : COLORS.muted,
+              }}
+            >
+              <span style={{ minWidth: 0 }}>{line.label}</span>
+              <span style={{ flexShrink: 0, fontWeight: 600 }}>
+                {line.amount < 0 ? '−' : '+'}
+                {formatMoney(Math.abs(line.amount), symbol)}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div
+        data-order-snapshot-order-total-row
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: hasLineBreakdown ? '12px 0 10px' : '14px 0 10px',
+          marginTop: hasLineBreakdown ? 8 : 4,
+          borderTop: `${hasLineBreakdown ? 1 : 2}px solid ${COLORS.border}`,
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
+        <span
+          data-order-snapshot-order-total-value
+          style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}
+        >
+          {grandTotal != null && Number.isFinite(grandTotal) ? formatMoney(grandTotal, symbol) : '—'}
+        </span>
+      </div>
+    </>
+  );
+}
+
 // ─── SVG Icons (crisp, iOS-style) ────────────────────────────────────────────
 const Ic = {
   Back: () => (
@@ -957,7 +1011,7 @@ function StatusDropdown({
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const statuses: StatusType[] = ['pending', 'completed', 'cancelled'];
+  const statuses: StatusType[] = [...ORDER_STATUSES];
 
   return (
     <div ref={ref} style={{
@@ -1206,6 +1260,7 @@ export default function OrderDetail() {
   const [addItemsSearch, setAddItemsSearch] = useState('');
   const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null);
   const [priceEditValue, setPriceEditValue] = useState('');
+  const [editAdjustments, setEditAdjustments] = useState<ManualOrderAdjustment[]>([]);
   const isSwipeProcessingRef = useRef(false);
   const pdfProcessingRef = useRef(false);
   const shareImageProcessingRef = useRef(false);
@@ -1512,6 +1567,7 @@ useEffect(() => {
     setEditShipState(addr?.state || '');
     setEditShipPincode(addr?.pincode || '');
     setEditItems((order.items || []).map((it: OrderItem, i: number) => ({ ...it, _key: String(i) })));
+    setEditAdjustments(manualAdjustmentsFromCheckoutTotals(order.checkout_adjustments));
     setEditModeSync(true);
   }, [order]);
 
@@ -1521,11 +1577,14 @@ useEffect(() => {
     setSaveLoading(true);
     try {
       const persistedEditItems = editItems.filter((it) => it.quantity > 0);
-      const total = persistedEditItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
       const itemsToSave = persistedEditItems.map(({ _key, ...item }) => ({
         ...item,
         rowTotal: (item.unitPrice || 0) * item.quantity,
       })) as any[];
+      const subtotal = itemsToSave.reduce((sum, item) => sum + (item.rowTotal || 0), 0);
+      const checkoutTotals = computeManualCheckoutTotals(subtotal, editAdjustments);
+      const hasAdjustments = hasManualAdjustments(editAdjustments);
+      const total = checkoutTotals.grandTotal;
       const shipping_address =
         editShipLine1.trim() && editShipCity.trim() && editShipState.trim() && editShipPincode.trim()
           ? {
@@ -1542,6 +1601,7 @@ useEffect(() => {
         customer_whatsapp: editPhone,
         total_amount: total,
         shipping_address,
+        checkout_adjustments: hasAdjustments ? checkoutTotals : null,
       });
 
       if (error) {
@@ -1562,6 +1622,7 @@ useEffect(() => {
         customer_whatsapp: editPhone,
         total_amount: total,
         shipping_address,
+        checkout_adjustments: hasAdjustments ? checkoutTotals : null,
       } as Order;
       setOrder(updatedOrder);
       if (user?.uid) {
@@ -1966,6 +2027,28 @@ useEffect(() => {
     }
   };
 
+  const editItemsSubtotal = useMemo(
+    () =>
+      editItems
+        .filter((it) => it.quantity > 0)
+        .reduce((sum, it) => sum + (it.unitPrice || 0) * it.quantity, 0),
+    [editItems]
+  );
+  const editCheckoutTotals = useMemo(
+    () => computeManualCheckoutTotals(editItemsSubtotal, editAdjustments),
+    [editItemsSubtotal, editAdjustments]
+  );
+  const editPersistedItems = useMemo(
+    () =>
+      editItems
+        .filter((it) => it.quantity > 0)
+        .map((it) => ({
+          ...it,
+          rowTotal: (it.unitPrice || 0) * it.quantity,
+        })),
+    [editItems]
+  );
+
   // ── Loading ──
   if (loading) return (
     <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: COLORS.bg, fontFamily: FONT }}>
@@ -1991,8 +2074,9 @@ useEffect(() => {
 
   const symbol = getSymbolForCurrencyCode(order.currency_code);
   const items: OrderItem[] = order.items || [];
+  const orderDisplayTotal =
+    order.checkout_adjustments?.grandTotal ?? order.total_amount ?? sumOrderItemsSubtotal(items);
   const phone = (order as any).customer_whatsapp || '';
-  const editTotal = editItems.reduce((s, it) => s + ((it.unitPrice || 0) * it.quantity), 0);
   const statusCfg = getStatusConfig(order.status);
 
   return (
@@ -2096,7 +2180,7 @@ useEffect(() => {
 
         {/* Status color bar */}
         <div style={{ height: 3, background: statusCfg.bg, borderTop: `1px solid ${statusCfg.border}` }}>
-          <div style={{ height: '100%', background: statusCfg.dot, width: order.status === 'completed' ? '100%' : order.status === 'pending' ? '50%' : '0%', transition: 'width 0.5s ease', opacity: 0.5 }} />
+          <div style={{ height: '100%', background: statusCfg.dot, width: orderStatusProgressWidth(order.status), transition: 'width 0.5s ease', opacity: 0.5 }} />
         </div>
       </div>
 
@@ -2514,6 +2598,11 @@ useEffect(() => {
                 ) : null}
               </Card>
 
+              <ManualOrderAdjustmentsEditor
+                adjustments={editAdjustments}
+                onChange={setEditAdjustments}
+              />
+
               {/* Price Edit Modal */}
               {editingPriceKey !== null && (
                 <div style={{
@@ -2661,7 +2750,9 @@ useEffect(() => {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.text, letterSpacing: '-0.5px' }}>
-                      {order.total_amount ? formatMoney(order.total_amount, symbol) : '—'}
+                      {orderDisplayTotal != null && Number.isFinite(orderDisplayTotal)
+                        ? formatMoney(orderDisplayTotal, symbol)
+                        : '—'}
                     </div>
                     <div style={{ fontSize: 11, color: COLORS.subtle, marginTop: 2 }}>
                       {items.length} item{items.length !== 1 ? 's' : ''}
@@ -2725,40 +2816,31 @@ useEffect(() => {
                       </div>
                     );
                   })}
-                  <div
-                    data-order-snapshot-order-total-row
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '14px 0 10px',
-                      marginTop: 4,
-                      borderTop: `2px solid ${COLORS.border}`,
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.muted }}>Order Total</span>
-                    <span
-                      data-order-snapshot-order-total-value
-                      style={{ fontSize: 20, fontWeight: 800, color: COLORS.green, letterSpacing: '-0.4px' }}
-                    >
-                      {order.total_amount ? formatMoney(order.total_amount, symbol) : '—'}
-                    </span>
-                  </div>
+                  <OrderItemsTotalsFooter
+                    items={items}
+                    checkoutAdjustments={order.checkout_adjustments}
+                    totalAmount={order.total_amount}
+                    symbol={symbol}
+                  />
                 </div>
               </Card>
             </div>
           )}
 
           {/* ── Edit mode total ── */}
-          {editMode && editTotal > 0 && (
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              background: COLORS.greenLight, borderRadius: 12, padding: '12px 16px',
-              border: `1px solid #BBF7D0`,
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#166534' }}>Updated Total</span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>{formatMoney(editTotal, symbol)}</span>
-            </div>
+          {editMode && editItemsSubtotal > 0 && (
+            <Card>
+              <div style={{ padding: '4px 16px' }}>
+                <OrderItemsTotalsFooter
+                  items={editPersistedItems}
+                  checkoutAdjustments={
+                    hasManualAdjustments(editAdjustments) ? editCheckoutTotals : null
+                  }
+                  totalAmount={editCheckoutTotals.grandTotal}
+                  symbol={symbol}
+                />
+              </div>
+            </Card>
           )}
 
           {/* ── Actions (edit mode) ── */}
@@ -2800,7 +2882,7 @@ useEffect(() => {
                 <SectionLabel>Quick Actions</SectionLabel>
                 <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {(['pending', 'completed', 'cancelled'] as StatusType[]).filter(s => s !== order.status).map(s => {
+                  {ORDER_STATUSES.filter(s => s !== order.status).map(s => {
                     const cfg = getStatusConfig(s);
                     return (
                       <button
@@ -2814,7 +2896,7 @@ useEffect(() => {
                           transition: 'transform 0.1s',
                         }}
                       >
-                        {s === 'completed' ? '✓ Complete' : s === 'cancelled' ? '✕ Cancel' : '↩ Reopen'}
+                        {getStatusChangeLabel(s)}
                       </button>
                     );
                   })}
@@ -2875,7 +2957,7 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div style={{ padding: '0 6px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <OdIntegrationsStack>
                 <OrderPaymentSection order={order} />
                 <OrderShipmentSection
                   orderId={order.id}
@@ -2898,7 +2980,7 @@ useEffect(() => {
                     }
                   }}
                 />
-              </div>
+              </OdIntegrationsStack>
             </>
           )}
         </div>

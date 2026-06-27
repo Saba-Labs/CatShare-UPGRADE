@@ -16,6 +16,7 @@ import {
   resolveQuantityAwarePricing,
   roundQuantityToRules,
 } from '../utils/quantityPricingUtils';
+import { productMatchesSearchQuery } from '../utils/productSearchUtils';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
 
@@ -110,11 +111,7 @@ export default function CreateOrderModal({
   // Filter products by search
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return catalogueProducts;
-    const q = searchQuery.toLowerCase();
-    return catalogueProducts.filter(p => 
-      p.name?.toLowerCase().includes(q) || 
-      p.category?.some((c: string) => c?.toLowerCase().includes(q))
-    );
+    return catalogueProducts.filter((p) => productMatchesSearchQuery(p, searchQuery));
   }, [catalogueProducts, searchQuery]);
 
   // Calculate order totals

@@ -11,12 +11,11 @@ import {
   type BusinessProfile as BusinessProfileData,
 } from '../../config/businessProfile';
 import StoreLayout from './components/StoreLayout';
+import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import {
   STORE_FIELD_CLASS,
-  STORE_SAVE_BTN_DISABLED,
-  STORE_SAVE_BTN_ENABLED,
 } from './storeTypography';
 
 const BUSINESS_LOGO_PRODUCT_ID = 'business-logo';
@@ -445,27 +444,12 @@ export default function BusinessProfile() {
         </div>
       </div>
 
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 md:hidden bg-white/95 dark:bg-gray-950/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-4 z-[55]">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!canSave}
-          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
-        >
-          {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
-        </button>
-      </div>
-
-      <div className="hidden md:block fixed bottom-6 right-6">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!canSave}
-          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
-        >
-          {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
-        </button>
-      </div>
+      <StoreSaveBar
+        hasChanges={hasChanges}
+        saving={saving}
+        canSave={canSave}
+        onSave={() => void handleSave()}
+      />
     </StoreLayout>
   );
 }

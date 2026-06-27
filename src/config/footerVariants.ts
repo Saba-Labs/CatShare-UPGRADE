@@ -199,5 +199,6 @@ export function footerVariantForTemplate(templateId: string): WebsiteFooterVaria
   if (templateId === 'aurora-boutique') return 'aurora';
   if (templateId === 'pulse-tech') return 'pulse';
   if (templateId === 'clean-market') return 'clean';
+  if (templateId === 'studio-commerce') return 'clean';
   return 'classic';
 }

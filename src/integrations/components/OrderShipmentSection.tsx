@@ -30,7 +30,6 @@ import {
   OdSectionLabel,
   OdStatusPill,
   getDeliveryStatusPill,
-  OD_COLORS,
 } from './orderDetailUi';
 
 function formatDate(iso: string | null | undefined): string {
@@ -67,16 +66,6 @@ const DELIVERY_LABELS: Record<string, string> = {
   failed: 'Failed',
   cancelled: 'Cancelled',
   unknown: 'Unknown',
-};
-
-const addressInputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: `1.5px solid ${OD_COLORS.border}`,
-  fontSize: 14,
-  background: '#FAFAFA',
-  fontFamily: 'inherit',
 };
 
 type OrderShipmentSectionProps = {
@@ -162,9 +151,7 @@ export function OrderShipmentSection({
       <OdSectionLabel>Shipment</OdSectionLabel>
       <OdCard>
         {loading ? (
-          <div style={{ padding: '20px 16px', fontSize: 13, color: OD_COLORS.muted }}>
-            Loading shipment…
-          </div>
+          <div className="od-loading">Loading shipment…</div>
         ) : !shipment ? (
           <>
             <OdEmptyState
@@ -180,44 +167,29 @@ export function OrderShipmentSection({
             />
 
             {needsAddressForm ? (
-              <div
-                style={{
-                  padding: '0 16px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: OD_COLORS.text,
-                  }}
-                >
-                  Delivery address
-                </div>
+              <div className="od-form-block">
+                <div className="od-form-label">Delivery address</div>
                 <input
                   type="text"
                   value={line1}
                   onChange={(e) => setLine1(e.target.value)}
                   placeholder="Street / building / area"
-                  style={addressInputStyle}
+                  className="od-input"
                 />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="od-input-grid">
                   <input
                     type="text"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="City"
-                    style={addressInputStyle}
+                    className="od-input"
                   />
                   <input
                     type="text"
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     placeholder="State"
-                    style={addressInputStyle}
+                    className="od-input"
                   />
                 </div>
                 <input
@@ -227,33 +199,22 @@ export function OrderShipmentSection({
                   value={pincode}
                   onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="Pincode"
-                  style={addressInputStyle}
+                  className="od-input"
                 />
               </div>
             ) : savedAddress ? (
-              <div style={{ padding: '0 16px 12px', fontSize: 13, color: OD_COLORS.muted, lineHeight: 1.5 }}>
+              <div className="od-address-preview">
                 {savedAddress.line1}, {savedAddress.city}, {savedAddress.state} — {savedAddress.pincode}
               </div>
             ) : null}
 
             {shiprocketLive ? (
-              <div style={{ padding: '0 16px 14px' }}>
+              <div className="od-actions">
                 <button
                   type="button"
                   disabled={creating}
                   onClick={handleCreateAwb}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: '#7C3AED',
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: creating ? 'wait' : 'pointer',
-                    opacity: creating ? 0.7 : 1,
-                  }}
+                  className="od-btn-primary"
                 >
                   {creating ? 'Creating AWB…' : 'Create AWB in Shiprocket'}
                 </button>
@@ -263,10 +224,10 @@ export function OrderShipmentSection({
         ) : (
           <>
             <OdCardHeader
+              variant="shipment"
               icon={<OdIcons.Shipment />}
               title={shipment.courier || 'Shipment'}
               subtitle={shipment.awbNumber ? `AWB ${shipment.awbNumber}` : undefined}
-              accentColor="#7C3AED"
               badge={
                 <OdStatusPill
                   {...getDeliveryStatusPill(shipment.deliveryStatus)}
@@ -275,33 +236,21 @@ export function OrderShipmentSection({
               }
             />
 
-            <OdDetailRow label="Shipment ID" value={shipment.shipmentId} mono />
-            <OdDetailRow label="Tracking no." value={shipment.trackingNumber} mono />
-            <OdDetailRow label="Pickup" value={formatDate(shipment.pickupDate)} />
-            <OdDetailRow label="Est. delivery" value={formatDate(shipment.estimatedDelivery)} />
-            <OdDetailRow label="Last updated" value={formatDateTime(shipment.lastUpdatedAt)} isLast />
+            <div className="od-detail-grid">
+              <OdDetailRow label="Shipment ID" value={shipment.shipmentId} mono />
+              <OdDetailRow label="Tracking no." value={shipment.trackingNumber} mono />
+              <OdDetailRow label="Pickup" value={formatDate(shipment.pickupDate)} />
+              <OdDetailRow label="Est. delivery" value={formatDate(shipment.estimatedDelivery)} />
+              <OdDetailRow label="Last updated" value={formatDateTime(shipment.lastUpdatedAt)} isLast />
+            </div>
 
             {shipment.trackingUrl ? (
-              <div style={{ padding: '12px 16px 14px', borderTop: `1px solid ${OD_COLORS.divider}` }}>
+              <div className="od-actions">
                 <a
                   href={shipment.trackingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: 12,
-                    border: `1.5px solid ${OD_COLORS.border}`,
-                    background: OD_COLORS.surface,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: OD_COLORS.blue,
-                    textDecoration: 'none',
-                  }}
+                  className="od-btn-secondary"
                 >
                   Track package
                 </a>
@@ -309,25 +258,8 @@ export function OrderShipmentSection({
             ) : null}
 
             {shipment.timeline.length > 0 ? (
-              <div
-                style={{
-                  borderTop: `1px solid ${OD_COLORS.divider}`,
-                  padding: '14px 16px 16px',
-                  background: '#FAFAFA',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.5px',
-                    textTransform: 'uppercase',
-                    color: OD_COLORS.subtle,
-                    marginBottom: 10,
-                  }}
-                >
-                  Tracking timeline
-                </div>
+              <div className="od-timeline-wrap">
+                <div className="od-timeline-label">Tracking timeline</div>
                 <ShipmentTrackingTimeline events={shipment.timeline} />
               </div>
             ) : null}

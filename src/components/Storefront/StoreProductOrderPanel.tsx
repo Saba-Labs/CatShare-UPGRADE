@@ -13,12 +13,15 @@ import {
   buildStorefrontDetailFields,
   fmt,
   fmtCalc,
-  formatQuantitySlabTable,
+  getEffectiveQuantitySlabs,
   getStorefrontPriceAndUnit,
   getStoreProductGalleryProps,
+  getStorefrontProductGalleryProps,
+  getStorefrontVariantPrimaryImageUrl,
   isDisplayableProductImage,
   unitLabel,
 } from './storefrontOrderHelpers';
+import { formatQuantitySlabRange, type QuantityPriceSlab } from '../../utils/quantityPricingUtils';
 import { IconImage, MoqHint, PackHint } from './StorefrontIcons';
 import './store-product-order-page.css';
 
@@ -45,6 +48,44 @@ function QtyControl({
       <button type="button" className="sv-qty-btn" onClick={handlePlus}>
         +
       </button>
+    </div>
+  );
+}
+
+function slabMatchesQuantity(slab: QuantityPriceSlab, qty: number): boolean {
+  if (qty <= 0) return false;
+  return qty >= slab.minQty && (slab.maxQty == null || qty <= slab.maxQty);
+}
+
+function QuantitySlabPricing({
+  slabs,
+  quantity,
+  currencySymbol,
+}: {
+  slabs: QuantityPriceSlab[];
+  quantity: number;
+  currencySymbol: string;
+  priceUnit?: string;
+}) {
+  if (slabs.length === 0) return null;
+
+  return (
+    <div className="sv-order-slab-compact" aria-label="Volume pricing tiers">
+      <span className="sv-order-slab-label">Bulk pricing</span>
+      <div className="sv-order-slab-chips">
+        {slabs.map((slab) => {
+          const active = slabMatchesQuantity(slab, quantity);
+          const rangeLabel = formatQuantitySlabRange(slab);
+          return (
+            <span
+              key={`${slab.minQty}-${slab.maxQty ?? 'open'}`}
+              className={`sv-order-slab-chip${active ? ' is-active' : ''}`}
+            >
+              {rangeLabel} · {fmt(slab.price, currencySymbol)}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -105,7 +146,7 @@ export default function StoreProductOrderPanel({
   const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
   const qstep = rules.step;
   const minQty = rules.minQty;
-  const slabLines = formatQuantitySlabTable(catData, currencySymbol, variantData ?? undefined);
+  const slabTiers = getEffectiveQuantitySlabs(catData, variantData ?? undefined);
   const { price, priceUnit, listPrice, showOffer, priceFrom } = getStorefrontPriceAndUnit(
     catData,
     catalogue,
@@ -122,9 +163,8 @@ export default function StoreProductOrderPanel({
   );
   const groups = getProductVariantGroups(product);
   const variantSummary = formatVariantSelectionSummary(groups, variantSelection);
-  const gallery = getStoreProductGalleryProps(product);
-  const variantImageUrl = variantData?.image;
-  const imageSrc = variantImageUrl || gallery.fallback;
+  const gallery = getStorefrontProductGalleryProps(product, variantData);
+  const imageSrc = gallery.fallback;
 
   const rootClass =
     layout === 'page'
@@ -135,9 +175,7 @@ export default function StoreProductOrderPanel({
     <div
       className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery sv-drawer-img-wrap--thumbs' : ''}`}
     >
-      {variantImageUrl ? (
-        <img src={variantImageUrl} alt={product.name} />
-      ) : gallery.urls.length > 1 ? (
+      {gallery.urls.length > 1 ? (
         <ProductImageGallery
           urls={gallery.urls}
           primaryIndex={gallery.primaryIndex}
@@ -171,11 +209,15 @@ export default function StoreProductOrderPanel({
     ) : null;
 
   const orderSection = showQuantitySelector ? (
-    <div className="sv-drawer-qty-section">
+    <div className="sv-drawer-qty-section sv-order-qty-card">
       <div className="sv-drawer-qty-header">
-        <div className="sv-drawer-qty-label">Quantity</div>
-        {qstep > 1 ? <PackHint step={qstep} className="website-product-pack-hint" /> : null}
-        {rules.moq > 1 ? <MoqHint minQty={minQty} className="website-product-pack-hint" /> : null}
+        <span className="sv-drawer-qty-label">Quantity</span>
+        {(qstep > 1 || rules.moq > 1) ? (
+          <div className="sv-drawer-qty-rules" role="list" aria-label="Ordering rules">
+            {qstep > 1 ? <PackHint step={qstep} /> : null}
+            {rules.moq > 1 ? <MoqHint minQty={minQty} /> : null}
+          </div>
+        ) : null}
       </div>
       <div className="sv-drawer-qty-row">
         <QtyControl value={quantity} step={qstep} onChange={onQtyChange} accent={quantity > 0} />
@@ -225,12 +267,12 @@ export default function StoreProductOrderPanel({
           <span style={{ color: 'var(--c-text3)', fontWeight: 400 }}>Price on request</span>
         )}
       </div>
-      {slabLines.length > 0 ? (
-        <div className="sv-drawer-sub" style={{ marginTop: 4 }}>
-          {slabLines.map((line) => (
-            <div key={line}>{line}</div>
-          ))}
-        </div>
+      {slabTiers.length > 0 ? (
+        <QuantitySlabPricing
+          slabs={slabTiers}
+          quantity={quantity}
+          currencySymbol={currencySymbol}
+        />
       ) : null}
 
       {!fieldsAfterOrder ? fieldsTable : null}

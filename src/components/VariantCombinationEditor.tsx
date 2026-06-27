@@ -8,6 +8,11 @@ import {
   extractVariantCombinationDetails,
   hasVariantCombinationDetailsForCatalogue,
   countConfiguredCombinationsForCatalogue,
+  getVariantSpecificImages,
+  getVariantBaseImageIndices,
+  getVariantGalleryUrls,
+  normalizeVariantImageFields,
+  MAX_VARIANT_GALLERY_IMAGES,
   type ProductVariantGroup,
   type ProductVariantsConfig,
   type VariantCombination,
@@ -37,6 +42,8 @@ interface VariantCombinationEditorProps {
   selectedCatalogue: string;
   onCatalogueChange?: (catalogueId: string) => void;
   productId: string;
+  /** Base product gallery slots (same order as product imageUrls / editor slots). */
+  baseProductImages?: string[];
 }
 
 export default function VariantCombinationEditor({
@@ -49,12 +56,13 @@ export default function VariantCombinationEditor({
   selectedCatalogue,
   onCatalogueChange,
   productId,
+  baseProductImages = [],
 }: VariantCombinationEditorProps) {
   const { showToast } = useToast();
   const [selectedCombinationId, setSelectedCombinationId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<Partial<VariantCombinationDetails>>({});
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [showImageMenu, setShowImageMenu] = useState(false);
+  const [showImageMenu, setShowImageMenu] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const combinations = getAllVariantCombinations(variantConfig.groups);
@@ -76,11 +84,36 @@ export default function VariantCombinationEditor({
     setEditingData(details ? { ...details, inStock: details.inStock !== false } : { inStock: true });
   }, [existingData, selectedCatalogue]);
 
+  const variantImages = getVariantSpecificImages(editingData as VariantCombinationDetails);
+  const selectedBaseIndices = getVariantBaseImageIndices(editingData as VariantCombinationDetails);
+  const baseImageSlots = baseProductImages
+    .map((src, index) => ({ src: String(src ?? "").trim(), index }))
+    .filter((slot) => slot.src.length > 0);
+  const galleryPreviewCount =
+    (getVariantGalleryUrls({ imageUrls: baseProductImages }, editingData as VariantCombinationDetails)?.length ??
+      0);
+
+  const toggleBaseImageIndex = useCallback((index: number) => {
+    setEditingData((prev) => {
+      const current = getVariantBaseImageIndices(prev as VariantCombinationDetails);
+      const next = current.includes(index)
+        ? current.filter((i) => i !== index)
+        : [...current, index].sort((a, b) => a - b);
+      const normalized = normalizeVariantImageFields({
+        ...(prev as VariantCombinationDetails),
+        baseImageIndices: next,
+      });
+      return { ...prev, ...normalized };
+    });
+  }, []);
+
   const handleSaveData = useCallback(() => {
     if (!selectedCombination) return;
     const slabs = normalizeQuantitySlabs(editingData.customFields?.quantitySlabs);
+    const imageFields = normalizeVariantImageFields(editingData);
     const payload: Partial<VariantCombinationDetails> = {
       ...editingData,
+      ...imageFields,
       inStock: editingData.inStock !== false,
       customFields: {
         ...editingData.customFields,
@@ -118,21 +151,37 @@ export default function VariantCombinationEditor({
     setEditingData({});
   }, [selectedCombination, variantConfig, onChange, selectedCatalogue]);
 
-  const handleRemoveVariantImage = useCallback(async () => {
-    if (editingData.image && editingData.image.startsWith("https://")) {
+  const handleRemoveVariantImage = useCallback(async (url: string) => {
+    const isBaseProductUrl = baseImageSlots.some((slot) => slot.src === url);
+    if (!isBaseProductUrl && url.startsWith("https://")) {
       try {
-        await deleteImageFromR2(editingData.image);
+        await deleteImageFromR2(url);
       } catch (err) {
         console.error("Failed to delete variant image from R2:", err);
       }
     }
-    setEditingData({ ...editingData, image: undefined });
-    setShowImageMenu(false);
-  }, [editingData]);
+    setEditingData((prev) => {
+      const current = getVariantSpecificImages(prev as VariantCombinationDetails);
+      const nextImages = current.filter((u) => u !== url);
+      const normalized = normalizeVariantImageFields({
+        ...(prev as VariantCombinationDetails),
+        images: nextImages,
+        image: nextImages[0],
+      });
+      return { ...prev, ...normalized };
+    });
+    setShowImageMenu(null);
+  }, [baseImageSlots]);
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
       showToast("Please select an image file", "error");
+      return;
+    }
+
+    const currentCount = getVariantSpecificImages(editingData as VariantCombinationDetails).length;
+    if (currentCount >= MAX_VARIANT_GALLERY_IMAGES) {
+      showToast(`You can add up to ${MAX_VARIANT_GALLERY_IMAGES} variant images`, "error");
       return;
     }
 
@@ -155,7 +204,16 @@ export default function VariantCombinationEditor({
         dataUrl: base64,
       });
       if (result?.url) {
-        setEditingData((prev) => ({ ...prev, image: result.url }));
+        setEditingData((prev) => {
+          const current = getVariantSpecificImages(prev as VariantCombinationDetails);
+          const nextImages = [...current, result.url].slice(0, MAX_VARIANT_GALLERY_IMAGES);
+          const normalized = normalizeVariantImageFields({
+            ...(prev as VariantCombinationDetails),
+            images: nextImages,
+            image: nextImages[0],
+          });
+          return { ...prev, ...normalized };
+        });
         showToast("Image uploaded successfully", "success");
       } else {
         showToast("Upload failed: could not get image URL", "error");
@@ -166,7 +224,7 @@ export default function VariantCombinationEditor({
     } finally {
       setUploadingImage(false);
     }
-  }, [selectedCombinationId, showToast]);
+  }, [editingData, selectedCombinationId, showToast]);
 
   const selectedCatalogueLabel =
     catalogues.find((c) => c.id === selectedCatalogue)?.label ?? selectedCatalogue;
@@ -252,22 +310,31 @@ export default function VariantCombinationEditor({
         </div>
 
         <div className="space-y-3">
-          {/* Image */}
+          {/* Images */}
           <div className="flex gap-3 items-start">
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0 pt-2">
-              Image
+              Images
             </label>
-            <div className="flex-1">
+            <div className="flex-1 space-y-3">
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                Upload variant photos first. Toggle base product images below to include shared shots
+                like safety labels or instructions.
+                {galleryPreviewCount > 0 ? (
+                  <span className="block mt-1 font-medium text-gray-600 dark:text-gray-300">
+                    {galleryPreviewCount} image{galleryPreviewCount !== 1 ? "s" : ""} will show for this variant.
+                  </span>
+                ) : null}
+              </p>
+
               <div className="flex flex-wrap gap-3">
-                {editingData.image && (
-                  <div className="relative">
-                    <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-gray-200">
-                      <img src={editingData.image} alt="Variant" className="w-full h-full object-cover" />
+                {variantImages.map((url) => (
+                  <div key={url} className="relative">
+                    <div className="relative h-24 w-24 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
+                      <img src={url} alt="Variant" className="w-full h-full object-cover" />
                     </div>
-                    {/* Action Menu Button */}
                     <button
                       type="button"
-                      onClick={() => setShowImageMenu(!showImageMenu)}
+                      onClick={() => setShowImageMenu(showImageMenu === url ? null : url)}
                       className="absolute -top-2 -right-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-gray-100 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-all hover:scale-110"
                       title="More actions"
                     >
@@ -275,33 +342,32 @@ export default function VariantCombinationEditor({
                         <path d="M10.5 1.5H9.5V.5h1v1zm0 5H9.5v-1h1v1zm0 5H9.5v-1h1v1zm0 5H9.5v-1h1v1z" />
                       </svg>
                     </button>
-                    {/* Dropdown Menu */}
                     <AnimatePresence>
-                      {showImageMenu && (
+                      {showImageMenu === url && (
                         <motion.div
                           initial={{ opacity: 0, scale: 0.9, y: -10 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.9, y: -10 }}
                           transition={{ duration: 0.15 }}
                           className="absolute top-10 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50"
-                          style={{ minWidth: '140px' }}
+                          style={{ minWidth: "140px" }}
                         >
                           <button
                             type="button"
                             onClick={() => {
                               fileInputRef.current?.click();
-                              setShowImageMenu(false);
+                              setShowImageMenu(null);
                             }}
                             className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            Replace
+                            Add another
                           </button>
                           <button
                             type="button"
-                            onClick={handleRemoveVariantImage}
+                            onClick={() => void handleRemoveVariantImage(url)}
                             className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2 border-t border-gray-200 dark:border-gray-700"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -313,13 +379,15 @@ export default function VariantCombinationEditor({
                       )}
                     </AnimatePresence>
                   </div>
-                )}
-                {!editingData.image && (
+                ))}
+
+                {variantImages.length < MAX_VARIANT_GALLERY_IMAGES && (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingImage}
                     className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center hover:border-blue-400 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
+                    title="Upload variant image"
                   >
                     {uploadingImage ? (
                       <div className="flex flex-col items-center justify-center gap-1">
@@ -336,6 +404,7 @@ export default function VariantCombinationEditor({
                     )}
                   </button>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -344,6 +413,43 @@ export default function VariantCombinationEditor({
                   className="hidden"
                 />
               </div>
+
+              {baseImageSlots.length > 0 ? (
+                <div className="pt-1">
+                  <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                    From base product
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {baseImageSlots.map(({ src, index }) => {
+                      const included = selectedBaseIndices.includes(index);
+                      return (
+                        <button
+                          key={`${index}-${src}`}
+                          type="button"
+                          onClick={() => toggleBaseImageIndex(index)}
+                          className={`relative h-20 w-20 rounded-lg overflow-hidden border-2 transition-all ${
+                            included
+                              ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                              : "border-gray-200 dark:border-gray-700 opacity-60 hover:opacity-100"
+                          }`}
+                          title={included ? "Shown on this variant — click to hide" : "Hidden — click to show on this variant"}
+                        >
+                          <img src={src} alt={`Base product image ${index + 1}`} className="w-full h-full object-cover" />
+                          <span
+                            className={`absolute bottom-1 right-1 rounded px-1 py-0.5 text-[10px] font-bold ${
+                              included
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-900/70 text-white"
+                            }`}
+                          >
+                            {included ? "On" : "Off"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -668,14 +774,16 @@ export default function VariantCombinationEditor({
                 {/* Details Grid */}
                 {hasData && details && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-green-200 dark:border-green-800">
-                    {details.image && (
+                    {details.image || (details.images && details.images.length > 0) || (details.baseImageIndices && details.baseImageIndices.length > 0) ? (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-green-700 dark:text-green-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M5 5a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V5z" />
                         </svg>
-                        <span className="text-gray-700 dark:text-gray-300">Image</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {getVariantGalleryUrls({ imageUrls: baseProductImages }, details)?.length ?? (details.image ? 1 : 0)} image(s)
+                        </span>
                       </div>
-                    )}
+                    ) : null}
                     {details.inStock === false && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <svg className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

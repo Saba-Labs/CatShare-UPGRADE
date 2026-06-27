@@ -8,7 +8,7 @@ import type {
   WebsiteModeConfig,
 } from '../types/homepage';
 
-export type WebsiteTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market';
+export type WebsiteTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market' | 'studio-commerce';
 
 export interface WebsiteTemplateMeta {
   id: WebsiteTemplateId;
@@ -414,7 +414,166 @@ function buildCleanMarket(): WebsiteModeConfig {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Studio Commerce — Shopify-inspired, clean modern professional       */
+/* ------------------------------------------------------------------ */
+
+function buildStudioCommerce(): WebsiteModeConfig {
+  resetOrder();
+  const theme: ThemeSettings = {
+    primaryColor: '#121212',
+    secondaryColor: '#f6f6f6',
+    backgroundColor: '#ffffff',
+    textColor: '#121212',
+    accentColor: '#121212',
+    fontFamily: "'Inter', system-ui, sans-serif",
+    buttonStyle: 'solid',
+  };
+
+  const sections: BuilderSection[] = [
+    section({
+      type: 'banner',
+      settings: {
+        height: 'large',
+        backgroundImage: img('studio-commerce', 'hero.jpg'),
+        backgroundColor: '#f6f6f6',
+        overlayOpacity: 0.08,
+        textAlignment: 'left',
+      },
+      content: {
+        title: 'Designed for everyday living',
+        subtitle: 'Thoughtfully curated products with the quality and simplicity you expect.',
+        buttonText: 'Shop collection',
+        buttonLink: '/collections/all',
+      },
+    } as HomepageSection),
+    section({
+      type: 'category-showcase',
+      settings: { title: 'Shop by collection', columns: 4, layout: 'grid', showCount: false },
+      content: { categoryIds: [] },
+    } as HomepageSection),
+    section({
+      type: 'featured-products',
+      settings: {
+        title: 'New arrivals',
+        displayMode: 'grid',
+        columns: 4,
+        itemsPerPage: 8,
+        showPrice: true,
+        showDescription: false,
+        backgroundColor: '#ffffff',
+      },
+      content: { productIds: [] },
+    } as HomepageSection),
+    section({
+      type: 'content-grid',
+      settings: { title: '', columns: 3, backgroundColor: '#f6f6f6', padding: 'large', gap: 'large' },
+      content: {
+        items: [
+          { id: uuid(), imageUrl: img('studio-commerce', 'feature2.jpg'), title: 'Free shipping', description: 'Complimentary delivery on qualifying orders.', link: '#' },
+          { id: uuid(), imageUrl: img('studio-commerce', 'feature1.jpg'), title: 'Easy returns', description: 'Hassle-free returns within 14 days.', link: '#' },
+          { id: uuid(), imageUrl: img('studio-commerce', 'feature3.jpg'), title: 'Dedicated support', description: 'Real people ready to help when you need it.', link: '#' },
+        ],
+      },
+    } as HomepageSection),
+    section({
+      type: 'feature-card',
+      settings: { layout: 'image-left', imageWidth: 'large', padding: 'large', backgroundColor: '#ffffff', textColor: '#121212' },
+      content: {
+        imageUrl: img('studio-commerce', 'story.jpg'),
+        title: 'Built on quality, not hype',
+        description: 'We partner with makers who share our standards — fewer products, better materials, and details that last.',
+        buttonText: 'Our story',
+        buttonLink: '#',
+      },
+    } as HomepageSection),
+    section({
+      type: 'product-grid',
+      settings: {
+        title: 'Best sellers',
+        columns: 4,
+        displayMode: 'grid',
+        sortBy: 'default',
+        itemsToShow: 8,
+        showFilters: false,
+        showSearch: false,
+        backgroundColor: '#ffffff',
+      },
+      content: { productSource: 'all', categoryId: undefined, productIds: [] },
+    } as HomepageSection),
+    section({
+      type: 'testimonials',
+      settings: { title: 'What our customers say', displayMode: 'carousel', columns: 1, showRating: true, backgroundColor: '#f6f6f6' },
+      content: {
+        testimonials: [
+          { id: uuid(), text: 'Exactly what I was looking for — clean design, fast delivery, and great quality.', author: 'Meera R.', role: 'Verified buyer', rating: 5 },
+          { id: uuid(), text: 'Feels like shopping on a premium brand site. Super smooth experience.', author: 'Daniel K.', role: 'Verified buyer', rating: 5 },
+          { id: uuid(), text: 'Beautiful products and the packaging was a nice touch. Will order again.', author: 'Sofia L.', role: 'Verified buyer', rating: 5 },
+        ],
+      },
+    } as HomepageSection),
+    section({
+      type: 'cta',
+      settings: { layout: 'single', backgroundColor: '#121212', buttonColor: '#ffffff', textAlignment: 'center' },
+      content: {
+        title: 'Stay in the loop',
+        description: 'Be the first to know about new drops, restocks, and exclusive offers.',
+        buttonText: 'Shop now',
+        buttonLink: '/collections/all',
+      },
+    } as HomepageSection),
+  ];
+
+  return {
+    siteSettings: {
+      websiteName: 'Studio Commerce',
+      showAnnouncement: true,
+      announcementText: 'Free shipping on orders above your store minimum',
+      announcementBg: '#121212',
+      announcementTextColor: '#ffffff',
+      headerBg: '#ffffff',
+      headerTextColor: '#121212',
+      headerVariant: headerVariantForTemplate('studio-commerce'),
+      ...footerPresetForVariant('clean'),
+      footerDescription: 'Modern essentials, thoughtfully made. Quality products with a shopping experience you can trust.',
+      footerColumns: createDefaultFooterLinkColumns(),
+      navItems: [
+        { id: uuid(), label: 'Home', href: '/' },
+        { id: uuid(), label: 'Shop', href: '/collections/all' },
+        { id: uuid(), label: 'Collections', href: '/collections/all' },
+      ],
+    },
+    seo: { metaTitle: 'Studio Commerce', metaDescription: 'Clean, modern essentials for everyday living.', keywords: '', allowIndexing: true },
+    pages: { home: { sections, theme }, custom: [] },
+    templates: {
+      collection: { showFilters: true, showSort: true, columns: 4, cardsStyle: 'minimal' },
+      product: {
+        layoutVariant: 'minimal',
+        galleryLayout: 'left-thumbs',
+        showRecommendations: true,
+        showTrustBadges: true,
+        ctaStyle: 'solid',
+        imageLook: 'clean',
+        fieldsInBox: false,
+        showQuantitySelector: true,
+        stickyBuyBar: true,
+        orderCtaLabel: 'Add to order',
+      },
+    },
+    versioning: {},
+  };
+}
+
 export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
+  {
+    id: 'studio-commerce',
+    name: 'Studio Commerce',
+    tagline: 'Shopify-inspired',
+    description: 'Clean, modern, and professional — crisp typography, generous whitespace, and a layout that feels like a premium Shopify theme.',
+    previewImage: '/templates/studio-commerce/preview.jpg',
+    palette: ['#121212', '#f6f6f6', '#ffffff', '#6b7280'],
+    build: buildStudioCommerce,
+  },
   {
     id: 'aurora-boutique',
     name: 'Aurora Boutique',

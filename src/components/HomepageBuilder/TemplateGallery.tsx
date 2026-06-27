@@ -35,7 +35,11 @@ export default function TemplateGallery({ variant = 'full', onApply, onStartBlan
       <div className={`template-gallery-grid${isFull ? ' template-gallery-grid--picker' : ''}`}>
         {WEBSITE_TEMPLATES.map((tpl, index) => (
           <article key={tpl.id} className="template-card">
-            {isFull && index === 0 ? <span className="template-card-badge">Popular</span> : null}
+            {isFull && tpl.id === 'studio-commerce' ? (
+              <span className="template-card-badge">New</span>
+            ) : isFull && index === 1 ? (
+              <span className="template-card-badge">Popular</span>
+            ) : null}
             <div className="template-card-preview">
               {failedPreviews[tpl.id] ? (
                 <div className="template-card-preview-fallback" style={{ background: tpl.palette[0] }}>

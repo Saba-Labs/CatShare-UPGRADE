@@ -88,5 +88,6 @@ export function headerVariantForTemplate(templateId: string): WebsiteHeaderVaria
   if (templateId === 'aurora-boutique') return 'centered';
   if (templateId === 'pulse-tech') return 'split';
   if (templateId === 'clean-market') return 'minimal';
+  if (templateId === 'studio-commerce') return 'classic';
   return 'classic';
 }

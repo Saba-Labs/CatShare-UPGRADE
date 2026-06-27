@@ -626,7 +626,7 @@ export interface WebsiteProductTemplate {
 }
 
 /** Selected storefront template — applies site-wide (home, shop, checkout, custom pages). */
-export type WebsiteActiveTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market';
+export type WebsiteActiveTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market' | 'studio-commerce';
 
 export interface WebsiteModeConfig {
   siteSettings: WebsiteSiteSettings;

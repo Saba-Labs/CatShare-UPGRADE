@@ -232,6 +232,24 @@ export async function updateInventoryRoom(
   }
 }
 
+export async function deleteInventoryRoom(
+  userId: string,
+  roomId: string
+): Promise<{ ok: boolean; error: unknown }> {
+  try {
+    await ensureRlsHeader(userId);
+    const { error } = await getSupabaseClient()
+      .from('inventories')
+      .delete()
+      .eq('id', roomId)
+      .eq('user_id', userId.trim());
+    if (error) return { ok: false, error };
+    return { ok: true, error: null };
+  } catch (err) {
+    return { ok: false, error: err };
+  }
+}
+
 export async function fetchInventoryLevels(
   userId: string,
   inventoryId: string

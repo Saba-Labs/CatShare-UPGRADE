@@ -13,14 +13,13 @@ import {
 } from '../../types/storeMarketingSettings';
 import { readCachedMarketingSettings } from '../../utils/storePageCache';
 import StoreLayout from './components/StoreLayout';
+import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
 import { FiInfo } from 'react-icons/fi';
 import {
   STORE_FIELD_CLASS,
-  STORE_SAVE_BTN_DISABLED,
-  STORE_SAVE_BTN_ENABLED,
 } from './storeTypography';
 
 function ToggleRow({
@@ -372,33 +371,12 @@ export default function Marketing() {
         </div>
       </div>
 
-      <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 md:hidden bg-white/95 dark:bg-gray-950/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 p-4 z-[55]">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!canSave}
-          className={canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED}
-        >
-          {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
-        </button>
-      </div>
-
-      <div className="hidden md:block fixed bottom-6 right-6">
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!canSave}
-          className={`${canSave ? STORE_SAVE_BTN_ENABLED : STORE_SAVE_BTN_DISABLED} shadow-lg`}
-        >
-          {saving ? 'Saving…' : hasChanges ? 'Save Changes' : 'No Changes'}
-        </button>
-      </div>
-
-      {hasChanges ? (
-        <div className="hidden md:block fixed bottom-20 right-6 text-sm text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700">
-          You have unsaved changes
-        </div>
-      ) : null}
+      <StoreSaveBar
+        hasChanges={hasChanges}
+        saving={saving}
+        canSave={canSave}
+        onSave={() => void handleSave()}
+      />
     </StoreLayout>
   );
 }

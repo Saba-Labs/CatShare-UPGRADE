@@ -92,12 +92,15 @@ export default function ProductImageGallery({
   const primarySlot = Math.min(Math.max(0, primaryIndex ?? 0), Math.max(0, n - 1));
   const src = thumbSrc(current, safeIx, primarySlot, primaryImageVersion);
 
+  const multi = n > 1;
+  const withThumbs = showThumbnails && multi;
+
   const mainBgClass = fillContainer
     ? "bg-gray-100 dark:bg-gray-800"
     : "rounded-lg bg-gray-100 dark:bg-gray-800";
-  const mainSizeClass = fillContainer ? "h-full w-full" : "aspect-square w-full";
+  const mainSizeClass =
+    fillContainer && !withThumbs ? "h-full w-full" : fillContainer ? "w-full" : "aspect-square w-full";
   const imgFitClass = objectFit === "cover" ? "object-cover" : "object-contain";
-  const multi = n > 1;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!enableTouchSwipe || !multi) return;
@@ -117,6 +120,7 @@ export default function ProductImageGallery({
   const rootClass = [
     "product-image-gallery",
     fillContainer ? "product-image-gallery--fill" : "",
+    withThumbs ? "product-image-gallery--with-thumbs" : "",
     className,
   ]
     .filter(Boolean)
@@ -141,7 +145,7 @@ export default function ProductImageGallery({
           key={src || `idx-${safeIx}`}
           src={src}
           alt=""
-          className={`h-full w-full ${imgFitClass}`}
+          className={`${withThumbs ? "w-full" : "h-full w-full"} ${imgFitClass}`}
           draggable={false}
         />
         {multi && (

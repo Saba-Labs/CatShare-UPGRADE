@@ -2,6 +2,7 @@ import { getSupabaseClient, setSupabaseRlsUserId } from '../supabaseClient';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { generateOrderTrackingToken, isLikelyMissingTrackingColumnsError } from './orderTrackingService';
+import type { OrderStatus } from '../types/orderStatus';
 import type { CheckoutTotals } from '../types/checkoutSettings';
 import { applyOrderInventory, restoreOrderInventory } from './inventoryService';
 
@@ -53,6 +54,7 @@ function normalizeOrderRow(row: Record<string, unknown>): Order {
     payment_method: row.payment_method as Order['payment_method'],
     checkout_adjustments: (row.checkout_adjustments as CheckoutTotals | null) ?? null,
     shipping_address: (row.shipping_address as Order['shipping_address']) ?? null,
+    catalogue_id: row.catalogue_id != null ? String(row.catalogue_id) : undefined,
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
   };
@@ -228,7 +230,7 @@ export interface Order {
   items: OrderItem[];
   total_amount?: number;
   currency_code: string;
-  status: 'pending' | 'completed' | 'cancelled';
+  status: OrderStatus;
   order_source?: 'link' | 'manual' | 'store';
   tracking_token?: string;
   store_slug?: string;
@@ -243,9 +245,13 @@ export interface Order {
     pincode: string;
     country?: string;
   } | null;
+  /** Catalogue used when the order was created (manual / seller entry). */
+  catalogue_id?: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type { OrderStatus } from '../types/orderStatus';
 
 /**
  * Create a new order from customer confirmation
@@ -369,7 +375,8 @@ export async function createOrderDirectly(
   currencyCode: string = 'INR',
   customerWhatsapp?: string,
   catalogueId?: string,
-  orderSource: 'link' | 'manual' | 'store' = 'manual'
+  orderSource: 'link' | 'manual' | 'store' = 'manual',
+  checkoutAdjustments?: CheckoutTotals | null
 ): Promise<{ data: Order | null; error: any }> {
   try {
     const client = getSupabaseClient();
@@ -380,17 +387,40 @@ export async function createOrderDirectly(
       customer_name: customerName,
       customer_whatsapp: customerWhatsapp,
       items: items,
-      total_amount: totalAmount,
+      total_amount: checkoutAdjustments?.grandTotal ?? totalAmount,
       currency_code: currencyCode,
       status: 'pending',
       order_source: orderSource,
       tracking_token: trackingToken,
     };
 
+    if (checkoutAdjustments) {
+      insertRow.checkout_adjustments = checkoutAdjustments;
+    }
+
+    if (catalogueId?.trim()) {
+      insertRow.catalogue_id = catalogueId.trim();
+    }
+
     let { data, error } = await client.from('orders').insert(insertRow).select().maybeSingle();
 
     if (error && isLikelyMissingTrackingColumnsError(error)) {
       delete insertRow.tracking_token;
+      ({ data, error } = await client.from('orders').insert(insertRow).select().maybeSingle());
+    }
+
+    if (
+      error &&
+      (String((error as { message?: string }).message || '').includes('checkout_adjustments') ||
+        String((error as { message?: string }).message || '').includes('payment_method'))
+    ) {
+      delete insertRow.checkout_adjustments;
+      delete insertRow.payment_method;
+      ({ data, error } = await client.from('orders').insert(insertRow).select().maybeSingle());
+    }
+
+    if (error && String((error as { message?: string }).message || '').includes('catalogue_id')) {
+      delete insertRow.catalogue_id;
       ({ data, error } = await client.from('orders').insert(insertRow).select().maybeSingle());
     }
 
@@ -401,7 +431,7 @@ export async function createOrderDirectly(
 }
 
 export type FetchSellerOrdersOptions = {
-  status?: 'pending' | 'completed' | 'cancelled';
+  status?: OrderStatus;
   /**
    * Only rows with created_at strictly greater than this ISO timestamp.
    * Use for polling new orders — avoids re-reading the full orders table every tick.
@@ -489,7 +519,7 @@ export async function fetchSellerOrders(
  */
 export async function updateOrderStatus(
   orderId: string,
-  status: 'pending' | 'completed' | 'cancelled'
+  status: OrderStatus
 ): Promise<{ data: Order | null; error: any }> {
   try {
     await ensureOrdersRlsHeaderFromSession();
@@ -529,16 +559,24 @@ export async function updateOrder(
     customer_whatsapp?: string;
     total_amount?: number;
     shipping_address?: Order['shipping_address'];
+    checkout_adjustments?: CheckoutTotals | null;
   }
 ): Promise<{ data: Order | null; error: any }> {
   try {
     await ensureOrdersRlsHeaderFromSession();
     const client = getSupabaseClient();
 
-    const { data, error } = await client
-      .from('orders')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
+    const row = { ...updates, updated_at: new Date().toISOString() };
+
+    let { data, error } = await client.from('orders').update(row).eq('id', orderId);
+
+    if (
+      error &&
+      String((error as { message?: string }).message || '').includes('checkout_adjustments')
+    ) {
+      delete row.checkout_adjustments;
+      ({ data, error } = await client.from('orders').update(row).eq('id', orderId));
+    }
 
     return { data, error };
   } catch (err) {

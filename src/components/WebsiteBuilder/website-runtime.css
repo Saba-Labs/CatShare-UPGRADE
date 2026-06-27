@@ -127,6 +127,13 @@
   aspect-ratio: 1;
 }
 
+.website-product-gallery:has(.sv-drawer-img-wrap--thumbs),
+.website-product-gallery:has(.product-image-gallery--with-thumbs) {
+  aspect-ratio: unset;
+  overflow: visible;
+  background: transparent;
+}
+
 .website-product-gallery img {
   width: 100%;
   height: 100%;

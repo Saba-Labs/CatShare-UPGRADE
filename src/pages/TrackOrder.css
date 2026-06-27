@@ -167,6 +167,11 @@
   color: var(--trk-amber);
 }
 
+.trk-status-icon--confirmed {
+  background: var(--trk-blue-soft, #dbeafe);
+  color: var(--trk-blue, #2563eb);
+}
+
 .trk-status-icon--completed {
   background: var(--trk-green-soft);
   color: var(--trk-green);
@@ -207,6 +212,11 @@
   color: #92400e;
 }
 
+.trk-pill--confirmed {
+  background: var(--trk-blue-soft, #dbeafe);
+  color: #1e40af;
+}
+
 .trk-pill--completed {
   background: var(--trk-green-soft);
   color: #166534;
@@ -226,6 +236,7 @@
 }
 
 .trk-pill--completed .trk-pill-dot,
+.trk-pill--confirmed .trk-pill-dot,
 .trk-pill--cancelled .trk-pill-dot {
   animation: none;
 }

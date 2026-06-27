@@ -94,59 +94,59 @@ alter table public.inventory_movements enable row level security;
 
 drop policy if exists warehouses_select_own on public.warehouses;
 create policy warehouses_select_own on public.warehouses
-  for select using (user_id = public.current_catshare_user_id());
+  for select using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists warehouses_insert_own on public.warehouses;
 create policy warehouses_insert_own on public.warehouses
-  for insert with check (user_id = public.current_catshare_user_id());
+  for insert with check (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists warehouses_update_own on public.warehouses;
 create policy warehouses_update_own on public.warehouses
-  for update using (user_id = public.current_catshare_user_id());
+  for update using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists warehouses_delete_own on public.warehouses;
 create policy warehouses_delete_own on public.warehouses
-  for delete using (user_id = public.current_catshare_user_id());
+  for delete using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventories_select_own on public.inventories;
 create policy inventories_select_own on public.inventories
-  for select using (user_id = public.current_catshare_user_id());
+  for select using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventories_insert_own on public.inventories;
 create policy inventories_insert_own on public.inventories
-  for insert with check (user_id = public.current_catshare_user_id());
+  for insert with check (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventories_update_own on public.inventories;
 create policy inventories_update_own on public.inventories
-  for update using (user_id = public.current_catshare_user_id());
+  for update using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventories_delete_own on public.inventories;
 create policy inventories_delete_own on public.inventories
-  for delete using (user_id = public.current_catshare_user_id());
+  for delete using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_levels_select_own on public.inventory_levels;
 create policy inventory_levels_select_own on public.inventory_levels
-  for select using (user_id = public.current_catshare_user_id());
+  for select using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_levels_insert_own on public.inventory_levels;
 create policy inventory_levels_insert_own on public.inventory_levels
-  for insert with check (user_id = public.current_catshare_user_id());
+  for insert with check (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_levels_update_own on public.inventory_levels;
 create policy inventory_levels_update_own on public.inventory_levels
-  for update using (user_id = public.current_catshare_user_id());
+  for update using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_levels_delete_own on public.inventory_levels;
 create policy inventory_levels_delete_own on public.inventory_levels
-  for delete using (user_id = public.current_catshare_user_id());
+  for delete using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_movements_select_own on public.inventory_movements;
 create policy inventory_movements_select_own on public.inventory_movements
-  for select using (user_id = public.current_catshare_user_id());
+  for select using (user_id::text = public.current_catshare_user_id());
 
 drop policy if exists inventory_movements_insert_own on public.inventory_movements;
 create policy inventory_movements_insert_own on public.inventory_movements
-  for insert with check (user_id = public.current_catshare_user_id());
+  for insert with check (user_id::text = public.current_catshare_user_id());
 
 create or replace function public.resolve_catalogue_inventory_id(
   p_seller_id text,
@@ -233,7 +233,7 @@ begin
 
   select * into v_wh
   from public.warehouses
-  where user_id = trim(p_user_id) and is_default = true
+  where user_id::text = trim(p_user_id) and is_default = true
   limit 1;
 
   if not found then
@@ -334,7 +334,7 @@ begin
 
   select * into v_inv
   from public.inventories
-  where id = p_inventory_id and user_id = v_user;
+  where id = p_inventory_id and user_id::text = v_user;
 
   if not found then
     raise exception 'inventory_not_found';
@@ -427,10 +427,10 @@ begin
     raise exception 'same_inventory';
   end if;
 
-  select * into v_from from public.inventories where id = p_from_inventory_id and user_id = v_user;
+  select * into v_from from public.inventories where id = p_from_inventory_id and user_id::text = v_user;
   if not found then raise exception 'from_inventory_not_found'; end if;
 
-  select * into v_to from public.inventories where id = p_to_inventory_id and user_id = v_user;
+  select * into v_to from public.inventories where id = p_to_inventory_id and user_id::text = v_user;
   if not found then raise exception 'to_inventory_not_found'; end if;
 
   v_variant := nullif(trim(p_variant_combination_id), '');
@@ -536,7 +536,7 @@ begin
   if v_catalogue_id is null then
     select s.catalogue_id into v_catalogue_id
     from public.stores s
-    where s.seller_user_id::text = trim(v_order.seller_user_id)
+    where s.seller_user_id::text = trim(v_order.seller_user_id::text)
     order by s.created_at asc
     limit 1;
   end if;
@@ -545,7 +545,7 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'no_catalogue');
   end if;
 
-  v_inventory_id := public.resolve_catalogue_inventory_id(v_order.seller_user_id, v_catalogue_id);
+  v_inventory_id := public.resolve_catalogue_inventory_id(v_order.seller_user_id::text, v_catalogue_id);
   if v_inventory_id is null then
     return jsonb_build_object('applied', false, 'reason', 'no_inventory_link');
   end if;
@@ -585,7 +585,7 @@ begin
       delta, on_hand_after, reason, reference_type, reference_id
     )
     values (
-      v_order.seller_user_id, v_inventory_id, v_product_id, v_variant,
+      v_order.seller_user_id::text, v_inventory_id, v_product_id, v_variant,
       -v_qty, v_new_on_hand, 'order_sale', 'order', p_order_id
     );
   end loop;
@@ -642,7 +642,7 @@ begin
         inventory_id, user_id, product_id, variant_combination_id, on_hand
       )
       values (
-        v_mov.inventory_id, v_order.seller_user_id, v_mov.product_id,
+        v_mov.inventory_id, v_order.seller_user_id::text, v_mov.product_id,
         v_mov.variant_combination_id, v_new_on_hand
       );
     end if;
@@ -652,7 +652,7 @@ begin
       delta, on_hand_after, reason, reference_type, reference_id
     )
     values (
-      v_order.seller_user_id, v_mov.inventory_id, v_mov.product_id, v_mov.variant_combination_id,
+      v_order.seller_user_id::text, v_mov.inventory_id, v_mov.product_id, v_mov.variant_combination_id,
       abs(v_mov.delta), v_new_on_hand, 'order_restore', 'order', p_order_id
     );
   end loop;

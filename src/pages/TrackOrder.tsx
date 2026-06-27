@@ -5,6 +5,7 @@ import {
   updateOrderByTrackingToken,
 } from '../services/orderTrackingService';
 import type { Order, OrderItem } from '../services/orderService';
+import { canCustomerEditOrder } from '../types/orderStatus';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { applyQuantityDelta } from '../utils/quantityPricingUtils';
 import { productImageDisplayUrl } from '../utils/imageUrl';
@@ -20,7 +21,14 @@ const STATUS = {
     pill: 'trk-pill--pending',
     icon: 'trk-status-icon--pending',
     headline: 'Waiting for seller',
-    hint: 'You can still update quantities or contact details until the seller confirms.',
+    hint: 'You can still update quantities or contact details until the seller confirms your order.',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    pill: 'trk-pill--confirmed',
+    icon: 'trk-status-icon--confirmed',
+    headline: 'Order confirmed',
+    hint: 'The seller has confirmed your order. Changes are locked while they prepare it.',
   },
   completed: {
     label: 'Completed',
@@ -69,6 +77,14 @@ function StatusIcon({ status }: { status: Order['status'] }) {
     return (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
         <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (status === 'confirmed') {
+    return (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 12l2.5 2.5L16 9" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
@@ -230,7 +246,7 @@ export default function TrackOrder() {
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
 
-  const canEdit = order?.status === 'pending';
+  const canEdit = canCustomerEditOrder(order?.status);
   const currencySymbol = useMemo(
     () => getCurrencySymbol(order?.currency_code || 'INR'),
     [order?.currency_code]

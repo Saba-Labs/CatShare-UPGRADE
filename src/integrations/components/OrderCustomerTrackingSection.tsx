@@ -5,8 +5,6 @@ import {
   OdCardHeader,
   OdIcons,
   OdSectionLabel,
-  OD_COLORS,
-  OD_FONT,
 } from './orderDetailUi';
 
 function formatDate(dateStr: string) {
@@ -28,58 +26,25 @@ export function OrderCustomerTrackingSection({
       <OdSectionLabel>Customer tracking link</OdSectionLabel>
       <OdCard>
         <OdCardHeader
+          variant="tracking"
           icon={<OdIcons.Link />}
           title="Share with customer"
           subtitle="View & edit while pending"
-          accentColor={OD_COLORS.blue}
         />
-        <div style={{ padding: '14px 16px' }}>
-          <p
-            style={{
-              fontSize: 13,
-              color: OD_COLORS.muted,
-              marginBottom: 12,
-              lineHeight: 1.5,
-            }}
-          >
+        <div className="od-tracking-body">
+          <p className="od-tracking-copy">
             Send this link so your customer can view their order and make edits while it is still
-            pending.
+            pending. Once you confirm the order, they can view status but cannot change it.
           </p>
           {order.customer_edited_at ? (
-            <div
-              style={{
-                fontSize: 12,
-                color: OD_COLORS.blue,
-                fontWeight: 600,
-                marginBottom: 12,
-                padding: '8px 10px',
-                borderRadius: 10,
-                background: OD_COLORS.blueLight,
-              }}
-            >
+            <div className="od-edited-badge">
               Customer last edited {formatDate(order.customer_edited_at)}
             </div>
           ) : null}
           <button
             type="button"
             onClick={() => void onCopy(buildOrderTrackingUrl(order.tracking_token!))}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              width: '100%',
-              padding: '14px',
-              borderRadius: 14,
-              border: `1.5px solid ${OD_COLORS.border}`,
-              background: OD_COLORS.surface,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: OD_FONT,
-              color: OD_COLORS.blue,
-              transition: 'background 0.15s',
-            }}
+            className="od-btn-secondary"
           >
             <OdIcons.Copy />
             Copy tracking link

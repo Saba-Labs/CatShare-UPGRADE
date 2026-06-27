@@ -3,19 +3,20 @@ import { FiMinus, FiPlus } from 'react-icons/fi';
 
 export const WAREHOUSE_QTY_STEPPER_CSS = `
   .wh-qty {
-    display: flex; align-items: center; gap: 0; flex-shrink: 0;
-    border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff;
+    display: flex; align-items: stretch; gap: 0; flex-shrink: 0;
+    border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff;
+    min-height: 44px;
   }
   .wh-qty-btn {
-    width: 36px; height: 36px; border: none; background: #f8fafc; color: var(--text, #0f172a);
+    width: 44px; min-width: 44px; height: 44px; border: none; background: #f8fafc; color: var(--text, #0f172a);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
-  .wh-qty-btn:hover:not(:disabled) { background: #e2e8f0; }
+  .wh-qty-btn:active:not(:disabled) { background: #e2e8f0; }
   .wh-qty-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .wh-qty-input {
-    width: 48px; min-width: 48px; height: 36px; border: none;
+    width: 52px; min-width: 52px; height: 44px; border: none;
     border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;
-    text-align: center; font-size: 14px; font-weight: 600; font-family: inherit;
+    text-align: center; font-size: 16px; font-weight: 700; font-family: inherit;
     color: var(--text, #0f172a); background: #fff; padding: 0 4px;
     -moz-appearance: textfield;
   }

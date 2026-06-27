@@ -150,21 +150,43 @@ export function IconMessage(props: StorefrontIconProps) {
   );
 }
 
-export function PackHint({ step, className }: { step: number; className?: string }) {
+export function PackHint({
+  step,
+  className,
+  variant = 'chip',
+}: {
+  step: number;
+  className?: string;
+  variant?: 'chip' | 'legacy';
+}) {
+  const chipClass =
+    className ??
+    (variant === 'chip' ? 'sv-order-rule-chip sv-order-rule-chip--pack' : 'sv-pack-hint');
   return (
-    <div className={className ?? 'sv-pack-hint'}>
-      <IconPackage size={12} aria-hidden />
+    <div className={chipClass}>
+      <IconPackage size={13} aria-hidden />
       <span>Pack of {step}</span>
     </div>
   );
 }
 
-export function MoqHint({ minQty, className }: { minQty: number; className?: string }) {
+export function MoqHint({
+  minQty,
+  className,
+  variant = 'chip',
+}: {
+  minQty: number;
+  className?: string;
+  variant?: 'chip' | 'legacy';
+}) {
   if (minQty <= 1) return null;
+  const chipClass =
+    className ??
+    (variant === 'chip' ? 'sv-order-rule-chip sv-order-rule-chip--moq' : 'sv-pack-hint');
   return (
-    <div className={className ?? 'sv-pack-hint'}>
-      <IconPackage size={12} aria-hidden />
-      <span>Min order {minQty}</span>
+    <div className={chipClass}>
+      <IconTag size={13} aria-hidden />
+      <span>Min. {minQty} units</span>
     </div>
   );
 }

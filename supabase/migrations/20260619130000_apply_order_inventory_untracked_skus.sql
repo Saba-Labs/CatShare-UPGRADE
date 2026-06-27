@@ -40,7 +40,7 @@ begin
   if v_catalogue_id is null then
     select s.catalogue_id into v_catalogue_id
     from public.stores s
-    where s.seller_user_id::text = trim(v_order.seller_user_id)
+    where s.seller_user_id::text = trim(v_order.seller_user_id::text)
     order by s.created_at asc
     limit 1;
   end if;
@@ -49,7 +49,7 @@ begin
     return jsonb_build_object('applied', false, 'reason', 'no_catalogue');
   end if;
 
-  v_inventory_id := public.resolve_catalogue_inventory_id(v_order.seller_user_id, v_catalogue_id);
+  v_inventory_id := public.resolve_catalogue_inventory_id(v_order.seller_user_id::text, v_catalogue_id);
   if v_inventory_id is null then
     return jsonb_build_object('applied', false, 'reason', 'no_inventory_link');
   end if;
@@ -89,7 +89,7 @@ begin
       delta, on_hand_after, reason, reference_type, reference_id
     )
     values (
-      v_order.seller_user_id, v_inventory_id, v_product_id, v_variant,
+      v_order.seller_user_id::text, v_inventory_id, v_product_id, v_variant,
       -v_qty, v_new_on_hand, 'order_sale', 'order', p_order_id
     );
   end loop;

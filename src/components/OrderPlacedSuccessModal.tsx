@@ -35,7 +35,7 @@ export default function OrderPlacedSuccessModal({
   onClose,
   trackingUrl,
   title = 'Order placed!',
-  subtitle = 'Save your tracking link to view status and edit your order anytime while it is pending.',
+  subtitle = 'Save your tracking link to view status and edit your order while it is still pending. Once the seller confirms, changes are locked.',
   whatsAppHref,
 }: OrderPlacedSuccessModalProps) {
   const [copied, setCopied] = useState(false);

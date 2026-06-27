@@ -14,7 +14,7 @@ create table if not exists public.orders (
   items jsonb not null,
   total_amount numeric,
   currency_code text default 'INR',
-  status text default 'pending' check (status in ('pending', 'completed', 'cancelled')),
+  status text default 'pending' check (status in ('pending', 'confirmed', 'completed', 'cancelled')),
   order_source text,
   tracking_token text,
   store_slug text,

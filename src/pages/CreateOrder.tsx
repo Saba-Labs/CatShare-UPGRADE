@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSwipeable } from 'react-swipeable';
 import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
@@ -22,6 +22,7 @@ import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
 import { applyInventoryCapToQuantity } from '../utils/orderQuantityStock';
 import TypedQuantityStepper from '../components/TypedQuantityStepper';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
+import ManualOrderAdjustmentsEditor from '../components/ManualOrderAdjustmentsEditor';
 import { getStorefrontPriceAndUnit } from '../components/Storefront/storefrontOrderHelpers';
 import { isCatalogueInventoryTracked } from '../utils/inventoryAvailability';
 import {
@@ -43,6 +44,13 @@ import {
   type OrderCartLine,
 } from '../utils/orderCartLines';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { productMatchesSearchQuery } from '../utils/productSearchUtils';
+import {
+  computeManualCheckoutTotals,
+  hasManualAdjustments,
+  type ManualOrderAdjustment,
+} from '../utils/manualOrderAdjustments';
+import type { CheckoutTotals } from '../types/checkoutSettings';
 import './CreateOrder.css';
 
 type Step = 'catalogue' | 'products' | 'customer' | 'review';
@@ -76,6 +84,108 @@ function IconChevronRight() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M9 18l6-6-6-6" />
     </svg>
+  );
+}
+
+function IconChevronLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function CategoryChipScroller({
+  categories,
+  selectedCategory,
+  onSelect,
+}: {
+  categories: string[];
+  selectedCategory: string;
+  onSelect: (category: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollHints = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(maxScroll - el.scrollLeft > 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollHints();
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(updateScrollHints);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [categories, updateScrollHints]);
+
+  const scrollBy = (delta: number) => {
+    scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  const chipClass = (active: boolean) =>
+    `co-category-chip${active ? ' co-category-chip--active' : ''}`;
+
+  return (
+    <div
+      className={`co-category-scroller${canScrollLeft ? ' co-category-scroller--left' : ''}${canScrollRight ? ' co-category-scroller--right' : ''}`}
+    >
+      {canScrollLeft ? (
+        <button
+          type="button"
+          className="co-category-scroller__arrow co-category-scroller__arrow--left"
+          onClick={() => scrollBy(-180)}
+          aria-label="Scroll categories left"
+        >
+          <IconChevronLeft />
+        </button>
+      ) : null}
+      <div
+        ref={scrollRef}
+        className="co-category-scroller__track"
+        onScroll={updateScrollHints}
+        role="tablist"
+        aria-label="Filter by category"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={selectedCategory === 'all'}
+          className={chipClass(selectedCategory === 'all')}
+          onClick={() => onSelect('all')}
+        >
+          All
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            role="tab"
+            aria-selected={selectedCategory === cat}
+            className={chipClass(selectedCategory === cat)}
+            onClick={() => onSelect(cat)}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+      {canScrollRight ? (
+        <button
+          type="button"
+          className="co-category-scroller__arrow co-category-scroller__arrow--right"
+          onClick={() => scrollBy(180)}
+          aria-label="Scroll categories right"
+        >
+          <IconChevronRight />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -143,6 +253,59 @@ const Divider = () => (
   <div style={{ height: 1, background: '#F2F2F7', margin: '0 0' }} />
 );
 
+function formatOrderMoney(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
+  const hasAdjustments = totals.lines.length > 0;
+
+  return (
+    <div style={{
+      padding: 12,
+      background: '#DCFCE7',
+      borderRadius: 10,
+      border: '1px solid #86EFAC',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 8,
+    }}>
+      {hasAdjustments ? (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#166534' }}>
+            <span>Subtotal</span>
+            <span>{formatOrderMoney(totals.subtotal)}</span>
+          </div>
+          {totals.lines.map((line) => (
+            <div
+              key={`${line.ruleId}-${line.label}`}
+              style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#166534' }}
+            >
+              <span>{line.label}</span>
+              <span>
+                {line.amount < 0 ? '−' : '+'}
+                {formatOrderMoney(Math.abs(line.amount))}
+              </span>
+            </div>
+          ))}
+        </>
+      ) : null}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: hasAdjustments ? 4 : 0,
+        borderTop: hasAdjustments ? '1px solid #86EFAC' : undefined,
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>Order Total</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
+          {formatOrderMoney(totals.grandTotal)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Product image thumbnail
 function ProductThumb({
   url,
@@ -197,6 +360,7 @@ export default function CreateOrder() {
   const [draftVariantSelections, setDraftVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [orderAdjustments, setOrderAdjustments] = useState<ManualOrderAdjustment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -218,6 +382,7 @@ export default function CreateOrder() {
         stepRef.current = 'catalogue';
         setStep('catalogue');
       } else if (stepRef.current === 'customer') {
+        setOrderAdjustments([]);
         stepRef.current = 'products';
         setStep('products');
       } else if (stepRef.current === 'review') {
@@ -286,13 +451,8 @@ export default function CreateOrder() {
       );
     }
 
-    // Filter by search
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(p => 
-        p.name?.toLowerCase().includes(q) || 
-        p.category?.some((c: string) => c?.toLowerCase().includes(q))
-      );
+      result = result.filter((p) => productMatchesSearchQuery(p, searchQuery));
     }
 
     return result;
@@ -391,6 +551,7 @@ export default function CreateOrder() {
     setVariantErrorIds(new Set());
     setSearchQuery('');
     setSelectedCategory('all');
+    setOrderAdjustments([]);
     setStepSync('products');
   };
 
@@ -594,16 +755,18 @@ export default function CreateOrder() {
 
   // Filter out 0-quantity items for final review/submission
   const reviewSummary = useMemo(() => {
+    const items = orderSummary.items.filter((item) => item.quantity > 0);
+    const subtotal = items.reduce((sum, item) => sum + item.rowTotal, 0);
+    const checkoutTotals = computeManualCheckoutTotals(subtotal, orderAdjustments);
+
     return {
-      items: orderSummary.items.filter(item => item.quantity > 0),
-      total: orderSummary.items
-        .filter(item => item.quantity > 0)
-        .reduce((sum, item) => sum + item.rowTotal, 0),
-      count: orderSummary.items
-        .filter(item => item.quantity > 0)
-        .reduce((sum, item) => sum + item.quantity, 0),
+      items,
+      subtotal,
+      total: checkoutTotals.grandTotal,
+      checkoutTotals,
+      count: items.reduce((sum, item) => sum + item.quantity, 0),
     };
-  }, [orderSummary]);
+  }, [orderSummary, orderAdjustments]);
 
   React.useEffect(() => {
     return () => {
@@ -641,6 +804,10 @@ export default function CreateOrder() {
         variantCombinationId: item.variantCombinationId,
       }));
 
+      const checkoutAdjustments = hasManualAdjustments(orderAdjustments)
+        ? reviewSummary.checkoutTotals
+        : undefined;
+
       const { error } = await createOrderDirectly(
         user.uid,
         customerName.trim(),
@@ -648,7 +815,9 @@ export default function CreateOrder() {
         reviewSummary.total,
         'INR',
         customerWhatsapp.trim() || undefined,
-        selectedCatalogueId
+        selectedCatalogueId,
+        'manual',
+        checkoutAdjustments
       );
 
       if (error) {
@@ -749,9 +918,12 @@ export default function CreateOrder() {
       {/* Content */}
       <div style={{
         flex: 1,
-        overflowY: 'auto',
+        overflowY: step === 'products' ? 'hidden' : 'auto',
         marginTop: 40,
-        paddingBottom: 80,
+        paddingBottom: step === 'products' ? 0 : 80,
+        display: step === 'products' ? 'flex' : 'block',
+        flexDirection: step === 'products' ? 'column' : undefined,
+        minHeight: 0,
       }}>
         {/* Step: Catalogue Selection */}
         {step === 'catalogue' && (
@@ -800,84 +972,21 @@ export default function CreateOrder() {
 
         {/* Step: Product Selection */}
         {step === 'products' && (
-          <div>
-            {/* Summary Section */}
-            {orderSummary.items.length > 0 && (
-              <div style={{
-                background: '#fff',
-                borderBottom: '1px solid #E2E8F0',
-                padding: '16px',
-                position: 'sticky',
-                top: 0,
-                zIndex: 30,
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                  <div>
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#64748B',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: 4,
-                    }}>
-                      Order Summary
-                    </div>
-                    <div style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: '#64748B',
-                    }}>
-                      {orderSummary.count} {orderSummary.count === 1 ? 'item' : 'items'} selected
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: '#64748B',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: 4,
-                    }}>
-                      Total
-                    </div>
-                    <div style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: '#166534',
-                    }}>
-                      ₹{orderSummary.total.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Toolbar */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+          }}>
             <div style={{
-              padding: '16px',
+              flexShrink: 0,
+              padding: '12px 16px',
               borderBottom: '1px solid #E2E8F0',
               background: '#fff',
               display: 'flex',
               flexDirection: 'column',
-              gap: 12,
+              gap: 10,
             }}>
-              <div style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.8px',
-                textTransform: 'uppercase',
-                color: '#94A3B8',
-              }}>
-                {filteredProducts.length} of {catalogueProducts.length} product{catalogueProducts.length !== 1 ? 's' : ''} shown
-              </div>
-
-              {/* Search */}
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
@@ -943,61 +1052,91 @@ export default function CreateOrder() {
                 )}
               </div>
 
-              {/* Category Chips */}
-              {allCategories.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                }}>
-                  <button
-                    onClick={() => setSelectedCategory('all')}
-                    style={{
-                      border: `1px solid ${selectedCategory === 'all' ? '#16A34A' : '#E2E8F0'}`,
-                      background: selectedCategory === 'all' ? '#DCFCE7' : '#fff',
-                      color: selectedCategory === 'all' ? '#166534' : '#94A3B8',
-                      borderRadius: 999,
-                      padding: '8px 12px',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    All
-                  </button>
-                  {allCategories.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      style={{
-                        border: `1px solid ${selectedCategory === cat ? '#16A34A' : '#E2E8F0'}`,
-                        background: selectedCategory === cat ? '#DCFCE7' : '#fff',
-                        color: selectedCategory === cat ? '#166534' : '#94A3B8',
-                        borderRadius: 999,
-                        padding: '8px 12px',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {allCategories.length > 0 ? (
+                <CategoryChipScroller
+                  categories={allCategories}
+                  selectedCategory={selectedCategory}
+                  onSelect={setSelectedCategory}
+                />
+              ) : null}
             </div>
 
-            {/* Products List */}
             <div style={{
-              padding: '0 12px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              paddingBottom: 88,
             }}>
+              {orderSummary.items.length > 0 && (
+                <div style={{
+                  background: '#fff',
+                  borderBottom: '1px solid #E2E8F0',
+                  padding: '16px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <div>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: 4,
+                      }}>
+                        Order Summary
+                      </div>
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#64748B',
+                      }}>
+                        {orderSummary.count} {orderSummary.count === 1 ? 'item' : 'items'} selected
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: 4,
+                      }}>
+                        Total
+                      </div>
+                      <div style={{
+                        fontSize: 20,
+                        fontWeight: 800,
+                        color: '#166534',
+                      }}>
+                        ₹{orderSummary.total.toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{
+                padding: '12px 16px 8px',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                color: '#94A3B8',
+              }}>
+                {filteredProducts.length} of {catalogueProducts.length} product{catalogueProducts.length !== 1 ? 's' : ''} shown
+              </div>
+
+              <div style={{
+                padding: '0 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}>
               {filteredProducts.length === 0 ? (
                 <div style={{
                   textAlign: 'center',
@@ -1469,6 +1608,7 @@ export default function CreateOrder() {
                 })
               )}
             </div>
+            </div>
           </div>
         )}
 
@@ -1544,6 +1684,11 @@ export default function CreateOrder() {
                 }}
               />
             </div>
+
+            <ManualOrderAdjustmentsEditor
+              adjustments={orderAdjustments}
+              onChange={setOrderAdjustments}
+            />
 
             {/* Order Summary Preview */}
             <div style={{
@@ -1662,20 +1807,7 @@ export default function CreateOrder() {
                 })}
 
                 {/* Total row */}
-                <div style={{
-                  padding: 12,
-                  background: '#DCFCE7',
-                  borderRadius: 10,
-                  border: '1px solid #86EFAC',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>Order Total</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
-                    ₹{orderSummary.total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                  </div>
-                </div>
+                <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
               </div>
             </div>
           </div>
@@ -1740,23 +1872,7 @@ export default function CreateOrder() {
               </div>
             </div>
 
-            {/* Total */}
-            <div style={{
-              padding: 12,
-              background: '#DCFCE7',
-              borderRadius: 10,
-              border: '1px solid #86EFAC',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#166534' }}>
-                Total Amount
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: '#166534' }}>
-                ₹{reviewSummary.total.toLocaleString('en-IN')}
-              </div>
-            </div>
+            <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
           </div>
         )}
       </div>

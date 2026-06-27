@@ -91,7 +91,7 @@ const StoreCheckoutSettingsPage = lazy(() => import("./pages/StoreCheckoutSettin
 const IntegrationsPage = lazy(() => import("./integrations/pages/IntegrationsPage"));
 const RazorpayIntegrationPage = lazy(() => import("./integrations/pages/RazorpayIntegrationPage"));
 const ShiprocketIntegrationPage = lazy(() => import("./integrations/pages/ShiprocketIntegrationPage"));
-const WarehousePage = lazy(() => import("./pages/WarehousePage"));
+const WarehouseRoutes = lazy(() => import("./pages/warehouse/WarehouseRoutes"));
 import { ToastProvider, useToast } from "./context/ToastContext";
 import { ToastContainer } from "./components/ToastContainer";
 import { AuthProvider } from "./context/AuthContext";
@@ -2773,10 +2773,10 @@ if (user?.uid && !authService.isOfflineGuest()) {
           }
         />
         <Route
-          path="/warehouse"
+          path="/warehouse/*"
           element={
             <ProtectedRoute>
-              <WarehousePage />
+              <WarehouseRoutes />
             </ProtectedRoute>
           }
         />

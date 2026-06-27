@@ -1,6 +1,12 @@
 -- Customer order tracking via secret link (no Supabase Auth / no MAU).
 -- Same as supabase/migrations/20260612120000_order_tracking_token.sql
 
+alter table public.orders drop constraint if exists orders_status_check;
+
+alter table public.orders
+  add constraint orders_status_check
+  check (status in ('pending', 'confirmed', 'completed', 'cancelled'));
+
 alter table public.orders
   add column if not exists tracking_token text,
   add column if not exists store_slug text,
@@ -74,7 +80,7 @@ begin
     raise exception 'order_not_found';
   end if;
 
-  if v_order.status = 'completed' then
+  if v_order.status in ('completed', 'confirmed') then
     raise exception 'order_locked';
   end if;
 

@@ -7,11 +7,12 @@ import {
   OdCardHeader,
   OdDetailRow,
   OdFooterNote,
+  OdHeroAmount,
   OdIcons,
+  OdMethodChip,
   OdSectionLabel,
   OdStatusPill,
   getPaymentStatusPill,
-  OD_COLORS,
 } from './orderDetailUi';
 
 function formatMoney(amount: number | null | undefined, currency: string): string {
@@ -29,13 +30,6 @@ function formatDateTime(iso: string | null | undefined): string {
     return iso;
   }
 }
-
-const paymentMethodLabel = (method: string | null | undefined) => {
-  if (!method) return '—';
-  if (method === 'cod') return 'Cash on delivery';
-  if (method === 'prepaid') return 'Pay now / UPI';
-  return method;
-};
 
 export function OrderPaymentSection({ order }: { order: Order }) {
   const { payment, loading } = useOrderPayment(order.id);
@@ -55,51 +49,58 @@ export function OrderPaymentSection({ order }: { order: Order }) {
       <OdSectionLabel>Payment</OdSectionLabel>
       <OdCard>
         <OdCardHeader
+          variant="payment"
           icon={<OdIcons.Payment />}
           title={payment ? 'Gateway payment' : 'Checkout payment'}
-          subtitle={amountStr !== '—' ? amountStr : undefined}
-          accentColor={OD_COLORS.green}
+          subtitle={payment ? 'Razorpay' : 'Order checkout'}
           badge={<OdStatusPill {...pill} />}
         />
 
-        {payment ? (
-          <>
-            <OdDetailRow label="Transaction ID" value={payment.paymentId} mono />
-            <OdDetailRow label="Order ID" value={payment.providerOrderId} mono />
-            <OdDetailRow label="Paid at" value={formatDateTime(payment.paidAt)} />
-            <OdDetailRow label="Method" value={payment.paymentMethod} />
-            <OdDetailRow label="Amount" value={amountStr} highlight />
-            <OdDetailRow label="Customer" value={payment.customerName} />
-            <OdDetailRow label="Email" value={payment.customerEmail} />
-            <OdDetailRow label="Phone" value={payment.customerPhone} isLast />
-          </>
-        ) : (
-          <>
-            <OdDetailRow label="Method" value={paymentMethodLabel(order.payment_method)} />
-            {order.checkout_adjustments ? (
-              <div
-                style={{
-                  padding: '8px 16px 12px',
-                  borderTop: `1px solid ${OD_COLORS.divider}`,
-                }}
-              >
-                <CheckoutBreakdown
-                  totals={order.checkout_adjustments}
-                  currencySymbol={getSymbolForCurrencyCode(currency)}
-                  fmt={(amount, sym) =>
-                    `${sym}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-                  }
-                  compact
-                />
+        {amountStr !== '—' ? (
+          <div style={{ padding: '16px 18px 4px' }}>
+            <OdHeroAmount>{amountStr}</OdHeroAmount>
+          </div>
+        ) : null}
+
+        <div className="od-detail-grid">
+          {payment ? (
+            <>
+              <OdDetailRow label="Transaction ID" value={payment.paymentId} mono />
+              <OdDetailRow label="Order ID" value={payment.providerOrderId} mono />
+              <OdDetailRow label="Paid at" value={formatDateTime(payment.paidAt)} />
+              <OdDetailRow label="Method" value={payment.paymentMethod} />
+              <OdDetailRow label="Customer" value={payment.customerName} />
+              <OdDetailRow label="Email" value={payment.customerEmail} />
+              <OdDetailRow label="Phone" value={payment.customerPhone} isLast />
+            </>
+          ) : (
+            <>
+              <div className="od-detail-row">
+                <span className="od-detail-label">Method</span>
+                <span className="od-detail-value">
+                  <OdMethodChip method={order.payment_method} />
+                </span>
               </div>
-            ) : (
-              <OdDetailRow label="Amount" value={amountStr} highlight isLast />
-            )}
-          </>
-        )}
+              {order.checkout_adjustments ? (
+                <div className="od-breakdown-wrap">
+                  <CheckoutBreakdown
+                    totals={order.checkout_adjustments}
+                    currencySymbol={getSymbolForCurrencyCode(currency)}
+                    fmt={(amount, sym) =>
+                      `${sym}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+                    }
+                    compact
+                  />
+                </div>
+              ) : (
+                <OdDetailRow label="Amount" value={amountStr} highlight isLast />
+              )}
+            </>
+          )}
+        </div>
 
         <OdFooterNote>
-          Payment status will update automatically when Razorpay webhooks are connected.
+          Payment status updates automatically when Razorpay webhooks are connected.
         </OdFooterNote>
       </OdCard>
     </>

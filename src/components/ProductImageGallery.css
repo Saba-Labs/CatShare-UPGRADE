@@ -10,6 +10,27 @@
   height: 100%;
 }
 
+/* Storefront product page: main image + thumb strip — auto height, never clip thumbs */
+.product-image-gallery--with-thumbs.product-image-gallery--fill {
+  height: auto;
+  min-height: 0;
+}
+
+.product-image-gallery--with-thumbs .product-image-gallery__main {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.product-image-gallery--with-thumbs .product-image-gallery__thumbs {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 10px 0 2px;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
 .product-image-gallery__main {
   position: relative;
   flex: 1 1 auto;

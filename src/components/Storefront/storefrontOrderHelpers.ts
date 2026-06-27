@@ -17,7 +17,11 @@ import {
   resolveVariantQuantityAwarePricing,
   type VariantSlabContext,
 } from '../../utils/quantityPricingUtils';
-import { getVariantCombinationData } from '../../utils/productVariants';
+import {
+  getVariantCombinationData,
+  getVariantGalleryUrls,
+  getVariantPrimaryImageUrl,
+} from '../../utils/productVariants';
 
 export function unitLabel(u?: string): string {
   if (!u || String(u).trim() === '' || u === 'None') return 'unit';
@@ -57,6 +61,16 @@ function isDisplayableImageUrl(url?: string): boolean {
   } catch {
     return false;
   }
+}
+
+function filterGalleryUrls(urls: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of urls) {
+    const url = String(raw ?? '').trim();
+    if (!isDisplayableImageUrl(url)) continue;
+    if (!out.includes(url)) out.push(url);
+  }
+  return out;
 }
 
 function pickProductImageSrc(p: ProductWithCatalogueData | Record<string, unknown>): string | undefined {
@@ -291,12 +305,41 @@ export function buildStorefrontDetailFields(
 }
 
 export function getStoreProductGalleryProps(p: ProductWithCatalogueData) {
-  const urls = getProductImageUrls(p);
-  const primaryIndex = getPrimaryImageIndex(p);
+  const urls = filterGalleryUrls(getProductImageUrls(p));
+  const rawPrimary = getPrimaryImageIndex(p);
+  const primaryIndex =
+    urls.length === 0 ? 0 : Math.min(Math.max(0, rawPrimary), urls.length - 1);
   const r = p as Record<string, unknown>;
   const v = r.imageVersion ?? r.image_version;
   const primaryImageVersion = typeof v === 'number' && Number.isFinite(v) ? v : undefined;
   return { urls, primaryIndex, primaryImageVersion, fallback: displayStoreProductImage(p) };
+}
+
+/** Product gallery with optional variant-specific overrides (uploads + selected base images). */
+export function getStorefrontProductGalleryProps(
+  product: ProductWithCatalogueData,
+  variantDetails?: ReturnType<typeof getVariantCombinationData> | null
+) {
+  const base = getStoreProductGalleryProps(product);
+  const variantUrls = getVariantGalleryUrls(product, variantDetails ?? undefined);
+  const urls = filterGalleryUrls(variantUrls?.length ? variantUrls : base.urls);
+  if (urls.length === 0) {
+    return { ...base, urls: [] };
+  }
+  const usesVariantGallery = Boolean(variantUrls?.length);
+  return {
+    urls,
+    primaryIndex: usesVariantGallery ? 0 : Math.min(base.primaryIndex, Math.max(0, urls.length - 1)),
+    primaryImageVersion: base.primaryImageVersion,
+    fallback: urls[0] || base.fallback,
+  };
+}
+
+export function getStorefrontVariantPrimaryImageUrl(
+  product: ProductWithCatalogueData,
+  variantDetails?: ReturnType<typeof getVariantCombinationData> | null
+): string | undefined {
+  return getVariantPrimaryImageUrl(product, variantDetails ?? undefined) || getStoreProductGalleryProps(product).fallback;
 }
 
 export function isDisplayableProductImage(url?: string) {

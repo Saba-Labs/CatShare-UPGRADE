@@ -1,4 +1,5 @@
 import React from 'react';
+import './order-detail-integrations.css';
 
 /** Design tokens aligned with OrderDetail.tsx */
 export const OD_FONT = "'DM Sans', system-ui, sans-serif";
@@ -26,24 +27,12 @@ export const OD_COLORS = {
   divider: '#F2F2F7',
 };
 
+export function OdIntegrationsStack({ children }: { children: React.ReactNode }) {
+  return <div className="od-integrations-stack">{children}</div>;
+}
+
 export function OdSectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.6px',
-        textTransform: 'uppercase',
-        color: OD_COLORS.subtle,
-        padding: '0 4px',
-        marginBottom: 8,
-        marginTop: 4,
-        fontFamily: OD_FONT,
-      }}
-    >
-      {children}
-    </div>
-  );
+  return <p className="od-section-label">{children}</p>;
 }
 
 export function OdCard({
@@ -54,24 +43,10 @@ export function OdCard({
   style?: React.CSSProperties;
 }) {
   return (
-    <div
-      style={{
-        background: OD_COLORS.surface,
-        borderRadius: 16,
-        border: `1px solid ${OD_COLORS.border}`,
-        overflow: 'hidden',
-        marginBottom: 12,
-        fontFamily: OD_FONT,
-        ...style,
-      }}
-    >
+    <div className="od-card" style={style}>
       {children}
     </div>
   );
-}
-
-export function OdDivider() {
-  return <div style={{ height: 1, background: OD_COLORS.divider }} />;
 }
 
 export function OdCardHeader({
@@ -79,50 +54,28 @@ export function OdCardHeader({
   title,
   subtitle,
   badge,
-  accentColor = OD_COLORS.blue,
+  variant = 'payment',
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   badge?: React.ReactNode;
-  accentColor?: string;
+  variant?: 'payment' | 'shipment' | 'tracking';
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: '14px 16px',
-        borderBottom: `1px solid ${OD_COLORS.divider}`,
-        background: `linear-gradient(135deg, ${accentColor}08, transparent)`,
-      }}
-    >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          background: `${accentColor}14`,
-          border: `1px solid ${accentColor}22`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: accentColor,
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: OD_COLORS.text }}>{title}</div>
-        {subtitle ? (
-          <div style={{ fontSize: 12, color: OD_COLORS.muted, marginTop: 2 }}>{subtitle}</div>
-        ) : null}
+    <div className={`od-card-header od-card-header--${variant}`}>
+      <div className="od-card-icon">{icon}</div>
+      <div className="od-card-heading">
+        <div className="od-card-title">{title}</div>
+        {subtitle ? <div className="od-card-subtitle">{subtitle}</div> : null}
       </div>
       {badge ? <div style={{ flexShrink: 0 }}>{badge}</div> : null}
     </div>
   );
+}
+
+export function OdHeroAmount({ children }: { children: React.ReactNode }) {
+  return <div className="od-hero-amount">{children}</div>;
 }
 
 export function OdStatusPill({
@@ -140,30 +93,10 @@ export function OdStatusPill({
 }) {
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 5,
-        padding: '5px 11px',
-        borderRadius: 100,
-        background: bg,
-        border: `1px solid ${border}`,
-        color: text,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: '0.1px',
-        whiteSpace: 'nowrap',
-      }}
+      className="od-status-pill"
+      style={{ background: bg, borderColor: border, color: text }}
     >
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          background: dot,
-          flexShrink: 0,
-        }}
-      />
+      <span className="od-status-pill-dot" style={{ background: dot }} />
       {label}
     </span>
   );
@@ -245,26 +178,10 @@ export function OdDetailRow({
 }) {
   if (!value || value === '—') return null;
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 16,
-        padding: '12px 16px',
-        borderBottom: isLast ? 'none' : `1px solid ${OD_COLORS.divider}`,
-      }}
-    >
-      <span style={{ fontSize: 13, color: OD_COLORS.muted, flexShrink: 0 }}>{label}</span>
+    <div className="od-detail-row" style={isLast ? { borderBottom: 'none' } : undefined}>
+      <span className="od-detail-label">{label}</span>
       <span
-        style={{
-          fontSize: highlight ? 15 : mono ? 12 : 13,
-          fontWeight: highlight ? 700 : 600,
-          color: highlight ? OD_COLORS.text : OD_COLORS.text,
-          textAlign: 'right',
-          wordBreak: 'break-word',
-          fontFamily: mono ? "'DM Mono', Menlo, monospace" : OD_FONT,
-        }}
+        className={`od-detail-value${mono ? ' od-detail-value--mono' : ''}${highlight ? ' od-detail-value--highlight' : ''}`}
       >
         {value}
       </span>
@@ -272,68 +189,77 @@ export function OdDetailRow({
   );
 }
 
+export function OdMethodChip({
+  method,
+}: {
+  method: string | null | undefined;
+}) {
+  if (!method) return null;
+  const isCod = method === 'cod';
+  const label =
+    method === 'cod' ? 'Cash on delivery' : method === 'prepaid' ? 'Pay now / UPI' : method;
+  return (
+    <span className={`od-method-chip${isCod ? ' od-method-chip--cod' : ''}`}>{label}</span>
+  );
+}
+
 export function OdEmptyState({
   icon,
   title,
   description,
+  variant = 'shipment',
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  variant?: 'payment' | 'shipment';
 }) {
   return (
-    <div style={{ padding: '20px 16px', textAlign: 'center' }}>
+    <div className="od-empty">
       <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 14,
-          background: '#F2F2F7',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 12px',
-          color: OD_COLORS.subtle,
-        }}
+        className="od-empty-icon"
+        style={
+          variant === 'payment'
+            ? { background: 'linear-gradient(145deg, #ecfdf5, #d1fae5)', color: '#059669' }
+            : undefined
+        }
       >
         {icon}
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: OD_COLORS.text, marginBottom: 4 }}>
-        {title}
-      </div>
-      <div style={{ fontSize: 12, color: OD_COLORS.muted, lineHeight: 1.45, maxWidth: 280, margin: '0 auto' }}>
-        {description}
-      </div>
+      <div className="od-empty-title">{title}</div>
+      <div className="od-empty-desc">{description}</div>
     </div>
   );
 }
 
 export function OdFooterNote({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        padding: '10px 16px 14px',
-        borderTop: `1px solid ${OD_COLORS.divider}`,
-        fontSize: 11,
-        color: OD_COLORS.subtle,
-        lineHeight: 1.4,
-        background: '#FAFAFA',
-      }}
-    >
-      {children}
+    <div className="od-info-banner">
+      <svg
+        className="od-info-banner-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        aria-hidden
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4M12 8h.01" strokeLinecap="round" />
+      </svg>
+      <span>{children}</span>
     </div>
   );
 }
 
 export const OdIcons = {
   Payment: () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="5" width="20" height="14" rx="2" />
       <line x1="2" y1="10" x2="22" y2="10" />
     </svg>
   ),
   Shipment: () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 18H3a2 2 0 01-2-2V8a2 2 0 012-2h3m0 12h10m0 0h2a2 2 0 002-2V8a2 2 0 00-2-2h-5" />
       <circle cx="7" cy="18" r="2" />
       <circle cx="17" cy="18" r="2" />
@@ -341,7 +267,7 @@ export const OdIcons = {
     </svg>
   ),
   Link: () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
     </svg>

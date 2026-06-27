@@ -41,6 +41,7 @@ import {
   isVariantSelectionComplete,
   getVariantCombinationData,
   getVariantLegacyInStock,
+  getVariantPrimaryImageUrl,
 } from '../utils/productVariants';
 import {
   getStorePathFallbackBaseUrl,
@@ -374,12 +375,14 @@ body { background: var(--c-bg); }
 @keyframes sv-drawer-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
 .sv-drawer-handle { width: 36px; height: 4px; background: var(--c-surface3); border-radius: var(--r-full); margin: 12px auto 0; }
 .sv-drawer-img-wrap { width: 100%; background: var(--c-surface); position: relative; margin-top: 14px; padding: 0; box-sizing: border-box; }
-.sv-drawer-img-wrap img { display: block; width: 100%; height: auto; }
+.sv-drawer-img-wrap > img,
+.sv-drawer-img-wrap .product-image-gallery__main img { display: block; width: 100%; height: auto; }
+.sv-drawer-img-wrap .product-image-gallery__thumb img { display: block; width: 100%; height: 100%; max-height: none; object-fit: cover; }
 .sv-drawer-img-wrap--gallery { aspect-ratio: 1; max-height: min(72vh, 440px); }
 .sv-drawer-img-wrap--gallery .sv-store-gallery { height: 100%; }
-.sv-drawer-img-wrap--thumbs { display: flex; flex-direction: column; }
-.sv-drawer-img-wrap--thumbs.sv-drawer-img-wrap--gallery { aspect-ratio: unset; max-height: min(78vh, 520px); }
-.sv-drawer-img-wrap--thumbs .sv-store-gallery { flex: 1; min-height: 0; }
+.sv-drawer-img-wrap--thumbs { display: flex; flex-direction: column; overflow: visible; }
+.sv-drawer-img-wrap--thumbs.sv-drawer-img-wrap--gallery { aspect-ratio: unset; max-height: none; height: auto; overflow: visible; }
+.sv-drawer-img-wrap--thumbs .sv-store-gallery { flex: none; height: auto; min-height: 0; }
 .sv-drawer-img-ph { width: 100%; min-height: 180px; display: flex; align-items: center; justify-content: center; }
 .sv-pcard-img-wrap .sv-store-gallery,
 .of-img-wrap .sv-store-gallery { position: absolute; inset: 0; height: 100%; }
@@ -1489,7 +1492,7 @@ export default function StoreView() {
       const rowTotal = unitPrice * quantity;
       const pr = product as Record<string, unknown>;
       const iv = pr.imageVersion ?? pr.image_version;
-      const variantImageUrl = variantData?.image;
+      const variantImageUrl = getVariantPrimaryImageUrl(product, variantData);
       const baseImageUrl = pickProductImageSrc(product);
       const groups = getProductVariantGroups(product);
       items.push({
@@ -2949,7 +2952,7 @@ export default function StoreView() {
         isOpen={orderSuccess !== null}
         onClose={() => setOrderSuccess(null)}
         trackingUrl={orderSuccess?.trackingUrl ?? null}
-        subtitle="Save this link to check status and edit your order anytime while it is pending. The seller will contact you soon."
+        subtitle="Save this link to check status and edit your order while it is still pending. Once the seller confirms, changes are locked."
       />
     </>
   );

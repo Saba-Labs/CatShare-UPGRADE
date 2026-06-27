@@ -6,6 +6,12 @@ import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
+import { ORDER_STATUSES, type OrderStatus, type OrderTabFilter } from '../types/orderStatus';
+import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
+import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
+import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
+import { readCachedSellerStore } from '../utils/storePageCache';
+import { getOrderCatalogueLabel, getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import { patchCachedOrder, readCachedSellerOrders, writeCachedSellerOrders } from '../utils/storePageCache';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { productImageDisplayUrl } from '../utils/imageUrl';
@@ -16,8 +22,16 @@ import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type TabType = 'all' | 'pending' | 'completed' | 'cancelled';
-type StatusType = 'pending' | 'completed' | 'cancelled';
+type TabType = OrderTabFilter;
+type StatusType = OrderStatus;
+type OrderSourceFilter = 'all' | 'link' | 'manual' | 'store';
+
+const ORDER_SOURCE_FILTERS: { key: OrderSourceFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'link', label: 'Link' },
+  { key: 'manual', label: 'Manual' },
+  { key: 'store', label: 'Store' },
+];
 
 interface OrderItem {
   name: string;
@@ -56,6 +70,8 @@ function getStatusConfig(status: string) {
   switch (status) {
     case 'pending':
       return { bg: '#FEF9C3', text: '#854D0E', dot: '#EAB308', label: 'Pending' };
+    case 'confirmed':
+      return { bg: '#DBEAFE', text: '#1E40AF', dot: '#2563EB', label: 'Confirmed' };
     case 'completed':
       return { bg: '#DCFCE7', text: '#166534', dot: '#16A34A', label: 'Completed' };
     case 'cancelled':
@@ -78,11 +94,232 @@ function getOrderSourceLabel(source?: string): string {
   }
 }
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+function orderMatchesListFilters(
+  order: Order,
+  opts: {
+    tab: TabType;
+    searchQuery: string;
+    sourceFilter: OrderSourceFilter;
+    catalogueFilter: string;
+    catalogueIdByOrderId: Map<string, string | null>;
+  }
+): boolean {
+  if (opts.tab !== 'all' && order.status !== opts.tab) return false;
+  if (opts.sourceFilter !== 'all' && order.order_source !== opts.sourceFilter) return false;
+  if (opts.catalogueFilter !== 'all') {
+    const catalogueId = opts.catalogueIdByOrderId.get(order.id);
+    if (catalogueId !== opts.catalogueFilter) return false;
+  }
+  if (opts.searchQuery) {
+    const matchesSearch =
+      order.customer_name?.toLowerCase().includes(opts.searchQuery) ||
+      (order.items || []).some((it: OrderItem) => it.name?.toLowerCase().includes(opts.searchQuery));
+    if (!matchesSearch) return false;
+  }
+  return true;
+}
+
+function FilterSourceIcon({ type }: { type: OrderSourceFilter }) {
+  if (type === 'link') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+      </svg>
+    );
+  }
+  if (type === 'manual') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+    );
+  }
+  if (type === 'store') {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+
+function FilterCatalogueRow({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`orders-filter-catalogue-row${selected ? ' orders-filter-catalogue-row--active' : ''}`}
+      onClick={onClick}
+    >
+      <span className="orders-filter-radio" aria-hidden>
+        <span className="orders-filter-radio-dot" />
+      </span>
+      <span className="orders-filter-catalogue-label">{label}</span>
+    </button>
+  );
+}
+
+function OrdersFilterPopup({
+  open,
+  onClose,
+  sourceFilter,
+  catalogueFilter,
+  catalogues,
+  onSourceChange,
+  onCatalogueChange,
+  onClear,
+  hasActiveFilters,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sourceFilter: OrderSourceFilter;
+  catalogueFilter: string;
+  catalogues: Catalogue[];
+  onSourceChange: (value: OrderSourceFilter) => void;
+  onCatalogueChange: (value: string) => void;
+  onClear: () => void;
+  hasActiveFilters: boolean;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const activeCount =
+    (sourceFilter !== 'all' ? 1 : 0) + (catalogueFilter !== 'all' ? 1 : 0);
+
+  return (
+    <>
+      <div className="orders-filter-backdrop" onClick={onClose} aria-hidden />
+
+      <div
+        role="dialog"
+        aria-modal
+        aria-label="Filter orders"
+        className="orders-filter-sheet"
+      >
+        <div className="orders-filter-grabber">
+          <span />
+        </div>
+
+        <div className="orders-filter-header">
+          <div className="orders-filter-header-text">
+            <h2>Filter orders</h2>
+            <p>Narrow your list by source or catalogue</p>
+            {activeCount > 0 ? (
+              <span className="orders-filter-active-pill">
+                <span className="orders-filter-active-pill-dot" />
+                {activeCount} active
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            className="orders-filter-close"
+            onClick={onClose}
+            aria-label="Close filters"
+          >
+            <IconX size={16} />
+          </button>
+        </div>
+
+        <div className="orders-filter-body">
+          <section>
+            <span className="orders-filter-section-label">Order source</span>
+            <div className="orders-filter-source-grid">
+              {ORDER_SOURCE_FILTERS.map((opt) => {
+                const selected = sourceFilter === opt.key;
+                const chipLabel = opt.key === 'all' ? 'All sources' : opt.label;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    className={`orders-filter-source-chip${selected ? ' orders-filter-source-chip--active' : ''}`}
+                    onClick={() => onSourceChange(opt.key)}
+                  >
+                    <span className="orders-filter-source-chip-icon">
+                      <FilterSourceIcon type={opt.key} />
+                    </span>
+                    <span className="orders-filter-source-chip-label">{chipLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <span className="orders-filter-section-label">Catalogue</span>
+            <div className="orders-filter-card">
+              <div className="orders-filter-card-scroll">
+                <FilterCatalogueRow
+                  label="All catalogues"
+                  selected={catalogueFilter === 'all'}
+                  onClick={() => onCatalogueChange('all')}
+                />
+                {catalogues.map((cat) => (
+                  <FilterCatalogueRow
+                    key={cat.id}
+                    label={cat.label}
+                    selected={catalogueFilter === cat.id}
+                    onClick={() => onCatalogueChange(cat.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="orders-filter-footer">
+          {hasActiveFilters ? (
+            <button type="button" className="orders-filter-btn-clear" onClick={onClear}>
+              Clear all
+            </button>
+          ) : null}
+          <button type="button" className="orders-filter-btn-done" onClick={onClose}>
+            Show results
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function IconSearch() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+    </svg>
+  );
+}
+function IconFilter({ active }: { active?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" fill={active ? 'currentColor' : 'none'} opacity={active ? 0.15 : 1} />
+      <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
     </svg>
   );
 }
@@ -192,6 +429,76 @@ function IconPlus() {
   );
 }
 
+function getOrderSourceInfoText(source: string): string {
+  switch (source) {
+    case 'store':
+      return 'Placed via Store';
+    case 'manual':
+      return 'Created manually';
+    case 'link':
+      return 'Placed via Link';
+    default:
+      return 'Unknown source';
+  }
+}
+
+function IconCatalogueMeta() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+    </svg>
+  );
+}
+
+function OrderMetaHit({
+  open,
+  onToggle,
+  onClose,
+  trigger,
+  icon,
+  text,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  trigger: React.ReactNode;
+  icon: React.ReactNode;
+  text: string;
+}) {
+  const hitRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (hitRef.current && !hitRef.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, onClose]);
+
+  return (
+    <div ref={hitRef} className="order-row-meta-hit">
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+      >
+        {trigger}
+      </div>
+      {open ? (
+        <div className="order-row-meta-popover" role="tooltip">
+          <span className="order-row-meta-popover__icon" aria-hidden>
+            {icon}
+          </span>
+          <span className="order-row-meta-popover__text">{text}</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const cfg = getStatusConfig(status);
@@ -218,7 +525,7 @@ function StatusSelector({
   onChange: (s: StatusType) => void;
   onClose: () => void;
 }) {
-  const statuses: StatusType[] = ['pending', 'completed', 'cancelled'];
+  const statuses: StatusType[] = [...ORDER_STATUSES];
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -268,37 +575,36 @@ function StatusSelector({
 function OrderRow({
   order,
   currencySymbol,
+  catalogueLabel,
   onStatusChange,
   onClick,
 }: {
   order: Order;
   currencySymbol: string;
+  catalogueLabel?: string | null;
   onStatusChange: (id: string, status: StatusType) => void;
   onClick: () => void;
 }) {
   const [showStatusDrop, setShowStatusDrop] = useState(false);
+  const [metaInfoOpen, setMetaInfoOpen] = useState<'source' | 'catalogue' | null>(null);
   const statusCfg = getStatusConfig(order.status);
   const total = order.total_amount != null ? formatMoney(order.total_amount, currencySymbol) : null;
-  const itemCount = (order.items || []).length;
   const phone = (order as any).customer_whatsapp || (order as any).customerWhatsapp || '';
+
+  const sourceKey =
+    order.order_source === 'link' || order.order_source === 'manual' || order.order_source === 'store'
+      ? order.order_source
+      : 'unknown';
+
+  const toggleMetaInfo = (key: 'source' | 'catalogue') => {
+    setShowStatusDrop(false);
+    setMetaInfoOpen((prev) => (prev === key ? null : key));
+  };
 
   return (
     <div
-      style={{
-        background: '#fff', borderRadius: 16, border: '1.5px solid #E2E8F0',
-        margin: '0 12px 10px', overflow: 'visible',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        cursor: 'pointer', transition: 'box-shadow 0.18s, border-color 0.18s',
-      }}
+      className="order-row-card"
       onClick={onClick}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.09)';
-        (e.currentTarget as HTMLDivElement).style.borderColor = '#CBD5E1';
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)';
-        (e.currentTarget as HTMLDivElement).style.borderColor = '#E2E8F0';
-      }}
     >
       {/* Top stripe by status */}
       <div style={{ height: 3, background: statusCfg.dot, borderRadius: '14px 14px 0 0' }} />
@@ -326,62 +632,82 @@ function OrderRow({
           </div>
         </div>
 
-        {/* Row 2: Date + Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94A3B8', fontSize: 11 }}>
+        {/* Row 2: Date + meta */}
+        <div className="order-row-foot">
+          <div className="order-row-date">
             <IconCalendar />
             {formatDate(order.created_at)}
           </div>
 
-          {/* Pills container */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
-            {/* Order source pill */}
-            {order.order_source && (
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: '#F8FAFC',
-                  color: '#64748B',
-                  border: '1px solid #E2E8F0',
-                  fontSize: 10,
-                  fontWeight: 500,
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  letterSpacing: '0.01em',
-                }}
-              >
-                {getOrderSourceLabel(order.order_source)}
-              </span>
-            )}
+          <div className="order-row-foot-tags" onClick={(e) => e.stopPropagation()}>
+            {order.order_source ? (
+              <OrderMetaHit
+                open={metaInfoOpen === 'source'}
+                onToggle={() => toggleMetaInfo('source')}
+                onClose={() => setMetaInfoOpen(null)}
+                icon={<FilterSourceIcon type={sourceKey === 'unknown' ? 'all' : sourceKey} />}
+                text={getOrderSourceInfoText(order.order_source)}
+                trigger={
+                  <button
+                    type="button"
+                    className="order-row-source-icon"
+                    aria-label={getOrderSourceLabel(order.order_source)}
+                    aria-expanded={metaInfoOpen === 'source'}
+                  >
+                    <FilterSourceIcon type={sourceKey === 'unknown' ? 'all' : sourceKey} />
+                  </button>
+                }
+              />
+            ) : null}
 
-            {/* Status chip — clickable, stops propagation */}
-            <div style={{ position: 'relative' }}>
+            {catalogueLabel ? (
+              <OrderMetaHit
+                open={metaInfoOpen === 'catalogue'}
+                onToggle={() => toggleMetaInfo('catalogue')}
+                onClose={() => setMetaInfoOpen(null)}
+                icon={<IconCatalogueMeta />}
+                text={`Made in ${catalogueLabel} catalogue`}
+                trigger={
+                  <button
+                    type="button"
+                    className="order-row-catalogue"
+                    aria-expanded={metaInfoOpen === 'catalogue'}
+                  >
+                    {catalogueLabel}
+                  </button>
+                }
+              />
+            ) : null}
+
+            <div className="order-row-status-wrap">
               <button
+                type="button"
+                className="order-row-status-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowStatusDrop(v => !v);
+                  setMetaInfoOpen(null);
+                  setShowStatusDrop((v) => !v);
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  background: statusCfg.bg, color: statusCfg.text,
-                  fontSize: 11, fontWeight: 700,
-                  padding: '4px 9px', borderRadius: 100, border: 'none',
-                  cursor: 'pointer', fontFamily: 'inherit',
+                  background: statusCfg.bg,
+                  color: statusCfg.text,
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusCfg.dot, display: 'inline-block' }} />
+                <span className="order-row-status-dot" style={{ background: statusCfg.dot }} />
                 {statusCfg.label}
                 <IconChevronDown />
               </button>
-              {showStatusDrop && (
+              {showStatusDrop ? (
                 <StatusSelector
                   current={order.status}
-                  onChange={(s) => { onStatusChange(order.id, s); setShowStatusDrop(false); }}
+                  onChange={(s) => {
+                    onStatusChange(order.id, s);
+                    setShowStatusDrop(false);
+                  }}
                   onClose={() => setShowStatusDrop(false)}
                 />
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -661,7 +987,7 @@ export default function Orders() {
   const navigate = useNavigate();
   const location = useLocation();
   const scrollRef = useRef<HTMLElement | null>(null);
-  const { user } = useAuth();
+  const { user, supabaseData } = useAuth();
   const { showToast } = useToast();
   const { guardOnline } = useCloudWriteGate();
   const [tab, setTab] = useState<TabType>('all');
@@ -675,6 +1001,9 @@ export default function Orders() {
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [showDateFilters, setShowDateFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<OrderSourceFilter>('all');
+  const [catalogueFilter, setCatalogueFilter] = useState<string>('all');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
@@ -884,22 +1213,55 @@ export default function Orders() {
   const tabs: { key: TabType; label: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending' },
+    { key: 'confirmed', label: 'Confirmed' },
     { key: 'completed', label: 'Completed' },
     { key: 'cancelled', label: 'Cancelled' },
   ];
 
+  const localProducts = useMemo(() => {
+    const cloud = supabaseData?.products;
+    if (Array.isArray(cloud) && cloud.length > 0) return cloud as ProductWithCatalogueData[];
+    if (!user?.uid) return [] as ProductWithCatalogueData[];
+    return safeGetFromStorage(getStorageKey('products', user.uid), []) as ProductWithCatalogueData[];
+  }, [supabaseData?.products, user?.uid]);
+
+  const catalogues = useMemo(() => getAllCatalogues(user?.uid), [user?.uid]);
+
+  const storeCatalogueId = useMemo(
+    () => (user?.uid ? readCachedSellerStore(user.uid)?.catalogueId ?? null : null),
+    [user?.uid]
+  );
+
+  const catalogueLabelByOrderId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const order of orders) {
+      const label = getOrderCatalogueLabel(order, localProducts, catalogues, storeCatalogueId);
+      if (label) map.set(order.id, label);
+    }
+    return map;
+  }, [orders, localProducts, catalogues, storeCatalogueId]);
+
+  const catalogueIdByOrderId = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const order of orders) {
+      map.set(
+        order.id,
+        getOrderCatalogueId(order, localProducts, catalogues, storeCatalogueId)
+      );
+    }
+    return map;
+  }, [orders, localProducts, catalogues, storeCatalogueId]);
+
+  const listFilterOpts = useMemo(
+    () => ({ tab, searchQuery, sourceFilter, catalogueFilter, catalogueIdByOrderId }),
+    [tab, searchQuery, sourceFilter, catalogueFilter, catalogueIdByOrderId]
+  );
+
+  const hasActiveListFilters = sourceFilter !== 'all' || catalogueFilter !== 'all';
+
   const filteredOrders = useMemo(
-    () =>
-      orders
-        .filter(o => tab === 'all' || o.status === tab)
-        .filter(o => {
-          if (!searchQuery) return true;
-          return (
-            o.customer_name?.toLowerCase().includes(searchQuery) ||
-            (o.items || []).some((it: OrderItem) => it.name?.toLowerCase().includes(searchQuery))
-          );
-        }),
-    [orders, tab, searchQuery]
+    () => orders.filter((o) => orderMatchesListFilters(o, listFilterOpts)),
+    [orders, listFilterOpts]
   );
 
   // Summary stats
@@ -907,6 +1269,7 @@ export default function Orders() {
     () => ({
       total: orders.length,
       pending: orders.filter(o => o.status === 'pending').length,
+      confirmed: orders.filter(o => o.status === 'confirmed').length,
       completed: orders.filter(o => o.status === 'completed').length,
       revenue: orders
         .filter(o => o.status === 'completed' && o.total_amount)
@@ -920,7 +1283,8 @@ export default function Orders() {
   const filteredSales = useMemo(
     () =>
       orders
-        .filter(o => o.status === 'completed' && o.total_amount)
+        .filter((o) => o.status === 'completed' && o.total_amount)
+        .filter((o) => orderMatchesListFilters(o, { ...listFilterOpts, tab: 'all' }))
         .filter(o => {
           if (!dateRangeStart && !dateRangeEnd) return true;
           const orderDate = new Date(o.created_at || '').getTime();
@@ -929,7 +1293,7 @@ export default function Orders() {
           return orderDate >= startTime && orderDate <= endTime;
         })
         .reduce((s, o) => s + (o.total_amount || 0), 0),
-    [orders, dateRangeStart, dateRangeEnd]
+    [orders, dateRangeStart, dateRangeEnd, listFilterOpts]
   );
 
   const shouldRestoreScroll =
@@ -1118,6 +1482,43 @@ export default function Orders() {
           {/* Fixed Icons Group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
             <button
+              onClick={() => setShowFilters(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 18,
+                color: showFilters || hasActiveListFilters ? '#2563EB' : '#4B5563',
+                padding: 4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+                position: 'relative',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#2563EB'}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = showFilters || hasActiveListFilters ? '#2563EB' : '#4B5563';
+              }}
+              title="Filter"
+            >
+              <IconFilter active={hasActiveListFilters} />
+              {hasActiveListFilters ? (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: '#2563EB',
+                    border: '1.5px solid #fff',
+                  }}
+                />
+              ) : null}
+            </button>
+            <button
               onClick={() => setShowSearch((prev) => !prev)}
               style={{
                 background: 'none',
@@ -1150,9 +1551,9 @@ export default function Orders() {
                 key={t.key}
                 onClick={() => handleTabChange(t.key)}
                 style={{
-                  flex: 1, padding: '10px 4px', border: 'none',
+                  flex: 1, padding: '10px 2px', border: 'none',
                   background: 'transparent', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 12, fontWeight: isActive ? 700 : 500,
+                  fontFamily: 'inherit', fontSize: 11, fontWeight: isActive ? 700 : 500,
                   color: isActive ? '#2563EB' : '#64748B',
                   borderBottom: isActive ? '2.5px solid #2563EB' : '2.5px solid transparent',
                   transition: 'color 0.15s',
@@ -1315,12 +1716,16 @@ export default function Orders() {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, padding: 24 }}>
-              <div style={{ fontSize: 36, marginBottom: 4 }}>{search ? '🔍' : '📦'}</div>
+              <div style={{ fontSize: 36, marginBottom: 4 }}>{searchQuery || hasActiveListFilters ? '🔍' : '📦'}</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>
-                {search ? 'No results found' : `No ${tab !== 'all' ? tab : ''} orders yet`}
+                {searchQuery || hasActiveListFilters
+                  ? 'No matching orders'
+                  : `No ${tab !== 'all' ? tab : ''} orders yet`}
               </div>
               <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center' }}>
-                {search ? 'Try a different name or product' : 'Orders will appear here when customers place them'}
+                {searchQuery || hasActiveListFilters
+                  ? 'Try changing your search or filters'
+                  : 'Orders will appear here when customers place them'}
               </div>
             </div>
           ) : (
@@ -1329,6 +1734,7 @@ export default function Orders() {
                 key={order.id}
                 order={order}
                 currencySymbol={symbol}
+                catalogueLabel={catalogueLabelByOrderId.get(order.id)}
                 onStatusChange={handleStatusChange}
                 onClick={async () => {
                   await Haptics.impact({ style: ImpactStyle.Light });
@@ -1340,6 +1746,21 @@ export default function Orders() {
           )}
         </div>
       </main>
+
+      <OrdersFilterPopup
+        open={showFilters}
+        onClose={() => setShowFilters(false)}
+        sourceFilter={sourceFilter}
+        catalogueFilter={catalogueFilter}
+        catalogues={catalogues}
+        onSourceChange={setSourceFilter}
+        onCatalogueChange={setCatalogueFilter}
+        onClear={() => {
+          setSourceFilter('all');
+          setCatalogueFilter('all');
+        }}
+        hasActiveFilters={hasActiveListFilters}
+      />
 
       <MainAppBottomNav active="orders" />
     </div>

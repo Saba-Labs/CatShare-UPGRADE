@@ -1,4 +1,7 @@
+import { getProductImageUrls } from './productImages';
+
 export const MAX_VARIANT_GROUPS = 6;
+export const MAX_VARIANT_GALLERY_IMAGES = 5;
 export const MAX_VARIANT_OPTIONS_PER_GROUP = 24;
 
 export type ProductVariantGroup = {
@@ -9,7 +12,12 @@ export type ProductVariantGroup = {
 
 /** Per-catalogue fields for a variant combination (price, image, MOQ, slabs, stock, etc.). */
 export type VariantCombinationDetails = {
+  /** @deprecated Use `images[0]` — kept for cart thumbnails and legacy clients. */
   image?: string;
+  /** Variant-specific gallery URLs (uploaded for this combination). */
+  images?: string[];
+  /** Indices into the product `imageUrls` array to also show on this variant (e.g. safety labels). */
+  baseImageIndices?: number[];
   price?: number;
   /** Legacy in/out when catalogue has no warehouse room (default in stock when unset). */
   inStock?: boolean;
@@ -56,11 +64,93 @@ function cleanGroupName(raw: unknown): string {
 function hasNonemptyDetails(details: VariantCombinationDetails | undefined): boolean {
   if (!details) return false;
   if (details.inStock === false) return true;
-  if (details.image) return true;
+  if (getVariantSpecificImages(details).length > 0) return true;
+  if (getVariantBaseImageIndices(details).length > 0) return true;
   if (details.price != null && Number.isFinite(details.price)) return true;
   const cf = details.customFields;
   if (!cf || typeof cf !== 'object') return false;
   return Object.values(cf).some((v) => v !== undefined && v !== null && v !== '');
+}
+
+const HTTPS_URL = /^https?:\/\//i;
+
+/** Variant-only gallery URLs in display order (legacy `image` included when not in `images`). */
+export function getVariantSpecificImages(details?: VariantCombinationDetails | null): string[] {
+  if (!details) return [];
+  const out: string[] = [];
+  const extra = Array.isArray(details.images) ? details.images : [];
+  for (const u of extra) {
+    const t = String(u ?? '').trim();
+    if (t && HTTPS_URL.test(t) && !out.includes(t)) out.push(t);
+  }
+  const legacy = typeof details.image === 'string' ? details.image.trim() : '';
+  if (legacy && HTTPS_URL.test(legacy) && !out.includes(legacy)) {
+    out.unshift(legacy);
+  }
+  return out.slice(0, MAX_VARIANT_GALLERY_IMAGES);
+}
+
+/** Product gallery slot indices selected for this variant. */
+export function getVariantBaseImageIndices(details?: VariantCombinationDetails | null): number[] {
+  if (!details?.baseImageIndices || !Array.isArray(details.baseImageIndices)) return [];
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const raw of details.baseImageIndices) {
+    const idx = typeof raw === 'number' && Number.isFinite(raw) ? Math.floor(raw) : -1;
+    if (idx < 0 || seen.has(idx)) continue;
+    seen.add(idx);
+    out.push(idx);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/**
+ * Merged variant gallery: variant uploads first, then selected base product images.
+ * Returns null when the variant has no custom gallery config (storefront uses product gallery).
+ */
+export function getVariantGalleryUrls(
+  product: { imageUrls?: unknown; imageUrl?: unknown } | null | undefined,
+  details?: VariantCombinationDetails | null
+): string[] | null {
+  if (!details) return null;
+  const variantUrls = getVariantSpecificImages(details);
+  const baseIndices = getVariantBaseImageIndices(details);
+  if (variantUrls.length === 0 && baseIndices.length === 0) return null;
+
+  const baseUrls = getProductImageUrls(product);
+  const selectedBase: string[] = [];
+  for (const idx of baseIndices) {
+    if (idx < 0 || idx >= baseUrls.length) continue;
+    const u = baseUrls[idx];
+    if (!variantUrls.includes(u) && !selectedBase.includes(u)) selectedBase.push(u);
+  }
+
+  const merged = [...variantUrls, ...selectedBase];
+  return merged.length > 0 ? merged : null;
+}
+
+/** Primary thumbnail for cart / list rows when a variant is selected. */
+export function getVariantPrimaryImageUrl(
+  product: { imageUrls?: unknown; imageUrl?: unknown } | null | undefined,
+  details?: VariantCombinationDetails | null
+): string | undefined {
+  const gallery = getVariantGalleryUrls(product, details);
+  if (gallery?.length) return gallery[0];
+  const legacy = typeof details?.image === 'string' ? details.image.trim() : '';
+  return legacy && HTTPS_URL.test(legacy) ? legacy : undefined;
+}
+
+/** Normalize variant image fields before save. */
+export function normalizeVariantImageFields(
+  details: Partial<VariantCombinationDetails>
+): Pick<VariantCombinationDetails, 'image' | 'images' | 'baseImageIndices'> {
+  const images = getVariantSpecificImages(details as VariantCombinationDetails);
+  const baseImageIndices = getVariantBaseImageIndices(details as VariantCombinationDetails);
+  return {
+    image: images[0],
+    images: images.length > 0 ? images : undefined,
+    baseImageIndices: baseImageIndices.length > 0 ? baseImageIndices : undefined,
+  };
 }
 
 function legacyDetailsFromCombo(combo: VariantCombination): VariantCombinationDetails | undefined {

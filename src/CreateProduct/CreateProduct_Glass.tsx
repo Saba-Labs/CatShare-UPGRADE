@@ -2587,6 +2587,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
   selectedCatalogue={selectedCatalogue}
   onCatalogueChange={isPro ? setSelectedCatalogue : () => {}}
   productId={stockProductId}
+  baseProductImages={imageSlots}
   onSave={(updatedConfig) => {
     if (!editingId) return;
     const authUserIdNow = getPersistedAuthUserId();

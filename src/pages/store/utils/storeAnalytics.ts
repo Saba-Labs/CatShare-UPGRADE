@@ -62,6 +62,7 @@ export function computeAnalyticsFromOrders(
   const sym = currencySymbol(currency);
   const revenue = completed.reduce((sum, order) => sum + (order.total_amount || 0), 0);
   const pendingCount = filtered.filter((order) => order.status === 'pending').length;
+  const confirmedCount = filtered.filter((order) => order.status === 'confirmed').length;
   const aov = completed.length > 0 ? revenue / completed.length : 0;
 
   const customerCounts = new Map<string, number>();
@@ -99,7 +100,12 @@ export function computeAnalyticsFromOrders(
       visitors: metric('visitors', 'Store Orders', String(filtered.length), 'orders'),
       orders: metric('orders', 'Completed Orders', String(completed.length), 'orders'),
       revenue: metric('revenue', 'Revenue', formatMoney(revenue, sym), 'revenue'),
-      conversionRate: metric('conversion', 'Pending Orders', String(pendingCount), 'pending'),
+      conversionRate: metric(
+        'conversion',
+        'Pending · Confirmed',
+        `${pendingCount} · ${confirmedCount}`,
+        'pending'
+      ),
       returningCustomers: metric(
         'returning',
         'Returning Customers',
