@@ -14,7 +14,7 @@ export async function getPublicTrackedOrderPayloadByToken(
     .eq('tracking_token', token)
     .maybeSingle();
 
-  if (paymentError || !order) return null;
+  if (error || !order) return null;
 
   const paymentCtx = await getTrackingPaymentContextByToken(supabase, token).catch(() => null);
   const payload: Record<string, unknown> = { ...(order as Record<string, unknown>) };
