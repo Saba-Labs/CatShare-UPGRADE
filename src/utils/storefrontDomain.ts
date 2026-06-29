@@ -74,6 +74,14 @@ export function buildStorefrontUrl(slug: string): string {
   return `https://${normalizedSlug}.${rootHost}`;
 }
 
+/** Ensures a store URL has a scheme (for copy/open). Idempotent if already absolute. */
+export function ensureAbsoluteHttpsUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 /** Public store URL: active custom domain, else `{slug}.{root}`. */
 export function buildStorefrontPublicUrl(
   slug: string,

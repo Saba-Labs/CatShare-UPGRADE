@@ -33,10 +33,10 @@ export function PaymentStatusBadge({
   const variant = variants[status] ?? 'neutral';
   const labels: Record<string, string> = {
     paid: 'Paid',
-    failed: 'Failed',
-    pending: 'Pending',
+    failed: 'Payment failed',
+    pending: 'Awaiting payment',
     refunded: 'Refunded',
-    cancelled: 'Cancelled',
+    cancelled: 'Payment cancelled',
   };
   return (
     <span className={`int-badge ${variant}`}>

@@ -6,6 +6,7 @@ import { fetchRazorpayAccountProfile, createRazorpayOrder, verifyRazorpayPayment
 
 type RazorpayServerMetadata = {
   keyIdMasked?: string;
+  keyMode?: 'test' | 'live';
   encryptedKeyId?: string;
   encryptedKeySecret?: string;
   merchantId?: string;
@@ -15,6 +16,7 @@ type RazorpayServerMetadata = {
   phone?: string;
   accountStatus?: string;
   connectionDate?: string;
+  lastVerifiedAt?: string;
   lastError?: string | null;
   isDemo?: boolean;
 };
@@ -38,6 +40,7 @@ async function buildMetadata(
   const now = new Date().toISOString();
   return {
     keyIdMasked: maskKeyId(keyId),
+    keyMode: profile.keyMode,
     encryptedKeyId: encryptSecret(keyId),
     encryptedKeySecret: encryptSecret(keySecret),
     merchantId: profile.id,
@@ -47,6 +50,7 @@ async function buildMetadata(
     phone: profile.phone,
     accountStatus: 'active',
     connectionDate: now,
+    lastVerifiedAt: now,
     lastError: null,
     isDemo: false,
   };

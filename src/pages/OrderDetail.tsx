@@ -10,7 +10,7 @@ import { FileOpener } from '@capacitor-community/file-opener';
 import { OpenInvoicePdf } from '../plugins/openInvoicePdf';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, type Order } from '../services/orderService';
+import { fetchSellerOrders, updateOrder, updateOrderStatus, deleteOrder, ensureOrderTrackingToken, type Order } from '../services/orderService';
 import { buildOrderTrackingUrl } from '../services/orderTrackingService';
 import {
   getCatalogueData,
@@ -2967,6 +2967,18 @@ useEffect(() => {
                 />
                 <OrderCustomerTrackingSection
                   order={order}
+                  onEnsureToken={async () => {
+                    if (!user?.uid || !order.id) return null;
+                    const res = await ensureOrderTrackingToken(user.uid, order.id);
+                    if (res.error || !res.token) return null;
+                    if (res.token !== order.tracking_token) {
+                      setOrder((prev) =>
+                        prev ? { ...prev, tracking_token: res.token! } : prev
+                      );
+                      patchCachedOrder(user.uid, order.id, { tracking_token: res.token });
+                    }
+                    return res.token;
+                  }}
                   onCopy={async (url) => {
                     try {
                       await navigator.clipboard.writeText(url);

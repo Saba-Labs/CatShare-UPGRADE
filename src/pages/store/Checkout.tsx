@@ -3,13 +3,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
-import { getSellerStore, updateStoreCheckoutSettings } from '../../services/storeService';
+import { getSellerStore, updateStoreCheckoutSettings, updateStoreMinimumOrderValue, normalizeStoreMinimumOrderValueInput } from '../../services/storeService';
 import { readCachedSellerStore } from '../../utils/storePageCache';
-import StoreLayout from './components/StoreLayout';
+import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
+import MinimumOrderValueField from './components/MinimumOrderValueField';
 import CheckoutRulesSection from './components/CheckoutRulesSection';
 import { FiInfo } from 'react-icons/fi';
 import {
@@ -82,6 +83,9 @@ export default function Checkout() {
 
   const [settings, setSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
   const [originalSettings, setOriginalSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
+  const [minimumOrderValue, setMinimumOrderValue] = useState('0');
+  const [originalMinimumOrderValue, setOriginalMinimumOrderValue] = useState('0');
+  const [minimumOrderError, setMinimumOrderError] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState<string | null>(null);
@@ -91,8 +95,12 @@ export default function Checkout() {
     const cached = readCachedSellerStore(sellerId);
     if (cached) {
       const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      const mov =
+        cached.minimumOrderValue != null ? String(cached.minimumOrderValue) : '0';
       setSettings(loaded);
       setOriginalSettings(loaded);
+      setMinimumOrderValue(mov);
+      setOriginalMinimumOrderValue(mov);
       setLoading(false);
     }
   }, [sellerId]);
@@ -112,8 +120,12 @@ export default function Checkout() {
     if (!result.success || !result.data) {
       if (cached) {
         const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+        const mov =
+          cached.minimumOrderValue != null ? String(cached.minimumOrderValue) : '0';
         setSettings(loaded);
         setOriginalSettings(loaded);
+        setMinimumOrderValue(mov);
+        setOriginalMinimumOrderValue(mov);
       } else {
         showToast(result.error || 'Failed to load checkout settings', 'error');
       }
@@ -122,8 +134,12 @@ export default function Checkout() {
     }
 
     const loaded = normalizeCheckoutSettings(result.data.checkoutSettings);
+    const mov =
+      result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '0';
     setSettings(loaded);
     setOriginalSettings(loaded);
+    setMinimumOrderValue(mov);
+    setOriginalMinimumOrderValue(mov);
     setLoading(false);
   }, [sellerId, showToast]);
 
@@ -132,8 +148,10 @@ export default function Checkout() {
     void loadSettings();
   }, [authLoading, sellerId, loadSettings]);
 
-  const hasChanges = JSON.stringify(settings) !== JSON.stringify(originalSettings);
-  const canSave = hasChanges && !saving;
+  const hasChanges =
+    JSON.stringify(settings) !== JSON.stringify(originalSettings) ||
+    minimumOrderValue !== originalMinimumOrderValue;
+  const canSave = hasChanges && !saving && !minimumOrderError;
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -159,18 +177,54 @@ export default function Checkout() {
   const handleSave = async () => {
     if (!sellerId || !guardCloudWrite()) return;
 
+    if (minimumOrderValue !== originalMinimumOrderValue) {
+      const normalized = normalizeStoreMinimumOrderValueInput(minimumOrderValue);
+      if (normalized.ok === false) {
+        setMinimumOrderError(normalized.error);
+        showToast(normalized.error, 'error');
+        return;
+      }
+    }
+
     setSaving(true);
-    const result = await updateStoreCheckoutSettings(sellerId, settings);
+    const failures: string[] = [];
+
+    if (minimumOrderValue !== originalMinimumOrderValue) {
+      const normalized = normalizeStoreMinimumOrderValueInput(minimumOrderValue);
+      if (normalized.ok) {
+        const movResult = await updateStoreMinimumOrderValue(sellerId, normalized.value);
+        if (!movResult.success) {
+          failures.push(movResult.error || 'Failed to update minimum order value');
+        } else if (movResult.data) {
+          const mov =
+            movResult.data.minimumOrderValue != null
+              ? String(movResult.data.minimumOrderValue)
+              : '0';
+          setMinimumOrderValue(mov);
+          setOriginalMinimumOrderValue(mov);
+        }
+      }
+    }
+
+    if (JSON.stringify(settings) !== JSON.stringify(originalSettings)) {
+      const result = await updateStoreCheckoutSettings(sellerId, settings);
+      if (!result.success || !result.data) {
+        failures.push(result.error || 'Failed to save checkout settings');
+      } else {
+        const saved = normalizeCheckoutSettings(result.data.checkoutSettings);
+        setSettings(saved);
+        setOriginalSettings(saved);
+      }
+    }
+
     setSaving(false);
 
-    if (!result.success || !result.data) {
-      showToast(result.error || 'Failed to save checkout settings', 'error');
+    if (failures.length > 0) {
+      showToast(failures[0], 'error');
       return;
     }
 
-    const saved = normalizeCheckoutSettings(result.data.checkoutSettings);
-    setSettings(saved);
-    setOriginalSettings(saved);
+    setMinimumOrderError(undefined);
     showToast('Checkout settings saved', 'success');
   };
 
@@ -205,7 +259,7 @@ export default function Checkout() {
 
   return (
     <StoreLayout>
-      <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 max-w-3xl">
+      <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Checkout Settings"
           sticky
@@ -227,45 +281,35 @@ export default function Checkout() {
 
         <div className="space-y-6">
           <SettingsCard
-            title="Payment Methods"
-            description="Choose which payment options customers can use at checkout."
+            title="Order summary"
+            description="How totals appear to customers during checkout."
           >
-            <div className="space-y-4 divide-y divide-gray-200 dark:divide-gray-800">
-              <ToggleRow
-                title="Online / Prepaid Payments"
-                description="Allow customers to pay online via connected payment gateways."
-                checked={settings.enablePrepaid}
-                onChange={(enablePrepaid) => patchSettings({ enablePrepaid })}
-                disabled={saving}
-                tooltipOpen={tooltipOpen}
-                onTooltipToggle={setTooltipOpen}
-                tooltipKey="prepaid"
-              />
-              <div className="pt-4">
-                <ToggleRow
-                  title="Cash on Delivery"
-                  description="Let customers pay when the order is delivered."
-                  checked={settings.enableCod}
-                  onChange={(enableCod) => patchSettings({ enableCod })}
-                  disabled={saving}
-                  tooltipOpen={tooltipOpen}
-                  onTooltipToggle={setTooltipOpen}
-                  tooltipKey="cod"
-                />
-              </div>
-              <div className="pt-4">
-                <ToggleRow
-                  title="Show price breakdown"
-                  description="Display shipping, tax, and discount lines in the order summary."
-                  checked={settings.showBreakdown}
-                  onChange={(showBreakdown) => patchSettings({ showBreakdown })}
-                  disabled={saving}
-                  tooltipOpen={tooltipOpen}
-                  onTooltipToggle={setTooltipOpen}
-                  tooltipKey="breakdown"
-                />
-              </div>
-            </div>
+            <ToggleRow
+              title="Show price breakdown"
+              description="Display shipping, tax, and discount lines in the order summary."
+              checked={settings.showBreakdown}
+              onChange={(showBreakdown) => patchSettings({ showBreakdown })}
+              disabled={saving}
+              tooltipOpen={tooltipOpen}
+              onTooltipToggle={setTooltipOpen}
+              tooltipKey="breakdown"
+            />
+          </SettingsCard>
+
+          <SettingsCard
+            title="Minimum order value"
+            description="Cart total required before customers can place an order."
+          >
+            <MinimumOrderValueField
+              value={minimumOrderValue}
+              onChange={(value) => {
+                setMinimumOrderValue(value);
+                if (minimumOrderError) setMinimumOrderError(undefined);
+              }}
+              disabled={saving}
+              error={minimumOrderError}
+              linkedNote="Leave at 0 for no minimum. Synced with Store settings → Customer experience."
+            />
           </SettingsCard>
 
           <SettingsCard

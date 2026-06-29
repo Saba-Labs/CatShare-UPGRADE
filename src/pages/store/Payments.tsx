@@ -1,70 +1,173 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCreditCard, FiShield } from 'react-icons/fi';
-import StoreLayout from './components/StoreLayout';
+import { FiAlertTriangle } from 'react-icons/fi';
+import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
-import SettingsCard from './components/SettingsCard';
-import PaymentGatewayCard from './components/PaymentGatewayCard';
-import { PAYMENT_GATEWAYS, getActivePaymentGateways } from './config/paymentGateways';
+import StoreSaveBar from './components/StoreSaveBar';
+import { PAYMENT_GATEWAYS } from './config/paymentGateways';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
+import { getPersistedAuthUserId } from '../../utils/authUserId';
+import { getSellerStore, updateStoreCheckoutSettings } from '../../services/storeService';
+import { readCachedSellerStore } from '../../utils/storePageCache';
 import { useSellerIntegrations } from '../../integrations/hooks/useSellerIntegrations';
 import { disconnectIntegration } from '../../integrations/core/IntegrationConnectionService';
-import { isConnectedStatus } from '../../integrations/core/IntegrationStatusService';
-import type { PaymentGatewayId } from './config/paymentGateways';
+import {
+  canConnect,
+  canDisconnect,
+  getIntegrationStatusBadge,
+  isConnectedStatus,
+} from '../../integrations/core/IntegrationStatusService';
+import {
+  DEFAULT_CHECKOUT_SETTINGS,
+  normalizeCheckoutSettings,
+  type StoreCheckoutSettings,
+  type StorePaymentCollectionMode,
+} from '../../types/checkoutSettings';
+import { isValidUpiId, normalizeUpiId } from '../../utils/upiPayment';
+import ToggleSwitch from './components/ToggleSwitch';
+import { STORE_FIELD_CLASS, STORE_HINT } from './storeTypography';
+
+const COLLECTION_OPTIONS: Array<{
+  id: StorePaymentCollectionMode;
+  title: string;
+  hint: string;
+}> = [
+  {
+    id: 'manual',
+    title: 'Manual',
+    hint: 'Order confirmation only — you collect payment offline.',
+  },
+  {
+    id: 'upi',
+    title: 'UPI',
+    hint: 'Show your UPI ID at checkout; you verify payment.',
+  },
+  {
+    id: 'gateway',
+    title: 'Online gateway',
+    hint: 'Pay online via Razorpay.',
+  },
+];
+
+const RAZORPAY_GATEWAY = PAYMENT_GATEWAYS.find((g) => g.id === 'razorpay')!;
 
 export default function Payments() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
-  const { sellerId, views, loading, error, reload } = useSellerIntegrations();
-  const [disconnectingId, setDisconnectingId] = useState<PaymentGatewayId | null>(null);
+  const sellerId = user?.uid ?? getPersistedAuthUserId() ?? '';
+  const { views, loading: integrationsLoading, error, reload } = useSellerIntegrations();
+  const [disconnecting, setDisconnecting] = useState(false);
 
-  const activeGateways = getActivePaymentGateways();
+  const [settings, setSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const connectedGateways = useMemo(
-    () =>
-      activeGateways.filter(
-        (gateway) =>
-          gateway.integrationProviderId &&
-          views.some(
-            (view) =>
-              view.provider === gateway.integrationProviderId &&
-              isConnectedStatus(view.status)
-          )
-      ),
-    [views, activeGateways]
+  const razorpayView = views.find((v) => v.provider === 'razorpay');
+  const razorpayConnected =
+    razorpayView != null && isConnectedStatus(razorpayView.status) && !razorpayView.isDemo;
+  const razorpayStatus = razorpayView?.status ?? 'not_connected';
+  const razorpayBadge = getIntegrationStatusBadge(razorpayStatus);
+  const gatewayBlocked =
+    settings.paymentCollectionMode === 'gateway' && !razorpayConnected && !settings.enableCod;
+
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSellerStore(sellerId);
+    if (cached) {
+      const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      setSettings(loaded);
+      setOriginalSettings(loaded);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
+  const loadSettings = useCallback(async () => {
+    if (!sellerId) {
+      setLoading(false);
+      return;
+    }
+    const cached = readCachedSellerStore(sellerId);
+    if (cached) {
+      const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      setSettings(loaded);
+      setOriginalSettings(loaded);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    const result = await getSellerStore(sellerId);
+    if (!result.success || !result.data) {
+      if (!cached) setLoading(false);
+      return;
+    }
+    const loaded = normalizeCheckoutSettings(result.data.checkoutSettings);
+    setSettings(loaded);
+    setOriginalSettings(loaded);
+    setLoading(false);
+  }, [sellerId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadSettings();
+  }, [authLoading, loadSettings]);
+
+  const dirty = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(originalSettings),
+    [settings, originalSettings]
   );
 
-  const viewForGateway = (gatewayId: PaymentGatewayId) => {
-    const gateway = PAYMENT_GATEWAYS.find((item) => item.id === gatewayId);
-    if (!gateway?.integrationProviderId) return null;
-    return views.find((view) => view.provider === gateway.integrationProviderId) ?? null;
+  const patchSettings = (patch: Partial<StoreCheckoutSettings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleConnect = (gatewayId: PaymentGatewayId) => {
-    const gateway = PAYMENT_GATEWAYS.find((item) => item.id === gatewayId);
-    if (!gateway?.managePath) return;
-    navigate(gateway.managePath);
+  const handleSave = async () => {
+    if (!guardCloudWrite() || !sellerId) return;
+    if (settings.paymentCollectionMode === 'upi') {
+      const upi = normalizeUpiId(settings.sellerUpiId);
+      if (!isValidUpiId(upi)) {
+        showToast('Enter a valid UPI ID (e.g. yourname@oksbi)', 'error');
+        return;
+      }
+    }
+    if (gatewayBlocked) {
+      showToast('Connect Razorpay or enable Cash on Delivery', 'error');
+      return;
+    }
+
+    setSaving(true);
+    const result = await updateStoreCheckoutSettings(sellerId, {
+      ...settings,
+      sellerUpiId: normalizeUpiId(settings.sellerUpiId),
+      enablePrepaid: settings.paymentCollectionMode === 'gateway',
+    });
+    setSaving(false);
+
+    if (!result.success || !result.data) {
+      showToast(result.error ?? 'Could not save payment settings', 'error');
+      return;
+    }
+    const saved = normalizeCheckoutSettings(result.data.checkoutSettings);
+    setSettings(saved);
+    setOriginalSettings(saved);
+    showToast('Payment settings saved', 'success');
   };
 
-  const handleManage = (gatewayId: PaymentGatewayId) => {
-    const gateway = PAYMENT_GATEWAYS.find((item) => item.id === gatewayId);
-    if (!gateway?.managePath) return;
-    navigate(gateway.managePath);
+  const handleRazorpayAction = () => {
+    navigate(RAZORPAY_GATEWAY.managePath!);
   };
 
-  const handleDisconnect = async (gatewayId: PaymentGatewayId) => {
-    if (!guardCloudWrite()) return;
+  const handleDisconnectRazorpay = async () => {
+    if (!guardCloudWrite() || !sellerId) return;
+    if (!window.confirm('Disconnect Razorpay from your store?')) return;
 
-    const gateway = PAYMENT_GATEWAYS.find((item) => item.id === gatewayId);
-    if (!gateway?.integrationProviderId || !sellerId) return;
-
-    if (!window.confirm(`Disconnect ${gateway.name} from your store?`)) return;
-
-    setDisconnectingId(gatewayId);
-    const result = await disconnectIntegration(sellerId, gateway.integrationProviderId);
-    setDisconnectingId(null);
+    setDisconnecting(true);
+    const result = await disconnectIntegration(sellerId, 'razorpay');
+    setDisconnecting(false);
 
     if (result.error) {
       showToast(
@@ -73,81 +176,193 @@ export default function Payments() {
       );
       return;
     }
-
-    showToast(`${gateway.name} disconnected`, 'success');
+    showToast('Razorpay disconnected', 'success');
     await reload();
   };
 
   return (
     <StoreLayout>
-      <PageHeader
-        title="Payments"
-      />
+      <PageHeader title="Payments" description="How customers pay at checkout." />
 
-      <div className="space-y-6 max-w-3xl">
-        <SettingsCard
-          title="Payment Gateways"
-          description={
-            loading
-              ? 'Loading your payment connections…'
-              : connectedGateways.length > 0
-                ? `${connectedGateways.length} gateway${connectedGateways.length === 1 ? '' : 's'} connected`
-                : 'Connect a gateway to start accepting online payments.'
-          }
-        >
-          {error ? (
-            <div className="mb-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-              {error}
-              <button
-                type="button"
-                onClick={() => void reload()}
-                className="ml-2 font-semibold underline underline-offset-2"
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
-
-          <div className="space-y-4">
-            {activeGateways.map((gateway) => {
-              const view = viewForGateway(gateway.id);
+      <div className={`max-w-lg space-y-6 ${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}`}>
+        {loading ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+        ) : (
+          <div className="space-y-2" role="radiogroup" aria-label="Payment method">
+            {COLLECTION_OPTIONS.map(({ id, title, hint }) => {
+              const selected = settings.paymentCollectionMode === id;
               return (
-                <PaymentGatewayCard
-                  key={gateway.id}
-                  gateway={gateway}
-                  status={view?.status}
-                  displayStatus={view?.displayStatus}
-                  loading={loading}
-                  actionLoading={disconnectingId === gateway.id}
-                  onConnect={() => handleConnect(gateway.id)}
-                  onManage={() => handleManage(gateway.id)}
-                  onDisconnect={() => void handleDisconnect(gateway.id)}
-                />
+                <div
+                  key={id}
+                  className={`rounded-xl border transition-colors ${
+                    selected
+                      ? 'border-gray-900 dark:border-gray-200 bg-white dark:bg-gray-900/60'
+                      : 'border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-900/30'
+                  }`}
+                >
+                  <label className="flex cursor-pointer items-start gap-3 p-4">
+                    <input
+                      type="radio"
+                      name="paymentCollectionMode"
+                      className="mt-1 h-4 w-4 flex-shrink-0 accent-gray-900 dark:accent-gray-100"
+                      checked={selected}
+                      onChange={() => patchSettings({ paymentCollectionMode: id })}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {title}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">
+                        {hint}
+                      </span>
+                    </span>
+                  </label>
+
+                  {selected && id === 'upi' ? (
+                    <div className="border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-800">
+                      <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        Your UPI ID
+                      </label>
+                      <input
+                        type="text"
+                        className={`${STORE_FIELD_CLASS} mt-2`}
+                        placeholder="yourname@oksbi"
+                        value={settings.sellerUpiId}
+                        onChange={(e) => patchSettings({ sellerUpiId: e.target.value })}
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <p className={`${STORE_HINT} mt-2 flex items-start gap-1.5`}>
+                        <FiAlertTriangle
+                          className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-amber-600"
+                          aria-hidden
+                        />
+                        <span>
+                          CatShare cannot verify UPI payments. Confirm them yourself in Orders.
+                        </span>
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {selected && id === 'gateway' ? (
+                    <div className="border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
+                          style={{
+                            backgroundColor: RAZORPAY_GATEWAY.logo.background,
+                            color: RAZORPAY_GATEWAY.logo.color,
+                          }}
+                          aria-hidden
+                        >
+                          {RAZORPAY_GATEWAY.logo.initials}
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Razorpay
+                          </span>
+                          {integrationsLoading ? (
+                            <span className="text-xs text-gray-400">…</span>
+                          ) : (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                razorpayBadge.variant === 'success'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                  : razorpayBadge.variant === 'pending'
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                              }`}
+                            >
+                              {razorpayView?.displayStatus ?? razorpayBadge.label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {error ? (
+                        <button
+                          type="button"
+                          onClick={() => void reload()}
+                          className="mt-2 text-xs text-red-600 underline dark:text-red-400"
+                        >
+                          Failed to load — retry
+                        </button>
+                      ) : null}
+
+                      {!integrationsLoading ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {canConnect(razorpayStatus) ? (
+                            <button
+                              type="button"
+                              onClick={handleRazorpayAction}
+                              className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                            >
+                              Connect
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleRazorpayAction}
+                              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                            >
+                              Manage
+                            </button>
+                          )}
+                          {canDisconnect(razorpayStatus) && razorpayStatus !== 'not_connected' ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleDisconnectRazorpay()}
+                              disabled={disconnecting}
+                              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                            >
+                              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {gatewayBlocked ? (
+                        <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+                          Connect Razorpay or enable Cash on Delivery to use this method.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
-          </div>
-        </SettingsCard>
-
-        <SettingsCard
-          title="Secure Payments"
-          description="How CatShare handles payment credentials and customer checkout."
-        >
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/20 p-4">
-              <FiShield className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Payments go directly to your gateway account
-                </p>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Customer payments are collected by your connected provider. CatShare never stores
-                  your gateway dashboard password.
-                </p>
+            <div className="rounded-xl border border-gray-200 bg-white/60 dark:border-gray-800 dark:bg-gray-900/30">
+              <div className="flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Cash on delivery
+                  </span>
+                  <span className="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">
+                    Let customers pay when the order is delivered.
+                  </span>
+                </div>
+                <ToggleSwitch
+                  checked={settings.enableCod}
+                  onChange={(enableCod) => patchSettings({ enableCod })}
+                  disabled={saving}
+                />
               </div>
             </div>
           </div>
-        </SettingsCard>
+        )}
+
+        <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+          Manual and UPI payments are between you and your customer. CatShare never stores your UPI
+          PIN or gateway password.
+        </p>
       </div>
+
+      <StoreSaveBar
+        hasChanges={dirty}
+        saving={saving}
+        canSave={dirty && !saving}
+        onSave={() => void handleSave()}
+      />
     </StoreLayout>
   );
 }

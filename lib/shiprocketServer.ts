@@ -247,3 +247,40 @@ export async function assignShiprocketAwb(
         : null,
   };
 }
+
+/** Cancel shipments by AWB before dispatch (Shiprocket API). */
+export async function cancelShiprocketShipmentAwbs(
+  token: string,
+  awbs: string[]
+): Promise<void> {
+  const cleaned = awbs.map((a) => a.trim()).filter(Boolean);
+  if (!cleaned.length) {
+    throw new ShiprocketApiError('AWB is required to cancel shipment');
+  }
+
+  await shiprocketFetch<Record<string, unknown>>(
+    '/v1/external/orders/cancel/shipment/awbs',
+    {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ awbs: cleaned }),
+    }
+  );
+}
+
+/** Cancel Shiprocket orders by internal order id (before shipping). */
+export async function cancelShiprocketOrders(
+  token: string,
+  orderIds: number[]
+): Promise<void> {
+  const ids = orderIds.filter((id) => Number.isFinite(id) && id > 0);
+  if (!ids.length) {
+    throw new ShiprocketApiError('Shiprocket order id is required to cancel');
+  }
+
+  await shiprocketFetch<Record<string, unknown>>('/v1/external/orders/cancel', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ ids }),
+  });
+}

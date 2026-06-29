@@ -8,7 +8,12 @@ import type {
   WebsiteModeConfig,
 } from '../types/homepage';
 
-export type WebsiteTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market' | 'studio-commerce';
+export type WebsiteTemplateId =
+  | 'aurora-boutique'
+  | 'pulse-tech'
+  | 'clean-market'
+  | 'studio-commerce'
+  | 'default-store';
 
 export interface WebsiteTemplateMeta {
   id: WebsiteTemplateId;
@@ -564,6 +569,84 @@ function buildStudioCommerce(): WebsiteModeConfig {
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* Default Store — classic catalog order list (editable in builder)    */
+/* ------------------------------------------------------------------ */
+
+function buildDefaultStore(): WebsiteModeConfig {
+  resetOrder();
+  const theme: ThemeSettings = {
+    primaryColor: '#1a6b4a',
+    secondaryColor: '#e8f4ef',
+    backgroundColor: '#f7f7f5',
+    textColor: '#1a1a1a',
+    accentColor: '#1a6b4a',
+    fontFamily: "'DM Sans', system-ui, sans-serif",
+    buttonStyle: 'solid',
+  };
+
+  const homeSections: BuilderSection[] = [
+    section({
+      type: 'full-product-list',
+      settings: {
+        title: '',
+        showSearch: true,
+        showCategoryFilters: true,
+        showSort: true,
+        viewMode: 'list',
+        productImageRatio: 'square',
+        showPrice: true,
+        showAvailability: true,
+        defaultSorting: 'newest',
+      },
+      content: {},
+    } as HomepageSection),
+  ];
+
+  return {
+    siteSettings: {
+      websiteName: 'My Store',
+      showAnnouncement: false,
+      headerVariant: 'minimal',
+      ...footerPresetForVariant('clean'),
+      footerColumns: createDefaultFooterLinkColumns(),
+      navItems: [{ id: uuid(), label: 'Home', href: '/' }],
+    },
+    seo: {
+      metaTitle: '',
+      metaDescription: '',
+      keywords: '',
+      allowIndexing: true,
+    },
+    pages: {
+      home: { sections: homeSections, theme },
+      custom: [],
+    },
+    templates: {
+      collection: {
+        showFilters: true,
+        showSort: true,
+        columns: 4,
+        cardsStyle: 'boxed',
+      },
+      product: {
+        layoutVariant: 'minimal',
+        galleryLayout: 'left-thumbs',
+        showRecommendations: false,
+        imageLook: 'clean',
+        fieldsInBox: true,
+        suggestedProductsLayout: 'cards',
+        suggestedProductsCount: 4,
+        showTrustBadges: false,
+        ctaStyle: 'solid',
+        showQuantitySelector: true,
+        orderCtaLabel: 'Done',
+      },
+    },
+    versioning: {},
+  };
+}
+
 export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
   {
     id: 'studio-commerce',
@@ -600,6 +683,16 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/clean-market/preview.jpg',
     palette: ['#111827', '#2563eb', '#f3f4f6', '#ffffff'],
     build: buildCleanMarket,
+  },
+  {
+    id: 'default-store',
+    name: 'Default Store',
+    tagline: 'Classic catalog',
+    description:
+      'The familiar order-form catalog — full product list with search, categories, and quantity controls. Fully editable in the builder.',
+    previewImage: '/templates/clean-market/preview.jpg',
+    palette: ['#1a6b4a', '#f7f7f5', '#1a1a1a', '#ffffff'],
+    build: buildDefaultStore,
   },
 ];
 

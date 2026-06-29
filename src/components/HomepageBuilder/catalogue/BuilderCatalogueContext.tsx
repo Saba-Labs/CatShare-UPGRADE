@@ -5,7 +5,9 @@ import { getStoreProducts, type StorePublic } from '../../../services/storeServi
 import { getCatalogueRowsFromDeviceStorage } from '../../../utils/catalogueCachePersist';
 import { parseBusinessProfile } from '../../../config/businessProfile';
 import { deriveStoreCategories, type StoreCategory } from '../../../utils/storefrontCategories';
+import { getSymbolForCurrencyCode } from '../../../utils/currencyUtils';
 import { WebsiteStoreProvider } from '../../WebsiteBuilder/WebsiteStoreContext';
+import BuilderProductPreviewBridge from '../BuilderProductPreviewBridge';
 
 const PRODUCTS_FETCH_TIMEOUT_MS = 12_000;
 
@@ -115,6 +117,19 @@ export function BuilderCatalogueProvider({
     [products, categories, loading, error, currencyCode, catalogueId, reload]
   );
 
+  const previewCatalogue = useMemo(() => {
+    if (!catalogues?.length) return null;
+    if (catalogueId) {
+      return catalogues.find((c) => c.id === catalogueId) ?? catalogues[0];
+    }
+    return catalogues[0];
+  }, [catalogues, catalogueId]);
+
+  const currencySymbol = useMemo(
+    () => getSymbolForCurrencyCode(currencyCode || 'INR'),
+    [currencyCode]
+  );
+
   const previewStore = useMemo<StorePublic>(() => {
     let bp = parseBusinessProfile(null);
     try {
@@ -150,7 +165,9 @@ export function BuilderCatalogueProvider({
   return (
     <BuilderCatalogueContext.Provider value={value}>
       <WebsiteStoreProvider slug={storeSlug || ''} store={previewStore} products={products}>
-        {children}
+        <BuilderProductPreviewBridge currencySymbol={currencySymbol} catalogue={previewCatalogue}>
+          {children}
+        </BuilderProductPreviewBridge>
       </WebsiteStoreProvider>
     </BuilderCatalogueContext.Provider>
   );

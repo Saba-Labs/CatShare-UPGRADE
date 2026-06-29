@@ -8,6 +8,7 @@ import BannerSectionView from './BannerSectionView';
 import FeaturedProductsSectionView from './FeaturedProductsSectionView';
 import CategoryShowcaseSectionView from './CategoryShowcaseSectionView';
 import ProductGridSectionView from './ProductGridSectionView';
+import FullProductListSectionView from './FullProductListSectionView';
 import AnnouncementSectionView from './AnnouncementSectionView';
 import CTASectionView from './CTASectionView';
 import VideoSectionView from './VideoSectionView';
@@ -66,6 +67,8 @@ export default function SectionRenderer({
       return <CategoryShowcaseSectionView {...commonProps} section={section as any} />;
     case 'product-grid':
       return <ProductGridSectionView {...commonProps} section={section as any} />;
+    case 'full-product-list':
+      return <FullProductListSectionView {...commonProps} section={section as any} />;
     case 'announcement':
       return <AnnouncementSectionView {...commonProps} section={section as any} />;
     case 'cta':

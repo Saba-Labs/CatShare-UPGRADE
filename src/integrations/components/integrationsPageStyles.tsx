@@ -239,9 +239,17 @@ export const INTEGRATIONS_PAGE_CSS = `
     font-size: 13px;
   }
   .int-detail-row:last-child { border-bottom: none; }
-  .int-detail-label { color: var(--int-muted); flex-shrink: 0; }
-  .int-detail-value { text-align: right; font-weight: 500; word-break: break-word; }
+  .int-detail-label { color: var(--int-muted); flex-shrink: 0; max-width: 46%; }
+  .int-detail-value { text-align: right; font-weight: 500; word-break: break-word; max-width: 54%; }
   .int-detail-value.mono { font-family: var(--int-mono); font-size: 12px; }
+  .int-detail-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--int-faint);
+    margin-bottom: 4px;
+  }
 
   .int-error-box {
     background: var(--int-red-bg);

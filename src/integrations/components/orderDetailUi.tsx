@@ -38,12 +38,14 @@ export function OdSectionLabel({ children }: { children: React.ReactNode }) {
 export function OdCard({
   children,
   style,
+  className,
 }: {
   children: React.ReactNode;
   style?: React.CSSProperties;
+  className?: string;
 }) {
   return (
-    <div className="od-card" style={style}>
+    <div className={`od-card${className ? ` ${className}` : ''}`} style={style}>
       {children}
     </div>
   );
@@ -84,19 +86,53 @@ export function OdStatusPill({
   bg,
   border,
   text,
+  kind = 'default',
 }: {
   label: string;
   dot: string;
   bg: string;
   border: string;
   text: string;
+  kind?: 'default' | 'payment' | 'delivery';
 }) {
   return (
     <span
-      className="od-status-pill"
+      className={`od-status-pill od-status-pill--${kind}`}
       style={{ background: bg, borderColor: border, color: text }}
     >
-      <span className="od-status-pill-dot" style={{ background: dot }} />
+      {kind === 'payment' ? (
+        <svg
+          className="od-status-pill-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <rect x="2" y="5" width="20" height="14" rx="2" />
+          <line x1="2" y1="10" x2="22" y2="10" />
+        </svg>
+      ) : kind === 'delivery' ? (
+        <svg
+          className="od-status-pill-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M5 18H3a2 2 0 01-2-2V8a2 2 0 012-2h3m0 12h10m0 0h2a2 2 0 002-2V8a2 2 0 00-2-2h-5" />
+          <circle cx="7" cy="18" r="2" />
+          <circle cx="17" cy="18" r="2" />
+          <path d="M5 8h10v8H5z" />
+        </svg>
+      ) : (
+        <span className="od-status-pill-dot" style={{ background: dot }} />
+      )}
       {label}
     </span>
   );
@@ -148,6 +184,93 @@ export function getPaymentStatusPill(status: string) {
   }
 }
 
+/** Payment badge on order detail — labels differ from order fulfillment status. */
+export function getOrderPaymentStatusPill(
+  status: string,
+  paymentMethod?: string | null,
+  customerClaimedPaidAt?: string | null,
+  paymentConfirmedBy?: 'customer' | 'seller' | null
+) {
+  if (status === 'paid' && paymentMethod === 'upi' && paymentConfirmedBy === 'customer') {
+    return {
+      label: 'Customer reported paid',
+      dot: '#D97706',
+      bg: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+      border: '#FDE68A',
+      text: '#92400E',
+    };
+  }
+
+  if (status === 'paid') {
+    return getPaymentStatusPill(status);
+  }
+
+  if (status === 'pending') {
+    if (paymentMethod === 'cod') {
+      return {
+        label: 'Pay on delivery',
+        dot: '#7C3AED',
+        bg: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
+        border: '#DDD6FE',
+        text: '#5B21B6',
+      };
+    }
+    if (paymentMethod === 'upi') {
+      if (customerClaimedPaidAt) {
+        return {
+          label: 'Customer marked paid',
+          dot: '#D97706',
+          bg: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+          border: '#FDE68A',
+          text: '#92400E',
+        };
+      }
+      return {
+        label: 'Awaiting UPI payment',
+        dot: '#7C3AED',
+        bg: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
+        border: '#DDD6FE',
+        text: '#5B21B6',
+      };
+    }
+    if (paymentMethod === 'manual') {
+      return {
+        label: 'Payment with seller',
+        dot: '#64748B',
+        bg: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)',
+        border: '#E2E8F0',
+        text: '#475569',
+      };
+    }
+    return {
+      label: 'Awaiting payment',
+      dot: '#2563EB',
+      bg: 'linear-gradient(135deg, #EFF6FF, #DBEAFE)',
+      border: '#BFDBFE',
+      text: '#1E40AF',
+    };
+  }
+  if (status === 'failed') {
+    return {
+      label: 'Payment failed',
+      dot: '#F43F5E',
+      bg: 'linear-gradient(135deg, #FFF1F2, #FFE4E6)',
+      border: '#FECDD3',
+      text: '#881337',
+    };
+  }
+  if (status === 'cancelled') {
+    return {
+      label: 'Payment cancelled',
+      dot: '#F43F5E',
+      bg: 'linear-gradient(135deg, #FFF1F2, #FFE4E6)',
+      border: '#FECDD3',
+      text: '#881337',
+    };
+  }
+  return getPaymentStatusPill(status);
+}
+
 export function getDeliveryStatusPill(status: string) {
   if (status === 'delivered') return getPaymentStatusPill('paid');
   if (status === 'in_transit' || status === 'out_for_delivery' || status === 'picked_up') {
@@ -160,7 +283,13 @@ export function getDeliveryStatusPill(status: string) {
     };
   }
   if (status === 'failed' || status === 'cancelled') return getPaymentStatusPill('failed');
-  return getPaymentStatusPill('pending');
+  return {
+    label: 'Not shipped',
+    dot: '#94A3B8',
+    bg: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)',
+    border: '#E2E8F0',
+    text: '#475569',
+  };
 }
 
 export function OdDetailRow({
@@ -195,11 +324,24 @@ export function OdMethodChip({
   method: string | null | undefined;
 }) {
   if (!method) return null;
-  const isCod = method === 'cod';
   const label =
-    method === 'cod' ? 'Cash on delivery' : method === 'prepaid' ? 'Pay now / UPI' : method;
+    method === 'cod'
+      ? 'Cash on delivery'
+      : method === 'prepaid'
+        ? 'Pay online / UPI'
+        : method === 'upi'
+          ? 'Pay via UPI'
+          : method === 'manual'
+            ? 'Manual payment'
+            : method;
+  const isCod = method === 'cod';
+  const isUpi = method === 'upi';
   return (
-    <span className={`od-method-chip${isCod ? ' od-method-chip--cod' : ''}`}>{label}</span>
+    <span
+      className={`od-method-chip${isCod ? ' od-method-chip--cod' : ''}${isUpi ? ' od-method-chip--upi' : ''}`}
+    >
+      {label}
+    </span>
   );
 }
 

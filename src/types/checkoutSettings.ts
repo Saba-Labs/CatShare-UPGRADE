@@ -9,6 +9,15 @@ export type CheckoutAmountKind = 'flat' | 'percent';
 
 export type CheckoutPaymentMethod = 'any' | 'prepaid' | 'cod';
 
+/** How the seller collects payment from customers at checkout. */
+export type StorePaymentCollectionMode = 'manual' | 'upi' | 'gateway';
+
+/** How the seller fulfills / ships orders. */
+export type StoreShippingCollectionMode = 'manual' | 'provider';
+
+/** Stored on orders when customer checks out */
+export type OrderCheckoutPaymentMethod = 'prepaid' | 'cod' | 'upi' | 'manual';
+
 /** When the rule amount is calculated from */
 export type CheckoutApplyBase = 'subtotal' | 'after_discount' | 'after_shipping';
 
@@ -65,8 +74,14 @@ export interface StoreCheckoutSettings {
   allowCouponEntry: boolean;
   /** Offer COD when any cod_charge rule exists */
   enableCod: boolean;
-  /** Offer online / prepaid payment methods at checkout */
+  /** Offer online / prepaid payment methods at checkout (gateway mode) */
   enablePrepaid: boolean;
+  /** manual = seller handles payment offline; upi = show seller UPI; gateway = Razorpay/COD */
+  paymentCollectionMode: StorePaymentCollectionMode;
+  /** Seller UPI VPA when paymentCollectionMode is upi */
+  sellerUpiId: string;
+  /** manual = seller ships on their own; provider = Shiprocket / logistics integration */
+  shippingCollectionMode: StoreShippingCollectionMode;
   experience: CheckoutExperienceSettings;
 }
 
@@ -133,7 +148,10 @@ export const DEFAULT_CHECKOUT_SETTINGS: StoreCheckoutSettings = {
   showBreakdown: true,
   allowCouponEntry: true,
   enableCod: false,
-  enablePrepaid: true,
+  enablePrepaid: false,
+  paymentCollectionMode: 'manual',
+  sellerUpiId: '',
+  shippingCollectionMode: 'manual',
   experience: { ...DEFAULT_CHECKOUT_EXPERIENCE },
 };
 
@@ -275,6 +293,19 @@ function normalizeExperience(raw: unknown): CheckoutExperienceSettings {
   };
 }
 
+function normalizePaymentCollectionMode(o: Record<string, unknown>): StorePaymentCollectionMode {
+  const raw = o.paymentCollectionMode;
+  if (raw === 'manual' || raw === 'upi' || raw === 'gateway') return raw;
+  if (o.enablePrepaid !== false) return 'gateway';
+  return 'manual';
+}
+
+function normalizeShippingCollectionMode(o: Record<string, unknown>): StoreShippingCollectionMode {
+  const raw = o.shippingCollectionMode;
+  if (raw === 'manual' || raw === 'provider') return raw;
+  return 'manual';
+}
+
 export function normalizeCheckoutSettings(raw: unknown): StoreCheckoutSettings {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ...DEFAULT_CHECKOUT_SETTINGS, rules: [] };
@@ -283,13 +314,18 @@ export function normalizeCheckoutSettings(raw: unknown): StoreCheckoutSettings {
   const rulesRaw = Array.isArray(o.rules) ? o.rules : [];
   const rules = rulesRaw.map(coerceRule).filter((r): r is CheckoutRule => r != null);
   rules.sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+  const paymentCollectionMode = normalizePaymentCollectionMode(o);
+  const shippingCollectionMode = normalizeShippingCollectionMode(o);
   return {
     version: 1,
     rules,
     showBreakdown: o.showBreakdown !== false,
     allowCouponEntry: o.allowCouponEntry !== false,
     enableCod: o.enableCod === true,
-    enablePrepaid: o.enablePrepaid !== false,
+    enablePrepaid: o.enablePrepaid === true,
+    paymentCollectionMode,
+    sellerUpiId: typeof o.sellerUpiId === 'string' ? o.sellerUpiId.trim().toLowerCase() : '',
+    shippingCollectionMode,
     experience: normalizeExperience(o.experience),
   };
 }

@@ -1,64 +1,153 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiTruck } from 'react-icons/fi';
-import StoreLayout from './components/StoreLayout';
+import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import PageHeader from './components/PageHeader';
-import SettingsCard from './components/SettingsCard';
-import ShippingProviderCard from './components/ShippingProviderCard';
-import { SHIPPING_PROVIDERS, getActiveShippingProviders } from './config/shippingProviders';
-import type { ShippingProviderId } from './config/shippingProviders';
+import StoreSaveBar from './components/StoreSaveBar';
+import { SHIPPING_PROVIDERS } from './config/shippingProviders';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
+import { getPersistedAuthUserId } from '../../utils/authUserId';
+import { getSellerStore, updateStoreCheckoutSettings } from '../../services/storeService';
+import { readCachedSellerStore } from '../../utils/storePageCache';
 import { useSellerIntegrations } from '../../integrations/hooks/useSellerIntegrations';
 import { disconnectIntegration } from '../../integrations/core/IntegrationConnectionService';
-import { isConnectedStatus } from '../../integrations/core/IntegrationStatusService';
+import {
+  canConnect,
+  canDisconnect,
+  getIntegrationStatusBadge,
+  isConnectedStatus,
+} from '../../integrations/core/IntegrationStatusService';
+import {
+  DEFAULT_CHECKOUT_SETTINGS,
+  normalizeCheckoutSettings,
+  type StoreCheckoutSettings,
+  type StoreShippingCollectionMode,
+} from '../../types/checkoutSettings';
+
+const FULFILLMENT_OPTIONS: Array<{
+  id: StoreShippingCollectionMode;
+  title: string;
+  hint: string;
+}> = [
+  {
+    id: 'manual',
+    title: 'Manual',
+    hint: 'You pack and dispatch orders yourself — no courier integration at checkout.',
+  },
+  {
+    id: 'provider',
+    title: 'Shipping provider',
+    hint: 'Connect Shiprocket for AWB creation and delivery tracking.',
+  },
+];
+
+const SHIPROCKET_PROVIDER = SHIPPING_PROVIDERS.find((p) => p.id === 'shiprocket')!;
 
 export default function Shipping() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
-  const { sellerId, views, loading, error, reload } = useSellerIntegrations();
-  const [disconnectingId, setDisconnectingId] = useState<ShippingProviderId | null>(null);
+  const sellerId = user?.uid ?? getPersistedAuthUserId() ?? '';
+  const { views, loading: integrationsLoading, error, reload } = useSellerIntegrations();
+  const [disconnecting, setDisconnecting] = useState(false);
 
-  const activeProviders = getActiveShippingProviders();
+  const [settings, setSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<StoreCheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const connectedProviders = useMemo(
-    () =>
-      activeProviders.filter(
-        (provider) =>
-          provider.integrationProviderId &&
-          views.some(
-            (view) =>
-              view.provider === provider.integrationProviderId &&
-              isConnectedStatus(view.status)
-          )
-      ),
-    [views, activeProviders]
+  const shiprocketView = views.find((v) => v.provider === 'shiprocket');
+  const shiprocketConnected =
+    shiprocketView != null && isConnectedStatus(shiprocketView.status) && !shiprocketView.isDemo;
+  const shiprocketStatus = shiprocketView?.status ?? 'not_connected';
+  const shiprocketBadge = getIntegrationStatusBadge(shiprocketStatus);
+  const providerBlocked =
+    settings.shippingCollectionMode === 'provider' && !shiprocketConnected;
+
+  useLayoutEffect(() => {
+    if (!sellerId) return;
+    const cached = readCachedSellerStore(sellerId);
+    if (cached) {
+      const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      setSettings(loaded);
+      setOriginalSettings(loaded);
+      setLoading(false);
+    }
+  }, [sellerId]);
+
+  const loadSettings = useCallback(async () => {
+    if (!sellerId) {
+      setLoading(false);
+      return;
+    }
+    const cached = readCachedSellerStore(sellerId);
+    if (cached) {
+      const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
+      setSettings(loaded);
+      setOriginalSettings(loaded);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    const result = await getSellerStore(sellerId);
+    if (!result.success || !result.data) {
+      if (!cached) setLoading(false);
+      return;
+    }
+    const loaded = normalizeCheckoutSettings(result.data.checkoutSettings);
+    setSettings(loaded);
+    setOriginalSettings(loaded);
+    setLoading(false);
+  }, [sellerId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadSettings();
+  }, [authLoading, loadSettings]);
+
+  const dirty = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(originalSettings),
+    [settings, originalSettings]
   );
 
-  const viewForProvider = (providerId: ShippingProviderId) => {
-    const provider = SHIPPING_PROVIDERS.find((item) => item.id === providerId);
-    if (!provider?.integrationProviderId) return null;
-    return views.find((view) => view.provider === provider.integrationProviderId) ?? null;
+  const patchSettings = (patch: Partial<StoreCheckoutSettings>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleConnect = (providerId: ShippingProviderId) => {
-    const provider = SHIPPING_PROVIDERS.find((item) => item.id === providerId);
-    if (!provider?.managePath) return;
-    navigate(provider.managePath);
+  const handleSave = async () => {
+    if (!guardCloudWrite() || !sellerId) return;
+    if (providerBlocked) {
+      showToast('Connect Shiprocket before using shipping provider mode', 'error');
+      return;
+    }
+
+    setSaving(true);
+    const result = await updateStoreCheckoutSettings(sellerId, settings);
+    setSaving(false);
+
+    if (!result.success || !result.data) {
+      showToast(result.error ?? 'Could not save shipping settings', 'error');
+      return;
+    }
+    const saved = normalizeCheckoutSettings(result.data.checkoutSettings);
+    setSettings(saved);
+    setOriginalSettings(saved);
+    showToast('Shipping settings saved', 'success');
   };
 
-  const handleDisconnect = async (providerId: ShippingProviderId) => {
-    if (!guardCloudWrite()) return;
+  const handleShiprocketAction = () => {
+    navigate(SHIPROCKET_PROVIDER.managePath!);
+  };
 
-    const provider = SHIPPING_PROVIDERS.find((item) => item.id === providerId);
-    if (!provider?.integrationProviderId || !sellerId) return;
+  const handleDisconnectShiprocket = async () => {
+    if (!guardCloudWrite() || !sellerId) return;
+    if (!window.confirm('Disconnect Shiprocket from your store?')) return;
 
-    if (!window.confirm(`Disconnect ${provider.name} from your store?`)) return;
-
-    setDisconnectingId(providerId);
-    const result = await disconnectIntegration(sellerId, provider.integrationProviderId);
-    setDisconnectingId(null);
+    setDisconnecting(true);
+    const result = await disconnectIntegration(sellerId, 'shiprocket');
+    setDisconnecting(false);
 
     if (result.error) {
       showToast(
@@ -67,84 +156,157 @@ export default function Shipping() {
       );
       return;
     }
-
-    showToast(`${provider.name} disconnected`, 'success');
+    showToast('Shiprocket disconnected', 'success');
     await reload();
   };
 
   return (
     <StoreLayout>
-      <PageHeader title="Shipping" />
+      <PageHeader title="Shipping" description="How you fulfill orders." />
 
-      <div className="space-y-6 max-w-3xl">
-        <SettingsCard
-          title="Shipping Providers"
-          description={
-            loading
-              ? 'Loading provider connections…'
-              : connectedProviders.length > 0
-                ? `${connectedProviders.length} provider${connectedProviders.length === 1 ? '' : 's'} connected`
-                : 'Connect a logistics provider to automate fulfillment.'
-          }
-        >
-          {error ? (
-            <div className="mb-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
-              {error}
-              <button
-                type="button"
-                onClick={() => void reload()}
-                className="ml-2 font-semibold underline underline-offset-2"
-              >
-                Retry
-              </button>
-            </div>
-          ) : null}
-
-          <div className="space-y-4">
-            {activeProviders.map((provider) => {
-              const view = viewForProvider(provider.id);
+      <div className={`max-w-lg space-y-6 ${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}`}>
+        {loading ? (
+          <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+        ) : (
+          <div className="space-y-2" role="radiogroup" aria-label="Fulfillment method">
+            {FULFILLMENT_OPTIONS.map(({ id, title, hint }) => {
+              const selected = settings.shippingCollectionMode === id;
               return (
-                <ShippingProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  status={view?.status}
-                  displayStatus={view?.displayStatus}
-                  loading={loading}
-                  actionLoading={disconnectingId === provider.id}
-                  onConnect={() => handleConnect(provider.id)}
-                  onManage={() => handleConnect(provider.id)}
-                  onDisconnect={() => void handleDisconnect(provider.id)}
-                />
+                <div
+                  key={id}
+                  className={`rounded-xl border transition-colors ${
+                    selected
+                      ? 'border-gray-900 dark:border-gray-200 bg-white dark:bg-gray-900/60'
+                      : 'border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-900/30'
+                  }`}
+                >
+                  <label className="flex cursor-pointer items-start gap-3 p-4">
+                    <input
+                      type="radio"
+                      name="shippingCollectionMode"
+                      className="mt-1 h-4 w-4 flex-shrink-0 accent-gray-900 dark:accent-gray-100"
+                      checked={selected}
+                      onChange={() => patchSettings({ shippingCollectionMode: id })}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {title}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-gray-500 dark:text-gray-400">
+                        {hint}
+                      </span>
+                    </span>
+                  </label>
+
+                  {selected && id === 'provider' ? (
+                    <div className="border-t border-gray-100 px-4 pb-4 pt-3 dark:border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
+                          style={{
+                            backgroundColor: SHIPROCKET_PROVIDER.logo.background,
+                            color: SHIPROCKET_PROVIDER.logo.color,
+                          }}
+                          aria-hidden
+                        >
+                          {SHIPROCKET_PROVIDER.logo.initials}
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            Shiprocket
+                          </span>
+                          {integrationsLoading ? (
+                            <span className="text-xs text-gray-400">…</span>
+                          ) : (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                shiprocketBadge.variant === 'success'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                  : shiprocketBadge.variant === 'pending'
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                              }`}
+                            >
+                              {shiprocketView?.displayStatus ?? shiprocketBadge.label}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {error ? (
+                        <button
+                          type="button"
+                          onClick={() => void reload()}
+                          className="mt-2 text-xs text-red-600 underline dark:text-red-400"
+                        >
+                          Failed to load — retry
+                        </button>
+                      ) : null}
+
+                      {!integrationsLoading ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {canConnect(shiprocketStatus) ? (
+                            <button
+                              type="button"
+                              onClick={handleShiprocketAction}
+                              className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+                            >
+                              Connect
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleShiprocketAction}
+                              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                            >
+                              Manage
+                            </button>
+                          )}
+                          {canDisconnect(shiprocketStatus) && shiprocketStatus !== 'not_connected' ? (
+                            <button
+                              type="button"
+                              onClick={() => void handleDisconnectShiprocket()}
+                              disabled={disconnecting}
+                              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                            >
+                              {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {providerBlocked ? (
+                        <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+                          Connect Shiprocket to use this method.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </div>
-        </SettingsCard>
+        )}
 
-        <SettingsCard
-          title="Delivery charges & fees"
-          description="Configure what customers pay at checkout."
-        >
-          <div className="flex items-start gap-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-950/20 p-4">
-            <FiTruck className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                Set shipping fees on the Checkout page
-              </p>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Flat shipping, free-shipping thresholds, packing charges, taxes, and COD fees are
-                configured under Store → Checkout.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/store/checkout')}
-                className="mt-3 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Open Checkout settings
-              </button>
-            </div>
-          </div>
-        </SettingsCard>
+        <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+          Delivery fees and free-shipping rules are set in{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/store/checkout')}
+            className="font-medium text-gray-600 underline underline-offset-2 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
+          >
+            Checkout settings
+          </button>
+          .
+        </p>
       </div>
+
+      <StoreSaveBar
+        hasChanges={dirty}
+        saving={saving}
+        canSave={dirty && !saving}
+        onSave={() => void handleSave()}
+      />
     </StoreLayout>
   );
 }

@@ -66,7 +66,9 @@ export default function WebsiteRuntime({
       }
     : null;
 
-  const pageKind: StorefrontPageKind = section === 'collections'
+  const pageKind: StorefrontPageKind = section === 'checkout'
+    ? 'home'
+    : section === 'collections'
     ? 'collection'
     : section === 'products'
       ? 'product'

@@ -93,6 +93,7 @@ const VALID_SECTION_TYPES: HomepageSectionType[] = [
   'featured-products',
   'category-showcase',
   'product-grid',
+  'full-product-list',
   'announcement',
   'cta',
   'video',

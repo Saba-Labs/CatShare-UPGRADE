@@ -12,7 +12,7 @@ import {
   type StoreMarketingSettings,
 } from '../../types/storeMarketingSettings';
 import { readCachedMarketingSettings } from '../../utils/storePageCache';
-import StoreLayout from './components/StoreLayout';
+import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
@@ -170,7 +170,7 @@ export default function Marketing() {
 
   return (
     <StoreLayout>
-      <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6 max-w-3xl">
+      <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Marketing"
           sticky

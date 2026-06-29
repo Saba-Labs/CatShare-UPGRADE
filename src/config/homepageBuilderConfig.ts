@@ -30,6 +30,7 @@ export const SECTION_TYPE_LABELS: Record<HomepageSectionType, string> = {
   'featured-products': 'Featured Products',
   'category-showcase': 'Category Showcase',
   'product-grid': 'Product Grid',
+  'full-product-list': 'Full Product List',
   announcement: 'Announcement Bar',
   cta: 'Call to Action',
   video: 'Video Section',
@@ -61,6 +62,7 @@ export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   'featured-products': 'Showcase selected products in grid or slider',
   'category-showcase': 'Display store categories as cards',
   'product-grid': 'Product grid with search and filters',
+  'full-product-list': 'Complete store catalog with order-form list and quantity controls',
   announcement: 'Important announcements or alerts',
   cta: 'Call-to-action section with button',
   video: 'Embedded video player',
@@ -217,6 +219,25 @@ export function createDefaultSection(
           categoryId: undefined,
           productIds: [],
         },
+      } as any;
+
+    case 'full-product-list':
+      return {
+        id,
+        type: 'full-product-list',
+        order,
+        settings: {
+          title: '',
+          showSearch: true,
+          showCategoryFilters: true,
+          showSort: true,
+          viewMode: 'list',
+          productImageRatio: 'square',
+          showPrice: true,
+          showAvailability: true,
+          defaultSorting: 'newest',
+        },
+        content: {},
       } as any;
 
     case 'announcement':
@@ -717,6 +738,7 @@ export const STORE_SECTION_ORDERING: HomepageSectionType[] = [
   'featured-products',
   'category-showcase',
   'product-grid',
+  'full-product-list',
 ];
 
 export const SECTION_ORDERING: HomepageSectionType[] = [

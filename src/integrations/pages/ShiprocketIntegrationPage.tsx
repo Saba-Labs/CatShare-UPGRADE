@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainAppBottomNav from '../../components/MainAppBottomNav';
 import { useToast } from '../../context/ToastContext';
@@ -43,6 +43,12 @@ export default function ShiprocketIntegrationPage() {
 
   const status = view?.status ?? 'not_connected';
   const canConnect = status === 'not_connected' || status === 'error';
+
+  useEffect(() => {
+    if (isConnectedStatus(status)) {
+      setShowDetails(true);
+    }
+  }, [status]);
 
   const handleConnect = async () => {
     if (!guardCloudWrite()) return;

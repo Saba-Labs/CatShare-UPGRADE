@@ -6,7 +6,9 @@ export interface ShiprocketIntegrationMetadata {
   pickupLocationId?: number;
   pickupLocationName?: string;
   apiUserEmailMasked?: string;
+  companyId?: string | number;
   connectionDate?: string;
+  lastVerifiedAt?: string;
   tokenExpiresAt?: string;
   lastError?: string;
   isDemo?: boolean;

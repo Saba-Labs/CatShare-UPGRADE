@@ -2,6 +2,8 @@ import type { PaymentProvider } from '../../base/PaymentProvider';
 import type {
   ConnectIntegrationResult,
   IntegrationConnectionStatus,
+  IntegrationDetailField,
+  IntegrationDetailSection,
   SellerIntegration,
   SellerIntegrationView,
 } from '../../../core/types';
@@ -19,6 +21,21 @@ function meta(row: SellerIntegration): RazorpayIntegrationMetadata {
   return (row.metadata ?? {}) as RazorpayIntegrationMetadata;
 }
 
+function formatIntegrationDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 function formatDisplayStatus(status: IntegrationConnectionStatus): string {
   switch (status) {
     case 'not_connected':
@@ -34,6 +51,61 @@ function formatDisplayStatus(status: IntegrationConnectionStatus): string {
   }
 }
 
+function detailField(
+  label: string,
+  value: string | null | undefined,
+  mono = false
+): IntegrationDetailField | null {
+  if (!value?.trim()) return null;
+  return { label, value: value.trim(), mono };
+}
+
+function buildDetailSections(
+  row: SellerIntegration,
+  m: RazorpayIntegrationMetadata,
+  isDemo: boolean
+): IntegrationDetailSection[] {
+  const keyModeLabel =
+    m.keyMode === 'live' ? 'Live' : m.keyMode === 'test' ? 'Test' : null;
+
+  const connectionFields = [
+    detailField('Status', isDemo ? 'Demo mode' : formatDisplayStatus(row.status)),
+    detailField('Key mode', keyModeLabel),
+    detailField('Key ID', m.keyIdMasked ?? m.merchantId ?? row.accountId, true),
+    detailField('Connected', formatIntegrationDate(m.connectionDate ?? row.connectedAt)),
+    detailField(
+      'Last checked',
+      formatIntegrationDate(m.lastVerifiedAt ?? row.updatedAt)
+    ),
+  ].filter((f): f is IntegrationDetailField => f != null);
+
+  const accountFields = [
+    detailField('Account', m.accountName ?? m.businessName),
+    detailField('Email', m.email),
+    detailField('Phone', m.phone),
+    detailField('Razorpay status', m.accountStatus),
+  ].filter((f): f is IntegrationDetailField => f != null);
+
+  const catshareFields: IntegrationDetailField[] = [
+    { label: 'Store checkout', value: 'Online prepaid (when enabled in Payments)' },
+    { label: 'Order links', value: 'Pay now at customer checkout' },
+    { label: 'Payment methods', value: 'UPI, cards, net banking, wallets' },
+    { label: 'Settlement', value: 'Payments go to your Razorpay account' },
+  ];
+
+  const sections: IntegrationDetailSection[] = [
+    { title: 'Connection', fields: connectionFields },
+  ];
+
+  if (accountFields.length > 0) {
+    sections.push({ title: 'Account', fields: accountFields });
+  }
+
+  sections.push({ title: 'In CatShare', fields: catshareFields });
+
+  return sections;
+}
+
 export const razorpayProvider: PaymentProvider = {
   id: 'razorpay',
   category: 'payments',
@@ -46,18 +118,10 @@ export const razorpayProvider: PaymentProvider = {
 
   normalizeConnection(row: SellerIntegration): SellerIntegrationView {
     const m = meta(row);
-    const details = this.getAccountDetails(row);
-    const detailFields = [
-      { label: 'Account Name', value: details.accountName },
-      { label: 'Business Name', value: details.businessName },
-      { label: 'Email', value: details.email },
-      { label: 'Phone', value: details.phone },
-      { label: 'Key ID', value: details.merchantId, mono: true },
-      { label: 'Connection Date', value: details.connectionDate },
-      { label: 'Account Status', value: details.accountStatus },
-    ].filter((f) => f.value) as SellerIntegrationView['details'];
-
     const isDemo = Boolean(m.isDemo);
+    const detailSections = buildDetailSections(row, m, isDemo);
+    const details = detailSections.flatMap((section) => section.fields);
+
     return {
       id: row.id,
       provider: 'razorpay',
@@ -69,7 +133,8 @@ export const razorpayProvider: PaymentProvider = {
       updatedAt: row.updatedAt,
       lastError: m.lastError ?? null,
       isDemo,
-      details: detailFields,
+      details,
+      detailSections,
     };
   },
 

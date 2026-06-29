@@ -194,9 +194,9 @@ export default function ConfirmOrder() {
     () => normalizeStoreIntegrationFlags(state?.integrationFlags),
     [state?.integrationFlags]
   );
-  const shiprocketActive = integrationFlags.shiprocket;
+  const shippingCollectionMode = checkoutSettings.shippingCollectionMode ?? 'manual';
   const razorpayActive = integrationFlags.razorpay;
-  const requiresShippingAddress = shiprocketActive;
+  const requiresShippingAddress = shippingCollectionMode === 'provider';
 
   const showCodOption = useMemo(() => {
     if (checkoutSettings.enableCod) return true;

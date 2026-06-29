@@ -4,11 +4,15 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  max-height: 100dvh;
 }
 
 .sv-checkout-shell {
   width: 100%;
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -240,6 +244,12 @@
   display: none;
 }
 
+/* Tighter footer spacing inside checkout — avoid excess scroll below order summary */
+.sv-checkout-panel .sv-footer {
+  margin: 12px 12px 0;
+  flex-shrink: 0;
+}
+
 .website-checkout .sv-checkout-card {
   background: var(--site-bg, #fff);
   border-color: color-mix(in srgb, var(--site-text, #202124) 12%, transparent);
@@ -259,9 +269,21 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-primary, #1a73e8) 14%, transparent);
 }
 
-.website-checkout .sv-payment-opt.is-active {
+.website-checkout .sv-payment-radio.is-active {
   border-color: var(--site-primary, #1a73e8);
   background: color-mix(in srgb, var(--site-primary, #1a73e8) 8%, var(--site-bg, #fff));
+}
+
+.website-checkout .sv-payment-radio.is-active .sv-payment-radio-mark {
+  border-color: var(--site-primary, #1a73e8);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--site-primary, #1a73e8) 14%, transparent);
+}
+
+.website-checkout .sv-payment-radio-dot {
+  background: var(--site-primary, #1a73e8);
+}
+
+.website-checkout .sv-payment-radio.is-active .sv-payment-radio-label {
   color: var(--site-primary, #1a73e8);
 }
 
@@ -366,8 +388,8 @@
 
 .website-checkout .sv-checkout-content,
 .sv-checkout-panel .sv-checkout-content {
-  padding: 0 16px 32px;
-  flex: 1;
+  padding: 0 16px 24px;
+  flex: 0 0 auto;
 }
 
 .website-checkout .sv-checkout-section-title {
@@ -450,7 +472,7 @@
     max-width: 1120px;
     margin: 0 auto;
     width: 100%;
-    padding: 0 32px 48px;
+    padding: 0 32px 12px;
     box-sizing: border-box;
   }
 
@@ -593,7 +615,20 @@
   }
 
   .sv-checkout-panel .sv-checkout-content {
-    padding-bottom: 88px;
+    padding-bottom: 16px;
+  }
+
+  /*
+   * Details step: fixed Continue bar overlays the panel — pad the shell (not just
+   * content) so the store footer / Follow section can scroll fully above it.
+   * Bar ≈ 12px pad + 48px button + 12px pad + safe-area.
+   */
+  .sv-checkout-panel--details .sv-checkout-shell {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sv-checkout-panel:not(.sv-checkout-panel--details) .sv-checkout-shell {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .sv-checkout-panel--details .sv-panel-header .sv-panel-cta {

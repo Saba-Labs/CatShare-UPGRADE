@@ -97,7 +97,7 @@ async function insertStoreOrderViaRpc(
   currencyCode: string,
   trackingToken: string,
   checkoutExtras?: {
-    paymentMethod?: 'prepaid' | 'cod';
+    paymentMethod?: 'prepaid' | 'cod' | 'upi' | 'manual';
     checkoutAdjustments?: CheckoutTotals;
     shippingAddress?: Order['shipping_address'];
   }
@@ -235,7 +235,7 @@ export interface Order {
   tracking_token?: string;
   store_slug?: string;
   customer_edited_at?: string;
-  payment_method?: 'prepaid' | 'cod';
+  payment_method?: 'prepaid' | 'cod' | 'upi' | 'manual';
   checkout_adjustments?: CheckoutTotals | null;
   shipping_address?: {
     line1: string;
@@ -267,7 +267,7 @@ export async function createOrder(
   orderSource: 'link' | 'manual' | 'store' = 'link',
   storeSlug?: string,
   checkoutExtras?: {
-    paymentMethod?: 'prepaid' | 'cod';
+    paymentMethod?: 'prepaid' | 'cod' | 'upi' | 'manual';
     checkoutAdjustments?: CheckoutTotals;
     shippingAddress?: Order['shipping_address'];
   }
@@ -511,6 +511,51 @@ export async function fetchSellerOrders(
     return { data, error };
   } catch (err) {
     return { data: null, error: err };
+  }
+}
+
+const MIN_TRACKING_TOKEN_LENGTH = 16;
+
+/** Create or return the secret tracking token stored on the order row. */
+export async function ensureOrderTrackingToken(
+  sellerUserId: string,
+  orderId: string
+): Promise<{ token: string | null; error: unknown }> {
+  try {
+    const trimmedSeller = String(sellerUserId ?? '').trim();
+    const trimmedOrderId = String(orderId ?? '').trim();
+    if (!trimmedSeller || !trimmedOrderId) {
+      return { token: null, error: new Error('Missing seller or order id') };
+    }
+
+    setSupabaseRlsUserId(trimmedSeller);
+    const client = getSupabaseClient();
+    const { data: row, error: readErr } = await client
+      .from('orders')
+      .select('tracking_token')
+      .eq('id', trimmedOrderId)
+      .eq('seller_user_id', trimmedSeller)
+      .maybeSingle();
+
+    if (readErr) return { token: null, error: readErr };
+    if (!row) return { token: null, error: new Error('Order not found') };
+
+    const existing = String(row.tracking_token ?? '').trim();
+    if (existing.length >= MIN_TRACKING_TOKEN_LENGTH) {
+      return { token: existing, error: null };
+    }
+
+    const token = generateOrderTrackingToken();
+    const { error: updateErr } = await client
+      .from('orders')
+      .update({ tracking_token: token, updated_at: new Date().toISOString() })
+      .eq('id', trimmedOrderId)
+      .eq('seller_user_id', trimmedSeller);
+
+    if (updateErr) return { token: null, error: updateErr };
+    return { token, error: null };
+  } catch (err) {
+    return { token: null, error: err };
   }
 }
 

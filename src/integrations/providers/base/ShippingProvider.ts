@@ -27,4 +27,7 @@ export interface ShippingProvider extends IntegrationProvider {
 
   /** Future: sync tracking from provider */
   handleWebhook?(event: unknown): Promise<OrderShipment | null>;
+
+  /** Cancel AWB / shipment with the logistics provider */
+  cancelShipment?(sellerId: string, orderId: string): Promise<OrderShipment>;
 }

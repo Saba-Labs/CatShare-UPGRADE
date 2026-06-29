@@ -68,6 +68,7 @@ export const SECTION_ICONS: Partial<Record<HomepageSectionType, IconType>> = {
   'featured-products': FiStar,
   'category-showcase': FiGrid,
   'product-grid': FiBox,
+  'full-product-list': FiShoppingBag,
   announcement: FiBell,
   cta: FiArrowRight,
   video: FiFilm,

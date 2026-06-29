@@ -132,6 +132,7 @@ function shortBlockLabel(type: HomepageSectionType): string {
     'featured-products': 'Featured',
     'category-showcase': 'Categories',
     'product-grid': 'Products',
+    'full-product-list': 'Full list',
     announcement: 'Alert',
     cta: 'CTA',
     video: 'Video',

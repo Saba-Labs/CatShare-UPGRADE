@@ -16,6 +16,7 @@ import {
 import {
   connectShiprocketIntegration,
   createShiprocketShipmentForOrder,
+  cancelShiprocketShipmentForOrder,
   refreshShiprocketIntegration,
 } from '../lib/shiprocketIntegration.js';
 import { RazorpayApiError } from '../lib/razorpayServer.js';
@@ -229,6 +230,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const status =
         msg.includes('not found') ||
         msg.includes('delivery address') ||
+        msg.includes('Connect Shiprocket')
+          ? 400
+          : 500;
+      return res.status(status).json({ error: msg });
+    }
+  }
+
+  if (key === 'shipments/cancel' && req.method === 'POST') {
+    const orderId = String((req.body as { orderId?: string })?.orderId ?? '').trim();
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' });
+    }
+
+    try {
+      const shipment = await cancelShiprocketShipmentForOrder(
+        supabase,
+        auth.userId,
+        orderId
+      );
+      return res.status(200).json({ shipment });
+    } catch (e) {
+      console.error('integrations shipments cancel:', e);
+      const msg =
+        e instanceof ShiprocketApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Could not cancel shipment';
+      const status =
+        msg.includes('not found') ||
+        msg.includes('No shipment') ||
+        msg.includes('already cancelled') ||
+        msg.includes('cannot be cancelled') ||
         msg.includes('Connect Shiprocket')
           ? 400
           : 500;

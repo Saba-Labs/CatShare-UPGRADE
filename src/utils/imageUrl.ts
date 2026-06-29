@@ -46,3 +46,12 @@ export function productImageDisplayUrl(
     return `${base}?v=${encodeURIComponent(v)}`;
   }
 }
+
+/** Whether a storefront <img> can use this source (https or data:image). */
+export function isDisplayableImageUrl(url?: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const t = url.trim();
+  if (!t) return false;
+  if (t.startsWith('data:image/')) return true;
+  return /^https?:\/\//i.test(t);
+}

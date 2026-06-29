@@ -7,6 +7,8 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { handleDevIntegrationsRequest } from "./lib/devIntegrationsApi";
 import { handleDevStorePaymentRequest } from "./lib/devStorePaymentApi";
+import { handleDevTrackingPaymentRequest } from "./lib/devTrackingPaymentApi";
+import { handleDevTrackingOrderRequest } from "./lib/devTrackingOrderApi";
 
 /**
  * Dev / preview: Homepage config API proxy for Supabase access.
@@ -246,7 +248,9 @@ function devIntegrationsApiPlugin(): Plugin {
         const path = req.url?.split("?")[0] || "";
         const isIntegrations = path.startsWith("/api/integrations");
         const isStorePayments = path.startsWith("/api/store-payments");
-        if (!isIntegrations && !isStorePayments) {
+        const isTrackingPayment = path.startsWith("/api/tracking-payment");
+        const isTrackingOrder = path.startsWith("/api/tracking-order");
+        if (!isIntegrations && !isStorePayments && !isTrackingPayment && !isTrackingOrder) {
           return next();
         }
 
@@ -275,7 +279,20 @@ function devIntegrationsApiPlugin(): Plugin {
           }
 
           const body = rawBody ? JSON.parse(rawBody) : {};
-          const result = isStorePayments
+          const requestUrl = new URL(req.url || "/", "http://localhost");
+          const result = isTrackingOrder
+            ? await handleDevTrackingOrderRequest(
+                req.method || "GET",
+                requestUrl.searchParams,
+                { supabaseUrl, supabaseServiceKey: supabaseKey }
+              )
+            : isTrackingPayment
+            ? await handleDevTrackingPaymentRequest(
+                req.method || "GET",
+                requestUrl.searchParams,
+                { supabaseUrl, supabaseServiceKey: supabaseKey }
+              )
+            : isStorePayments
             ? await handleDevStorePaymentRequest(
                 req.method || "POST",
                 path,

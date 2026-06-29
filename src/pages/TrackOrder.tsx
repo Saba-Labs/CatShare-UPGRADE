@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import {
+  claimUpiPaymentByTrackingToken,
   fetchOrderByTrackingToken,
+  getCustomerPaymentStatusView,
+  isTrackOrderUpiPending,
   updateOrderByTrackingToken,
+  type TrackedOrder,
 } from '../services/orderTrackingService';
 import type { Order, OrderItem } from '../services/orderService';
+import { buildUpiPaymentUrl } from '../utils/upiPayment';
+import UpiQrCode from '../components/UpiQrCode';
 import { canCustomerEditOrder } from '../types/orderStatus';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { applyQuantityDelta } from '../utils/quantityPricingUtils';
@@ -232,6 +239,116 @@ function ActionButtons({
   );
 }
 
+function TrackOrderUpiPayment({
+  upi,
+  trackingToken,
+  currencySymbol,
+  onPaid,
+  claiming,
+  onClaimingChange,
+}: {
+  upi: NonNullable<TrackedOrder['upiCheckout']>;
+  trackingToken: string;
+  currencySymbol: string;
+  onPaid: (order: TrackedOrder) => void;
+  claiming: boolean;
+  onClaimingChange: (v: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const payUrl = buildUpiPaymentUrl({
+    vpa: upi.vpa,
+    payeeName: upi.storeName,
+    amount: upi.amount,
+    transactionNote: `Order ${upi.orderRef}`,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  const handleClaimPaid = async () => {
+    if (claiming) return;
+    onClaimingChange(true);
+    const res = await claimUpiPaymentByTrackingToken(trackingToken);
+    onClaimingChange(false);
+    if (!res.ok) {
+      alert(res.error || 'Could not save payment status');
+      return;
+    }
+    setOpen(false);
+    if (res.order) onPaid(res.order);
+    else {
+      const refreshed = await fetchOrderByTrackingToken(trackingToken);
+      if (refreshed.data) onPaid(refreshed.data);
+    }
+  };
+
+  const modal = open ? (
+    <div className="trk-upi-modal" role="dialog" aria-modal="true" aria-labelledby="trk-upi-modal-title">
+      <button
+        type="button"
+        className="trk-upi-modal-backdrop"
+        aria-label="Close"
+        onClick={() => setOpen(false)}
+      />
+      <div className="trk-upi-modal-card">
+        <button
+          type="button"
+          className="trk-upi-modal-close"
+          aria-label="Close"
+          onClick={() => setOpen(false)}
+        >
+          ×
+        </button>
+        <h3 id="trk-upi-modal-title" className="trk-upi-modal-title">
+          Pay via UPI
+        </h3>
+        <p className="trk-upi-amount">
+          Pay <strong>{formatMoney(upi.amount, currencySymbol)}</strong>
+        </p>
+        <div className="trk-upi-qr-wrap">
+          <UpiQrCode value={payUrl} className="trk-upi-qr" size={168} />
+          <p className="trk-upi-qr-hint">Scan with any UPI app</p>
+        </div>
+        <p className="trk-upi-id">{upi.vpa}</p>
+        <p className="trk-upi-ref">Ref {upi.orderRef}</p>
+        <div className="trk-upi-actions">
+          <a className="trk-btn trk-btn--primary trk-upi-open" href={payUrl}>
+            Open UPI app
+          </a>
+          <button
+            type="button"
+            className="trk-btn trk-btn--ghost"
+            disabled={claiming}
+            onClick={() => void handleClaimPaid()}
+          >
+            {claiming ? 'Saving…' : 'I have paid'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="trk-btn trk-btn--primary trk-upi-launch"
+        onClick={() => setOpen(true)}
+      >
+        Pay {formatMoney(upi.amount, currencySymbol)} via UPI
+      </button>
+      {modal && typeof document !== 'undefined' ? createPortal(modal, document.body) : null}
+    </>
+  );
+}
+
 export default function TrackOrder() {
   const { token: routeToken } = useParams<{ token: string }>();
   const trackingToken = decodeURIComponent(routeToken || '').trim();
@@ -241,10 +358,11 @@ export default function TrackOrder() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [claimingUpi, setClaimingUpi] = useState(false);
 
   const canEdit = canCustomerEditOrder(order?.status);
   const currencySymbol = useMemo(
@@ -338,9 +456,9 @@ export default function TrackOrder() {
       alert(saveErr || 'Failed to save');
       return;
     }
-    setOrder(data);
     setEditLines(linesFromOrder(data.items || []));
     setSaveMessage(status === 'cancelled' ? 'Your order has been cancelled.' : 'Changes saved successfully.');
+    await loadOrder();
   };
 
   const handleCancelOrder = () => {
@@ -369,6 +487,8 @@ export default function TrackOrder() {
 
   const statusKey = order.status in STATUS ? order.status : 'pending';
   const statusCfg = STATUS[statusKey];
+  const paymentStatusView = getCustomerPaymentStatusView(order.paymentSummary, order.payment_method);
+  const showUpiPay = isTrackOrderUpiPending(order) && Boolean(order.upiCheckout);
 
   return (
     <div className="trk-root">
@@ -410,6 +530,29 @@ export default function TrackOrder() {
                 </p>
               ) : null}
             </section>
+
+            {paymentStatusView ? (
+              <section className="trk-card trk-card-pad">
+                <h2 className="trk-card-label">Payment</h2>
+                <div className="trk-payment-row">
+                  <span className={`trk-pill ${paymentStatusView.pillClass}`}>
+                    <span className="trk-pill-dot" aria-hidden />
+                    {paymentStatusView.label}
+                  </span>
+                  <p className="trk-payment-hint">{paymentStatusView.hint}</p>
+                </div>
+                {showUpiPay && order.upiCheckout ? (
+                  <TrackOrderUpiPayment
+                    upi={order.upiCheckout}
+                    trackingToken={trackingToken}
+                    currencySymbol={currencySymbol}
+                    claiming={claimingUpi}
+                    onClaimingChange={setClaimingUpi}
+                    onPaid={(next) => setOrder(next)}
+                  />
+                ) : null}
+              </section>
+            ) : null}
 
             <section className="trk-card trk-card-pad">
               <h2 className="trk-card-label">Your details</h2>
@@ -495,6 +638,15 @@ export default function TrackOrder() {
               ) : (
                 <p className="trk-summary-meta">Price confirmed by seller</p>
               )}
+              {paymentStatusView ? (
+                <div className="trk-side-payment">
+                  <span className="trk-side-payment-label">Payment</span>
+                  <span className={`trk-pill ${paymentStatusView.pillClass}`}>
+                    <span className="trk-pill-dot" aria-hidden />
+                    {paymentStatusView.label}
+                  </span>
+                </div>
+              ) : null}
               {canEdit ? (
                 <p className="trk-summary-meta">
                   Adjust quantities above, then save. Prices are set by the seller and cannot be changed here.

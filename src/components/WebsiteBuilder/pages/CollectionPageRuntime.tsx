@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   getCatalogueData,
+  isProductInStockForCatalogue,
   normalizeOrderQuantityStep,
   type ProductWithCatalogueData,
 } from '../../../config/catalogueProductUtils';
+import type { DefaultSorting, ProductImageRatio } from '../../../types/storeBehaviorSettings';
 import { productsInCategory } from '../../../utils/storefrontCategories';
+import { productImageAspectRatio, sortStorefrontProducts } from '../../../utils/storefrontBehavior';
 import {
   formatStorePrice,
   getWebsiteProductImageUrl,
@@ -16,18 +19,50 @@ import { getProductVariantGroups } from '../../../utils/productVariants';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
 import { useWebsiteStore } from '../WebsiteStoreContext';
+import '../website-runtime.css';
 
 interface CollectionPageRuntimeProps {
   products: ProductWithCatalogueData[];
   columns?: number;
   cardsStyle?: 'minimal' | 'boxed';
+  /** When true, hides breadcrumbs and uses optional section title (homepage block). */
+  embedded?: boolean;
+  sectionTitle?: string;
+  showSearch?: boolean;
+  showCategoryFilters?: boolean;
+  showSort?: boolean;
+  viewMode?: 'list' | 'grid';
+  productImageRatio?: ProductImageRatio;
+  showPrice?: boolean;
+  showAvailability?: boolean;
+  defaultSorting?: DefaultSorting;
+  /** Builder canvas: open in-editor product preview instead of navigating away. */
+  builderPreview?: boolean;
+  onBuilderProductClick?: (product: ProductWithCatalogueData) => void;
 }
 
-export default function CollectionPageRuntime({ products, columns = 4, cardsStyle = 'boxed' }: CollectionPageRuntimeProps) {
+export default function CollectionPageRuntime({
+  products,
+  columns = 4,
+  cardsStyle = 'boxed',
+  embedded = false,
+  sectionTitle,
+  showSearch = true,
+  showCategoryFilters = true,
+  showSort = true,
+  viewMode,
+  productImageRatio = 'square',
+  showPrice = true,
+  showAvailability = true,
+  defaultSorting = 'newest',
+  builderPreview = false,
+  onBuilderProductClick,
+}: CollectionPageRuntimeProps) {
   const { basePath, collectionPath, productPath, store } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const location = useLocation();
-  const isListView = store.viewMode === 'list';
+  const isListView = embedded ? (viewMode ?? 'list') === 'list' : store.viewMode === 'list';
+  const imageAspect = productImageAspectRatio(productImageRatio);
   void columns;
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
@@ -61,7 +96,17 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
   }, [products, selectedCategory, normalizedQuery]);
 
   const sortedProducts = useMemo(() => {
-    if (sortBy === 'default') return filteredProducts;
+    if (sortBy === 'default') {
+      if (embedded) {
+        return sortStorefrontProducts(
+          filteredProducts,
+          defaultSorting,
+          store.catalogueId,
+          orderBridge?.catalogue ?? null
+        );
+      }
+      return filteredProducts;
+    }
     const catalogue = orderBridge?.catalogue ?? null;
     const withPrice = (product: ProductWithCatalogueData) =>
       getStorefrontPriceAndUnit(getCatalogueData(product, store.catalogueId), catalogue, product).price;
@@ -74,7 +119,14 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
       return 0;
     });
     return next;
-  }, [filteredProducts, orderBridge?.catalogue, sortBy, store.catalogueId]);
+  }, [
+    filteredProducts,
+    orderBridge?.catalogue,
+    sortBy,
+    store.catalogueId,
+    embedded,
+    defaultSorting,
+  ]);
 
   const categoryLabel = useMemo(() => {
     if (!selectedCategory || selectedCategory === 'all') return null;
@@ -90,28 +142,44 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
     return selectedCategory;
   }, [selectedCategory, products]);
 
-  const pageTitle = categoryLabel ? String(categoryLabel) : 'All products';
+  const pageTitle = embedded
+    ? (sectionTitle?.trim() || 'Products')
+    : categoryLabel
+      ? String(categoryLabel)
+      : 'All products';
 
   return (
-    <main className="website-section-products website-section-products--order-form">
+    <main
+      className={`website-section-products website-section-products--order-form${embedded ? ' website-section-products--embedded' : ''}`}
+    >
       <div className="website-of-panel">
-        <WebsiteBreadcrumbs
-          items={[
-            { label: 'Home', to: basePath || '/' },
-            ...(categoryLabel
-              ? [
-                  { label: 'Shop', to: collectionPath },
-                  { label: String(categoryLabel) },
-                ]
-              : [{ label: 'All products' }]),
-          ]}
-        />
-        <h1>{pageTitle}</h1>
+        {!embedded ? (
+          <WebsiteBreadcrumbs
+            items={[
+              { label: 'Home', to: basePath || '/' },
+              ...(categoryLabel
+                ? [
+                    { label: 'Shop', to: collectionPath },
+                    { label: String(categoryLabel) },
+                  ]
+                : [{ label: 'All products' }]),
+            ]}
+          />
+        ) : null}
+        {!embedded || sectionTitle?.trim() ? (
+          embedded ? (
+            <h2 className="website-section-products__title">{pageTitle}</h2>
+          ) : (
+            <h1>{pageTitle}</h1>
+          )
+        ) : null}
         <div className="website-of-toolbar">
           <div className="website-of-count">
             {sortedProducts.length} item{sortedProducts.length === 1 ? '' : 's'}
           </div>
+          {showSearch || showSort ? (
           <div className="website-of-search-row">
+            {showSearch ? (
             <div className="website-of-search">
               <span className="website-of-search-icon" aria-hidden>
                 ⌕
@@ -135,6 +203,8 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
                 </button>
               ) : null}
             </div>
+            ) : null}
+            {showSort ? (
             <select
               className="website-of-sort"
               value={sortBy}
@@ -147,8 +217,10 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
               <option value="name-asc">Name: A to Z</option>
               <option value="name-desc">Name: Z to A</option>
             </select>
+            ) : null}
           </div>
-          {availableCategories.length > 0 ? (
+          ) : null}
+          {showCategoryFilters && availableCategories.length > 0 ? (
             <div className="website-of-category-filters" role="tablist" aria-label="Filter by category">
               <button
                 type="button"
@@ -192,6 +264,11 @@ export default function CollectionPageRuntime({ products, columns = 4, cardsStyl
               quantity={orderBridge?.getProductQty(product.id) ?? 0}
               quantityStep={normalizeOrderQuantityStep(getCatalogueData(product, store.catalogueId)?.orderQuantityStep)}
               onQtyChange={(delta, step) => orderBridge?.changeProductQty(product.id, delta, step)}
+              builderPreview={builderPreview}
+              onBuilderProductClick={onBuilderProductClick}
+              imageAspect={embedded ? imageAspect : '1 / 1'}
+              showPrice={embedded ? showPrice : true}
+              showAvailability={embedded ? showAvailability : false}
             />
           ))}
         </div>
@@ -209,6 +286,11 @@ function CollectionProductCard({
   quantity,
   quantityStep,
   onQtyChange,
+  builderPreview = false,
+  onBuilderProductClick,
+  imageAspect = '1 / 1',
+  showPrice = true,
+  showAvailability = false,
 }: {
   product: ProductWithCatalogueData;
   cardsStyle: 'minimal' | 'boxed';
@@ -218,6 +300,11 @@ function CollectionProductCard({
   quantity: number;
   quantityStep: number;
   onQtyChange: (delta: number, step: number) => void;
+  builderPreview?: boolean;
+  onBuilderProductClick?: (product: ProductWithCatalogueData) => void;
+  imageAspect?: string;
+  showPrice?: boolean;
+  showAvailability?: boolean;
 }) {
   const { store } = useWebsiteStore();
   const navigate = useNavigate();
@@ -226,9 +313,41 @@ function CollectionProductCard({
   const { price, priceUnit } = getStorefrontPriceAndUnit(catData, catalogue, product);
   const clampedStep = normalizeOrderQuantityStep(quantityStep);
   const variantGroups = getProductVariantGroups(product);
+  const inStock = isProductInStockForCatalogue(product, store.catalogueId, catalogue ?? undefined);
+
+  const openInBuilder = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onBuilderProductClick?.(product);
+  };
+
+  const ProductNav = ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => {
+    if (builderPreview) {
+      return (
+        <button type="button" className={className} onClick={openInBuilder}>
+          {children}
+        </button>
+      );
+    }
+    return (
+      <Link to={href} className={className}>
+        {children}
+      </Link>
+    );
+  };
 
   const handleQtyChange = (delta: number) => {
     if (delta > 0 && variantGroups.length > 0 && quantity <= 0) {
+      if (builderPreview) {
+        onBuilderProductClick?.(product);
+        return;
+      }
       navigate(href);
       return;
     }
@@ -239,23 +358,29 @@ function CollectionProductCard({
     <article
       className={`website-product-card website-product-card-${cardsStyle} ${
         listView ? 'website-product-card-list' : 'website-product-card-grid'
-      }`}
+      }${builderPreview ? ' website-product-card--builder' : ''}`}
     >
-      <Link to={href} className="website-product-card-linkwrap">
-        <div className="website-product-card-img">
+      <ProductNav className="website-product-card-linkwrap">
+        <div
+          className="website-product-card-img"
+          style={{ aspectRatio: imageAspect }}
+        >
           {img ? (
             <img src={img} alt={product.name} loading="lazy" />
           ) : (
             <ProductImagePlaceholder size={40} className="website-product-card-ph" />
           )}
+          {showAvailability && !inStock ? (
+            <span className="website-product-card-oos">Out of stock</span>
+          ) : null}
         </div>
-      </Link>
+      </ProductNav>
       <div className="website-product-card-body">
-        <Link to={href} className="website-product-card-title-link">
+        <ProductNav className="website-product-card-title-link">
           <p className="website-product-card-title">{product.name}</p>
-        </Link>
+        </ProductNav>
         {product.subtitle ? <p className="website-product-card-subtitle">{product.subtitle}</p> : null}
-        {Number.isFinite(price) && price > 0 ? (
+        {showPrice && Number.isFinite(price) && price > 0 ? (
           <p className="website-product-card-price">
             {formatStorePrice(price, store.sellerCurrencyCode)}
             {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
@@ -263,17 +388,29 @@ function CollectionProductCard({
         ) : null}
         <div className="website-product-card-order-row">
           <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
-            <button type="button" className="website-qty-btn" onClick={() => handleQtyChange(-clampedStep)}>
+            <button
+              type="button"
+              className="website-qty-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQtyChange(-clampedStep);
+              }}
+            >
               -
             </button>
             <span className="website-qty-val">{quantity}</span>
-            <button type="button" className="website-qty-btn" onClick={() => handleQtyChange(clampedStep)}>
+            <button
+              type="button"
+              className="website-qty-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleQtyChange(clampedStep);
+              }}
+            >
               +
             </button>
           </div>
-          <Link to={href} className="website-product-card-details-link">
-            Details
-          </Link>
+          <ProductNav className="website-product-card-details-link">Details</ProductNav>
         </div>
         {clampedStep > 1 ? (
           <div className="website-product-card-pack-row">

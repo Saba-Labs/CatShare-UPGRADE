@@ -33,9 +33,7 @@ export function legacyProductNameHandle(product: ProductWithCatalogueData): stri
 
 /** Product slug from `/store/:slug/products/:handle` or subdomain `/products/:handle`. */
 export function parseStorefrontProductHandle(pathname: string, onSubdomain = false): string | null {
-  const segments = pathname.split('/').filter(Boolean);
-  const storeSlugIndex = segments.findIndex((s) => s === 'store');
-  const pageSegments = storeSlugIndex >= 0 ? segments.slice(storeSlugIndex + 2) : onSubdomain ? segments : [];
+  const pageSegments = storefrontPageSegments(pathname, onSubdomain);
   if (pageSegments[0] !== 'products') return null;
   const handle = pageSegments[1];
   if (!handle) return null;
@@ -44,6 +42,32 @@ export function parseStorefrontProductHandle(pathname: string, onSubdomain = fal
   } catch {
     return handle;
   }
+}
+
+export type StorefrontCheckoutRoute = 'details' | 'review';
+
+/** Path segments after store slug (or subdomain root), e.g. `['checkout', 'details']`. */
+export function storefrontPageSegments(pathname: string, onSubdomain = false): string[] {
+  const segments = pathname.split('/').filter(Boolean);
+  const storeSlugIndex = segments.findIndex((s) => s === 'store');
+  return storeSlugIndex >= 0 ? segments.slice(storeSlugIndex + 2) : onSubdomain ? segments : [];
+}
+
+/** Checkout step from `/store/:slug/checkout/details` or `.../checkout/review`. */
+export function parseStorefrontCheckoutRoute(
+  pathname: string,
+  onSubdomain = false
+): StorefrontCheckoutRoute | null {
+  const pageSegments = storefrontPageSegments(pathname, onSubdomain);
+  if (pageSegments[0] !== 'checkout') return null;
+  const step = pageSegments[1];
+  if (step === 'details') return 'details';
+  if (step === 'review') return 'review';
+  return null;
+}
+
+export function isStorefrontCheckoutPath(pathname: string, onSubdomain = false): boolean {
+  return parseStorefrontCheckoutRoute(pathname, onSubdomain) != null;
 }
 
 export function findProductByHandle(
@@ -104,6 +128,14 @@ export function productPagePath(slug: string, product: ProductWithCatalogueData,
 
 export function collectionPagePath(slug: string, onSubdomain = false): string {
   return `${storePathPrefix(slug, onSubdomain)}/collections/all`;
+}
+
+export function checkoutDetailsPath(slug: string, onSubdomain = false): string {
+  return `${storePathPrefix(slug, onSubdomain)}/checkout/details`;
+}
+
+export function checkoutReviewPath(slug: string, onSubdomain = false): string {
+  return `${storePathPrefix(slug, onSubdomain)}/checkout/review`;
 }
 
 export function absoluteStoreUrl(slug: string, path: string): string {

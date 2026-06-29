@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FiCopy } from 'react-icons/fi';
 import { useToast } from '../../../context/ToastContext';
+import { ensureAbsoluteHttpsUrl } from '../../../utils/storefrontDomain';
 import { STORE_PAGE_TITLE } from '../storeTypography';
 
 interface StoreHeaderProps {
@@ -22,7 +23,7 @@ export default function StoreHeader({
 
     setCopying(true);
     try {
-      await navigator.clipboard.writeText(`https://${storeUrl}`);
+      await navigator.clipboard.writeText(ensureAbsoluteHttpsUrl(storeUrl));
       showToast('Store link copied!', 'success');
     } catch {
       showToast('Failed to copy link', 'error');

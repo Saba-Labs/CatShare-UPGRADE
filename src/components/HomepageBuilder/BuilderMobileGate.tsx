@@ -1,47 +1,20 @@
 import './BuilderMobileGate.css';
+import { getPublicWebBaseUrl } from '../../utils/publicWebBaseUrl';
 
 interface BuilderMobileGateProps {
   onClose: () => void;
 }
 
-const FEATURES = [
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </svg>
-    ),
-    label: 'Drag-and-drop blocks',
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-        <circle cx="12" cy="12" r="3" />
-      </svg>
-    ),
-    label: 'Live preview',
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6L6 21l2.3-7-6-4.6h7.6L12 2z" />
-      </svg>
-    ),
-    label: 'Ready-made templates',
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-    ),
-    label: 'Publish in one click',
-  },
-];
+function getBuilderAppHost(): string {
+  try {
+    return new URL(getPublicWebBaseUrl()).host;
+  } catch {
+    return 'my.catshare.app';
+  }
+}
+
+const BUILDER_APP_URL = getPublicWebBaseUrl();
+const BUILDER_APP_HOST = getBuilderAppHost();
 
 export default function BuilderMobileGate({ onClose }: BuilderMobileGateProps) {
   return (
@@ -60,7 +33,7 @@ export default function BuilderMobileGate({ onClose }: BuilderMobileGateProps) {
                 <span className="builder-mobile-gate__dot" />
                 <span className="builder-mobile-gate__dot" />
                 <span className="builder-mobile-gate__dot" />
-                <span className="builder-mobile-gate__url">catshare.app · Site editor</span>
+                <span className="builder-mobile-gate__url">{BUILDER_APP_HOST} · Site editor</span>
               </div>
               <div className="builder-mobile-gate__editor">
                 <div className="builder-mobile-gate__toolbar">
@@ -94,29 +67,31 @@ export default function BuilderMobileGate({ onClose }: BuilderMobileGateProps) {
         </div>
 
         <div className="builder-mobile-gate__card">
-          <span className="builder-mobile-gate__badge">Desktop experience</span>
+          <span className="builder-mobile-gate__badge">Desktop browser</span>
           <h1 className="builder-mobile-gate__title">Design your store on a bigger screen</h1>
           <p className="builder-mobile-gate__lead">
-            The visual site editor needs room for drag-and-drop, live preview, and fine-tuning. Open CatShare Sites on
-            a laptop or tablet for the full experience.
+            The site editor is built for laptops and tablets — not small phone screens.
           </p>
 
-          <ul className="builder-mobile-gate__features">
-            {FEATURES.map((f) => (
-              <li key={f.label}>
-                <span className="builder-mobile-gate__feature-icon">{f.icon}</span>
-                {f.label}
-              </li>
-            ))}
-          </ul>
+          <div className="builder-mobile-gate__url-callout">
+            <a
+              href={BUILDER_APP_URL}
+              className="builder-mobile-gate__url-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {BUILDER_APP_HOST}
+            </a>
+            <p className="builder-mobile-gate__url-note">
+              On a computer or tablet, visit this link and sign in with your CatShare account to use
+              the homepage editor.
+            </p>
+          </div>
 
           <div className="builder-mobile-gate__actions">
             <button type="button" className="builder-mobile-gate__btn-primary" onClick={onClose}>
-              Back to my store
+              Back to Store
             </button>
-            <p className="builder-mobile-gate__footnote">
-              Tip: bookmark <strong>catshare.app</strong> on your computer to pick up where you left off.
-            </p>
           </div>
         </div>
       </div>

@@ -65,6 +65,85 @@ export async function fetchOrderPaymentByOrderId(
   }
 }
 
+export async function confirmUpiPaymentReceived(
+  sellerUserId: string,
+  order: {
+    id: string;
+    customer_name: string;
+    customer_whatsapp?: string;
+    currency_code?: string;
+    total_amount?: number;
+    checkout_adjustments?: { grandTotal?: number } | null;
+  },
+  existingPayment?: OrderPayment | null
+): Promise<{ data: OrderPayment | null; error: unknown }> {
+  const claimedAt = existingPayment?.metadata?.customer_claimed_paid_at;
+  const metadata: Record<string, unknown> = {
+    payment_confirmed_by: 'seller',
+  };
+  if (typeof claimedAt === 'string') {
+    metadata.customer_claimed_paid_at = claimedAt;
+  }
+
+  return upsertOrderPayment(sellerUserId, {
+    orderId: order.id,
+    provider: 'upi',
+    status: 'paid',
+    paymentMethod: 'upi',
+    amount:
+      order.checkout_adjustments?.grandTotal ??
+      order.total_amount ??
+      existingPayment?.amount ??
+      null,
+    currency: order.currency_code ?? existingPayment?.currency ?? 'INR',
+    customerName: order.customer_name,
+    customerPhone: order.customer_whatsapp ?? existingPayment?.customerPhone ?? null,
+    paidAt: new Date().toISOString(),
+    metadata,
+  });
+}
+
+export async function reverseUpiPaymentConfirmation(
+  sellerUserId: string,
+  order: {
+    id: string;
+    customer_name: string;
+    customer_whatsapp?: string;
+    currency_code?: string;
+    total_amount?: number;
+    checkout_adjustments?: { grandTotal?: number } | null;
+  },
+  existingPayment: OrderPayment
+): Promise<{ data: OrderPayment | null; error: unknown }> {
+  if (existingPayment.provider !== 'upi') {
+    return { data: null, error: new Error('Only UPI confirmations can be reversed') };
+  }
+  if (existingPayment.status !== 'paid') {
+    return { data: null, error: new Error('Payment is not marked as received') };
+  }
+
+  const metadata: Record<string, unknown> = {
+    seller_unconfirmed_at: new Date().toISOString(),
+  };
+
+  return upsertOrderPayment(sellerUserId, {
+    orderId: order.id,
+    provider: 'upi',
+    status: 'pending',
+    paymentMethod: 'upi',
+    amount:
+      order.checkout_adjustments?.grandTotal ??
+      order.total_amount ??
+      existingPayment.amount ??
+      null,
+    currency: order.currency_code ?? existingPayment.currency ?? 'INR',
+    customerName: order.customer_name,
+    customerPhone: order.customer_whatsapp ?? existingPayment.customerPhone ?? null,
+    paidAt: null,
+    metadata,
+  });
+}
+
 /** Future: webhook handlers will call this to upsert payment status */
 export async function upsertOrderPayment(
   sellerUserId: string,

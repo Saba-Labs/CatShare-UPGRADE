@@ -11,7 +11,7 @@ import {
   upsertIntegration,
   type IntegrationProviderId,
 } from './integrationsServer.js';
-import { connectShiprocketIntegration, createShiprocketShipmentForOrder, refreshShiprocketIntegration } from './shiprocketIntegration.js';
+import { connectShiprocketIntegration, createShiprocketShipmentForOrder, cancelShiprocketShipmentForOrder, refreshShiprocketIntegration } from './shiprocketIntegration.js';
 import { connectRazorpayIntegration, refreshRazorpayIntegration } from './razorpayIntegration.js';
 import { ShiprocketApiError } from './shiprocketServer.js';
 import { RazorpayApiError } from './razorpayServer.js';
@@ -151,6 +151,32 @@ export async function handleDevIntegrationsRequest(
       const status =
         msg.includes('not found') ||
         msg.includes('delivery address') ||
+        msg.includes('Connect Shiprocket')
+          ? 400
+          : 500;
+      return jsonResponse(status, { error: msg });
+    }
+  }
+
+  if (path === '/api/integrations/shipments/cancel' && method === 'POST') {
+    const orderId = String(body.orderId ?? '').trim();
+    if (!orderId) {
+      return jsonResponse(400, { error: 'orderId is required' });
+    }
+    try {
+      const shipment = await cancelShiprocketShipmentForOrder(
+        supabase,
+        auth.userId,
+        orderId
+      );
+      return jsonResponse(200, { shipment });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Could not cancel shipment';
+      const status =
+        msg.includes('not found') ||
+        msg.includes('No shipment') ||
+        msg.includes('already cancelled') ||
+        msg.includes('cannot be cancelled') ||
         msg.includes('Connect Shiprocket')
           ? 400
           : 500;

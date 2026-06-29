@@ -6,6 +6,14 @@ import SupportWhatsAppFab from '../../../components/SupportWhatsAppFab';
 /** Matches legacy store / orders status bar height. */
 export const STORE_STATUS_BAR_HEIGHT_PX = 40;
 
+/** Scroll padding so content clears the fixed main app bottom tab bar. */
+export const STORE_SCROLL_BOTTOM_PADDING_CLASS =
+  'pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]';
+
+/** Extra scroll padding when a fixed save bar is shown above the tab bar. */
+export const STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS =
+  'pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]';
+
 /** Root wrapper class for all `/store/*` admin pages — compact in-app typography. */
 export const STORE_SHELL_CLASS = 'store-admin text-sm text-gray-900 dark:text-gray-100 antialiased';
 
@@ -34,7 +42,7 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
 
       <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
         <main
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain pt-[40px] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-6"
+          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pt-[40px] ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
             {children}

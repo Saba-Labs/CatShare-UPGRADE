@@ -22,7 +22,7 @@ function IconBack() {
 export interface WarehouseShellProps {
   title: string;
   subtitle?: string;
-  backTo?: string | 'app' | 'parent';
+  backTo?: string | 'parent' | 'dashboard';
   rightSlot?: ReactNode;
   children?: ReactNode;
 }
@@ -37,8 +37,8 @@ export default function WarehouseShell({
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (backTo === 'app') {
-      navigate(-1);
+    if (backTo === 'dashboard') {
+      navigate('/');
       return;
     }
     if (backTo === 'parent') {

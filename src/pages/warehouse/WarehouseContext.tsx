@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -28,7 +29,32 @@ import {
 } from '../../services/inventoryService';
 import type { DeadStockLine, InventoryMovement, InventoryRoom } from '../../types/inventory';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
+import { isBrowserOnline } from '../../utils/cloudWritePolicy';
+import {
+  readCachedWarehouseSnapshot,
+  writeCachedWarehouseSnapshot,
+  type CachedWarehouseSnapshot,
+} from '../../utils/warehouseCache';
 import { loadWarehouseProducts, type WarehouseProduct } from './warehouseUtils';
+
+function applyWarehouseSnapshot(
+  snapshot: CachedWarehouseSnapshot,
+  setters: {
+    setWarehouseName: (v: string) => void;
+    setWarehouseId: (v: string) => void;
+    setMainInventoryId: (v: string) => void;
+    setRooms: (v: InventoryRoom[]) => void;
+    setMovements: (v: InventoryMovement[]) => void;
+    setDeadStock: (v: DeadStockLine[]) => void;
+  }
+) {
+  setters.setWarehouseName(snapshot.warehouseName);
+  setters.setWarehouseId(snapshot.warehouseId);
+  setters.setMainInventoryId(snapshot.mainInventoryId);
+  setters.setRooms(snapshot.rooms);
+  setters.setMovements(snapshot.movements);
+  setters.setDeadStock(snapshot.deadStock);
+}
 
 export interface WarehouseContextValue {
   effectiveUid: string | null;
@@ -93,55 +119,158 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
     return map;
   }, [rooms]);
 
+  const persistSnapshot = useCallback(
+    (patch: Partial<CachedWarehouseSnapshot> & Pick<CachedWarehouseSnapshot, 'warehouseId'>) => {
+      if (!effectiveUid) return;
+      const prev = readCachedWarehouseSnapshot(effectiveUid);
+      writeCachedWarehouseSnapshot(effectiveUid, {
+        warehouseName: patch.warehouseName ?? prev?.warehouseName ?? warehouseName,
+        warehouseId: patch.warehouseId,
+        mainInventoryId: patch.mainInventoryId ?? prev?.mainInventoryId ?? mainInventoryId,
+        rooms: patch.rooms ?? prev?.rooms ?? rooms,
+        movements: patch.movements ?? prev?.movements ?? movements,
+        deadStock: patch.deadStock ?? prev?.deadStock ?? deadStock,
+        cachedAt: Date.now(),
+      });
+    },
+    [effectiveUid, warehouseName, mainInventoryId, rooms, movements, deadStock]
+  );
+
+  const hydrateFromCache = useCallback(
+    (uid: string) => {
+      const cached = readCachedWarehouseSnapshot(uid);
+      if (!cached?.warehouseId) return false;
+      applyWarehouseSnapshot(cached, {
+        setWarehouseName,
+        setWarehouseId,
+        setMainInventoryId,
+        setRooms,
+        setMovements,
+        setDeadStock,
+      });
+      setCatalogues(getAllCatalogues(uid));
+      return true;
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    if (!effectiveUid) {
+      setLoading(false);
+      return;
+    }
+    const hasCache = hydrateFromCache(effectiveUid);
+    setLoading(!hasCache);
+    setError('');
+  }, [effectiveUid, hydrateFromCache]);
+
   const refreshDeadStock = useCallback(async () => {
     if (!effectiveUid) return;
     const deadRes = await fetchDeadStock(
       effectiveUid,
       catalogues.map((c) => c.inventoryId).filter(Boolean) as string[]
     );
-    setDeadStock(deadRes.data ?? []);
-  }, [effectiveUid, catalogues]);
+    const nextDead = deadRes.data ?? [];
+    setDeadStock(nextDead);
+    if (effectiveUid && warehouseId) {
+      persistSnapshot({ warehouseId, deadStock: nextDead });
+    }
+  }, [effectiveUid, catalogues, warehouseId, persistSnapshot]);
 
   const refreshMovements = useCallback(async () => {
     if (!effectiveUid) return;
     const movRes = await fetchInventoryMovements(effectiveUid, { limit: 80 });
-    setMovements(movRes.data ?? []);
-  }, [effectiveUid]);
+    const nextMovements = movRes.data ?? [];
+    setMovements(nextMovements);
+    if (effectiveUid && warehouseId) {
+      persistSnapshot({ warehouseId, movements: nextMovements });
+    }
+  }, [effectiveUid, warehouseId, persistSnapshot]);
 
   const loadAll = useCallback(async () => {
     if (!effectiveUid) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+
+    const cached = readCachedWarehouseSnapshot(effectiveUid);
+    const hasCache = Boolean(cached?.warehouseId);
+    if (!hasCache) {
+      setLoading(true);
+    }
     setError('');
-    try {
-      const ensured = await ensureDefaultWarehouse(effectiveUid);
-      if (ensured.error || !ensured.data) {
-        setError('Could not initialize warehouse. Run sql/warehouse_inventory.sql in Supabase.');
+
+    if (!isBrowserOnline()) {
+      if (hasCache) {
+        hydrateFromCache(effectiveUid);
         setLoading(false);
         return;
       }
-      setWarehouseName(ensured.data.warehouseName);
-      setWarehouseId(ensured.data.warehouseId);
-      setMainInventoryId(ensured.data.mainInventoryId);
+      setError('Offline — no saved warehouse data on this device.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const ensured = await ensureDefaultWarehouse(effectiveUid);
+      if (ensured.error || !ensured.data) {
+        if (hasCache) {
+          hydrateFromCache(effectiveUid);
+          showToast('Could not refresh warehouse. Showing saved data.', 'info');
+        } else {
+          setError('Could not initialize warehouse. Run sql/warehouse_inventory.sql in Supabase.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      const { warehouseId: whId, warehouseName: whName, mainInventoryId: mainId } = ensured.data;
+      setWarehouseName(whName);
+      setWarehouseId(whId);
+      setMainInventoryId(mainId);
+
       const cats = getAllCatalogues(effectiveUid);
       setCatalogues(cats);
-      const roomsRes = await fetchInventoryRooms(effectiveUid, ensured.data.warehouseId);
-      setRooms(roomsRes.data ?? []);
+
+      const roomsRes = await fetchInventoryRooms(effectiveUid, whId);
+      const nextRooms = roomsRes.data ?? [];
+
       const movRes = await fetchInventoryMovements(effectiveUid, { limit: 80 });
-      setMovements(movRes.data ?? []);
+      const nextMovements = movRes.data ?? [];
+
       const deadRes = await fetchDeadStock(
         effectiveUid,
         cats.map((c) => c.inventoryId).filter(Boolean) as string[]
       );
-      setDeadStock(deadRes.data ?? []);
+      const nextDead = deadRes.data ?? [];
+
+      setRooms(nextRooms);
+      setMovements(nextMovements);
+      setDeadStock(nextDead);
+
+      writeCachedWarehouseSnapshot(effectiveUid, {
+        warehouseName: whName,
+        warehouseId: whId,
+        mainInventoryId: mainId,
+        rooms: nextRooms,
+        movements: nextMovements,
+        deadStock: nextDead,
+        cachedAt: Date.now(),
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load warehouse');
+      if (hasCache) {
+        hydrateFromCache(effectiveUid);
+        showToast(
+          isBrowserOnline() ? 'Could not refresh warehouse. Showing saved data.' : 'Showing saved warehouse',
+          'info'
+        );
+      } else {
+        setError(e instanceof Error ? e.message : 'Failed to load warehouse');
+      }
     } finally {
       setLoading(false);
     }
-  }, [effectiveUid]);
+  }, [effectiveUid, hydrateFromCache, showToast]);
 
   useEffect(() => {
     if (authLoading && !effectiveUid) return;
@@ -162,7 +291,13 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         showToast('Could not add inventory', 'error');
         return;
       }
-      setRooms((prev) => [...prev, res.data!]);
+      setRooms((prev) => {
+        const next = [...prev, res.data!];
+        if (warehouseId) {
+          persistSnapshot({ warehouseId, rooms: next });
+        }
+        return next;
+      });
       showToast('Inventory added', 'success');
     },
     [effectiveUid, warehouseId, rooms.length, guardCloudWrite, showToast]
@@ -177,9 +312,13 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         showToast('Rename failed', 'error');
         return false;
       }
-      setRooms((prev) =>
-        prev.map((r) => (r.id === room.id ? { ...r, name: newName.trim() } : r))
-      );
+      setRooms((prev) => {
+        const next = prev.map((r) => (r.id === room.id ? { ...r, name: newName.trim() } : r));
+        if (warehouseId) {
+          persistSnapshot({ warehouseId, rooms: next });
+        }
+        return next;
+      });
       showToast('Inventory renamed', 'success');
       return true;
     },
@@ -212,14 +351,25 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      setRooms((prev) => prev.filter((r) => r.id !== room.id));
+      setRooms((prev) => {
+        const next = prev.filter((r) => r.id !== room.id);
+        if (warehouseId) {
+          persistSnapshot({ warehouseId, rooms: next });
+        }
+        return next;
+      });
       const movRes = await fetchInventoryMovements(effectiveUid, { limit: 80 });
-      setMovements(movRes.data ?? []);
+      const nextMovements = movRes.data ?? [];
+      setMovements(nextMovements);
       const deadRes = await fetchDeadStock(
         effectiveUid,
         catalogues.map((c) => c.inventoryId).filter(Boolean) as string[]
       );
-      setDeadStock(deadRes.data ?? []);
+      const nextDead = deadRes.data ?? [];
+      setDeadStock(nextDead);
+      if (warehouseId) {
+        persistSnapshot({ warehouseId, movements: nextMovements, deadStock: nextDead });
+      }
       showToast('Inventory deleted', 'success');
       return true;
     },
@@ -242,7 +392,11 @@ export function WarehouseProvider({ children }: { children: ReactNode }) {
         effectiveUid,
         nextCats.map((c) => c.inventoryId).filter(Boolean) as string[]
       );
-      setDeadStock(deadRes.data ?? []);
+      const nextDead = deadRes.data ?? [];
+      setDeadStock(nextDead);
+      if (warehouseId) {
+        persistSnapshot({ warehouseId, deadStock: nextDead });
+      }
       showToast('Catalogue link updated', 'success');
     },
     [effectiveUid, guardCloudWrite, showToast]

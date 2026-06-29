@@ -4,6 +4,8 @@ import type {
   DeliveryStatus,
   IntegrationConnectionStatus,
   IntegrationConnectOptions,
+  IntegrationDetailField,
+  IntegrationDetailSection,
   OrderShipment,
   SellerIntegration,
   SellerIntegrationView,
@@ -11,6 +13,7 @@ import type {
 } from '../../../core/types';
 import {
   apiConnectIntegration,
+  apiCancelOrderShipment,
   apiCreateOrderShipment,
   apiDisconnectIntegration,
   apiRefreshIntegration,
@@ -54,6 +57,63 @@ function formatDisplayStatus(status: IntegrationConnectionStatus): string {
   }
 }
 
+function detailField(
+  label: string,
+  value: string | null | undefined,
+  mono = false
+): IntegrationDetailField | null {
+  if (!value?.trim()) return null;
+  return { label, value: value.trim(), mono };
+}
+
+function buildDetailSections(
+  row: SellerIntegration,
+  m: ShiprocketIntegrationMetadata,
+  isDemo: boolean
+): IntegrationDetailSection[] {
+  const connectionFields = [
+    detailField('Status', isDemo ? 'Demo mode' : formatDisplayStatus(row.status)),
+    detailField('API user', m.apiUserEmailMasked),
+    detailField(
+      'Company ID',
+      m.companyId != null ? String(m.companyId) : row.accountId,
+      true
+    ),
+    detailField('Connected', formatIntegrationDate(m.connectionDate ?? row.connectedAt)),
+    detailField(
+      'Last checked',
+      formatIntegrationDate(m.lastVerifiedAt ?? row.updatedAt)
+    ),
+    detailField('Token expires', formatIntegrationDate(m.tokenExpiresAt)),
+  ].filter((f): f is IntegrationDetailField => f != null);
+
+  const pickupFields = [
+    detailField('Warehouse', m.warehouseName ?? m.pickupLocationName),
+    detailField('Pickup location', m.pickupLocationName),
+    detailField('Pickup address', m.pickupAddress),
+  ].filter((f): f is IntegrationDetailField => f != null);
+
+  const catshareFields: IntegrationDetailField[] = [
+    { label: 'Shipping mode', value: 'Enable Provider in Store → Shipping' },
+    { label: 'Checkout', value: 'Collects delivery address when provider mode is on' },
+    { label: 'Orders', value: 'Create AWB from order shipment section' },
+    { label: 'Tracking', value: 'Live status, AWB, and courier tracking link' },
+    { label: 'Manage', value: 'Cancel shipment and create a new AWB if needed' },
+  ];
+
+  const sections: IntegrationDetailSection[] = [
+    { title: 'Connection', fields: connectionFields },
+  ];
+
+  if (pickupFields.length > 0) {
+    sections.push({ title: 'Pickup & warehouse', fields: pickupFields });
+  }
+
+  sections.push({ title: 'In CatShare', fields: catshareFields });
+
+  return sections;
+}
+
 export const shiprocketProvider: ShippingProvider = {
   id: 'shiprocket',
   category: 'shipping',
@@ -66,16 +126,10 @@ export const shiprocketProvider: ShippingProvider = {
 
   normalizeConnection(row: SellerIntegration): SellerIntegrationView {
     const m = meta(row);
-    const pickup = this.getPickupDetails(row);
-    const detailFields = [
-      { label: 'API user', value: m.apiUserEmailMasked ?? null },
-      { label: 'Warehouse Name', value: pickup.warehouseName },
-      { label: 'Pickup Address', value: pickup.pickupAddress },
-      { label: 'Connected Date', value: pickup.connectedDate },
-      { label: 'Status', value: pickup.status },
-    ].filter((f) => f.value) as SellerIntegrationView['details'];
-
     const isDemo = Boolean(m.isDemo);
+    const detailSections = buildDetailSections(row, m, isDemo);
+    const details = detailSections.flatMap((section) => section.fields);
+
     return {
       id: row.id,
       provider: 'shiprocket',
@@ -87,7 +141,8 @@ export const shiprocketProvider: ShippingProvider = {
       updatedAt: row.updatedAt,
       lastError: m.lastError ?? null,
       isDemo,
-      details: detailFields,
+      details,
+      detailSections,
     };
   },
 
@@ -169,6 +224,40 @@ export const shiprocketProvider: ShippingProvider = {
       pickupDate: null,
       estimatedDelivery: null,
       deliveryStatus: String(row.delivery_status ?? 'created') as DeliveryStatus,
+      timeline: Array.isArray(row.timeline)
+        ? (row.timeline as ShipmentTimelineEvent[])
+        : [],
+      lastUpdatedAt: row.last_updated_at != null ? String(row.last_updated_at) : null,
+      metadata:
+        row.metadata && typeof row.metadata === 'object'
+          ? (row.metadata as Record<string, unknown>)
+          : {},
+      createdAt: String(row.created_at ?? ''),
+      updatedAt: String(row.updated_at ?? ''),
+    };
+  },
+
+  async cancelShipment(sellerId: string, orderId: string): Promise<OrderShipment> {
+    const res = await apiCancelOrderShipment(orderId);
+    if (res.error || !res.data) {
+      throw new Error(res.error ?? 'Could not cancel shipment');
+    }
+    const row = res.data;
+    return {
+      id: String(row.id ?? ''),
+      orderId: String(row.order_id ?? orderId),
+      sellerUserId: String(row.seller_user_id ?? sellerId),
+      provider: 'shiprocket',
+      shipmentId: row.shipment_id != null ? String(row.shipment_id) : null,
+      awbNumber: row.awb_number != null ? String(row.awb_number) : null,
+      courier: row.courier != null ? String(row.courier) : null,
+      trackingNumber:
+        row.tracking_number != null ? String(row.tracking_number) : null,
+      trackingUrl: row.tracking_url != null ? String(row.tracking_url) : null,
+      pickupDate: row.pickup_date != null ? String(row.pickup_date) : null,
+      estimatedDelivery:
+        row.estimated_delivery != null ? String(row.estimated_delivery) : null,
+      deliveryStatus: String(row.delivery_status ?? 'cancelled') as DeliveryStatus,
       timeline: Array.isArray(row.timeline)
         ? (row.timeline as ShipmentTimelineEvent[])
         : [],

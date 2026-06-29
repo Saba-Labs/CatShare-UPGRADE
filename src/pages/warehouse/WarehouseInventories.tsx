@@ -105,14 +105,14 @@ export default function WarehouseInventories() {
 
   if (loading) {
     return (
-      <WarehouseShell title="Warehouse" backTo="app">
+      <WarehouseShell title="Warehouse" backTo="dashboard">
         <div className="wh-spinner" />
       </WarehouseShell>
     );
   }
 
   return (
-    <WarehouseShell title="Warehouse" backTo="app">
+    <WarehouseShell title="Warehouse" backTo="dashboard">
       {error ? <div className="wh-error">{error}</div> : null}
 
       <p className="wh-page-lead">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainAppBottomNav from '../../components/MainAppBottomNav';
 import { useToast } from '../../context/ToastContext';
@@ -42,6 +42,12 @@ export default function RazorpayIntegrationPage() {
   const status = view?.status ?? 'not_connected';
   const canConnect = status === 'not_connected' || status === 'error';
 
+  useEffect(() => {
+    if (isConnectedStatus(status)) {
+      setShowDetails(true);
+    }
+  }, [status]);
+
   const handleConnect = async () => {
     if (!guardCloudWrite()) return;
     if (!keyId.trim() || !keySecret) {
@@ -62,6 +68,7 @@ export default function RazorpayIntegrationPage() {
     }
     setKeySecret('');
     showToast('Razorpay connected', 'success');
+    setShowDetails(true);
     await reload();
   };
 
@@ -119,6 +126,11 @@ export default function RazorpayIntegrationPage() {
 
       <main className="int-main">
         {error ? <div className="int-error-box">{error}</div> : null}
+        {view?.lastError ? (
+          <div className="int-error-box" style={{ marginBottom: 12 }}>
+            {view.lastError}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="int-loading">Loading…</div>
@@ -133,7 +145,7 @@ export default function RazorpayIntegrationPage() {
                     {provider.description}
                   </div>
                 </div>
-                <IntegrationStatusBadge status={status} />
+                <IntegrationStatusBadge status={status} label={view?.displayStatus} />
               </div>
             </div>
 

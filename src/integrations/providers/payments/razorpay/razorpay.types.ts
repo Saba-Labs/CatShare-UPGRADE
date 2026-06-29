@@ -2,6 +2,7 @@ import type { RazorpayConnectionStatus } from '../../../core/types';
 
 export interface RazorpayIntegrationMetadata {
   keyIdMasked?: string;
+  keyMode?: 'test' | 'live';
   accountName?: string;
   businessName?: string;
   email?: string;
@@ -9,6 +10,7 @@ export interface RazorpayIntegrationMetadata {
   merchantId?: string;
   accountStatus?: string;
   connectionDate?: string;
+  lastVerifiedAt?: string;
   lastError?: string;
   isDemo?: boolean;
 }

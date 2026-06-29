@@ -1,5 +1,4 @@
 import type { ShipmentTimelineEvent } from '../core/types';
-import { OdIcons, OD_COLORS } from './orderDetailUi';
 
 export function ShipmentTrackingTimeline({
   events,
@@ -9,7 +8,7 @@ export function ShipmentTrackingTimeline({
   if (!events.length) return null;
 
   return (
-    <div>
+    <div className="od-ship-timeline">
       {events.map((event, index) => {
         const isDone = event.status === 'done';
         const isError = event.status === 'error';
@@ -19,63 +18,50 @@ export function ShipmentTrackingTimeline({
         return (
           <div
             key={event.id || `${event.label}-${index}`}
-            style={{ display: 'flex', gap: 12, minHeight: isLast ? 'auto' : 40 }}
+            className={`od-ship-timeline-item${isLast ? ' od-ship-timeline-item--last' : ''}`}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className="od-ship-timeline-rail">
               <div
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: isDone
-                    ? OD_COLORS.greenLight
-                    : isError
-                      ? OD_COLORS.redLight
-                      : '#F2F2F7',
-                  border: `2px solid ${
-                    isDone
-                      ? OD_COLORS.green
-                      : isError
-                        ? OD_COLORS.red
-                        : isActive
-                          ? OD_COLORS.blue
-                          : '#D1D1D6'
-                  }`,
-                  color: isDone ? OD_COLORS.green : isError ? OD_COLORS.red : 'transparent',
-                  flexShrink: 0,
-                  boxShadow: isActive ? `0 0 0 3px ${OD_COLORS.blue}22` : undefined,
-                }}
+                className={[
+                  'od-ship-timeline-dot',
+                  isDone ? 'od-ship-timeline-dot--done' : '',
+                  isError ? 'od-ship-timeline-dot--error' : '',
+                  isActive ? 'od-ship-timeline-dot--active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
-                {isDone ? <OdIcons.Check /> : null}
+                {isDone ? (
+                  <svg viewBox="0 0 14 11" fill="none" aria-hidden>
+                    <path
+                      d="M1 5.5L5 9.5L13 1"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : null}
               </div>
               {!isLast ? (
                 <div
-                  style={{
-                    width: 2,
-                    flex: 1,
-                    minHeight: 14,
-                    background: isDone ? OD_COLORS.greenBorder : OD_COLORS.divider,
-                    marginTop: 4,
-                    borderRadius: 1,
-                  }}
+                  className={`od-ship-timeline-line${isDone ? ' od-ship-timeline-line--done' : ''}`}
                 />
               ) : null}
             </div>
-            <div style={{ paddingBottom: isLast ? 0 : 14, flex: 1, paddingTop: 2 }}>
+            <div className="od-ship-timeline-body">
               <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: isDone ? 600 : 500,
-                  color: isDone ? OD_COLORS.text : OD_COLORS.muted,
-                }}
+                className={[
+                  'od-ship-timeline-title',
+                  isDone ? 'od-ship-timeline-title--done' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
                 {event.label}
               </div>
               {event.at ? (
-                <div style={{ fontSize: 11, color: OD_COLORS.subtle, marginTop: 3 }}>
+                <div className="od-ship-timeline-time">
                   {new Date(event.at).toLocaleString('en-IN', {
                     day: 'numeric',
                     month: 'short',
@@ -85,7 +71,7 @@ export function ShipmentTrackingTimeline({
                   })}
                 </div>
               ) : !isDone ? (
-                <div style={{ fontSize: 11, color: OD_COLORS.subtle, marginTop: 3 }}>Pending</div>
+                <div className="od-ship-timeline-time od-ship-timeline-time--pending">Upcoming</div>
               ) : null}
             </div>
           </div>

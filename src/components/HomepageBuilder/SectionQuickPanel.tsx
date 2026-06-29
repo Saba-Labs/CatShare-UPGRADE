@@ -9,6 +9,7 @@ import DividerSectionEditor from './editors/DividerSectionEditor';
 import FeaturedProductsEditor from './editors/FeaturedProductsEditor';
 import CategoryShowcaseEditor from './editors/CategoryShowcaseEditor';
 import ProductGridEditor from './editors/ProductGridEditor';
+import FullProductListEditor from './editors/FullProductListEditor';
 import TestimonialsSectionEditor from './editors/TestimonialsSectionEditor';
 import ContentGridSectionEditor from './editors/ContentGridSectionEditor';
 import FreeformSectionEditor from './editors/FreeformSectionEditor';
@@ -18,7 +19,7 @@ import SectionStyleControls from './SectionStyleControls';
 import SidebarSection from './SidebarSection';
 import { FiArrowLeft, FiDroplet, FiSliders, SECTION_ICONS } from './builderSidebarIcons';
 
-const CATALOGUE_SECTION_TYPES = ['featured-products', 'category-showcase', 'product-grid'];
+const CATALOGUE_SECTION_TYPES = ['featured-products', 'category-showcase', 'product-grid', 'full-product-list'];
 const DEDICATED_EDITOR_TYPES = [
   'text',
   'carousel',
@@ -105,6 +106,9 @@ export default function SectionQuickPanel({
           />
         )}
         {section.type === 'product-grid' && <ProductGridEditor section={section as any} onUpdate={onUpdate} />}
+        {section.type === 'full-product-list' && (
+          <FullProductListEditor section={section as any} onUpdate={onUpdate} />
+        )}
         {section.type === 'testimonials' && (
           <TestimonialsSectionEditor section={section as any} onUpdate={onUpdate} />
         )}

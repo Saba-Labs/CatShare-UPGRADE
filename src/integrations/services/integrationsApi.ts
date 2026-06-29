@@ -560,4 +560,25 @@ export async function apiCreateOrderShipment(
 
 }
 
+export async function apiCancelOrderShipment(
+  orderId: string
+): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
+  const r = await apiJson('/api/integrations/shipments/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ orderId }),
+  });
+
+  if (!r.ok) {
+    return {
+      data: null,
+      error: typeof r.error === 'string' ? r.error : 'Could not cancel shipment',
+    };
+  }
+
+  return {
+    data: (r.shipment as Record<string, unknown>) ?? null,
+    error: null,
+  };
+}
+
 

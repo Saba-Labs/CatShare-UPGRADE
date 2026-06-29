@@ -86,6 +86,7 @@ const SECTION_LABELS: Partial<Record<HomepageSection['type'], string>> = {
   'featured-products': 'Featured Products',
   'category-showcase': 'Categories',
   'product-grid': 'Product Grid',
+  'full-product-list': 'Full Product List',
   announcement: 'Announcement',
   cta: 'Call To Action',
   video: 'Video',

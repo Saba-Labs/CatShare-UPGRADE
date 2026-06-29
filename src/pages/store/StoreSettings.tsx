@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,7 +8,6 @@ import {
   updateStoreSlug,
   updateStoreLiveStatus,
   updateStoreMaintenanceMode,
-  updateStoreViewMode,
   updateStoreWhatsapp,
   updateStoreMinimumOrderValue,
   updateStoreCheckoutSettings,
@@ -20,8 +19,9 @@ import {
 } from '../../services/storeService';
 import { fetchBehaviorSettings, updateBehaviorSettings } from '../../services/storeBehaviorService';
 import {
-  behaviorFromStoreSettingsState,
+  DEFAULT_BEHAVIOR_SETTINGS,
   normalizeBehaviorSettings,
+  type StoreBehaviorSettings,
 } from '../../types/storeBehaviorSettings';
 import { normalizeCheckoutSettings } from '../../types/checkoutSettings';
 import { buildStorefrontPublicUrl } from '../../utils/storefrontDomain';
@@ -30,10 +30,11 @@ import {
   readCachedBehaviorSettings,
   readCachedSellerStore,
 } from '../../utils/storePageCache';
-import StoreLayout from './components/StoreLayout';
+import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
 import SettingsCard from './components/SettingsCard';
+import MinimumOrderValueField from './components/MinimumOrderValueField';
 import ToggleSwitch from './components/ToggleSwitch';
 import {
   STORE_CHIP_CLASS,
@@ -58,14 +59,6 @@ interface StoreSettingsState {
   // Catalogue Settings
   catalogueId: string;
   productsToShow: 'all' | 'wholesale' | 'reseller' | 'featured' | 'category';
-  defaultSorting: 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical';
-
-  // Display Settings
-  viewMode: 'grid' | 'list';
-  productImageRatio: 'square' | 'portrait' | 'landscape';
-  showPrice: boolean;
-  showAvailability: boolean;
-  showCategories: boolean;
 
   // Customer Settings
   whatsappNumber: string;
@@ -92,12 +85,6 @@ const INITIAL_STATE: StoreSettingsState = {
   storeSlug: '',
   catalogueId: '',
   productsToShow: 'all',
-  defaultSorting: 'newest',
-  viewMode: 'grid',
-  productImageRatio: 'square',
-  showPrice: true,
-  showAvailability: true,
-  showCategories: true,
   whatsappNumber: '',
   minimumOrderValue: '0',
   defaultCurrency: 'USD',
@@ -141,6 +128,22 @@ const REGIONS = [
   'worldwide', 'north-america', 'europe', 'asia-pacific', 'middle-east', 'africa', 'south-america'
 ];
 
+function behaviorFieldsFromSettings(state: StoreSettingsState): Partial<StoreBehaviorSettings> {
+  return {
+    productsToShow: state.productsToShow,
+    defaultCurrency: state.defaultCurrency,
+    defaultLanguage: state.defaultLanguage,
+    customerNotifications: state.customerNotifications,
+    allowGuestBrowsing: state.allowGuestBrowsing,
+    requireLoginBeforeCheckout: state.requireLoginBeforeCheckout,
+    timeZone: state.timeZone,
+    businessCountry: state.businessCountry,
+    defaultShippingRegion: state.defaultShippingRegion,
+    debugMode: state.debugMode,
+    developerMode: state.developerMode,
+  };
+}
+
 export default function StoreSettings() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -156,6 +159,7 @@ export default function StoreSettings() {
   const [slugValidating, setSlugValidating] = useState(false);
   const [catalogues, setCatalogues] = useState<Array<{ id: string; label: string }>>([]);
   const [tooltipOpen, setTooltipOpen] = useState<string | null>(null);
+  const loadedBehaviorRef = useRef<StoreBehaviorSettings>(DEFAULT_BEHAVIOR_SETTINGS);
 
   const applyLoadedSettings = useCallback(
     (
@@ -171,9 +175,10 @@ export default function StoreSettings() {
       }
 
       if (store) {
+        loadedBehaviorRef.current = behavior;
         const loadedSettings: StoreSettingsState = {
           ...INITIAL_STATE,
-          ...behavior,
+          ...behaviorFieldsFromSettings({ ...INITIAL_STATE, ...behavior } as StoreSettingsState),
           catalogueId: store.catalogueId || '',
           storeSlug: store.storeSlug || '',
           storeEnabled: store.isLive !== false,
@@ -181,16 +186,16 @@ export default function StoreSettings() {
           whatsappNumber: store.storeWhatsapp || '',
           minimumOrderValue:
             store.minimumOrderValue != null ? String(store.minimumOrderValue) : '0',
-          viewMode: store.viewMode || 'grid',
           requireLoginBeforeCheckout: checkoutRequireLogin,
           allowGuestBrowsing: checkoutAllowGuest,
         };
         setSettings(loadedSettings);
         setOriginalSettings(loadedSettings);
       } else {
+        loadedBehaviorRef.current = behavior;
         const loadedSettings: StoreSettingsState = {
           ...INITIAL_STATE,
-          ...behavior,
+          ...behaviorFieldsFromSettings({ ...INITIAL_STATE, ...behavior } as StoreSettingsState),
         };
         setSettings(loadedSettings);
         setOriginalSettings(loadedSettings);
@@ -414,13 +419,6 @@ export default function StoreSettings() {
         }
       }
 
-      if (settings.viewMode !== originalSettings.viewMode) {
-        const result = await updateStoreViewMode(sellerId, settings.viewMode);
-        if (!result.success) {
-          failures.push(result.error || 'Failed to update view mode');
-        }
-      }
-
       if (settings.catalogueId !== originalSettings.catalogueId) {
         const result = await updateStoreCatalogue(sellerId, settings.catalogueId);
         if (!result.success) {
@@ -429,19 +427,22 @@ export default function StoreSettings() {
       }
 
       const behaviorChanged =
-        JSON.stringify(behaviorFromStoreSettingsState(settings)) !==
-          JSON.stringify(behaviorFromStoreSettingsState(originalSettings)) ||
+        JSON.stringify(behaviorFieldsFromSettings(settings)) !==
+          JSON.stringify(behaviorFieldsFromSettings(originalSettings)) ||
         settings.catalogueId !== originalSettings.catalogueId;
 
       if (behaviorChanged) {
-        const behavior = behaviorFromStoreSettingsState({
-          ...settings,
+        const behavior = normalizeBehaviorSettings({
+          ...loadedBehaviorRef.current,
+          ...behaviorFieldsFromSettings(settings),
           productsToShow:
             settings.catalogueId !== originalSettings.catalogueId ? 'all' : settings.productsToShow,
         });
         const behaviorResult = await updateBehaviorSettings(sellerId, behavior);
         if (behaviorResult.error) {
-          failures.push('Failed to save catalogue and display preferences');
+          failures.push('Failed to save catalogue preferences');
+        } else {
+          loadedBehaviorRef.current = behavior;
         }
       }
 
@@ -522,7 +523,7 @@ export default function StoreSettings() {
   if (!originalSettings.storeSlug && !loading) {
     return (
       <StoreLayout>
-        <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+        <div className={STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}>
           <PageHeader title="Store Settings" sticky />
           <div className="mt-8 flex items-center justify-center">
             <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-8 max-w-md text-center">
@@ -544,7 +545,7 @@ export default function StoreSettings() {
 
   return (
     <StoreLayout>
-      <div className="pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))] md:pb-6">
+      <div className={STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}>
         <PageHeader
           title="Store Settings"
           sticky
@@ -755,105 +756,6 @@ export default function StoreSettings() {
                   ))}
                 </select>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Default Sorting
-                </label>
-                <select
-                  value={settings.defaultSorting}
-                  onChange={(e) => handleChange('defaultSorting', e.target.value as any)}
-                  disabled={saving}
-                  className={STORE_FIELD_CLASS}
-                >
-                  <option value="newest">Newest</option>
-                  <option value="oldest">Oldest</option>
-                  <option value="price-low">Price Low to High</option>
-                  <option value="price-high">Price High to Low</option>
-                  <option value="alphabetical">Alphabetical</option>
-                </select>
-              </div>
-            </div>
-          </SettingsCard>
-
-          {/* Display Settings Section */}
-          <SettingsCard
-            title="Store Appearance"
-            description="Control how products are displayed"
-          >
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-                  View Mode
-                </label>
-                <div className="flex gap-3">
-                  {(['grid', 'list'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => handleChange('viewMode', mode)}
-                      disabled={saving}
-                      className={`${STORE_CHIP_CLASS} flex-1 ${
-                        settings.viewMode === mode
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed capitalize`}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
-                  Default Product Image Ratio
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(['square', 'portrait', 'landscape'] as const).map((ratio) => (
-                    <button
-                      key={ratio}
-                      onClick={() => handleChange('productImageRatio', ratio)}
-                      disabled={saving}
-                      className={`${STORE_CHIP_CLASS} ${
-                        settings.productImageRatio === ratio
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed capitalize text-sm`}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-800">
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Product Price</label>
-                  <ToggleSwitch
-                    checked={settings.showPrice}
-                    onChange={(value) => handleChange('showPrice', value)}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Product Availability</label>
-                  <ToggleSwitch
-                    checked={settings.showAvailability}
-                    onChange={(value) => handleChange('showAvailability', value)}
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="flex items-start justify-between">
-                  <label className="font-medium text-gray-900 dark:text-gray-100">Show Categories</label>
-                  <ToggleSwitch
-                    checked={settings.showCategories}
-                    onChange={(value) => handleChange('showCategories', value)}
-                    disabled={saving}
-                  />
-                </div>
-              </div>
             </div>
           </SettingsCard>
 
@@ -884,28 +786,13 @@ export default function StoreSettings() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                  Minimum Order Value
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={settings.minimumOrderValue}
-                  onChange={(e) => handleChange('minimumOrderValue', e.target.value)}
-                  placeholder="0"
-                  disabled={saving}
-                  className={`${STORE_FIELD_CLASS} ${
-                    validationErrors.minimumOrderValue
-                      ? 'border-red-300 bg-red-50 text-gray-900'
-                      : ''
-                  }`}
-                />
-                {validationErrors.minimumOrderValue && (
-                  <p className="text-red-600 text-sm mt-2">{validationErrors.minimumOrderValue}</p>
-                )}
-              </div>
+              <MinimumOrderValueField
+                value={settings.minimumOrderValue}
+                onChange={(value) => handleChange('minimumOrderValue', value)}
+                disabled={saving}
+                error={validationErrors.minimumOrderValue}
+                linkedNote="Leave at 0 for no minimum. Synced with Checkout settings."
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">

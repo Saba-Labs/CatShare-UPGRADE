@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
 import WarehouseQtyStepper from '../../../components/WarehouseQtyStepper';
 import { useToast } from '../../../context/ToastContext';
@@ -6,6 +6,7 @@ import { useCloudWriteGate } from '../../../hooks/useCloudWriteGate';
 import { adjustInventoryLevel, fetchInventoryLevels } from '../../../services/inventoryService';
 import type { InventoryLevel } from '../../../types/inventory';
 import { notifyWarehouseInventoryUpdated } from '../../../utils/catalogueWarehouseStock';
+import { isBrowserOnline } from '../../../utils/cloudWritePolicy';
 import {
   formatVariantSelectionSummary,
   getAllVariantCombinations,
@@ -13,8 +14,26 @@ import {
   getVariantCombinationData,
   getVariantPrimaryImageUrl,
 } from '../../../utils/productVariants';
+import {
+  patchCachedInventoryLevel,
+  readCachedInventoryLevels,
+  writeCachedInventoryLevels,
+} from '../../../utils/warehouseCache';
 import { useWarehouse } from '../WarehouseContext';
 import { pickDisplayImage, stockLineKey, type WarehouseProduct } from '../warehouseUtils';
+
+function applyLevelsToState(
+  list: InventoryLevel[],
+  setLevels: (v: InventoryLevel[]) => void,
+  setQtyDraft: (v: Record<string, number>) => void
+) {
+  setLevels(list);
+  const draft: Record<string, number> = {};
+  for (const lvl of list) {
+    draft[stockLineKey(lvl.productId, lvl.variantCombinationId)] = lvl.onHand;
+  }
+  setQtyDraft(draft);
+}
 
 export default function InventoryStockEditor({ roomId }: { roomId: string }) {
   const { effectiveUid, products } = useWarehouse();
@@ -30,21 +49,45 @@ export default function InventoryStockEditor({ roomId }: { roomId: string }) {
 
   const refreshLevels = useCallback(async () => {
     if (!effectiveUid || !roomId) return;
+    const cached = readCachedInventoryLevels(effectiveUid, roomId);
+
+    if (!isBrowserOnline()) {
+      if (cached.length > 0) {
+        applyLevelsToState(cached, setLevels, setQtyDraft);
+      }
+      return;
+    }
+
     const res = await fetchInventoryLevels(effectiveUid, roomId);
     if (!res.error) {
       const list = res.data ?? [];
-      setLevels(list);
-      const draft: Record<string, number> = {};
-      for (const lvl of list) {
-        draft[stockLineKey(lvl.productId, lvl.variantCombinationId)] = lvl.onHand;
-      }
-      setQtyDraft(draft);
+      applyLevelsToState(list, setLevels, setQtyDraft);
+      writeCachedInventoryLevels(effectiveUid, roomId, list);
+    } else if (cached.length > 0) {
+      applyLevelsToState(cached, setLevels, setQtyDraft);
+    }
+  }, [effectiveUid, roomId]);
+
+  useLayoutEffect(() => {
+    if (!effectiveUid || !roomId) {
+      setRoomLoading(false);
+      return;
+    }
+    const cached = readCachedInventoryLevels(effectiveUid, roomId);
+    if (cached.length > 0) {
+      applyLevelsToState(cached, setLevels, setQtyDraft);
+      setRoomLoading(false);
     }
   }, [effectiveUid, roomId]);
 
   useEffect(() => {
     let cancelled = false;
-    setRoomLoading(true);
+    const hasCache =
+      Boolean(effectiveUid && roomId) &&
+      readCachedInventoryLevels(effectiveUid, roomId).length > 0;
+    if (!hasCache) {
+      setRoomLoading(true);
+    }
     void (async () => {
       await refreshLevels();
       if (!cancelled) setRoomLoading(false);
@@ -52,7 +95,7 @@ export default function InventoryStockEditor({ roomId }: { roomId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshLevels]);
+  }, [refreshLevels, effectiveUid, roomId]);
 
   useEffect(() => {
     return () => {
@@ -143,6 +186,7 @@ export default function InventoryStockEditor({ roomId }: { roomId: string }) {
           }
           return [...prev, res.data!];
         });
+        patchCachedInventoryLevel(effectiveUid, roomId, res.data);
       }
       notifyWarehouseInventoryUpdated();
     },

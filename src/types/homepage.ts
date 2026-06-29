@@ -1,5 +1,7 @@
 // Homepage Builder Types
 
+import type { DefaultSorting } from './storeBehaviorSettings';
+
 export type HomepageSectionType =
   | 'carousel'
   | 'text'
@@ -8,6 +10,7 @@ export type HomepageSectionType =
   | 'featured-products'
   | 'category-showcase'
   | 'product-grid'
+  | 'full-product-list'
   | 'announcement'
   | 'cta'
   | 'video'
@@ -174,6 +177,24 @@ export interface ProductGridSection {
     categoryId?: string;
     productIds?: string[];
   };
+}
+
+/** Full catalog order list — same UX as classic default store (all products, qty controls). */
+export interface FullProductListSection {
+  type: 'full-product-list';
+  settings: {
+    title?: string;
+    showSearch: boolean;
+    showCategoryFilters: boolean;
+    showSort: boolean;
+    viewMode: 'list' | 'grid';
+    productImageRatio: 'square' | 'portrait' | 'landscape';
+    showPrice: boolean;
+    showAvailability: boolean;
+    defaultSorting: DefaultSorting;
+    backgroundColor?: string;
+  };
+  content: Record<string, never>;
 }
 
 export interface AnnouncementSection {
@@ -441,6 +462,7 @@ export type HomepageSection =
   | FeaturedProductsSection
   | CategoryShowcaseSection
   | ProductGridSection
+  | FullProductListSection
   | AnnouncementSection
   | CTASection
   | VideoSection
@@ -626,7 +648,12 @@ export interface WebsiteProductTemplate {
 }
 
 /** Selected storefront template — applies site-wide (home, shop, checkout, custom pages). */
-export type WebsiteActiveTemplateId = 'aurora-boutique' | 'pulse-tech' | 'clean-market' | 'studio-commerce';
+export type WebsiteActiveTemplateId =
+  | 'aurora-boutique'
+  | 'pulse-tech'
+  | 'clean-market'
+  | 'studio-commerce'
+  | 'default-store';
 
 export interface WebsiteModeConfig {
   siteSettings: WebsiteSiteSettings;

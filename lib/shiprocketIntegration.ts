@@ -5,6 +5,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { decryptSecret, encryptSecret, maskEmail } from './integrationSecrets.js';
 import {
   assignShiprocketAwb,
+  cancelShiprocketOrders,
+  cancelShiprocketShipmentAwbs,
   createShiprocketAdhocOrder,
   fetchShiprocketPickupLocations,
   formatPickupAddress,
@@ -31,6 +33,7 @@ export type ShiprocketServerMetadata = {
   warehouseName?: string;
   pickupAddress?: string;
   connectionDate?: string;
+  lastVerifiedAt?: string;
   isDemo?: boolean;
   lastError?: string | null;
 };
@@ -66,6 +69,7 @@ function buildShiprocketMetadata(
     warehouseName: pickup?.pickup_location ?? 'Primary',
     pickupAddress: pickup ? formatPickupAddress(pickup) : null,
     connectionDate: now,
+    lastVerifiedAt: now,
     isDemo: false,
     lastError: null,
   };
@@ -393,5 +397,137 @@ export async function createShiprocketShipmentForOrder(
     .single();
 
   if (shipErr) throw shipErr;
+  return saved as Record<string, unknown>;
+}
+
+const NON_CANCELLABLE_SHIPMENT_STATUSES = new Set(['delivered', 'cancelled']);
+
+export async function cancelShiprocketShipmentForOrder(
+  supabase: SupabaseClient,
+  sellerUserId: string,
+  orderId: string
+): Promise<Record<string, unknown>> {
+  const integrationRow = await getIntegration(supabase, sellerUserId, 'shiprocket');
+  if (!integrationRow || integrationRow.status !== 'connected') {
+    throw new Error('Connect Shiprocket in Store → Integrations first');
+  }
+
+  let metadata = asMetadata(integrationRow.metadata);
+  if (metadata.isDemo) {
+    throw new Error('Reconnect Shiprocket with your API user credentials');
+  }
+
+  const { data: shipment, error: shipErr } = await supabase
+    .from('order_shipments')
+    .select('*')
+    .eq('order_id', orderId)
+    .eq('seller_user_id', sellerUserId)
+    .maybeSingle();
+
+  if (shipErr) throw shipErr;
+  if (!shipment) {
+    throw new Error('No shipment found for this order');
+  }
+
+  const shipmentRow = shipment as Record<string, unknown>;
+  const deliveryStatus = String(shipmentRow.delivery_status ?? 'unknown');
+  if (NON_CANCELLABLE_SHIPMENT_STATUSES.has(deliveryStatus)) {
+    throw new Error(
+      deliveryStatus === 'delivered'
+        ? 'Delivered shipments cannot be cancelled'
+        : 'Shipment is already cancelled'
+    );
+  }
+
+  const tokenResult = await ensureShiprocketToken(metadata);
+  metadata = tokenResult.metadata;
+
+  const awb =
+    shipmentRow.awb_number != null
+      ? String(shipmentRow.awb_number)
+      : shipmentRow.tracking_number != null
+        ? String(shipmentRow.tracking_number)
+        : '';
+  const shipMeta =
+    shipmentRow.metadata && typeof shipmentRow.metadata === 'object'
+      ? (shipmentRow.metadata as Record<string, unknown>)
+      : {};
+  const shiprocketOrderId = Number(shipMeta.shiprocketOrderId ?? 0);
+
+  try {
+    if (awb.trim()) {
+      await cancelShiprocketShipmentAwbs(tokenResult.token, [awb]);
+    } else if (shiprocketOrderId > 0) {
+      await cancelShiprocketOrders(tokenResult.token, [shiprocketOrderId]);
+    } else {
+      throw new Error('No AWB or Shiprocket order id found for this shipment');
+    }
+  } catch (e) {
+    const msg =
+      e instanceof ShiprocketApiError
+        ? e.message
+        : e instanceof Error
+          ? e.message
+          : 'Could not cancel shipment in Shiprocket';
+    await upsertIntegration(supabase, sellerUserId, 'shiprocket', {
+      status: 'connected',
+      account_id:
+        integrationRow.account_id != null ? String(integrationRow.account_id) : null,
+      metadata: { ...metadata, lastError: msg },
+      connected_at:
+        integrationRow.connected_at != null
+          ? String(integrationRow.connected_at)
+          : null,
+    });
+    throw new Error(msg);
+  }
+
+  await upsertIntegration(supabase, sellerUserId, 'shiprocket', {
+    status: 'connected',
+    account_id:
+      integrationRow.account_id != null ? String(integrationRow.account_id) : null,
+    metadata: { ...metadata, lastError: null },
+    connected_at:
+      integrationRow.connected_at != null ? String(integrationRow.connected_at) : null,
+  });
+
+  const now = new Date().toISOString();
+  const prevTimeline = Array.isArray(shipmentRow.timeline) ? shipmentRow.timeline : [];
+  const timeline = [
+    ...prevTimeline.map((entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      const ev = entry as Record<string, unknown>;
+      if (ev.status === 'pending') {
+        return { ...ev, status: 'error', at: ev.at ?? null };
+      }
+      return entry;
+    }),
+    {
+      id: 'cancelled',
+      label: 'Shipment cancelled',
+      status: 'done',
+      at: now,
+    },
+  ];
+
+  const { data: saved, error: updateErr } = await supabase
+    .from('order_shipments')
+    .update({
+      delivery_status: 'cancelled',
+      timeline,
+      last_updated_at: now,
+      updated_at: now,
+      metadata: {
+        ...shipMeta,
+        cancelledAt: now,
+        cancelledInShiprocket: true,
+      },
+    })
+    .eq('order_id', orderId)
+    .eq('seller_user_id', sellerUserId)
+    .select()
+    .single();
+
+  if (updateErr) throw updateErr;
   return saved as Record<string, unknown>;
 }

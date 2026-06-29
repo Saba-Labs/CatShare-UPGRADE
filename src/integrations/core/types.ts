@@ -59,12 +59,19 @@ export interface SellerIntegrationView {
   /** MVP stub connection — not linked to a live provider account */
   isDemo?: boolean;
   details: IntegrationDetailField[];
+  /** Grouped detail sections (preferred when present) */
+  detailSections?: IntegrationDetailSection[];
 }
 
 export interface IntegrationDetailField {
   label: string;
   value: string;
   mono?: boolean;
+}
+
+export interface IntegrationDetailSection {
+  title: string;
+  fields: IntegrationDetailField[];
 }
 
 export type OrderPaymentStatus =

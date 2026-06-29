@@ -5,7 +5,12 @@ type RazorpayAccountProfile = {
   name?: string;
   email?: string;
   phone?: string;
+  keyMode?: 'test' | 'live';
 };
+
+function razorpayKeyMode(keyId: string): 'test' | 'live' {
+  return keyId.trim().startsWith('rzp_live_') ? 'live' : 'test';
+}
 
 export class RazorpayApiError extends Error {
   status?: number;
@@ -66,9 +71,11 @@ export async function fetchRazorpayAccountProfile(
   }
 
   // Standard merchant keys do not expose account profile via API; key id is enough for display.
+  const mode = razorpayKeyMode(keyId);
   return {
     id: keyId.trim(),
-    name: keyId.trim().startsWith('rzp_test_') ? 'Razorpay (Test)' : 'Razorpay',
+    name: mode === 'live' ? 'Razorpay (Live)' : 'Razorpay (Test)',
+    keyMode: mode,
   };
 }
 
