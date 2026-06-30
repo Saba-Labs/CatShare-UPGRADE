@@ -27,6 +27,14 @@
       "destination": "/api/store-payment-api?route=$1"
     },
     {
+      "source": "/api/tracking-order",
+      "destination": "/api/tracking-api?route=order"
+    },
+    {
+      "source": "/api/tracking-payment",
+      "destination": "/api/tracking-api?route=payment"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
