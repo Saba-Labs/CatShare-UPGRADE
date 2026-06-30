@@ -2,6 +2,151 @@
 input:focus { outline: none; border-color: #16A34A !important; }
 ::-webkit-scrollbar { width: 0; }
 
+/* ─── Order status tabs & banner ──────────────────────────────────────────── */
+.orders-status-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 10px 0;
+  border-top: 1px solid #f1f5f9;
+  margin-top: 8px;
+}
+
+.orders-status-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0 0 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orders-status-tab__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #94a3b8;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.orders-status-tab--active .orders-status-tab__icon {
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.orders-status-tab__count {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 100px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  min-width: 18px;
+  text-align: center;
+}
+
+.orders-status-tab--active .orders-status-tab__count {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.orders-status-tab__indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 20px;
+  height: 3px;
+  border-radius: 100px;
+  background: #2563eb;
+  transition: transform 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+.orders-status-tab--active .orders-status-tab__indicator {
+  transform: translateX(-50%) scaleX(1);
+}
+
+.orders-status-banner {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: none;
+  border-bottom: 1px solid transparent;
+  animation: ordersBannerIn 0.28s cubic-bezier(0.34, 1.1, 0.64, 1);
+  flex-shrink: 0;
+}
+
+.orders-list-body {
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+
+.orders-main-shift {
+  min-height: 100%;
+  will-change: transform;
+}
+
+.orders-main-scroll {
+  touch-action: pan-y;
+}
+
+@keyframes ordersBannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.orders-status-banner__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.orders-status-banner__title {
+  margin: 0 0 2px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.orders-status-banner__meta {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 0.88;
+}
+
+.orders-status-banner__swipe-hint {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
 /* ─── Orders filter sheet ─────────────────────────────────────────────────── */
 .orders-filter-backdrop {
   position: fixed;

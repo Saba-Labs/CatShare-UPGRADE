@@ -343,6 +343,9 @@ body { background: var(--c-bg); }
 .sv-field input { width: 100%; height: 48px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 0 16px; outline: none; transition: border-color var(--trans), box-shadow var(--trans); }
 .sv-field input:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
 .sv-field input::placeholder { color: var(--c-text3); }
+.sv-field textarea { width: 100%; min-height: 88px; background: var(--c-surface); border: 1px solid var(--c-border2); border-radius: var(--r-md); color: var(--c-text); font-size: 15px; font-family: var(--f-body); padding: 12px 16px; outline: none; resize: vertical; transition: border-color var(--trans), box-shadow var(--trans); }
+.sv-field textarea:focus { border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(26,107,74,0.08); }
+.sv-field textarea::placeholder { color: var(--c-text3); }
 .sv-phone-group { display: flex; gap: 10px; align-items: flex-end; }
 .sv-phone-group-country { flex: 0 0 110px; }
 .sv-phone-group-country input,
@@ -991,6 +994,8 @@ export default function StoreView() {
   const [shipState, setShipState] = useState('');
   const [shipPincode, setShipPincode] = useState('');
   const [couponCode, setCouponCode] = useState('');
+  const [orderNote, setOrderNote] = useState('');
+  const [giftMessage, setGiftMessage] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'prepaid' | 'cod' | 'upi'>('prepaid');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{
@@ -1891,14 +1896,30 @@ export default function StoreView() {
     if (!showPrepaidOption && showCodOption) setPaymentMethod('cod');
   }, [isUpiPaymentMode, showUpiOption, showCodOption, showPrepaidOption]);
 
-  const checkoutTotals = useMemo(
-    () =>
-      computeCheckoutTotals(reviewSummary.total, checkoutSettings, {
-        couponCode,
-        paymentMethod: totalsPaymentMethod,
-      }),
-    [reviewSummary.total, checkoutSettings, couponCode, totalsPaymentMethod]
-  );
+  const checkoutTotals = useMemo(() => {
+    const totals = computeCheckoutTotals(reviewSummary.total, checkoutSettings, {
+      couponCode,
+      paymentMethod: totalsPaymentMethod,
+    });
+    const customerNotes: { orderNote?: string; giftMessage?: string } = {};
+    if (checkoutSettings.experience.enableOrderNotes && orderNote.trim()) {
+      customerNotes.orderNote = orderNote.trim();
+    }
+    if (checkoutSettings.experience.enableGiftNotes && giftMessage.trim()) {
+      customerNotes.giftMessage = giftMessage.trim();
+    }
+    if (customerNotes.orderNote || customerNotes.giftMessage) {
+      return { ...totals, customerNotes };
+    }
+    return totals;
+  }, [
+    reviewSummary.total,
+    checkoutSettings,
+    couponCode,
+    totalsPaymentMethod,
+    orderNote,
+    giftMessage,
+  ]);
 
   const hasCheckoutRules = checkoutSettings.rules.some((r) => r.enabled);
 
@@ -2062,6 +2083,9 @@ export default function StoreView() {
         setShipCity('');
         setShipState('');
         setShipPincode('');
+        setCouponCode('');
+        setOrderNote('');
+        setGiftMessage('');
         setSearchQuery('');
         setSelectedCategory('all');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2567,6 +2591,10 @@ export default function StoreView() {
                 fmt={fmt}
                 fmtCalc={fmtCalc}
                 onChangeCartLineQty={changeCartLineQty}
+                orderNote={orderNote}
+                onOrderNoteChange={setOrderNote}
+                giftMessage={giftMessage}
+                onGiftMessageChange={setGiftMessage}
               />
             ) : (
               <CheckoutReviewPage
@@ -2590,6 +2618,8 @@ export default function StoreView() {
                 fmt={fmt}
                 fmtCalc={fmtCalc}
                 onEditItems={goToCheckoutDetails}
+                orderNote={orderNote}
+                giftMessage={giftMessage}
               />
             )}
           </CheckoutPanelShell>

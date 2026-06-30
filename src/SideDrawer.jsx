@@ -90,9 +90,6 @@ const navigate = useNavigate();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
 
   const accountPlanLine = (() => {
-    if (subscriptionLoading) {
-      return { text: "Checking plan…", className: "text-xs text-gray-500 mt-1" };
-    }
     if (isPaidPro) {
       return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
     }
@@ -107,6 +104,9 @@ const navigate = useNavigate();
     }
     if (isPro) {
       return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
+    }
+    if (subscriptionLoading) {
+      return { text: "Checking plan…", className: "text-xs text-gray-500 mt-1" };
     }
     return { text: "Free", className: "text-xs text-gray-600 mt-1" };
   })();

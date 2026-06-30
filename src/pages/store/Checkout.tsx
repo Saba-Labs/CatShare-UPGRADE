@@ -15,6 +15,8 @@ import CheckoutRulesSection from './components/CheckoutRulesSection';
 import { FiInfo } from 'react-icons/fi';
 import {
   DEFAULT_CHECKOUT_SETTINGS,
+  isAutoDiscountRuleType,
+  isCouponRuleType,
   normalizeCheckoutSettings,
   type CheckoutExperienceSettings,
   type CheckoutTheme,
@@ -324,8 +326,10 @@ export default function Checkout() {
               presetFilter={(preset) =>
                 !preset.type.startsWith('coupon_') &&
                 !preset.type.startsWith('discount_') &&
-                !preset.type.startsWith('tax_')
+                !preset.type.startsWith('tax_') &&
+                preset.type !== 'cod_charge'
               }
+              ruleFilter={(rule) => rule.type !== 'cod_charge'}
               emptyHint="Add flat shipping, percentage shipping, packing, or free-shipping rules."
             />
           </SettingsCard>
@@ -355,6 +359,7 @@ export default function Checkout() {
                 onChange={(rules) => patchSettings({ rules })}
                 disabled={saving}
                 presetFilter={(preset) => preset.type.startsWith('coupon_')}
+                ruleFilter={(rule) => isCouponRuleType(rule.type)}
                 emptyHint="Add percentage or flat coupon rules with unique codes."
               />
             </div>
@@ -374,9 +379,14 @@ export default function Checkout() {
               onChange={(rules) => patchSettings({ rules })}
               disabled={saving}
               presetFilter={(preset) =>
-                preset.type.startsWith('discount_') || (preset.type === 'custom' && preset.category === 'discount')
+                preset.type.startsWith('discount_') ||
+                (preset.type === 'custom' && preset.category === 'discount')
               }
-              emptyHint="Add automatic percentage or flat order discounts."
+              ruleFilter={(rule) =>
+                isAutoDiscountRuleType(rule.type) ||
+                (rule.type === 'custom' && rule.category === 'discount')
+              }
+              emptyHint="Add automatic percentage or flat order discounts with minimum order and cap rules."
             />
           </SettingsCard>
 
@@ -403,6 +413,7 @@ export default function Checkout() {
               onChange={(rules) => patchSettings({ rules })}
               disabled={saving}
               presetFilter={(preset) => preset.type === 'cod_charge'}
+              ruleFilter={(rule) => rule.type === 'cod_charge'}
               emptyHint="Add a COD surcharge rule for cash on delivery orders."
             />
           </SettingsCard>

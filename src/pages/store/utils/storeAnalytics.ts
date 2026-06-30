@@ -1,4 +1,5 @@
 import type { Order } from '../../../services/orderService';
+import { normalizeOrderStatus } from '../../../types/orderStatus';
 import type {
   AnalyticsDashboardData,
   AnalyticsDateRange,
@@ -61,8 +62,8 @@ export function computeAnalyticsFromOrders(
   const currency = completed[0]?.currency_code || filtered[0]?.currency_code || 'INR';
   const sym = currencySymbol(currency);
   const revenue = completed.reduce((sum, order) => sum + (order.total_amount || 0), 0);
-  const pendingCount = filtered.filter((order) => order.status === 'pending').length;
-  const confirmedCount = filtered.filter((order) => order.status === 'confirmed').length;
+  const pendingCount = filtered.filter((order) => normalizeOrderStatus(order.status) === 'pending').length;
+  const processingCount = filtered.filter((order) => normalizeOrderStatus(order.status) === 'processing').length;
   const aov = completed.length > 0 ? revenue / completed.length : 0;
 
   const customerCounts = new Map<string, number>();
@@ -102,8 +103,8 @@ export function computeAnalyticsFromOrders(
       revenue: metric('revenue', 'Revenue', formatMoney(revenue, sym), 'revenue'),
       conversionRate: metric(
         'conversion',
-        'Pending · Confirmed',
-        `${pendingCount} · ${confirmedCount}`,
+        'Pending · Processing',
+        `${pendingCount} · ${processingCount}`,
         'pending'
       ),
       returningCustomers: metric(

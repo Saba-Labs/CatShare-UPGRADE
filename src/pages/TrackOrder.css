@@ -167,6 +167,16 @@
   color: var(--trk-amber);
 }
 
+.trk-status-icon--processing {
+  background: var(--trk-blue-soft, #dbeafe);
+  color: var(--trk-blue, #2563eb);
+}
+
+.trk-status-icon--shipped {
+  background: #ede9fe;
+  color: #6366f1;
+}
+
 .trk-status-icon--confirmed {
   background: var(--trk-blue-soft, #dbeafe);
   color: var(--trk-blue, #2563eb);
@@ -212,6 +222,16 @@
   color: #92400e;
 }
 
+.trk-pill--processing {
+  background: var(--trk-blue-soft, #dbeafe);
+  color: #1e40af;
+}
+
+.trk-pill--shipped {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
 .trk-pill--confirmed {
   background: var(--trk-blue-soft, #dbeafe);
   color: #1e40af;
@@ -236,6 +256,8 @@
 }
 
 .trk-pill--completed .trk-pill-dot,
+.trk-pill--processing .trk-pill-dot,
+.trk-pill--shipped .trk-pill-dot,
 .trk-pill--confirmed .trk-pill-dot,
 .trk-pill--cancelled .trk-pill-dot {
   animation: none;

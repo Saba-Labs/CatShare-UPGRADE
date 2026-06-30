@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -6,7 +6,13 @@ import { App } from '@capacitor/app';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
-import { ORDER_STATUSES, type OrderStatus, type OrderTabFilter } from '../types/orderStatus';
+import {
+  ORDER_STATUSES,
+  getOrderStatusLabel,
+  normalizeOrderStatus,
+  type OrderStatus,
+  type OrderTabFilter,
+} from '../types/orderStatus';
 import { getAllCatalogues, type Catalogue } from '../config/catalogueConfig';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
@@ -25,6 +31,15 @@ const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 type TabType = OrderTabFilter;
 type StatusType = OrderStatus;
 type OrderSourceFilter = 'all' | 'link' | 'manual' | 'store';
+
+const ORDER_TAB_KEYS: TabType[] = [
+  'all',
+  'pending',
+  'processing',
+  'shipped',
+  'completed',
+  'cancelled',
+];
 
 const ORDER_SOURCE_FILTERS: { key: OrderSourceFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -67,17 +82,19 @@ function formatTime(dateStr: string) {
 }
 
 function getStatusConfig(status: string) {
-  switch (status) {
+  switch (normalizeOrderStatus(status)) {
     case 'pending':
       return { bg: '#FEF9C3', text: '#854D0E', dot: '#EAB308', label: 'Pending' };
-    case 'confirmed':
-      return { bg: '#DBEAFE', text: '#1E40AF', dot: '#2563EB', label: 'Confirmed' };
+    case 'processing':
+      return { bg: '#DBEAFE', text: '#1E40AF', dot: '#2563EB', label: 'Processing' };
+    case 'shipped':
+      return { bg: '#EDE9FE', text: '#5B21B6', dot: '#6366F1', label: 'Shipped' };
     case 'completed':
       return { bg: '#DCFCE7', text: '#166534', dot: '#16A34A', label: 'Completed' };
     case 'cancelled':
       return { bg: '#FEE2E2', text: '#991B1B', dot: '#EF4444', label: 'Cancelled' };
     default:
-      return { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8', label: status };
+      return { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8', label: getOrderStatusLabel(status) };
   }
 }
 
@@ -104,7 +121,7 @@ function orderMatchesListFilters(
     catalogueIdByOrderId: Map<string, string | null>;
   }
 ): boolean {
-  if (opts.tab !== 'all' && order.status !== opts.tab) return false;
+  if (opts.tab !== 'all' && normalizeOrderStatus(order.status) !== opts.tab) return false;
   if (opts.sourceFilter !== 'all' && order.order_source !== opts.sourceFilter) return false;
   if (opts.catalogueFilter !== 'all') {
     const catalogueId = opts.catalogueIdByOrderId.get(order.id);
@@ -330,6 +347,197 @@ function IconX({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+function getOrderTabTheme(key: OrderTabFilter): {
+  label: string;
+  hint: string;
+  gradient: string;
+  shadow: string;
+  bannerBg: string;
+  bannerBorder: string;
+  text: string;
+  meta: string;
+  indicator: string;
+} {
+  switch (key) {
+    case 'all':
+      return {
+        label: 'All orders',
+        hint: 'Every order across all stages',
+        gradient: 'linear-gradient(145deg, #64748b 0%, #334155 100%)',
+        shadow: 'rgba(51, 65, 85, 0.4)',
+        bannerBg: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        bannerBorder: '#e2e8f0',
+        text: '#0f172a',
+        meta: '#64748b',
+        indicator: '#475569',
+      };
+    case 'pending':
+      return {
+        label: 'Pending',
+        hint: 'New orders waiting for your review',
+        gradient: 'linear-gradient(145deg, #fbbf24 0%, #ea580c 100%)',
+        shadow: 'rgba(234, 88, 12, 0.45)',
+        bannerBg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+        bannerBorder: '#fde68a',
+        text: '#92400e',
+        meta: '#b45309',
+        indicator: '#d97706',
+      };
+    case 'processing':
+      return {
+        label: 'Processing',
+        hint: 'Accepted and being prepared',
+        gradient: 'linear-gradient(145deg, #60a5fa 0%, #2563eb 100%)',
+        shadow: 'rgba(37, 99, 235, 0.45)',
+        bannerBg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+        bannerBorder: '#bfdbfe',
+        text: '#1e40af',
+        meta: '#1d4ed8',
+        indicator: '#2563eb',
+      };
+    case 'shipped':
+      return {
+        label: 'Shipped',
+        hint: 'Dispatched and on the way',
+        gradient: 'linear-gradient(145deg, #a78bfa 0%, #6366f1 100%)',
+        shadow: 'rgba(99, 102, 241, 0.45)',
+        bannerBg: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+        bannerBorder: '#c4b5fd',
+        text: '#5b21b6',
+        meta: '#6d28d9',
+        indicator: '#6366f1',
+      };
+    case 'completed':
+      return {
+        label: 'Completed',
+        hint: 'Successfully fulfilled orders',
+        gradient: 'linear-gradient(145deg, #4ade80 0%, #16a34a 100%)',
+        shadow: 'rgba(22, 163, 74, 0.4)',
+        bannerBg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+        bannerBorder: '#bbf7d0',
+        text: '#166534',
+        meta: '#15803d',
+        indicator: '#16a34a',
+      };
+    case 'cancelled':
+      return {
+        label: 'Cancelled',
+        hint: 'Closed and no longer active',
+        gradient: 'linear-gradient(145deg, #fb7185 0%, #e11d48 100%)',
+        shadow: 'rgba(225, 29, 72, 0.4)',
+        bannerBg: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)',
+        bannerBorder: '#fecdd3',
+        text: '#9f1239',
+        meta: '#be123c',
+        indicator: '#e11d48',
+      };
+    default:
+      return getOrderTabTheme('all');
+  }
+}
+
+function StatusTabGlyph({ tabKey, size = 20 }: { tabKey: OrderTabFilter; size?: number }) {
+  const s = size;
+  switch (tabKey) {
+    case 'all':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="3" y="3" width="8" height="8" rx="2.5" fill="currentColor" opacity="0.95" />
+          <rect x="13" y="3" width="8" height="8" rx="2.5" fill="currentColor" opacity="0.7" />
+          <rect x="3" y="13" width="8" height="8" rx="2.5" fill="currentColor" opacity="0.7" />
+          <rect x="13" y="13" width="8" height="8" rx="2.5" fill="currentColor" opacity="0.5" />
+        </svg>
+      );
+    case 'pending':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M5 8.5V18a2 2 0 002 2h10a2 2 0 002-2V8.5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M4 8.5h16l-1.6-3.2A2 2 0 0016.53 4H7.47a2 2 0 00-1.87 1.3L4 8.5z"
+            fill="currentColor"
+            opacity="0.35"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <circle cx="17" cy="7" r="3.25" fill="currentColor" />
+          <path d="M12 11v4M10 13h4" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case 'processing':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"
+            fill="currentColor"
+            opacity="0.25"
+          />
+          <path
+            d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path d="M12 12.5V21M12 12.5L4 8M12 12.5l8-4.5" stroke="currentColor" strokeWidth="1.5" opacity="0.65" />
+          <path
+            d="M9.5 10.5h5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
+    case 'shipped':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M2 4h3l2.2 11h11.3L20 9H7.2"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect x="2" y="4" width="5" height="5" rx="1" fill="currentColor" opacity="0.35" />
+          <circle cx="7.5" cy="18.5" r="2" fill="currentColor" />
+          <circle cx="16.5" cy="18.5" r="2" fill="currentColor" />
+          <path d="M1 18.5h3M20 18.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        </svg>
+      );
+    case 'completed':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.25" />
+          <path
+            d="M8.5 12.2l2.4 2.4 4.8-5.2"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12 2.8l1.4 2.8 3.1.4-2.2 2.2.5 3.1L12 9.8 9.2 11.3l.5-3.1L7.5 6l3.1-.4L12 2.8z"
+            fill="currentColor"
+            opacity="0.35"
+          />
+        </svg>
+      );
+    case 'cancelled':
+      return (
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.22" />
+          <path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 function IconChevronRight() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -545,7 +753,7 @@ function StatusSelector({
     }}>
       {statuses.map((s) => {
         const cfg = getStatusConfig(s);
-        const isActive = s === current;
+        const isActive = s === normalizeOrderStatus(current);
         return (
           <button
             key={s}
@@ -998,6 +1206,7 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
+  const [tabSwipeShift, setTabSwipeShift] = useState(0);
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [showDateFilters, setShowDateFilters] = useState(false);
@@ -1009,6 +1218,7 @@ export default function Orders() {
   const touchStartY = useRef(0);
   const swipeBackEligible = useRef(false);
   const swipeBackActive = useRef(false);
+  const tabSwipeActive = useRef(false);
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
@@ -1080,7 +1290,18 @@ export default function Orders() {
     };
   }, [navigate]);
 
-  // Handle swipe back gesture
+  const handleTabChange = useCallback(async (newTab: TabType) => {
+    if (newTab === tab) return;
+    try {
+      await Haptics.impact({ style: ImpactStyle.Light });
+    } catch {
+      /* haptics optional on web */
+    }
+    setTab(newTab);
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [tab]);
+
+  // Swipe back from left screen edge
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
@@ -1097,8 +1318,6 @@ export default function Orders() {
     const deltaY = currentY - touchStartY.current;
     const absDeltaY = Math.abs(deltaY);
 
-    // Orders is mostly a vertical-scrolling page, so treat the gesture as back
-    // only after a deliberate edge swipe with strong horizontal dominance.
     if (!swipeBackActive.current) {
       if (deltaX <= 12) return;
       if (absDeltaY > 24 || deltaX <= absDeltaY * 1.6) {
@@ -1127,13 +1346,76 @@ export default function Orders() {
       deltaX > Math.abs(deltaY) * 1.8;
 
     if (shouldNavigateBack) {
-      await Haptics.impact({ style: ImpactStyle.Light });
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch {
+        /* ignore */
+      }
       navigate(-1);
     }
 
     swipeBackEligible.current = false;
     swipeBackActive.current = false;
     setSwipeProgress(0);
+  };
+
+  const handleMainTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    tabSwipeActive.current = true;
+    setTabSwipeShift(0);
+  };
+
+  const handleMainTouchMove = (e: React.TouchEvent) => {
+    if (!tabSwipeActive.current) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+    const absDeltaY = Math.abs(deltaY);
+    const absDeltaX = Math.abs(deltaX);
+
+    if (absDeltaY > 28 && absDeltaY > absDeltaX * 1.2) {
+      tabSwipeActive.current = false;
+      setTabSwipeShift(0);
+      return;
+    }
+
+    if (absDeltaX > 14 && absDeltaX > absDeltaY * 1.35) {
+      const tabIdx = ORDER_TAB_KEYS.indexOf(tab);
+      const atFirst = tabIdx <= 0;
+      const atLast = tabIdx >= ORDER_TAB_KEYS.length - 1;
+      const resisted = (deltaX > 0 && atFirst) || (deltaX < 0 && atLast);
+      const shift = resisted
+        ? Math.sign(deltaX) * Math.min(absDeltaX * 0.12, 14)
+        : Math.max(-56, Math.min(56, deltaX * 0.28));
+      setTabSwipeShift(shift);
+    }
+  };
+
+  const handleMainTouchEnd = async (e: React.TouchEvent) => {
+    const currentY = e.changedTouches[0].clientY;
+    const currentX = e.changedTouches[0].clientX;
+    const deltaX = currentX - touchStartX.current;
+    const deltaY = currentY - touchStartY.current;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (
+      tabSwipeActive.current &&
+      absDeltaX >= 56 &&
+      absDeltaX > absDeltaY * 1.5
+    ) {
+      const tabIdx = ORDER_TAB_KEYS.indexOf(tab);
+      if (deltaX < 0 && tabIdx < ORDER_TAB_KEYS.length - 1) {
+        await handleTabChange(ORDER_TAB_KEYS[tabIdx + 1]);
+      } else if (deltaX > 0 && tabIdx > 0) {
+        await handleTabChange(ORDER_TAB_KEYS[tabIdx - 1]);
+      }
+    }
+
+    tabSwipeActive.current = false;
+    setTabSwipeShift(0);
   };
 
   const loadOrders = async () => {
@@ -1179,11 +1461,6 @@ export default function Orders() {
     setLoading(false);
   };
 
-  const handleTabChange = async (newTab: TabType) => {
-    await Haptics.impact({ style: ImpactStyle.Light });
-    setTab(newTab);
-  };
-
   const handleNavigate = async (path: string) => {
     await Haptics.impact({ style: ImpactStyle.Light });
     navigate(path);
@@ -1203,7 +1480,7 @@ export default function Orders() {
         );
       }
     } else {
-      showToast(`Order marked as ${status}`, 'success');
+      showToast(`Order marked as ${getOrderStatusLabel(status)}`, 'success');
       if (user?.uid) {
         patchCachedOrder(user.uid, id, { status });
       }
@@ -1211,12 +1488,21 @@ export default function Orders() {
   };
 
   const tabs: { key: TabType; label: string }[] = [
-    { key: 'all', label: 'All' },
+    { key: 'all', label: 'All orders' },
     { key: 'pending', label: 'Pending' },
-    { key: 'confirmed', label: 'Confirmed' },
+    { key: 'processing', label: 'Processing' },
+    { key: 'shipped', label: 'Shipped' },
     { key: 'completed', label: 'Completed' },
     { key: 'cancelled', label: 'Cancelled' },
   ];
+
+  const activeTabMeta = tabs.find((t) => t.key === tab);
+  const activeTabTheme = tab !== 'all' ? getOrderTabTheme(tab) : null;
+
+  const countForTab = (key: TabType) => {
+    if (key === 'all') return orders.length;
+    return orders.filter((o) => normalizeOrderStatus(o.status) === key).length;
+  };
 
   const localProducts = useMemo(() => {
     const cloud = supabaseData?.products;
@@ -1268,8 +1554,9 @@ export default function Orders() {
   const stats = useMemo(
     () => ({
       total: orders.length,
-      pending: orders.filter(o => o.status === 'pending').length,
-      confirmed: orders.filter(o => o.status === 'confirmed').length,
+      pending: orders.filter((o) => normalizeOrderStatus(o.status) === 'pending').length,
+      processing: orders.filter((o) => normalizeOrderStatus(o.status) === 'processing').length,
+      shipped: orders.filter((o) => normalizeOrderStatus(o.status) === 'shipped').length,
       completed: orders.filter(o => o.status === 'completed').length,
       revenue: orders
         .filter(o => o.status === 'completed' && o.total_amount)
@@ -1360,12 +1647,17 @@ export default function Orders() {
       {/* Status bar */}
       <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
 
-      {/* Header */}
-      <div style={{
-        position: 'sticky', top: 40, zIndex: 40,
-        background: '#fff', borderBottom: '1px solid #E2E8F0',
-        boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-      }}>
+      {/* Toolbar + tabs (fixed height, not sticky — list scrolls below) */}
+      <div
+        className="orders-page-header"
+        style={{
+          flexShrink: 0,
+          background: '#fff',
+          borderBottom: '1px solid #E2E8F0',
+          boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
+          marginTop: 40,
+        }}
+      >
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
           <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
@@ -1541,53 +1833,120 @@ export default function Orders() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderTop: '1px solid #F1F5F9', marginTop: 10 }}>
-          {tabs.map(t => {
-            const count = t.key === 'all' ? orders.length : orders.filter(o => o.status === t.key).length;
+        {/* Status tabs — gradient icon chips */}
+        <div className="orders-status-tabs">
+          {tabs.map((t) => {
+            const count = countForTab(t.key);
             const isActive = tab === t.key;
+            const theme = getOrderTabTheme(t.key);
             return (
               <button
                 key={t.key}
+                type="button"
+                title={t.label}
+                aria-label={`${t.label}${count > 0 ? `, ${count}` : ''}`}
+                aria-current={isActive ? 'true' : undefined}
                 onClick={() => handleTabChange(t.key)}
-                style={{
-                  flex: 1, padding: '10px 2px', border: 'none',
-                  background: 'transparent', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 11, fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#2563EB' : '#64748B',
-                  borderBottom: isActive ? '2.5px solid #2563EB' : '2.5px solid transparent',
-                  transition: 'color 0.15s',
-                  position: 'relative',
-                }}
+                className={`orders-status-tab${isActive ? ' orders-status-tab--active' : ''}`}
               >
-                {t.label}
-                {count > 0 && (
-                  <span style={{
-                    marginLeft: 4, fontSize: 10, fontWeight: 700,
-                    background: isActive ? '#DBEAFE' : '#F1F5F9',
-                    color: isActive ? '#2563EB' : '#94A3B8',
-                    padding: '1px 5px', borderRadius: 100,
-                  }}>
+                <div
+                  className="orders-status-tab__icon"
+                  style={
+                    isActive
+                      ? {
+                          background: theme.gradient,
+                          boxShadow: `0 6px 14px ${theme.shadow}`,
+                        }
+                      : undefined
+                  }
+                >
+                  <StatusTabGlyph tabKey={t.key} size={20} />
+                </div>
+                {(count > 0 || isActive) ? (
+                  <span
+                    className="orders-status-tab__count"
+                    style={
+                      isActive
+                        ? {
+                            background: theme.bannerBorder,
+                            color: theme.indicator,
+                          }
+                        : undefined
+                    }
+                  >
                     {count}
                   </span>
-                )}
+                ) : null}
+                <span
+                  className="orders-status-tab__indicator"
+                  style={isActive ? { background: theme.indicator } : undefined}
+                />
               </button>
             );
           })}
         </div>
       </div>
 
+      {/* Status banner — own row in layout so list never slides underneath */}
+      {tab !== 'all' && activeTabMeta && activeTabTheme && !loading && (
+        <div
+          key={tab}
+          className="orders-status-banner"
+          style={{
+            flexShrink: 0,
+            marginTop: 0,
+            marginBottom: 0,
+            borderRadius: 0,
+            borderLeft: 'none',
+            borderRight: 'none',
+            background: activeTabTheme.bannerBg,
+            borderColor: activeTabTheme.bannerBorder,
+            borderBottom: `1px solid ${activeTabTheme.bannerBorder}`,
+          }}
+        >
+          <div
+            className="orders-status-banner__icon"
+            style={{ background: activeTabTheme.gradient }}
+          >
+            <StatusTabGlyph tabKey={tab} size={24} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 className="orders-status-banner__title" style={{ color: activeTabTheme.text }}>
+              {activeTabMeta.label}
+            </h2>
+              <p className="orders-status-banner__meta" style={{ color: activeTabTheme.meta }}>
+                {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+                {' · '}
+                {activeTabTheme.hint}
+                {' · '}
+                <span className="orders-status-banner__swipe-hint">Swipe to change status</span>
+              </p>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <main
         ref={scrollRef}
+        className="orders-main-scroll"
+        onTouchStart={handleMainTouchStart}
+        onTouchMove={handleMainTouchMove}
+        onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
+        <div
+          className="orders-main-shift"
+          style={{
+            transform: tabSwipeShift ? `translateX(${tabSwipeShift}px)` : undefined,
+            transition: tabSwipeShift === 0 ? 'transform 0.22s cubic-bezier(0.34, 1.1, 0.64, 1)' : 'none',
+          }}
+        >
         {/* Sales Box at Top of Scrollable Content (All tab only) */}
         {tab === 'all' && (
           <div style={{
             background: '#fff',
             borderBottom: '1px solid #E2E8F0',
-            padding: '55px 16px 16px',
+            padding: '16px 16px 16px',
             display: 'flex',
             flexDirection: 'column',
             gap: 16,
@@ -1691,7 +2050,7 @@ export default function Orders() {
           </div>
         )}
 
-        <div style={{ paddingTop: tab === 'all' ? 0 : 50 }}>
+        <div className="orders-list-body">
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
@@ -1720,7 +2079,7 @@ export default function Orders() {
               <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>
                 {searchQuery || hasActiveListFilters
                   ? 'No matching orders'
-                  : `No ${tab !== 'all' ? tab : ''} orders yet`}
+                  : `No ${tab !== 'all' && activeTabMeta ? activeTabMeta.label.toLowerCase() : ''} orders yet`}
               </div>
               <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center' }}>
                 {searchQuery || hasActiveListFilters
@@ -1744,6 +2103,7 @@ export default function Orders() {
               />
             ))
           )}
+        </div>
         </div>
       </main>
 

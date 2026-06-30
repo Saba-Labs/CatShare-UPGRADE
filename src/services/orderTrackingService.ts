@@ -384,7 +384,7 @@ export async function updateOrderByTrackingToken(
     if (error) {
       const code = error.message || '';
       if (code.includes('order_locked')) {
-        return { data: null, error: 'This order has been confirmed and can no longer be edited.' };
+        return { data: null, error: 'This order is being processed and can no longer be edited.' };
       }
       if (code.includes('order_cancelled')) {
         return { data: null, error: 'This order was cancelled and can no longer be edited.' };

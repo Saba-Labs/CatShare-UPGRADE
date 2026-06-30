@@ -16,10 +16,12 @@ function ruleMatchesPayment(rule: CheckoutRule, paymentMethod: 'prepaid' | 'cod'
   return rule.paymentMethod === paymentMethod;
 }
 
-function ruleMatchesMinSubtotal(rule: CheckoutRule, subtotal: number): boolean {
+function ruleMatchesSubtotal(rule: CheckoutRule, subtotal: number): boolean {
   const min = rule.minSubtotal;
-  if (min == null || min <= 0) return true;
-  return subtotal >= min;
+  const max = rule.maxSubtotal;
+  if (min != null && min > 0 && subtotal < min) return false;
+  if (max != null && max > 0 && subtotal > max) return false;
+  return true;
 }
 
 function isCouponRule(rule: CheckoutRule): boolean {
@@ -28,14 +30,6 @@ function isCouponRule(rule: CheckoutRule): boolean {
 
 function isAutoDiscountRule(rule: CheckoutRule): boolean {
   return rule.type === 'discount_percent' || rule.type === 'discount_flat';
-}
-
-function isDiscountRule(rule: CheckoutRule): boolean {
-  return (
-    isAutoDiscountRule(rule) ||
-    isCouponRule(rule) ||
-    (rule.type === 'custom' && rule.category === 'discount')
-  );
 }
 
 function isShippingChargeRule(rule: CheckoutRule): boolean {
@@ -110,20 +104,20 @@ export function computeCheckoutTotals(
   const freeShippingApplied =
     freeThreshold != null && freeThreshold > 0 && sub >= freeThreshold;
 
-  // —— Discounts (auto, then coupon) ——
-  const discountRules = enabledRules.filter(
+  // —— Automatic discounts ——
+  const autoDiscountRules = enabledRules.filter(
     (r) =>
-      isDiscountRule(r) &&
+      (isAutoDiscountRule(r) || (r.type === 'custom' && r.category === 'discount')) &&
       ruleMatchesPayment(r, paymentMethod) &&
-      ruleMatchesMinSubtotal(r, sub)
+      ruleMatchesSubtotal(r, sub)
   );
 
-  for (const rule of discountRules) {
-    if (isCouponRule(rule)) {
-      if (!couponMatches(rule, options.couponCode)) continue;
-      appliedCouponCode = normalizeCoupon(options.couponCode);
-    }
-    const base = resolveBase(rule.applyBase, { subtotal: sub, afterDiscount: sub - discountTotal, afterShipping: sub - discountTotal });
+  for (const rule of autoDiscountRules) {
+    const base = resolveBase(rule.applyBase, {
+      subtotal: sub,
+      afterDiscount: sub - discountTotal,
+      afterShipping: sub - discountTotal,
+    });
     const rawAmt = computeAmount(rule, base);
     if (rawAmt <= 0) continue;
     const amt = -Math.abs(rawAmt);
@@ -132,7 +126,41 @@ export function computeCheckoutTotals(
   }
 
   discountTotal = roundMoney(discountTotal);
-  const afterDiscount = roundMoney(Math.max(0, sub - discountTotal));
+  let afterDiscount = roundMoney(Math.max(0, sub - discountTotal));
+
+  // —— Coupon (one matching code, only when entry is enabled) ——
+  if (settings.allowCouponEntry) {
+    const enteredCoupon = normalizeCoupon(options.couponCode);
+    if (enteredCoupon) {
+      const couponRules = enabledRules.filter(
+        (r) =>
+          isCouponRule(r) &&
+          ruleMatchesPayment(r, paymentMethod) &&
+          ruleMatchesSubtotal(r, sub)
+      );
+      const matchedCoupon = couponRules.find((rule) => couponMatches(rule, enteredCoupon));
+      if (matchedCoupon) {
+        const base = resolveBase(matchedCoupon.applyBase, {
+          subtotal: sub,
+          afterDiscount,
+          afterShipping: afterDiscount,
+        });
+        const rawAmt = computeAmount(matchedCoupon, base);
+        if (rawAmt > 0) {
+          const amt = -Math.abs(rawAmt);
+          discountTotal = roundMoney(discountTotal + Math.abs(amt));
+          afterDiscount = roundMoney(Math.max(0, sub - discountTotal));
+          appliedCouponCode = enteredCoupon;
+          lines.push({
+            ruleId: matchedCoupon.id,
+            label: matchedCoupon.label,
+            category: 'discount',
+            amount: amt,
+          });
+        }
+      }
+    }
+  }
 
   // —— Shipping (waived when free shipping applies; packing still charged) ——
   const shippingRules = enabledRules.filter(
@@ -145,7 +173,7 @@ export function computeCheckoutTotals(
       !(r.type === 'custom' && r.category === 'discount') &&
       (isShippingChargeRule(r) || (r.type === 'custom' && r.category === 'shipping')) &&
       ruleMatchesPayment(r, paymentMethod) &&
-      ruleMatchesMinSubtotal(r, sub)
+      ruleMatchesSubtotal(r, sub)
   );
 
   for (const rule of shippingRules) {
@@ -172,7 +200,7 @@ export function computeCheckoutTotals(
     (r) =>
       (isTaxRule(r) || (r.type === 'custom' && r.category === 'tax')) &&
       ruleMatchesPayment(r, paymentMethod) &&
-      ruleMatchesMinSubtotal(r, sub)
+      ruleMatchesSubtotal(r, sub)
   );
 
   for (const rule of taxRules) {
@@ -194,7 +222,7 @@ export function computeCheckoutTotals(
     const codRules = enabledRules.filter(
       (r) =>
         isCodRule(r) &&
-        ruleMatchesMinSubtotal(r, sub)
+        ruleMatchesSubtotal(r, sub)
     );
     for (const rule of codRules) {
       const base = resolveBase(rule.applyBase, {

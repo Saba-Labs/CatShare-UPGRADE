@@ -12,7 +12,7 @@ import {
 import type { Order, OrderItem } from '../services/orderService';
 import { buildUpiPaymentUrl } from '../utils/upiPayment';
 import UpiQrCode from '../components/UpiQrCode';
-import { canCustomerEditOrder } from '../types/orderStatus';
+import { canCustomerEditOrder, normalizeOrderStatus } from '../types/orderStatus';
 import { normalizeOrderQuantityStep } from '../config/catalogueProductUtils';
 import { applyQuantityDelta } from '../utils/quantityPricingUtils';
 import { productImageDisplayUrl } from '../utils/imageUrl';
@@ -28,14 +28,21 @@ const STATUS = {
     pill: 'trk-pill--pending',
     icon: 'trk-status-icon--pending',
     headline: 'Waiting for seller',
-    hint: 'You can still update quantities or contact details until the seller confirms your order.',
+    hint: 'You can still update quantities or contact details until the seller accepts your order.',
   },
-  confirmed: {
-    label: 'Confirmed',
-    pill: 'trk-pill--confirmed',
-    icon: 'trk-status-icon--confirmed',
-    headline: 'Order confirmed',
-    hint: 'The seller has confirmed your order. Changes are locked while they prepare it.',
+  processing: {
+    label: 'Processing',
+    pill: 'trk-pill--processing',
+    icon: 'trk-status-icon--processing',
+    headline: 'Order processing',
+    hint: 'The seller is preparing your order. Changes are locked.',
+  },
+  shipped: {
+    label: 'Shipped',
+    pill: 'trk-pill--shipped',
+    icon: 'trk-status-icon--shipped',
+    headline: 'Order shipped',
+    hint: 'Your order is on the way. You can track delivery updates from the seller.',
   },
   completed: {
     label: 'Completed',
@@ -79,23 +86,33 @@ function linesFromOrder(items: OrderItem[]): EditLine[] {
   }));
 }
 
-function StatusIcon({ status }: { status: Order['status'] }) {
-  if (status === 'completed') {
+function StatusIcon({ status }: { status: string }) {
+  const key = normalizeOrderStatus(status);
+  if (key === 'completed') {
     return (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
         <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
-  if (status === 'confirmed') {
+  if (key === 'processing') {
     return (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M8 12l2.5 2.5L16 9" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+        <path d="M12 22V12.5M3.3 7.7L12 12.5l8.7-4.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
-  if (status === 'cancelled') {
+  if (key === 'shipped') {
+    return (
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <path d="M1 3h11v11H1zM12 7h4l3 4v3h-7V7z" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="5.5" cy="17.5" r="2.5" />
+        <circle cx="17.5" cy="17.5" r="2.5" />
+      </svg>
+    );
+  }
+  if (key === 'cancelled') {
     return (
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
         <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
@@ -485,7 +502,8 @@ export default function TrackOrder() {
     );
   }
 
-  const statusKey = order.status in STATUS ? order.status : 'pending';
+  const statusKeyRaw = normalizeOrderStatus(order.status);
+  const statusKey = statusKeyRaw in STATUS ? (statusKeyRaw as keyof typeof STATUS) : 'pending';
   const statusCfg = STATUS[statusKey];
   const paymentStatusView = getCustomerPaymentStatusView(order.paymentSummary, order.payment_method);
   const showUpiPay = isTrackOrderUpiPending(order) && Boolean(order.upiCheckout);

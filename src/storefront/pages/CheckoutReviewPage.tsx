@@ -31,6 +31,8 @@ interface CheckoutReviewPageProps {
     step?: number
   ) => string | null;
   onEditItems: () => void;
+  orderNote: string;
+  giftMessage: string;
 }
 
 export default function CheckoutReviewPage({
@@ -54,6 +56,8 @@ export default function CheckoutReviewPage({
   fmt,
   fmtCalc,
   onEditItems,
+  orderNote,
+  giftMessage,
 }: CheckoutReviewPageProps) {
   return (
     <div className="sv-checkout-content">
@@ -130,6 +134,26 @@ export default function CheckoutReviewPage({
               </div>
             ) : null}
           </div>
+          {orderNote.trim() || giftMessage.trim() ? (
+            <div className="sv-review-customer" style={{ margin: '14px 0 0' }}>
+              {orderNote.trim() ? (
+                <div style={{ marginBottom: giftMessage.trim() ? 10 : 0 }}>
+                  <div className="sv-review-customer-label">Order notes</div>
+                  <div style={{ fontSize: 13, color: 'var(--c-text2)', whiteSpace: 'pre-wrap' }}>
+                    {orderNote.trim()}
+                  </div>
+                </div>
+              ) : null}
+              {giftMessage.trim() ? (
+                <div>
+                  <div className="sv-review-customer-label">Gift message</div>
+                  <div style={{ fontSize: 13, color: 'var(--c-text2)', whiteSpace: 'pre-wrap' }}>
+                    {giftMessage.trim()}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
         <section className="sv-checkout-section sv-checkout-section--summary">
           {showGatewayPaymentChoice ||

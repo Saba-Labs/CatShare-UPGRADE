@@ -51,6 +51,8 @@ export interface CheckoutRule {
   amountKind: CheckoutAmountKind;
   /** Min cart subtotal before rule applies */
   minSubtotal?: number | null;
+  /** Max cart subtotal — rule does not apply above this */
+  maxSubtotal?: number | null;
   /** For free_shipping_above — waive shipping when subtotal >= this */
   freeAbove?: number | null;
   /** Coupon code (coupon_* types) */
@@ -130,6 +132,11 @@ export interface CheckoutLineItem {
   amount: number;
 }
 
+export interface CheckoutCustomerNotes {
+  orderNote?: string | null;
+  giftMessage?: string | null;
+}
+
 export interface CheckoutTotals {
   subtotal: number;
   discountTotal: number;
@@ -140,6 +147,8 @@ export interface CheckoutTotals {
   lines: CheckoutLineItem[];
   freeShippingApplied: boolean;
   appliedCouponCode: string | null;
+  /** Gift message / order instructions captured at checkout */
+  customerNotes?: CheckoutCustomerNotes;
 }
 
 export const DEFAULT_CHECKOUT_SETTINGS: StoreCheckoutSettings = {
@@ -179,10 +188,10 @@ export const CHECKOUT_RULE_PRESETS: CheckoutRulePreset[] = [
   { type: 'tax_vat', category: 'tax', label: 'VAT', amountKind: 'percent', defaultValue: 5, applyBase: 'after_discount' },
   { type: 'tax_percent', category: 'tax', label: 'Tax (%)', amountKind: 'percent', defaultValue: 5, applyBase: 'after_discount' },
   { type: 'tax_flat', category: 'tax', label: 'Tax (flat)', amountKind: 'flat', defaultValue: 0, applyBase: 'after_discount' },
-  { type: 'discount_percent', category: 'discount', label: 'Order discount (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Auto-applied on all orders' },
-  { type: 'discount_flat', category: 'discount', label: 'Order discount (flat)', amountKind: 'flat', defaultValue: 50, applyBase: 'subtotal' },
-  { type: 'coupon_percent', category: 'discount', label: 'Coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Customer enters code at checkout' },
-  { type: 'coupon_flat', category: 'discount', label: 'Coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal' },
+  { type: 'discount_percent', category: 'discount', label: 'Auto discount (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Applied automatically when order qualifies' },
+  { type: 'discount_flat', category: 'discount', label: 'Auto discount (flat)', amountKind: 'flat', defaultValue: 50, applyBase: 'subtotal', hint: 'Fixed off when order qualifies' },
+  { type: 'coupon_percent', category: 'discount', label: 'Coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Customer must enter the code at checkout' },
+  { type: 'coupon_flat', category: 'discount', label: 'Coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal', hint: 'Fixed off with a valid coupon code' },
   { type: 'custom', category: 'shipping', label: 'Custom shipping rule', amountKind: 'flat', defaultValue: 0, hint: 'Your own label and conditions' },
   { type: 'custom', category: 'tax', label: 'Custom tax rule', amountKind: 'percent', defaultValue: 0, applyBase: 'after_discount', hint: 'Your own tax label and base' },
   { type: 'custom', category: 'discount', label: 'Custom discount', amountKind: 'flat', defaultValue: 0, applyBase: 'subtotal', hint: 'Auto or coupon-style discount' },
@@ -242,6 +251,7 @@ function coerceRule(raw: unknown): CheckoutRule | null {
     value: coerceNumber(r.value),
     amountKind,
     minSubtotal: r.minSubtotal != null ? coerceNumber(r.minSubtotal, 0) || null : null,
+    maxSubtotal: r.maxSubtotal != null ? coerceNumber(r.maxSubtotal, 0) || null : null,
     freeAbove: r.freeAbove != null ? coerceNumber(r.freeAbove, 0) || null : null,
     code: r.code != null ? String(r.code) : null,
     maxAmount: r.maxAmount != null ? coerceNumber(r.maxAmount, 0) || null : null,
@@ -335,4 +345,71 @@ export function hasCodRules(settings: StoreCheckoutSettings | null | undefined):
   return settings.rules.some(
     (r) => r.enabled && (r.type === 'cod_charge' || r.paymentMethod === 'cod')
   );
+}
+
+export function describeCheckoutRule(rule: CheckoutRule): string {
+  switch (rule.type) {
+    case 'coupon_percent':
+    case 'coupon_flat':
+      return 'Requires a matching coupon code at checkout.';
+    case 'discount_percent':
+    case 'discount_flat':
+      return 'Applied automatically when the order qualifies.';
+    case 'cod_charge':
+      return 'Only when customer pays cash on delivery. Set min/max order to limit when the fee applies.';
+    case 'free_shipping_above':
+      return 'Waives delivery charges above the threshold.';
+    case 'flat_shipping':
+    case 'percent_shipping':
+      return 'Delivery fee added to qualifying orders.';
+    case 'packing_charge':
+      return 'Packaging / handling fee on qualifying orders.';
+    default:
+      if (rule.category === 'tax') return 'Tax calculated on the selected order base.';
+      return 'Applied when conditions below are met.';
+  }
+}
+
+export function isCouponRuleType(type: CheckoutRuleType): boolean {
+  return type === 'coupon_percent' || type === 'coupon_flat';
+}
+
+export function isAutoDiscountRuleType(type: CheckoutRuleType): boolean {
+  return type === 'discount_percent' || type === 'discount_flat';
+}
+
+/** One-line summary for compact rule list rows */
+export function summarizeCheckoutRule(rule: CheckoutRule): string {
+  const parts: string[] = [];
+  const isFreeShipping = rule.type === 'free_shipping_above';
+  const isPercent = rule.amountKind === 'percent' && !isFreeShipping;
+  const isCoupon = isCouponRuleType(rule.type);
+
+  if (isFreeShipping) {
+    if (rule.freeAbove != null && rule.freeAbove > 0) {
+      parts.push(`Free above ₹${rule.freeAbove}`);
+    }
+  } else if (isPercent) {
+    parts.push(`${rule.value}%`);
+    if (rule.maxAmount != null && rule.maxAmount > 0) {
+      parts.push(`cap ₹${rule.maxAmount}`);
+    }
+  } else if (rule.value > 0) {
+    parts.push(`₹${rule.value}`);
+  }
+
+  if (isCoupon && rule.code?.trim()) {
+    parts.push(`code ${rule.code.trim().toUpperCase()}`);
+  }
+
+  const range: string[] = [];
+  if (rule.minSubtotal != null && rule.minSubtotal > 0) {
+    range.push(`from ₹${rule.minSubtotal}`);
+  }
+  if (rule.maxSubtotal != null && rule.maxSubtotal > 0) {
+    range.push(`up to ₹${rule.maxSubtotal}`);
+  }
+  if (range.length) parts.push(range.join(' '));
+
+  return parts.join(' · ') || describeCheckoutRule(rule);
 }

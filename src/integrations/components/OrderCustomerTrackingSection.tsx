@@ -45,7 +45,7 @@ export function OrderCustomerTrackingSection({
         <div className="od-tracking-body">
           <p className="od-tracking-copy">
             Send this link so your customer can view their order and make edits while it is still
-            pending. Once you confirm the order, they can view status but cannot change it.
+            pending. Once you mark the order as processing, they can view status but cannot change it.
           </p>
           {order.customer_edited_at ? (
             <div className="od-edited-badge">

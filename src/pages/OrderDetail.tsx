@@ -67,6 +67,8 @@ import { getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import {
   ORDER_STATUSES,
   getStatusChangeLabel,
+  getOrderStatusLabel,
+  normalizeOrderStatus,
   orderStatusProgressWidth,
   type OrderStatus,
 } from '../types/orderStatus';
@@ -150,7 +152,7 @@ function parseVariantSummary(summary: string): string[] {
 }
 
 function getStatusConfig(status: string) {
-  switch (status) {
+  switch (normalizeOrderStatus(status)) {
     case 'pending':
       return {
         bg: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
@@ -161,15 +163,25 @@ function getStatusConfig(status: string) {
         icon: '⏳',
         accent: '#F59E0B',
       };
-    case 'confirmed':
+    case 'processing':
       return {
         bg: 'linear-gradient(135deg, #EFF6FF, #DBEAFE)',
         border: '#BFDBFE',
         text: '#1E40AF',
         dot: '#2563EB',
-        label: 'Confirmed',
-        icon: '✓',
+        label: 'Processing',
+        icon: '📦',
         accent: '#2563EB',
+      };
+    case 'shipped':
+      return {
+        bg: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
+        border: '#C4B5FD',
+        text: '#5B21B6',
+        dot: '#6366F1',
+        label: 'Shipped',
+        icon: '🚚',
+        accent: '#6366F1',
       };
     case 'completed':
       return {
@@ -1025,7 +1037,7 @@ function StatusDropdown({
       <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
       {statuses.map((s, i) => {
         const cfg = getStatusConfig(s);
-        const isActive = s === current;
+        const isActive = s === normalizeOrderStatus(current);
         return (
           <button
             key={s}
@@ -1549,7 +1561,7 @@ useEffect(() => {
       if (user?.uid) {
         patchCachedOrder(user.uid, order.id, { status });
       }
-      showToast(`Marked as ${status}`, 'success');
+      showToast(`Marked as ${getOrderStatusLabel(status)}`, 'success');
     }
   };
 
@@ -2742,6 +2754,18 @@ useEffect(() => {
                       ) : (
                         <div style={{ fontSize: 12, color: COLORS.subtle, marginTop: 1 }}>No phone saved</div>
                       )}
+                      {order.checkout_adjustments?.customerNotes?.orderNote ? (
+                        <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 8, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 600, color: COLORS.text }}>Order note: </span>
+                          {order.checkout_adjustments.customerNotes.orderNote}
+                        </div>
+                      ) : null}
+                      {order.checkout_adjustments?.customerNotes?.giftMessage ? (
+                        <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 6, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 600, color: COLORS.text }}>Gift message: </span>
+                          {order.checkout_adjustments.customerNotes.giftMessage}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>

@@ -360,6 +360,69 @@ function CollectionProductCard({
         listView ? 'website-product-card-list' : 'website-product-card-grid'
       }${builderPreview ? ' website-product-card--builder' : ''}`}
     >
+      {listView ? (
+        <div className="website-product-card-list-inner">
+          <ProductNav className="website-product-card-linkwrap website-product-card-list-media">
+            <div
+              className="website-product-card-img"
+              style={{ aspectRatio: imageAspect }}
+            >
+              {img ? (
+                <img src={img} alt={product.name} loading="lazy" />
+              ) : (
+                <ProductImagePlaceholder size={40} className="website-product-card-ph" />
+              )}
+              {showAvailability && !inStock ? (
+                <span className="website-product-card-oos">Out of stock</span>
+              ) : null}
+            </div>
+          </ProductNav>
+          <div className="website-product-card-body">
+            <ProductNav className="website-product-card-title-link">
+              <p className="website-product-card-title">{product.name}</p>
+            </ProductNav>
+            {product.subtitle ? <p className="website-product-card-subtitle">{product.subtitle}</p> : null}
+            {showPrice && Number.isFinite(price) && price > 0 ? (
+              <p className="website-product-card-price">
+                {formatStorePrice(price, store.sellerCurrencyCode)}
+                {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
+              </p>
+            ) : null}
+            <div className="website-product-card-order-row">
+              <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
+                <button
+                  type="button"
+                  className="website-qty-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQtyChange(-clampedStep);
+                  }}
+                >
+                  -
+                </button>
+                <span className="website-qty-val">{quantity}</span>
+                <button
+                  type="button"
+                  className="website-qty-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQtyChange(clampedStep);
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              <ProductNav className="website-product-card-details-link">Details</ProductNav>
+            </div>
+            {clampedStep > 1 ? (
+              <div className="website-product-card-pack-row">
+                <span className="website-pack-hint">Pack of {clampedStep}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <>
       <ProductNav className="website-product-card-linkwrap">
         <div
           className="website-product-card-img"
@@ -418,6 +481,8 @@ function CollectionProductCard({
           </div>
         ) : null}
       </div>
+        </>
+      )}
     </article>
   );
 }

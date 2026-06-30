@@ -534,6 +534,19 @@ function RuleEditor({
             placeholder="No minimum"
           />
         </div>
+        {rule.type !== 'free_shipping_above' ? (
+          <div className="ck-field">
+            <label>Max order (optional)</label>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={rule.maxSubtotal ?? ''}
+              onChange={(e) => onChange({ maxSubtotal: e.target.value === '' ? null : Number(e.target.value) })}
+              placeholder="No maximum"
+            />
+          </div>
+        ) : null}
         {rule.type === 'custom' || rule.category === 'tax' ? (
           <div className="ck-field">
             <label>Calculate on</label>

@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 import { TRIAL_DAYS_UI_FALLBACK } from '../config/freeTierLimits';
+import { useAuth } from './AuthContext';
+import { getPersistedAuthUserId, tryGetSupabaseUserIdFromAuthToken } from '../utils/authUserId';
 
 const LS_TRIAL_ENDS = 'subscription_trialEndsAt';
 const LS_TRIAL_ACTIVE = 'subscription_isTrialActive';
 const LS_PAID_PRO = 'subscription_isPaidPro';
 const LS_TRIAL_DAYS = 'subscription_trialDays';
+const LS_CACHED_UID = 'subscription_cachedUid';
 
 type SubscriptionContextValue = {
   /** Full Pro access (paid subscription or active free trial). */
@@ -24,6 +27,21 @@ type SubscriptionContextValue = {
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
+function getCurrentAuthUserId(): string | null {
+  return getPersistedAuthUserId() || tryGetSupabaseUserIdFromAuthToken();
+}
+
+function shouldUseCachedSubscription(): boolean {
+  const cachedUid = localStorage.getItem(LS_CACHED_UID);
+  const currentUid = getCurrentAuthUserId();
+  if (cachedUid && currentUid) return cachedUid === currentUid;
+  // Legacy cache (before per-user key): trust when signed-in and subscription keys exist.
+  if (!cachedUid && currentUid) {
+    return localStorage.getItem('isPro') !== null;
+  }
+  return false;
+}
+
 function readCachedTrialDays(): number {
   const raw = localStorage.getItem(LS_TRIAL_DAYS);
   if (raw == null || raw === '') return TRIAL_DAYS_UI_FALLBACK;
@@ -31,10 +49,22 @@ function readCachedTrialDays(): number {
   return Number.isFinite(n) && n > 0 ? n : TRIAL_DAYS_UI_FALLBACK;
 }
 
+const EMPTY_CACHED_TRIAL: Pick<
+  SubscriptionContextValue,
+  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays'
+> = {
+  trialEndsAt: null,
+  isTrialActive: false,
+  isPaidPro: false,
+  trialDays: TRIAL_DAYS_UI_FALLBACK,
+};
+
 function readCachedTrial(): Pick<
   SubscriptionContextValue,
   'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays'
 > {
+  if (!shouldUseCachedSubscription()) return EMPTY_CACHED_TRIAL;
+
   const trialEndsAt = localStorage.getItem(LS_TRIAL_ENDS);
   return {
     trialEndsAt: trialEndsAt && trialEndsAt.length > 0 ? trialEndsAt : null,
@@ -45,7 +75,9 @@ function readCachedTrial(): Pick<
 }
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
   const [isPro, setIsPro] = useState<boolean>(() => {
+    if (!shouldUseCachedSubscription()) return false;
     return localStorage.getItem('isPro') === 'true';
   });
   const [isPaidPro, setIsPaidPro] = useState<boolean>(() => readCachedTrial().isPaidPro);
@@ -65,6 +97,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     localStorage.setItem(LS_TRIAL_ACTIVE, 'false');
     localStorage.setItem(LS_PAID_PRO, 'false');
     localStorage.removeItem(LS_TRIAL_DAYS);
+    localStorage.removeItem(LS_CACHED_UID);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -73,8 +106,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        clearSubscriptionCache();
-        setLoading(false);
+        // Session may still be hydrating on cold start — keep cached entitlement.
         return;
       }
 
@@ -149,6 +181,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setTrialDays(nextTrialDays);
 
         localStorage.setItem('isPro', next ? 'true' : 'false');
+        localStorage.setItem(LS_CACHED_UID, session.user.id);
         localStorage.setItem(LS_TRIAL_DAYS, String(nextTrialDays));
         localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
         localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
@@ -180,7 +213,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [clearSubscriptionCache]);
 
   useEffect(() => {
-    // Skip subscription check for offline guest users
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) {
       clearSubscriptionCache();
@@ -188,12 +220,38 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Token refresh does not change subscription; INITIAL_SESSION duplicates the mount refresh().
-      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
-      refresh().catch(() => setLoading(false));
-    });
+    if (authLoading) return;
+
+    if (!user?.uid) {
+      clearSubscriptionCache();
+      setLoading(false);
+      return;
+    }
+
     refresh().catch(() => setLoading(false));
+  }, [user?.uid, authLoading, refresh, clearSubscriptionCache]);
+
+  useEffect(() => {
+    const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
+    if (isGuestUser) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED') return;
+
+      if (event === 'SIGNED_OUT') {
+        clearSubscriptionCache();
+        setLoading(false);
+        return;
+      }
+
+      if (
+        session?.user &&
+        (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
+      ) {
+        refresh().catch(() => setLoading(false));
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, [refresh, clearSubscriptionCache]);
 

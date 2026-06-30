@@ -78,15 +78,17 @@ export default function Analytics() {
         <PageHeader
           title="Analytics"
           actions={(
-            <AnalyticsDateFilter
-              value={dateRange}
-              onChange={setDateRange}
-              disabled={loading}
-            />
+            <div className="hidden sm:block">
+              <AnalyticsDateFilter
+                value={dateRange}
+                onChange={setDateRange}
+                disabled={loading}
+              />
+            </div>
           )}
         />
 
-        <div className="mb-4 sm:hidden">
+        <div className="mb-4 sm:hidden overflow-x-auto">
           <AnalyticsDateFilter
             value={dateRange}
             onChange={setDateRange}

@@ -56,8 +56,8 @@
 }
 
 button.website-product-card-linkwrap,
-button.website-product-card-title-link,
-button.website-product-card-details-link {
+a.website-product-card-linkwrap,
+.website-product-card-linkwrap {
   display: block;
   width: 100%;
   background: none;
@@ -66,6 +66,7 @@ button.website-product-card-details-link {
   font: inherit;
   color: inherit;
   text-align: inherit;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -787,9 +788,45 @@ button.website-product-card-details-link {
 }
 
 .website-product-card-list {
-  display: grid;
-  grid-template-columns: minmax(96px, 148px) minmax(0, 1fr);
+  display: block;
+}
+
+.website-product-card-list-inner {
+  display: flex;
+  flex-direction: row;
   align-items: stretch;
+  min-width: 0;
+}
+
+.website-product-card-list .website-product-card-list-media {
+  flex: 0 0 clamp(88px, 26vw, 132px);
+  width: clamp(88px, 26vw, 132px);
+  max-width: 38%;
+  align-self: stretch;
+}
+
+.website-product-card-list .website-product-card-img {
+  width: 100%;
+  height: 100%;
+  min-height: 88px;
+  aspect-ratio: 1;
+}
+
+.website-product-card-list .website-product-card-body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.website-product-card-list .website-product-card-title {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.website-product-card-list .website-product-card-subtitle {
+  overflow-wrap: anywhere;
 }
 
 .website-product-card-grid {
@@ -802,9 +839,24 @@ button.website-product-card-details-link {
   text-decoration: none;
 }
 
+button.website-product-card-title-link,
+a.website-product-card-title-link,
 .website-product-card-title-link {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
   color: inherit;
+  text-align: inherit;
   text-decoration: none;
+  cursor: pointer;
+}
+
+button.website-product-card-details-link,
+a.website-product-card-details-link {
+  cursor: pointer;
 }
 
 .website-product-card-subtitle {
@@ -926,17 +978,6 @@ button.website-product-card-details-link {
   opacity: 0.9;
 }
 
-.website-product-card-list .website-product-card-img {
-  height: 100%;
-  aspect-ratio: auto;
-}
-
-.website-product-card-list .website-product-card-body {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
 @media (max-width: 768px) {
   .website-of-search-row {
     flex-direction: column;
@@ -946,10 +987,6 @@ button.website-product-card-details-link {
   .website-of-sort {
     width: 100%;
     min-width: 0;
-  }
-
-  .website-product-card-list {
-    grid-template-columns: 110px minmax(0, 1fr);
   }
 }
 

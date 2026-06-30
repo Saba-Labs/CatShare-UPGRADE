@@ -65,6 +65,10 @@ interface CheckoutDetailsPageProps {
     step?: number
   ) => string | null;
   onChangeCartLineQty: (lineId: string, delta: number) => void;
+  orderNote: string;
+  onOrderNoteChange: (value: string) => void;
+  giftMessage: string;
+  onGiftMessageChange: (value: string) => void;
 }
 
 export default function CheckoutDetailsPage({
@@ -103,6 +107,10 @@ export default function CheckoutDetailsPage({
   fmt,
   fmtCalc,
   onChangeCartLineQty,
+  orderNote,
+  onOrderNoteChange,
+  giftMessage,
+  onGiftMessageChange,
 }: CheckoutDetailsPageProps) {
   return (
     <div className="sv-checkout-content">
@@ -217,6 +225,38 @@ export default function CheckoutDetailsPage({
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : null}
+
+          {checkoutSettings.experience.enableOrderNotes ? (
+            <div className="sv-checkout-card">
+              <h2 className="sv-checkout-card-title">Order notes</h2>
+              <div className="sv-field">
+                <label>Special instructions</label>
+                <textarea
+                  value={orderNote}
+                  onChange={(e) => onOrderNoteChange(e.target.value)}
+                  placeholder={checkoutSettings.experience.orderNotesPlaceholder}
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {checkoutSettings.experience.enableGiftNotes ? (
+            <div className="sv-checkout-card">
+              <h2 className="sv-checkout-card-title">Gift message</h2>
+              <div className="sv-field">
+                <label>Message for recipient</label>
+                <textarea
+                  value={giftMessage}
+                  onChange={(e) => onGiftMessageChange(e.target.value)}
+                  placeholder={checkoutSettings.experience.giftNotesPlaceholder}
+                  rows={3}
+                  maxLength={500}
+                />
               </div>
             </div>
           ) : null}
