@@ -177,7 +177,7 @@ function normalizeListElements(root: ParentNode): void {
 
     const groups: ChildNode[][] = [[]];
     [...list.childNodes].forEach((child) => {
-      if (child.nodeType === Node.ELEMENT_NODE && child.tagName.toLowerCase() === 'br') {
+      if (child instanceof Element && child.tagName.toLowerCase() === 'br') {
         groups.push([]);
         return;
       }
