@@ -428,6 +428,27 @@ body { background: var(--c-bg); }
 .sv-detail-row:nth-child(even) { background: var(--c-surface2); }
 .sv-detail-lbl { color: var(--c-text3); font-weight: 500; }
 .sv-detail-val { color: var(--c-text); font-weight: 600; text-align: right; }
+.sv-detail-table-after-order { margin-top: 22px; }
+.sv-detail-table-after-order .sv-detail-table { margin-top: 0; }
+.sv-product-description { margin-top: 14px; font-size: 13px; line-height: 1.65; color: var(--c-text2); white-space: pre-wrap; word-break: break-word; }
+.sv-product-description--rich { white-space: normal; }
+.sv-product-description--rich p { margin: 0 0 0.65em; }
+.sv-product-description--rich p:last-child { margin-bottom: 0; }
+.sv-product-description--rich ul, .sv-product-description--rich ol { margin: 0.4em 0; padding-left: 1.5em; list-style-position: outside; }
+.sv-product-description--rich ul { list-style-type: disc; }
+.sv-product-description--rich ol { list-style-type: decimal; }
+.sv-product-description--rich li { display: list-item; margin: 0.2em 0; }
+.sv-product-description--rich .pd-heading { display: inline; font-size: 1.25em; font-weight: 700; line-height: inherit; }
+.sv-product-description--rich .pd-subheading { display: inline; font-size: 1.05em; font-weight: 600; line-height: inherit; }
+.sv-product-description--rich .pd-body { display: inline; font-size: 1em; font-weight: 400; line-height: inherit; }
+.sv-product-description-row { width: 100%; margin-top: 14px; box-sizing: border-box; }
+.sv-product-description-row .sv-product-description { margin-top: 0; }
+@media (min-width: 900px) {
+  .sv-catalog-product-content .sv-product-order-page.website-product-page .sv-product-description-row--span {
+    margin-left: calc(-100% - var(--product-page-col-gap, 32px));
+    width: calc(200% + var(--product-page-col-gap, 32px));
+  }
+}
 .sv-drawer-qty-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--c-border); }
 .sv-drawer-qty-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: var(--c-text3); margin-bottom: 12px; font-family: var(--f-body); }
 .sv-drawer-qty-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }

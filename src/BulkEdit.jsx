@@ -14,6 +14,8 @@ import {
   isCatalogueLinkedToWarehouse,
 } from "./utils/catalogueWarehouseStock";
 import { saveProducts, setFieldValue, setUnitValue } from "./config/productUtils";
+import { descriptionToBulkEditPlainText } from "./utils/productDescriptionHtml";
+import BulkDescriptionField from "./components/BulkDescriptionField";
 import OrderQuantityStepInput from "./components/OrderQuantityStepInput";
 import MinimumOrderQuantityInput from "./components/MinimumOrderQuantityInput";
 import { FiEdit2, FiGrid, FiX } from "react-icons/fi";
@@ -23,6 +25,7 @@ const getFieldOptions = (catalogueId, priceField, priceUnitField) => {
     { key: "name", label: "Name" },
     { key: "subtitle", label: "Subtitle" },
     { key: "privateNotes", label: "Private Notes" },
+    { key: "description", label: "Description" },
   ];
 
   // Add all enabled product fields
@@ -167,6 +170,7 @@ useEffect(() => {
       name: p.name || "",
       subtitle: p.subtitle || "",
       privateNotes: p.privateNotes || "",
+      description: descriptionToBulkEditPlainText(p.description),
       badge: catData.badge || "",
       category: p.category || [],
       // Store original badge for fallback
@@ -215,6 +219,7 @@ useEffect(() => {
     normalized.masterName = p.name || "";
     normalized.masterSubtitle = p.subtitle || "";
     normalized.masterPrivateNotes = p.privateNotes || "";
+    normalized.masterDescription = p.description || "";
     normalized.masterCategory = p.category || [];
     normalized.masterWholesale = p.wholesale || "";
     normalized.masterWholesaleUnit = p.wholesaleUnit || "/ piece";
@@ -238,6 +243,7 @@ useEffect(() => {
       name: item.name ?? "",
       subtitle: item.subtitle ?? "",
       privateNotes: item.privateNotes ?? "",
+      description: item.description ?? "",
       badge: item.badge ?? "",
       category: item.category ?? [],
       wholesale: item.wholesale ?? "",
@@ -332,6 +338,8 @@ useEffect(() => {
             updates.subtitle = "";
           } else if (fieldKey === "privateNotes") {
             updates.privateNotes = "";
+          } else if (fieldKey === "description") {
+            updates.description = "";
           } else if (fieldKey === "category") {
             updates.category = [];
           } else if (fieldKey === "stock") {
@@ -383,6 +391,8 @@ useEffect(() => {
           updates.subtitle = item.masterSubtitle || "";
         } else if (fieldKey === "privateNotes") {
           updates.privateNotes = item.masterPrivateNotes || "";
+        } else if (fieldKey === "description") {
+          updates.description = descriptionToBulkEditPlainText(item.masterDescription || "");
         } else if (fieldKey === "category") {
           updates.category = item.masterCategory || [];
         } else if (fieldKey === "stock") {
@@ -474,6 +484,7 @@ useEffect(() => {
   copy.name = p.name ?? "";
   copy.subtitle = p.subtitle ?? "";
   copy.privateNotes = p.privateNotes ?? "";
+  copy.description = p.description ?? "";
   copy.category = Array.isArray(p.category) ? p.category : [];
 
   if (isMasterCatalogue) {
@@ -565,6 +576,10 @@ useEffect(() => {
   /** Fixed width per field column; horizontal scroll on narrow screens */
   const bulkFieldCol =
     "min-w-[190px] max-w-[240px] w-[190px] shrink-0";
+  const bulkDescriptionCol =
+    "min-w-[280px] max-w-[400px] w-[280px] shrink-0";
+  const bulkFieldColFor = (field) =>
+    field === "description" ? bulkDescriptionCol : bulkFieldCol;
 
   /** Shared field control look — visual only */
   const cellInput =
@@ -577,10 +592,10 @@ useEffect(() => {
   const renderBulkFieldHeader = (field) => {
     const fieldLabel = FIELD_OPTIONS.find((f) => f.key === field)?.label;
     const isFilledFromMaster = !!filledFromMaster[field];
-    const hideFillBox = field === "name" || field === "subtitle" || field === "privateNotes";
+    const hideFillBox = field === "name" || field === "subtitle" || field === "privateNotes" || field === "description";
 
     return (
-      <div className={`flex items-center gap-1.5 ${bulkFieldCol}`}>
+      <div className={`flex items-center gap-1.5 ${bulkFieldColFor(field)}`}>
         {!hideFillBox && (
           <input
             type="checkbox"
@@ -621,6 +636,17 @@ useEffect(() => {
           onChange={(e) => handleFieldChange(item.id, "privateNotes", e.target.value)}
           className={cellInput}
           placeholder="Private Notes"
+        />
+      );
+    }
+    if (field === "description") {
+      return (
+        <BulkDescriptionField
+          value={item.description ?? ""}
+          onChange={(next) => handleFieldChange(item.id, "description", next)}
+          inputClassName={`${cellInput} min-h-[6rem] resize-y leading-relaxed whitespace-pre-wrap`}
+          placeholder="Store description"
+          rows={5}
         />
       );
     }
@@ -854,6 +880,8 @@ useEffect(() => {
                     resellStock: typeof p.resellStock === "boolean" ? p.resellStock ? "in" : "out" : p.resellStock,
                     masterName: p.name || "",
                     masterSubtitle: p.subtitle || "",
+                    masterPrivateNotes: p.privateNotes || "",
+                    masterDescription: p.description || "",
                     masterCategory: p.category || [],
                     masterWholesale: p.wholesale || "",
                     masterWholesaleUnit: p.wholesaleUnit || "/ piece",
@@ -1117,7 +1145,7 @@ useEffect(() => {
               </div>
               <div className="flex gap-2 py-2 pl-2 pr-1 items-center">
                 {selectedFieldsInDefaultOrder.map((field) => (
-                  <div key={`${item.id}-${field}`} className={bulkFieldCol}>
+                  <div key={`${item.id}-${field}`} className={bulkFieldColFor(field)}>
                     {renderBulkFieldCell(item, field)}
                   </div>
                 ))}

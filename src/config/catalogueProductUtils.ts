@@ -147,6 +147,8 @@ export interface ProductWithCatalogueData {
   id: string;
   name: string;
   subtitle?: string;
+  /** Longer copy for the public store (product-level, not per catalogue). */
+  description?: string;
   privateNotes?: string;
   imagePath?: string;
   image?: string;

@@ -25,6 +25,7 @@ export function buildBulkImportedProduct(options: {
     id: options.id,
     name: options.name,
     subtitle: "",
+    description: "",
     privateNotes: "",
     category: [],
   };

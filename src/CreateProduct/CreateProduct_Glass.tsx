@@ -51,6 +51,7 @@ import { getAllProducts } from "../config/productUtils";
 import { readCategoriesList, persistCategoriesList } from "../utils/categoriesStorage";
 import { normalizeProductCategories } from "../utils/productCategoryUtils";
 import OrderQuantityStepInput from "../components/OrderQuantityStepInput";
+import ProductDescriptionEditor from "../components/ProductDescriptionEditor";
 import MinimumOrderQuantityInput from "../components/MinimumOrderQuantityInput";
 import QuantitySlabEditor from "../components/QuantitySlabEditor";
 import { normalizeQuantitySlabs } from "../utils/quantityPricingUtils";
@@ -473,6 +474,7 @@ export default function CreateProduct() {
     id: "",
     name: "",
     subtitle: "",
+    description: "",
     privateNotes: "",
     category: [],
     catalogueData: {},
@@ -702,6 +704,7 @@ export default function CreateProduct() {
           id: migratedProduct.id || "",
           name: migratedProduct.name || "",
           subtitle: migratedProduct.subtitle || "",
+          description: migratedProduct.description || "",
           privateNotes: migratedProduct.privateNotes || "",
           category: normalizeProductCategories(migratedProduct.category),
           catalogueData: migratedProduct.catalogueData,
@@ -1156,7 +1159,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    const commonFields = ['id', 'name', 'subtitle', 'category', 'privateNotes'];
+    const commonFields = ['id', 'name', 'subtitle', 'description', 'category', 'privateNotes'];
 
     if (commonFields.includes(name)) {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -2209,6 +2212,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 min-h-[100px] resize-none"
                 />
                 <p className="text-[10px] text-gray-400 mt-1.5 italic">These notes are only visible to you and won't be shared or shown on previews.</p>
+              </div>
+
+              {/* Store description */}
+              <div className="mb-5">
+                <label className="block text-xs font-semibold mb-3 text-gray-600 dark:text-gray-400">
+                  Description
+                </label>
+                <ProductDescriptionEditor
+                  value={formData.description ?? ""}
+                  onChange={(html) => setFormData((prev) => ({ ...prev, description: html }))}
+                  placeholder="Tell customers about this product on your store…"
+                />
+                <p className="text-[10px] text-gray-400 mt-1.5 italic">
+                  Shown on your store only. You can choose where it appears later.
+                </p>
               </div>
             </>
           )}

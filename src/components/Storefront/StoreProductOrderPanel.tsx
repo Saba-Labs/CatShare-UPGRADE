@@ -23,6 +23,7 @@ import {
 } from './storefrontOrderHelpers';
 import { formatQuantitySlabRange, type QuantityPriceSlab } from '../../utils/quantityPricingUtils';
 import { IconImage, MoqHint, PackHint } from './StorefrontIcons';
+import ProductDescriptionView from '../ProductDescriptionView';
 import './store-product-order-page.css';
 
 function QtyControl({
@@ -208,6 +209,11 @@ export default function StoreProductOrderPanel({
       </div>
     ) : null;
 
+  const descriptionEl =
+    (product.description ?? '').trim() ? (
+      <ProductDescriptionView html={product.description} />
+    ) : null;
+
   const orderSection = showQuantitySelector ? (
     <div className="sv-drawer-qty-section sv-order-qty-card">
       <div className="sv-drawer-qty-header">
@@ -275,7 +281,12 @@ export default function StoreProductOrderPanel({
         />
       ) : null}
 
-      {!fieldsAfterOrder ? fieldsTable : null}
+      {!fieldsAfterOrder ? (
+        <>
+          {fieldsTable}
+          {descriptionEl}
+        </>
+      ) : null}
 
       {groups.length > 0 ? (
         <ProductVariantsDisplay
@@ -291,6 +302,10 @@ export default function StoreProductOrderPanel({
 
       {fieldsAfterOrder && fieldsTable ? (
         <div className="sv-detail-table-after-order">{fieldsTable}</div>
+      ) : null}
+
+      {fieldsAfterOrder && descriptionEl ? (
+        <div className="sv-product-description-row sv-product-description-row--span">{descriptionEl}</div>
       ) : null}
     </div>
   );
