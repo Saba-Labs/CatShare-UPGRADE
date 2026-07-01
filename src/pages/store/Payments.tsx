@@ -182,7 +182,7 @@ export default function Payments() {
 
   return (
     <StoreLayout>
-      <PageHeader title="Payments" description="How customers pay at checkout." />
+      <PageHeader title="Payments" />
 
       <div className={`max-w-lg space-y-6 ${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}`}>
         {loading ? (

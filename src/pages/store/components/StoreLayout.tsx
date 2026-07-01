@@ -20,6 +20,8 @@ export const STORE_SHELL_CLASS = 'store-admin text-sm text-gray-900 dark:text-gr
 interface StoreLayoutProps {
   children: ReactNode;
   storeUrl?: string;
+  /** Child fills the viewport below the status bar (e.g. homepage builder). */
+  immersive?: boolean;
 }
 
 export function StoreStatusBar() {
@@ -31,7 +33,7 @@ export function StoreStatusBar() {
   );
 }
 
-export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
+export default function StoreLayout({ children, storeUrl, immersive = false }: StoreLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMainStorePage = location.pathname === '/store';
@@ -42,9 +44,21 @@ export default function StoreLayout({ children, storeUrl }: StoreLayoutProps) {
 
       <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
         <main
-          className={`flex-1 min-h-0 overflow-y-auto overscroll-contain pt-[40px] ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`}
+          className={`flex-1 min-h-0 pt-[40px] ${
+            immersive
+              ? `flex flex-col overflow-hidden ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`
+              : `overflow-y-auto overscroll-contain ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`
+          }`}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+          <div
+            className={`max-w-7xl mx-auto px-4 sm:px-6 ${
+              immersive
+                ? 'flex min-h-0 flex-1 flex-col pb-4 sm:pb-5'
+                : isMainStorePage
+                  ? 'py-4 sm:py-5'
+                  : 'pb-4 sm:pb-5'
+            }`}
+          >
             {children}
           </div>
         </main>

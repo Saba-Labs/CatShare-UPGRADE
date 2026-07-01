@@ -1,10 +1,18 @@
 export type { CheckoutTotals } from '../types/checkoutSettings';
 import type { CheckoutApplyBase, CheckoutLineItem, CheckoutRule, CheckoutTotals, StoreCheckoutSettings } from '../types/checkoutSettings';
-import { normalizeCheckoutSettings } from '../types/checkoutSettings';
+import { isCategoryCouponRuleType, isCouponRuleExpired, isCouponRuleType, isProductCouponRuleType, normalizeCheckoutSettings } from '../types/checkoutSettings';
+import type { CheckoutCartLine } from './checkoutCouponCategories';
+import { getCouponEligibleSubtotal } from './checkoutCouponCategories';
+
+export type { CheckoutCartLine } from './checkoutCouponCategories';
 
 export type CheckoutComputeOptions = {
   couponCode?: string;
   paymentMethod?: 'prepaid' | 'cod';
+  /** When false, a matching coupon code is not applied (usage limits). */
+  couponRedemptionAllowed?: boolean;
+  /** Cart lines for category/product-restricted coupons. */
+  cartLines?: CheckoutCartLine[];
 };
 
 function roundMoney(n: number): number {
@@ -25,7 +33,7 @@ function ruleMatchesSubtotal(rule: CheckoutRule, subtotal: number): boolean {
 }
 
 function isCouponRule(rule: CheckoutRule): boolean {
-  return rule.type === 'coupon_percent' || rule.type === 'coupon_flat';
+  return isCouponRuleType(rule.type);
 }
 
 function isAutoDiscountRule(rule: CheckoutRule): boolean {
@@ -97,7 +105,9 @@ export function computeCheckoutTotals(
   let codTotal = 0;
   let appliedCouponCode: string | null = null;
 
-  const enabledRules = settings.rules.filter((r) => r.enabled);
+  const enabledRules = settings.rules.filter(
+    (r) => r.enabled && !(isCouponRuleType(r.type) && isCouponRuleExpired(r))
+  );
 
   const freeShippingRule = enabledRules.find((r) => r.type === 'free_shipping_above');
   const freeThreshold = freeShippingRule?.freeAbove ?? freeShippingRule?.minSubtotal ?? null;
@@ -131,32 +141,42 @@ export function computeCheckoutTotals(
   // —— Coupon (one matching code, only when entry is enabled) ——
   if (settings.allowCouponEntry) {
     const enteredCoupon = normalizeCoupon(options.couponCode);
+    const cartLines = options.cartLines ?? [];
     if (enteredCoupon) {
-      const couponRules = enabledRules.filter(
-        (r) =>
-          isCouponRule(r) &&
-          ruleMatchesPayment(r, paymentMethod) &&
-          ruleMatchesSubtotal(r, sub)
-      );
+      const couponRules = enabledRules.filter((r) => {
+        if (!isCouponRule(r) || !ruleMatchesPayment(r, paymentMethod)) return false;
+        const eligibleSub = getCouponEligibleSubtotal(r, cartLines, sub);
+        return ruleMatchesSubtotal(r, eligibleSub);
+      });
       const matchedCoupon = couponRules.find((rule) => couponMatches(rule, enteredCoupon));
-      if (matchedCoupon) {
-        const base = resolveBase(matchedCoupon.applyBase, {
-          subtotal: sub,
-          afterDiscount,
-          afterShipping: afterDiscount,
-        });
-        const rawAmt = computeAmount(matchedCoupon, base);
-        if (rawAmt > 0) {
-          const amt = -Math.abs(rawAmt);
-          discountTotal = roundMoney(discountTotal + Math.abs(amt));
-          afterDiscount = roundMoney(Math.max(0, sub - discountTotal));
-          appliedCouponCode = enteredCoupon;
-          lines.push({
-            ruleId: matchedCoupon.id,
-            label: matchedCoupon.label,
-            category: 'discount',
-            amount: amt,
-          });
+      const redemptionAllowed = options.couponRedemptionAllowed !== false;
+      if (matchedCoupon && redemptionAllowed) {
+        const eligibleSub = getCouponEligibleSubtotal(matchedCoupon, cartLines, sub);
+
+        if (eligibleSub > 0 && ruleMatchesSubtotal(matchedCoupon, eligibleSub)) {
+          const restricted =
+            isCategoryCouponRuleType(matchedCoupon.type) ||
+            isProductCouponRuleType(matchedCoupon.type);
+          const couponBase = restricted
+            ? eligibleSub
+            : resolveBase(matchedCoupon.applyBase, {
+                  subtotal: sub,
+                  afterDiscount,
+                  afterShipping: afterDiscount,
+                });
+          const rawAmt = computeAmount(matchedCoupon, couponBase);
+          if (rawAmt > 0) {
+            const amt = -Math.abs(rawAmt);
+            discountTotal = roundMoney(discountTotal + Math.abs(amt));
+            afterDiscount = roundMoney(Math.max(0, sub - discountTotal));
+            appliedCouponCode = enteredCoupon;
+            lines.push({
+              ruleId: matchedCoupon.id,
+              label: matchedCoupon.label,
+              category: 'discount',
+              amount: amt,
+            });
+          }
         }
       }
     }

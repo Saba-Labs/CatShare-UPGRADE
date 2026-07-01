@@ -188,8 +188,8 @@ export default function Security() {
   if (loading || authLoading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8 max-w-3xl">
-          <div className="h-12 w-48 rounded bg-gray-200 dark:bg-gray-800" />
+        <PageHeader title="Security" />
+        <div className="animate-pulse space-y-6 py-4 max-w-3xl">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="h-48 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
@@ -203,7 +203,6 @@ export default function Security() {
       <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Security"
-          sticky
           actions={(
             <button
               type="button"

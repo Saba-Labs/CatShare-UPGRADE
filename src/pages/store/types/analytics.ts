@@ -29,16 +29,21 @@ export interface AnalyticsDashboardData {
   range: AnalyticsDateRange;
   rangeLabel: string;
   metrics: {
-    visitors: AnalyticsMetric;
-    orders: AnalyticsMetric;
+    totalOrders: AnalyticsMetric;
+    completedOrders: AnalyticsMetric;
     revenue: AnalyticsMetric;
-    conversionRate: AnalyticsMetric;
-    returningCustomers: AnalyticsMetric;
     averageOrderValue: AnalyticsMetric;
+    itemsSold: AnalyticsMetric;
+    uniqueCustomers: AnalyticsMetric;
+    returningCustomers: AnalyticsMetric;
+    activePipeline: AnalyticsMetric;
+    shippedOrders: AnalyticsMetric;
+    cancelledOrders: AnalyticsMetric;
   };
   popularProducts: AnalyticsProductRow[];
-  trafficSources: AnalyticsBreakdownRow[];
-  deviceTypes: AnalyticsBreakdownRow[];
+  orderStatusBreakdown: AnalyticsBreakdownRow[];
+  orderSourceBreakdown: AnalyticsBreakdownRow[];
+  paymentMethodBreakdown: AnalyticsBreakdownRow[];
   chartBars: number[];
   chartLabels: string[];
 }

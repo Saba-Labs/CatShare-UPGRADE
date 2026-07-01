@@ -78,11 +78,11 @@ input:focus { outline: none; border-color: #16A34A !important; }
 
 .orders-status-banner {
   margin: 0;
-  padding: 14px 16px;
+  padding: 10px 16px;
   border-radius: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   border: none;
   border-bottom: 1px solid transparent;
   animation: ordersBannerIn 0.28s cubic-bezier(0.34, 1.1, 0.64, 1);
@@ -115,36 +115,30 @@ input:focus { outline: none; border-color: #16A34A !important; }
 }
 
 .orders-status-banner__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
 }
 
 .orders-status-banner__title {
-  margin: 0 0 2px;
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-}
-
-.orders-status-banner__meta {
   margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.35;
-  opacity: 0.88;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
-.orders-status-banner__swipe-hint {
+.orders-status-banner__count {
+  font-size: 13px;
   font-weight: 600;
-  opacity: 0.75;
 }
 
 /* ─── Orders filter sheet ─────────────────────────────────────────────────── */

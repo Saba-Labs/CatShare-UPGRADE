@@ -38,6 +38,10 @@ export type CheckoutRuleType =
   | 'discount_flat'
   | 'coupon_percent'
   | 'coupon_flat'
+  | 'coupon_category_percent'
+  | 'coupon_category_flat'
+  | 'coupon_product_percent'
+  | 'coupon_product_flat'
   | 'custom';
 
 export interface CheckoutRule {
@@ -57,6 +61,16 @@ export interface CheckoutRule {
   freeAbove?: number | null;
   /** Coupon code (coupon_* types) */
   code?: string | null;
+  /** When set, category coupons only apply if the cart contains items in these categories */
+  allowedCategories?: string[] | null;
+  /** When set, product coupons only apply if the cart contains these product IDs */
+  allowedProductIds?: string[] | null;
+  /** ISO datetime — coupon stops working after this moment */
+  expiresAt?: string | null;
+  /** Limit each WhatsApp / phone number to one redemption of this code */
+  oncePerCustomer?: boolean;
+  /** Max total orders that may use this coupon code (all customers) */
+  maxTotalUses?: number | null;
   /** Cap for percent discounts */
   maxAmount?: number | null;
   /** Only apply for selected payment method */
@@ -190,8 +204,12 @@ export const CHECKOUT_RULE_PRESETS: CheckoutRulePreset[] = [
   { type: 'tax_flat', category: 'tax', label: 'Tax (flat)', amountKind: 'flat', defaultValue: 0, applyBase: 'after_discount' },
   { type: 'discount_percent', category: 'discount', label: 'Auto discount (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Applied automatically when order qualifies' },
   { type: 'discount_flat', category: 'discount', label: 'Auto discount (flat)', amountKind: 'flat', defaultValue: 50, applyBase: 'subtotal', hint: 'Fixed off when order qualifies' },
-  { type: 'coupon_percent', category: 'discount', label: 'Coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Customer must enter the code at checkout' },
-  { type: 'coupon_flat', category: 'discount', label: 'Coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal', hint: 'Fixed off with a valid coupon code' },
+  { type: 'coupon_percent', category: 'discount', label: 'Coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Applies to the whole order' },
+  { type: 'coupon_flat', category: 'discount', label: 'Coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal', hint: 'Fixed off the whole order' },
+  { type: 'coupon_category_percent', category: 'discount', label: 'Category coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Percent off selected categories only' },
+  { type: 'coupon_category_flat', category: 'discount', label: 'Category coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal', hint: 'Fixed off selected categories only' },
+  { type: 'coupon_product_percent', category: 'discount', label: 'Product coupon (%)', amountKind: 'percent', defaultValue: 10, applyBase: 'subtotal', hint: 'Percent off selected products only' },
+  { type: 'coupon_product_flat', category: 'discount', label: 'Product coupon (flat off)', amountKind: 'flat', defaultValue: 100, applyBase: 'subtotal', hint: 'Fixed off selected products only' },
   { type: 'custom', category: 'shipping', label: 'Custom shipping rule', amountKind: 'flat', defaultValue: 0, hint: 'Your own label and conditions' },
   { type: 'custom', category: 'tax', label: 'Custom tax rule', amountKind: 'percent', defaultValue: 0, applyBase: 'after_discount', hint: 'Your own tax label and base' },
   { type: 'custom', category: 'discount', label: 'Custom discount', amountKind: 'flat', defaultValue: 0, applyBase: 'subtotal', hint: 'Auto or coupon-style discount' },
@@ -208,6 +226,9 @@ function newRuleId(): string {
 }
 
 export function createRuleFromPreset(preset: CheckoutRulePreset): CheckoutRule {
+  const isCoupon = preset.type.startsWith('coupon_');
+  const isCategoryCoupon = isCategoryCouponRuleType(preset.type);
+  const isProductCoupon = isProductCouponRuleType(preset.type);
   return {
     id: newRuleId(),
     type: preset.type,
@@ -219,7 +240,12 @@ export function createRuleFromPreset(preset: CheckoutRulePreset): CheckoutRule {
     paymentMethod: preset.paymentMethod ?? 'any',
     applyBase: preset.applyBase ?? 'subtotal',
     order: Date.now(),
-    code: preset.type.startsWith('coupon_') ? '' : null,
+    code: isCoupon ? '' : null,
+    allowedCategories: isCategoryCoupon ? [] : undefined,
+    allowedProductIds: isProductCoupon ? [] : undefined,
+    oncePerCustomer: isCoupon ? false : undefined,
+    maxTotalUses: isCoupon ? null : undefined,
+    expiresAt: isCoupon ? null : undefined,
     freeAbove: preset.type === 'free_shipping_above' ? 999 : null,
   };
 }
@@ -230,10 +256,32 @@ function coerceNumber(raw: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function coerceStringArray(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const values = Array.from(
+    new Set(raw.map((item) => String(item ?? '').trim()).filter(Boolean))
+  );
+  return values.length > 0 ? values : null;
+}
+
+function migrateLegacyCouponType(
+  type: CheckoutRuleType,
+  allowedCategories: string[] | null
+): CheckoutRuleType {
+  if (
+    (type === 'coupon_percent' || type === 'coupon_flat') &&
+    allowedCategories &&
+    allowedCategories.length > 0
+  ) {
+    return type === 'coupon_percent' ? 'coupon_category_percent' : 'coupon_category_flat';
+  }
+  return type;
+}
+
 function coerceRule(raw: unknown): CheckoutRule | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  const type = String(r.type ?? 'custom') as CheckoutRuleType;
+  let type = String(r.type ?? 'custom') as CheckoutRuleType;
   const id = String(r.id ?? newRuleId());
   const amountKind: CheckoutAmountKind = r.amountKind === 'percent' ? 'percent' : 'flat';
   const paymentMethod = (['any', 'prepaid', 'cod'] as const).includes(r.paymentMethod as CheckoutPaymentMethod)
@@ -242,6 +290,16 @@ function coerceRule(raw: unknown): CheckoutRule | null {
   const applyBase = (['subtotal', 'after_discount', 'after_shipping'] as const).includes(r.applyBase as CheckoutApplyBase)
     ? (r.applyBase as CheckoutApplyBase)
     : 'subtotal';
+  const allowedCategories = coerceStringArray(r.allowedCategories);
+  type = migrateLegacyCouponType(type, allowedCategories);
+  const isCategoryCoupon = isCategoryCouponRuleType(type);
+  const isProductCoupon = isProductCouponRuleType(type);
+  const isPlainCoupon = type === 'coupon_percent' || type === 'coupon_flat';
+  let expiresAt: string | null = null;
+  if (typeof r.expiresAt === 'string' && r.expiresAt.trim()) {
+    const parsed = new Date(r.expiresAt);
+    expiresAt = Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
   return {
     id,
     type,
@@ -254,6 +312,14 @@ function coerceRule(raw: unknown): CheckoutRule | null {
     maxSubtotal: r.maxSubtotal != null ? coerceNumber(r.maxSubtotal, 0) || null : null,
     freeAbove: r.freeAbove != null ? coerceNumber(r.freeAbove, 0) || null : null,
     code: r.code != null ? String(r.code) : null,
+    allowedCategories: isCategoryCoupon ? allowedCategories ?? [] : isPlainCoupon ? null : undefined,
+    allowedProductIds: isProductCoupon ? coerceStringArray(r.allowedProductIds) ?? [] : undefined,
+    expiresAt: type.startsWith('coupon_') ? expiresAt : undefined,
+    oncePerCustomer: r.oncePerCustomer === true,
+    maxTotalUses:
+      r.maxTotalUses != null && r.maxTotalUses !== ''
+        ? coerceNumber(r.maxTotalUses, 0) || null
+        : null,
     maxAmount: r.maxAmount != null ? coerceNumber(r.maxAmount, 0) || null : null,
     paymentMethod,
     applyBase,
@@ -351,7 +417,13 @@ export function describeCheckoutRule(rule: CheckoutRule): string {
   switch (rule.type) {
     case 'coupon_percent':
     case 'coupon_flat':
-      return 'Requires a matching coupon code at checkout.';
+      return 'Applies to the whole order when the customer enters the code.';
+    case 'coupon_category_percent':
+    case 'coupon_category_flat':
+      return 'Applies only to items in the selected categories.';
+    case 'coupon_product_percent':
+    case 'coupon_product_flat':
+      return 'Applies only to the selected products.';
     case 'discount_percent':
     case 'discount_flat':
       return 'Applied automatically when the order qualifies.';
@@ -371,7 +443,104 @@ export function describeCheckoutRule(rule: CheckoutRule): string {
 }
 
 export function isCouponRuleType(type: CheckoutRuleType): boolean {
+  return type.startsWith('coupon_');
+}
+
+export function isCategoryCouponRuleType(type: CheckoutRuleType): boolean {
+  return type === 'coupon_category_percent' || type === 'coupon_category_flat';
+}
+
+export function isProductCouponRuleType(type: CheckoutRuleType): boolean {
+  return type === 'coupon_product_percent' || type === 'coupon_product_flat';
+}
+
+export function isPlainCouponRuleType(type: CheckoutRuleType): boolean {
   return type === 'coupon_percent' || type === 'coupon_flat';
+}
+
+export function parseCouponExpiresAt(raw: string | null | undefined): Date | null {
+  if (!raw || !String(raw).trim()) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function isCouponRuleExpired(rule: CheckoutRule, now = Date.now()): boolean {
+  if (!isCouponRuleType(rule.type)) return false;
+  const expires = parseCouponExpiresAt(rule.expiresAt);
+  return expires != null && expires.getTime() <= now;
+}
+
+export function expiresAtToDatetimeLocal(iso: string | null | undefined): string {
+  const d = parseCouponExpiresAt(iso);
+  if (!d) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function expiresAtToDateInput(iso: string | null | undefined): string {
+  const d = parseCouponExpiresAt(iso);
+  if (!d) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function expiresAtToTimeInput(iso: string | null | undefined): string {
+  const d = parseCouponExpiresAt(iso);
+  if (!d) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function dateTimeInputsToExpiresAt(date: string, time: string): string | null {
+  const datePart = date.trim();
+  if (!datePart) return null;
+  const timePart = time.trim() || '23:59';
+  return datetimeLocalToExpiresAt(`${datePart}T${timePart}`);
+}
+
+export function formatCouponExpiryPreview(iso: string | null | undefined): string | null {
+  const d = parseCouponExpiresAt(iso);
+  if (!d) return null;
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+export function datetimeLocalToExpiresAt(local: string): string | null {
+  const trimmed = local.trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+export function formatCouponExpirySummary(rule: CheckoutRule): string | null {
+  const expires = parseCouponExpiresAt(rule.expiresAt);
+  if (!expires) return null;
+  if (isCouponRuleExpired(rule)) return 'Expired';
+  return `Ends ${expires.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`;
+}
+
+/** Disable coupons whose end date has passed. Returns labels of rules that were turned off. */
+export function disableExpiredCouponRules(
+  settings: StoreCheckoutSettings
+): { settings: StoreCheckoutSettings; disabledLabels: string[] } {
+  const disabledLabels: string[] = [];
+  const rules = settings.rules.map((rule) => {
+    if (!isCouponRuleType(rule.type) || !rule.enabled) return rule;
+    if (!isCouponRuleExpired(rule)) return rule;
+    disabledLabels.push(rule.label);
+    return { ...rule, enabled: false };
+  });
+  return {
+    settings: { ...settings, rules },
+    disabledLabels,
+  };
 }
 
 export function isAutoDiscountRuleType(type: CheckoutRuleType): boolean {
@@ -400,6 +569,32 @@ export function summarizeCheckoutRule(rule: CheckoutRule): string {
 
   if (isCoupon && rule.code?.trim()) {
     parts.push(`code ${rule.code.trim().toUpperCase()}`);
+  }
+  if (isCoupon && rule.oncePerCustomer) {
+    parts.push('1× per customer');
+  }
+  if (isCoupon && rule.maxTotalUses != null && rule.maxTotalUses > 0) {
+    parts.push(`${rule.maxTotalUses} total`);
+  }
+  if (isCoupon) {
+    const expiry = formatCouponExpirySummary(rule);
+    if (expiry) parts.push(expiry);
+  }
+  if (isCategoryCouponRuleType(rule.type)) {
+    const cats = Array.isArray(rule.allowedCategories)
+      ? rule.allowedCategories.map((c) => String(c).trim()).filter(Boolean)
+      : [];
+    if (cats.length > 0) {
+      parts.push(
+        cats.length <= 2 ? cats.join(', ') : `${cats.slice(0, 2).join(', ')} +${cats.length - 2}`
+      );
+    }
+  }
+  if (isProductCouponRuleType(rule.type)) {
+    const count = Array.isArray(rule.allowedProductIds) ? rule.allowedProductIds.length : 0;
+    if (count > 0) {
+      parts.push(`${count} product${count === 1 ? '' : 's'}`);
+    }
   }
 
   const range: string[] = [];

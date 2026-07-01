@@ -14,7 +14,7 @@ export default function Integrations() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
-  const { sellerId, views, loading, error, connectedCount, reload } = useSellerIntegrations();
+  const { sellerId, views, loading, error, reload } = useSellerIntegrations();
   const [disconnectingId, setDisconnectingId] = useState<StoreIntegrationId | null>(null);
 
   const connectableApps = useMemo(
@@ -27,13 +27,6 @@ export default function Integrations() {
     if (!app?.integrationProviderId) return null;
     return views.find((view) => view.provider === app.integrationProviderId) ?? null;
   };
-
-  const pageDescription =
-    loading
-      ? 'Loading your connections…'
-      : connectedCount > 0
-        ? `${connectedCount} provider${connectedCount === 1 ? '' : 's'} connected.`
-        : 'Connect payment and shipping providers for your store.';
 
   const handleConnect = (appId: StoreIntegrationId) => {
     const app = connectableApps.find((item) => item.id === appId);
@@ -72,7 +65,7 @@ export default function Integrations() {
 
   return (
     <StoreLayout>
-      <PageHeader title="Integrations" description={pageDescription} />
+      <PageHeader title="Integrations" />
 
       <ProFeatureGate featureName="Integrations">
         <div className="max-w-lg space-y-6 pb-8">

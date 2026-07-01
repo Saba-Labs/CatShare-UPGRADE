@@ -508,8 +508,8 @@ export default function StoreSettings() {
   if (loading || authLoading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8">
-          <div className="h-12 w-48 bg-gray-200 rounded"></div>
+        <PageHeader title="Store Settings" />
+        <div className="animate-pulse space-y-6 py-4">
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="h-64 bg-gray-200 rounded-xl"></div>
@@ -524,7 +524,7 @@ export default function StoreSettings() {
     return (
       <StoreLayout>
         <div className={STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}>
-          <PageHeader title="Store Settings" sticky />
+          <PageHeader title="Store Settings" />
           <div className="mt-8 flex items-center justify-center">
             <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-8 max-w-md text-center">
               <FiAlertCircle className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
@@ -548,7 +548,6 @@ export default function StoreSettings() {
       <div className={STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}>
         <PageHeader
           title="Store Settings"
-          sticky
           actions={(
             <button
               type="button"

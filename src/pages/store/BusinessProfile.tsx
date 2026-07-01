@@ -153,8 +153,8 @@ export default function BusinessProfile() {
   if (loading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8 max-w-3xl">
-          <div className="h-12 w-56 rounded bg-gray-200 dark:bg-gray-800" />
+        <PageHeader title="Business Profile" />
+        <div className="animate-pulse space-y-6 py-4 max-w-3xl">
           <div className="h-80 rounded-2xl bg-gray-200 dark:bg-gray-800" />
         </div>
       </StoreLayout>
@@ -166,7 +166,6 @@ export default function BusinessProfile() {
       <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Business Profile"
-          sticky
           actions={(
             <button
               type="button"

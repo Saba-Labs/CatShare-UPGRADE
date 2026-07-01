@@ -332,6 +332,8 @@ export interface Store {
   customDomainStatus: string | null;
   /** Shipping, tax, and discount rules for storefront checkout. */
   checkoutSettings: StoreCheckoutSettings;
+  /** Seller's managed category labels (for coupon restrictions and storefront filters). */
+  productCategories?: string[];
 }
 
 export interface StorePublic {
@@ -1080,6 +1082,10 @@ export async function getSellerStore(sellerUserId: string): Promise<{ success: b
     }
     
     const store = mapStoreRow(data[0] as Record<string, unknown>);
+    const productCategories = await fetchSellerProductCategories(client, trimmed);
+    if (productCategories) {
+      store.productCategories = productCategories;
+    }
     writeCachedSellerStore(trimmed, store);
     return {
       success: true,

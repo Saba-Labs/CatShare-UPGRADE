@@ -1,8 +1,12 @@
 import { ReactNode } from 'react';
 import { STORE_SECTION_DESCRIPTION, STORE_SECTION_TITLE } from '../storeTypography';
+import InfoTooltipButton from './InfoTooltipButton';
 
 interface SettingsCardProps {
   title: string;
+  /** Shown via the info icon next to the title */
+  info?: string;
+  /** Legacy: paragraph below the title (prefer `info` for new screens) */
   description?: string;
   children: ReactNode;
   className?: string;
@@ -45,6 +49,7 @@ const getColorScheme = (title: string): { bg: string; accent: string; border: st
 
 export default function SettingsCard({
   title,
+  info,
   description,
   children,
   className = '',
@@ -55,7 +60,12 @@ export default function SettingsCard({
     <section className={`${bg} border ${border} rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden ${className}`}>
       {title && <div className={`h-1 bg-gradient-to-r ${accent}`}></div>}
       <div className="p-4 sm:p-5">
-        {title ? <h2 className={STORE_SECTION_TITLE}>{title}</h2> : null}
+        {title ? (
+          <div className="flex items-center gap-2">
+            <h2 className={STORE_SECTION_TITLE}>{title}</h2>
+            {info ? <InfoTooltipButton text={info} label={`${title} information`} /> : null}
+          </div>
+        ) : null}
         {description ? <p className={STORE_SECTION_DESCRIPTION}>{description}</p> : null}
         <div className={title || description ? 'mt-4 sm:mt-5' : ''}>{children}</div>
       </div>

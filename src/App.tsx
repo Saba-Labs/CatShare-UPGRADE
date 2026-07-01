@@ -4,6 +4,7 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
+  Navigate,
   useNavigate,
   useLocation,
 } from "react-router-dom";
@@ -86,8 +87,6 @@ const TermsOfService = lazy(() => import("./TermsOfService"));
 const Website = lazy(() => import("./Website"));
 const Tutorial = lazy(() => import("./Tutorial"));
 const HomepageEditorPage = lazy(() => import("./pages/HomepageEditorPage"));
-const StoreCustomDomain = lazy(() => import("./pages/StoreCustomDomain"));
-const StoreCheckoutSettingsPage = lazy(() => import("./pages/StoreCheckoutSettingsPage"));
 const IntegrationsPage = lazy(() => import("./integrations/pages/IntegrationsPage"));
 const RazorpayIntegrationPage = lazy(() => import("./integrations/pages/RazorpayIntegrationPage"));
 const ShiprocketIntegrationPage = lazy(() => import("./integrations/pages/ShiprocketIntegrationPage"));
@@ -2742,19 +2741,11 @@ if (user?.uid && !authService.isOfflineGuest()) {
         />
         <Route
           path="/store/custom-domain"
-          element={
-            <ProtectedRoute>
-              <StoreCustomDomain />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/store/domain" replace />}
         />
         <Route
           path="/store/checkout-settings"
-          element={
-            <ProtectedRoute>
-              <StoreCheckoutSettingsPage />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/store/checkout" replace />}
         />
         <Route
           path="/store/integrations/razorpay"

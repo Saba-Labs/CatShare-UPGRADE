@@ -88,6 +88,13 @@ import StoreProductOrderPanel from '../components/Storefront/StoreProductOrderPa
 import '../components/Storefront/store-product-order-page.css';
 import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
 import { computeCheckoutTotals } from '../utils/checkoutTotals';
+import {
+  validateStorefrontCoupon,
+  couponValidationMessage,
+  evaluateCouponRestrictionBlock,
+  type CouponValidationReason,
+} from '../services/couponRedemptionService';
+import type { CheckoutCartLine } from '../utils/checkoutTotals';
 import { normalizeStoreIntegrationFlags } from '../types/storeIntegrationFlags';
 import {
   beginStoreRazorpayCheckout,
@@ -994,6 +1001,7 @@ export default function StoreView() {
   const [shipState, setShipState] = useState('');
   const [shipPincode, setShipPincode] = useState('');
   const [couponCode, setCouponCode] = useState('');
+  const [couponBlockReason, setCouponBlockReason] = useState<CouponValidationReason | null>(null);
   const [orderNote, setOrderNote] = useState('');
   const [giftMessage, setGiftMessage] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'prepaid' | 'cod' | 'upi'>('prepaid');
@@ -1519,6 +1527,7 @@ export default function StoreView() {
           groups.length > 0 && isVariantSelectionComplete(groups, selection)
             ? generateVariantCombinationId(selection)
             : undefined,
+        categories: normalizeProductCategories(product.category),
       });
       total += rowTotal;
     });
@@ -1751,6 +1760,16 @@ export default function StoreView() {
     };
   }, [orderSummary]);
 
+  const checkoutCartLines = useMemo<CheckoutCartLine[]>(
+    () =>
+      reviewSummary.items.map((item) => ({
+        productId: item.productId,
+        rowTotal: item.rowTotal,
+        categories: item.categories ?? [],
+      })),
+    [reviewSummary.items]
+  );
+
   const checkoutSettings = useMemo(
     () =>
       sellerCheckoutFeatures?.checkoutSettings ??
@@ -1896,10 +1915,64 @@ export default function StoreView() {
     if (!showPrepaidOption && showCodOption) setPaymentMethod('cod');
   }, [isUpiPaymentMode, showUpiOption, showCodOption, showPrepaidOption]);
 
+  useEffect(() => {
+    const code = couponCode.trim();
+    if (!code || !store?.sellerUserId) {
+      setCouponBlockReason(null);
+      return;
+    }
+
+    const restrictionReason = evaluateCouponRestrictionBlock(
+      checkoutSettings,
+      code,
+      checkoutCartLines
+    );
+    if (restrictionReason) {
+      setCouponBlockReason(restrictionReason);
+      return;
+    }
+
+    const phone = customerWhatsappNumber.trim()
+      ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}`
+      : '';
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void validateStorefrontCoupon(
+        store.sellerUserId,
+        code,
+        phone,
+        checkoutCartLines.map((line) => ({
+          productId: line.productId,
+          categories: line.categories,
+          category: line.categories[0],
+          rowTotal: line.rowTotal,
+        }))
+      ).then((result) => {
+        if (cancelled) return;
+        setCouponBlockReason(result.valid ? null : result.reason ?? 'invalid_coupon');
+      });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    couponCode,
+    customerWhatsappCountry,
+    customerWhatsappNumber,
+    store?.sellerUserId,
+    checkoutSettings,
+    checkoutCartLines,
+  ]);
+
   const checkoutTotals = useMemo(() => {
     const totals = computeCheckoutTotals(reviewSummary.total, checkoutSettings, {
       couponCode,
       paymentMethod: totalsPaymentMethod,
+      couponRedemptionAllowed: !couponBlockReason,
+      cartLines: checkoutCartLines,
     });
     const customerNotes: { orderNote?: string; giftMessage?: string } = {};
     if (checkoutSettings.experience.enableOrderNotes && orderNote.trim()) {
@@ -1917,11 +1990,21 @@ export default function StoreView() {
     checkoutSettings,
     couponCode,
     totalsPaymentMethod,
+    couponBlockReason,
+    checkoutCartLines,
     orderNote,
     giftMessage,
   ]);
 
   const hasCheckoutRules = checkoutSettings.rules.some((r) => r.enabled);
+
+  const couponBlockMessage = useMemo(
+    () =>
+      couponBlockReason
+        ? couponValidationMessage(couponBlockReason, checkoutSettings, couponCode)
+        : null,
+    [couponBlockReason, checkoutSettings, couponCode]
+  );
 
   const handlePlaceOrder = async () => {
     if (!listingCatalogueId) return;
@@ -1991,6 +2074,26 @@ export default function StoreView() {
       alert('Store configuration error. Please refresh and try again.');
       return;
     }
+    if (couponCode.trim()) {
+      const fullWhatsapp = customerWhatsappNumber.trim()
+        ? `${customerWhatsappCountry}${customerWhatsappNumber.trim()}`
+        : '';
+      const couponCheck = await validateStorefrontCoupon(
+        store.sellerUserId,
+        couponCode,
+        fullWhatsapp,
+        checkoutCartLines.map((line) => ({
+          productId: line.productId,
+          categories: line.categories,
+          category: line.categories[0],
+          rowTotal: line.rowTotal,
+        }))
+      );
+      if (!couponCheck.valid) {
+        alert(couponValidationMessage(couponCheck.reason, checkoutSettings, couponCode));
+        return;
+      }
+    }
     setIsSubmitting(true);
     try {
       const orderItems: OrderItem[] = [];
@@ -2003,13 +2106,15 @@ export default function StoreView() {
           product,
           item.variantSelection ?? {}
         );
+        const productCategories = normalizeProductCategories(product.category);
         orderItems.push({
           productId: item.productId,
           name: item.name,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           rowTotal: item.rowTotal,
-          category: product.category?.[0],
+          category: productCategories[0],
+          categories: productCategories,
           subtitle: product.subtitle,
           priceUnit,
           imageUrl: item.imageUrl,
@@ -2128,6 +2233,10 @@ export default function StoreView() {
     if (checkoutRoute === 'details') {
       if (!customerName.trim()) { alert('Please enter your name'); return; }
       if (!customerWhatsappNumber.trim()) { alert('Please enter your WhatsApp number'); return; }
+      if (couponCode.trim() && couponBlockReason) {
+        alert(couponValidationMessage(couponBlockReason, checkoutSettings, couponCode));
+        return;
+      }
       if (
         requiresShippingAddress &&
         (!shipLine1.trim() || !shipCity.trim() || !shipState.trim() || shipPincode.replace(/\D/g, '').length !== 6)
@@ -2582,6 +2691,8 @@ export default function StoreView() {
                 checkoutSettings={checkoutSettings}
                 couponCode={couponCode}
                 onCouponCodeChange={setCouponCode}
+                couponBlockReason={couponBlockReason}
+                couponBlockMessage={couponBlockMessage}
                 checkoutTotals={checkoutTotals}
                 hasCheckoutRules={hasCheckoutRules}
                 orderItems={orderSummary.items}

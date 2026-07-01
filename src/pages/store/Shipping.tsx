@@ -162,7 +162,7 @@ export default function Shipping() {
 
   return (
     <StoreLayout>
-      <PageHeader title="Shipping" description="How you fulfill orders." />
+      <PageHeader title="Shipping" />
 
       <div className={`max-w-lg space-y-6 ${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS}`}>
         {loading ? (

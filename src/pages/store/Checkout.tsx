@@ -3,7 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
 import { getPersistedAuthUserId } from '../../utils/authUserId';
-import { getSellerStore, updateStoreCheckoutSettings, updateStoreMinimumOrderValue, normalizeStoreMinimumOrderValueInput } from '../../services/storeService';
+import { getSellerStore, getStoreProducts, updateStoreCheckoutSettings, updateStoreMinimumOrderValue, normalizeStoreMinimumOrderValueInput } from '../../services/storeService';
+import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
+import { getWebsiteProductImageUrl } from '../../utils/websiteStorefront';
 import { readCachedSellerStore } from '../../utils/storePageCache';
 import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import StoreSaveBar from './components/StoreSaveBar';
@@ -12,9 +14,10 @@ import SettingsCard from './components/SettingsCard';
 import ToggleSwitch from './components/ToggleSwitch';
 import MinimumOrderValueField from './components/MinimumOrderValueField';
 import CheckoutRulesSection from './components/CheckoutRulesSection';
-import { FiInfo } from 'react-icons/fi';
+import InfoTooltipButton from './components/InfoTooltipButton';
 import {
   DEFAULT_CHECKOUT_SETTINGS,
+  disableExpiredCouponRules,
   isAutoDiscountRuleType,
   isCouponRuleType,
   normalizeCheckoutSettings,
@@ -33,43 +36,20 @@ function ToggleRow({
   checked,
   onChange,
   disabled,
-  tooltipOpen,
-  onTooltipToggle,
-  tooltipKey,
 }: {
   title: string;
   description?: string;
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
-  tooltipOpen?: string | null;
-  onTooltipToggle?: (key: string) => void;
-  tooltipKey?: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1">
-      <div>
-        <div className="flex items-center gap-2 relative">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">{title}</h3>
-          {description && onTooltipToggle && tooltipKey ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onTooltipToggle(tooltipKey)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
-                aria-label={`${title} information`}
-                title={description}
-              >
-                <FiInfo className="w-4 h-4" />
-              </button>
-              {tooltipOpen === tooltipKey && (
-                <div className="absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-700 text-white text-sm px-2 py-1 rounded whitespace-nowrap z-10">
-                  {description}
-                </div>
-              )}
-            </>
-          ) : null}
-        </div>
+      <div className="flex items-center gap-2">
+        <h3 className="font-medium text-gray-900 dark:text-gray-100">{title}</h3>
+        {description ? (
+          <InfoTooltipButton text={description} label={`${title} information`} />
+        ) : null}
       </div>
       <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
@@ -90,7 +70,24 @@ export default function Checkout() {
   const [minimumOrderError, setMinimumOrderError] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [tooltipOpen, setTooltipOpen] = useState<string | null>(null);
+  const [productCategoryOptions, setProductCategoryOptions] = useState<string[]>([]);
+  const [productOptions, setProductOptions] = useState<{ id: string; name: string }[]>([]);
+
+  const applyLoadedCheckoutSettings = useCallback(
+    (raw: StoreCheckoutSettings) => {
+      const normalized = normalizeCheckoutSettings(raw);
+      const { settings: withExpiryApplied, disabledLabels } = disableExpiredCouponRules(normalized);
+      setSettings(withExpiryApplied);
+      setOriginalSettings(normalized);
+      if (disabledLabels.length > 0) {
+        showToast(
+          `Expired coupon${disabledLabels.length === 1 ? '' : 's'} turned off: ${disabledLabels.join(', ')}. Save checkout settings to keep this change.`,
+          'warning'
+        );
+      }
+    },
+    [showToast]
+  );
 
   useLayoutEffect(() => {
     if (!sellerId) return;
@@ -99,10 +96,12 @@ export default function Checkout() {
       const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
       const mov =
         cached.minimumOrderValue != null ? String(cached.minimumOrderValue) : '0';
-      setSettings(loaded);
+      const { settings: withExpiryApplied } = disableExpiredCouponRules(loaded);
+      setSettings(withExpiryApplied);
       setOriginalSettings(loaded);
       setMinimumOrderValue(mov);
       setOriginalMinimumOrderValue(mov);
+      setProductCategoryOptions(cached.productCategories ?? []);
       setLoading(false);
     }
   }, [sellerId]);
@@ -119,15 +118,30 @@ export default function Checkout() {
     }
 
     const result = await getSellerStore(sellerId);
+    void getStoreProducts(sellerId).then((productsResult) => {
+      if (productsResult.success && productsResult.products) {
+        setProductOptions(
+          productsResult.products.map((product: ProductWithCatalogueData) => ({
+            id: product.id,
+            name: product.name?.trim() || 'Untitled product',
+            subtitle: product.subtitle?.trim() || undefined,
+            imageUrl: getWebsiteProductImageUrl(product),
+          }))
+        );
+      }
+    });
+
     if (!result.success || !result.data) {
       if (cached) {
         const loaded = normalizeCheckoutSettings(cached.checkoutSettings);
         const mov =
           cached.minimumOrderValue != null ? String(cached.minimumOrderValue) : '0';
-        setSettings(loaded);
+        const { settings: withExpiryApplied } = disableExpiredCouponRules(loaded);
+        setSettings(withExpiryApplied);
         setOriginalSettings(loaded);
         setMinimumOrderValue(mov);
         setOriginalMinimumOrderValue(mov);
+        setProductCategoryOptions(cached.productCategories ?? []);
       } else {
         showToast(result.error || 'Failed to load checkout settings', 'error');
       }
@@ -135,15 +149,14 @@ export default function Checkout() {
       return;
     }
 
-    const loaded = normalizeCheckoutSettings(result.data.checkoutSettings);
+    applyLoadedCheckoutSettings(result.data.checkoutSettings);
     const mov =
       result.data.minimumOrderValue != null ? String(result.data.minimumOrderValue) : '0';
-    setSettings(loaded);
-    setOriginalSettings(loaded);
     setMinimumOrderValue(mov);
     setOriginalMinimumOrderValue(mov);
+    setProductCategoryOptions(result.data.productCategories ?? []);
     setLoading(false);
-  }, [sellerId, showToast]);
+  }, [sellerId, showToast, applyLoadedCheckoutSettings]);
 
   useEffect(() => {
     if (authLoading && !sellerId) return;
@@ -249,8 +262,8 @@ export default function Checkout() {
   if (loading || authLoading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8 max-w-3xl">
-          <div className="h-12 w-56 rounded bg-gray-200 dark:bg-gray-800" />
+        <PageHeader title="Checkout Settings" />
+        <div className="animate-pulse space-y-6 py-4 max-w-3xl">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-48 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
@@ -264,7 +277,6 @@ export default function Checkout() {
       <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Checkout Settings"
-          sticky
           actions={(
             <button
               type="button"
@@ -284,7 +296,7 @@ export default function Checkout() {
         <div className="space-y-6">
           <SettingsCard
             title="Order summary"
-            description="How totals appear to customers during checkout."
+            info="How totals appear to customers during checkout."
           >
             <ToggleRow
               title="Show price breakdown"
@@ -292,15 +304,12 @@ export default function Checkout() {
               checked={settings.showBreakdown}
               onChange={(showBreakdown) => patchSettings({ showBreakdown })}
               disabled={saving}
-              tooltipOpen={tooltipOpen}
-              onTooltipToggle={setTooltipOpen}
-              tooltipKey="breakdown"
             />
           </SettingsCard>
 
           <SettingsCard
             title="Minimum order value"
-            description="Cart total required before customers can place an order."
+            info="Cart total required before customers can place an order."
           >
             <MinimumOrderValueField
               value={minimumOrderValue}
@@ -316,7 +325,7 @@ export default function Checkout() {
 
           <SettingsCard
             title="Shipping Charges"
-            description="Configure delivery fees and free-shipping thresholds."
+            info="Configure delivery fees, packing charges, and free-shipping thresholds."
           >
             <CheckoutRulesSection
               category="shipping"
@@ -330,15 +339,14 @@ export default function Checkout() {
                 preset.type !== 'cod_charge'
               }
               ruleFilter={(rule) => rule.type !== 'cod_charge'}
-              emptyHint="Add flat shipping, percentage shipping, packing, or free-shipping rules."
             />
           </SettingsCard>
 
           <SettingsCard
             title="Coupons"
-            description={
+            info={
               couponRuleCount > 0
-                ? `${couponRuleCount} active coupon rule${couponRuleCount === 1 ? '' : 's'}`
+                ? `${couponRuleCount} active coupon rule${couponRuleCount === 1 ? '' : 's'}. Create codes customers enter at checkout.`
                 : 'Create coupon codes customers can apply at checkout.'
             }
           >
@@ -349,27 +357,25 @@ export default function Checkout() {
                 checked={settings.allowCouponEntry}
                 onChange={(allowCouponEntry) => patchSettings({ allowCouponEntry })}
                 disabled={saving}
-                tooltipOpen={tooltipOpen}
-                onTooltipToggle={setTooltipOpen}
-                tooltipKey="coupon"
               />
               <CheckoutRulesSection
                 category="discount"
                 rules={settings.rules}
                 onChange={(rules) => patchSettings({ rules })}
                 disabled={saving}
+                categoryOptions={productCategoryOptions}
+                productOptions={productOptions}
                 presetFilter={(preset) => preset.type.startsWith('coupon_')}
                 ruleFilter={(rule) => isCouponRuleType(rule.type)}
-                emptyHint="Add percentage or flat coupon rules with unique codes."
               />
             </div>
           </SettingsCard>
 
           <SettingsCard
             title="Discount Rules"
-            description={
+            info={
               discountRuleCount > 0
-                ? `${discountRuleCount} automatic discount rule${discountRuleCount === 1 ? '' : 's'} active`
+                ? `${discountRuleCount} automatic discount rule${discountRuleCount === 1 ? '' : 's'} active. Applied without coupon codes when orders qualify.`
                 : 'Apply automatic order discounts without coupon codes.'
             }
           >
@@ -386,26 +392,24 @@ export default function Checkout() {
                 isAutoDiscountRuleType(rule.type) ||
                 (rule.type === 'custom' && rule.category === 'discount')
               }
-              emptyHint="Add automatic percentage or flat order discounts with minimum order and cap rules."
             />
           </SettingsCard>
 
           <SettingsCard
             title="Taxes"
-            description="Configure GST, VAT, and other tax rules applied at checkout."
+            info="Configure GST, VAT, and other tax rules applied at checkout."
           >
             <CheckoutRulesSection
               category="tax"
               rules={settings.rules}
               onChange={(rules) => patchSettings({ rules })}
               disabled={saving}
-              emptyHint="Add GST, CGST/SGST, IGST, VAT, or custom tax rules."
             />
           </SettingsCard>
 
           <SettingsCard
             title="Cash on Delivery Charges"
-            description="Add COD fees that apply only when customers choose cash on delivery."
+            info="Add COD fees that apply only when customers choose cash on delivery."
           >
             <CheckoutRulesSection
               category="shipping"
@@ -414,13 +418,12 @@ export default function Checkout() {
               disabled={saving}
               presetFilter={(preset) => preset.type === 'cod_charge'}
               ruleFilter={(rule) => rule.type === 'cod_charge'}
-              emptyHint="Add a COD surcharge rule for cash on delivery orders."
             />
           </SettingsCard>
 
           <SettingsCard
             title="Gift Notes"
-            description="Let customers include a gift message with their order."
+            info="Let customers include a gift message with their order."
           >
             <div className="space-y-4">
               <ToggleRow
@@ -429,9 +432,6 @@ export default function Checkout() {
                 checked={settings.experience.enableGiftNotes}
                 onChange={(enableGiftNotes) => patchExperience({ enableGiftNotes })}
                 disabled={saving}
-                tooltipOpen={tooltipOpen}
-                onTooltipToggle={setTooltipOpen}
-                tooltipKey="giftnotes"
               />
               {settings.experience.enableGiftNotes ? (
                 <div>
@@ -452,7 +452,7 @@ export default function Checkout() {
 
           <SettingsCard
             title="Order Notes"
-            description="Collect special instructions from customers during checkout."
+            info="Collect special instructions from customers during checkout."
           >
             <div className="space-y-4">
               <ToggleRow
@@ -461,9 +461,6 @@ export default function Checkout() {
                 checked={settings.experience.enableOrderNotes}
                 onChange={(enableOrderNotes) => patchExperience({ enableOrderNotes })}
                 disabled={saving}
-                tooltipOpen={tooltipOpen}
-                onTooltipToggle={setTooltipOpen}
-                tooltipKey="ordernotes"
               />
               {settings.experience.enableOrderNotes ? (
                 <div>
@@ -484,7 +481,7 @@ export default function Checkout() {
 
           <SettingsCard
             title="Address Validation"
-            description="Validate customer shipping details before order submission."
+            info="Validate customer shipping details before order submission."
           >
             <ToggleRow
               title="Validate shipping address"
@@ -492,15 +489,12 @@ export default function Checkout() {
               checked={settings.experience.validateAddress}
               onChange={(validateAddress) => patchExperience({ validateAddress })}
               disabled={saving}
-              tooltipOpen={tooltipOpen}
-              onTooltipToggle={setTooltipOpen}
-              tooltipKey="validateaddress"
             />
           </SettingsCard>
 
           <SettingsCard
             title="Policies"
-            description="Link to your legal and customer policy pages shown during checkout."
+            info="Link to your legal and customer policy pages shown during checkout."
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
@@ -528,7 +522,7 @@ export default function Checkout() {
 
           <SettingsCard
             title="Order Confirmation"
-            description="Customize the message customers see after placing an order."
+            info="Customize the message customers see after placing an order."
           >
             <div className="space-y-4">
               <div>
@@ -563,9 +557,6 @@ export default function Checkout() {
                   patchExperience({ showOrderSummaryOnConfirmation })
                 }
                 disabled={saving}
-                tooltipOpen={tooltipOpen}
-                onTooltipToggle={setTooltipOpen}
-                tooltipKey="ordersummary"
               />
             </div>
           </SettingsCard>

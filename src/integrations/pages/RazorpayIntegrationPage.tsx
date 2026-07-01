@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import MainAppBottomNav from '../../components/MainAppBottomNav';
 import { useToast } from '../../context/ToastContext';
 import { useCloudWriteGate } from '../../hooks/useCloudWriteGate';
+import StoreLayout from '../../pages/store/components/StoreLayout';
+import PageHeader from '../../pages/store/components/PageHeader';
 import {
   connectIntegration,
   disconnectIntegration,
@@ -15,14 +15,9 @@ import { IntegrationGuideCard } from '../components/IntegrationGuideCard';
 import { IntegrationStatusBadge } from '../components/IntegrationStatusBadge';
 import { RazorpayConnectForm } from '../components/RazorpayConnectForm';
 import { useIntegrationProvider } from '../hooks/useIntegrationProvider';
-import {
-  INTEGRATIONS_PAGE_CSS,
-  IconBack,
-  IconCheck,
-} from '../components/integrationsPageStyles';
+import { INTEGRATIONS_PAGE_CSS, IconCheck } from '../components/integrationsPageStyles';
 
 export default function RazorpayIntegrationPage() {
-  const navigate = useNavigate();
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
   const {
@@ -109,22 +104,11 @@ export default function RazorpayIntegrationPage() {
   const securityNote = provider.getSecurityNote();
 
   return (
-    <div className="int-root">
+    <StoreLayout>
       <style>{INTEGRATIONS_PAGE_CSS}</style>
-      <div className="int-status-bar" aria-hidden />
-      <header className="int-header">
-        <button
-          type="button"
-          className="int-back"
-          onClick={() => navigate('/store/integrations')}
-          aria-label="Back"
-        >
-          <IconBack />
-        </button>
-        <h1 className="int-title">Razorpay</h1>
-      </header>
+      <PageHeader title="Razorpay" backTo="/store/integrations" />
 
-      <main className="int-main">
+      <div className="int-main max-w-lg pb-8">
         {error ? <div className="int-error-box">{error}</div> : null}
         {view?.lastError ? (
           <div className="int-error-box" style={{ marginBottom: 12 }}>
@@ -196,9 +180,7 @@ export default function RazorpayIntegrationPage() {
             ) : null}
           </>
         )}
-      </main>
-
-      <MainAppBottomNav active="store" />
-    </div>
+      </div>
+    </StoreLayout>
   );
 }

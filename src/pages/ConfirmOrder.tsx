@@ -229,13 +229,30 @@ export default function ConfirmOrder() {
     return { updatedTotal: total };
   }, [localCartLines, catalogueItems]);
 
+  const checkoutCartLines = useMemo(() => {
+    const lines: { productId: string; rowTotal: number; categories: string[] }[] = [];
+    activeCartLines(localCartLines).forEach((line) => {
+      const catItem = catalogueItems.find((i) => i.productId === line.productId);
+      if (!catItem) return;
+      const unitPrice = getShareLinkItemUnitPrice(catItem, line.quantity);
+      if (!Number.isFinite(unitPrice)) return;
+      lines.push({
+        productId: line.productId,
+        rowTotal: unitPrice * line.quantity,
+        categories: getItemCategories(catItem),
+      });
+    });
+    return lines;
+  }, [localCartLines, catalogueItems]);
+
   const checkoutTotals = useMemo(
     () =>
       computeCheckoutTotals(updatedTotal, checkoutSettings, {
         couponCode,
         paymentMethod: effectivePaymentMethod,
+        cartLines: checkoutCartLines,
       }),
-    [updatedTotal, checkoutSettings, couponCode, effectivePaymentMethod]
+    [updatedTotal, checkoutSettings, couponCode, effectivePaymentMethod, checkoutCartLines]
   );
 
   if (!isValid) {
@@ -300,6 +317,7 @@ export default function ConfirmOrder() {
           const unitPrice = getShareLinkItemUnitPrice(i, line.quantity);
           const rowTotal = Number.isFinite(unitPrice) ? unitPrice * line.quantity : 0;
           const groups = i.variantGroups ?? [];
+          const itemCategories = getItemCategories(i);
 
           return {
             productId: i.productId,
@@ -307,7 +325,8 @@ export default function ConfirmOrder() {
             quantity: line.quantity,
             unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
             rowTotal,
-            category: (i.category || []).join(', ') || '',
+            category: itemCategories[0] ?? '',
+            categories: itemCategories,
             subtitle: i.subtitle || '',
             priceUnit: i.priceUnit || undefined,
             imageUrl: i.imageUrl,

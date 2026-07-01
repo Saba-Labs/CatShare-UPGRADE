@@ -1908,20 +1908,17 @@ export default function Orders() {
             className="orders-status-banner__icon"
             style={{ background: activeTabTheme.gradient }}
           >
-            <StatusTabGlyph tabKey={tab} size={24} />
+            <StatusTabGlyph tabKey={tab} size={20} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 className="orders-status-banner__title" style={{ color: activeTabTheme.text }}>
-              {activeTabMeta.label}
-            </h2>
-              <p className="orders-status-banner__meta" style={{ color: activeTabTheme.meta }}>
-                {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
-                {' · '}
-                {activeTabTheme.hint}
-                {' · '}
-                <span className="orders-status-banner__swipe-hint">Swipe to change status</span>
-              </p>
-          </div>
+          <p className="orders-status-banner__title" style={{ color: activeTabTheme.text }}>
+            {activeTabMeta.label}
+            <span className="orders-status-banner__sep" style={{ color: activeTabTheme.meta }}>
+              {' · '}
+            </span>
+            <span className="orders-status-banner__count" style={{ color: activeTabTheme.meta }}>
+              {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+            </span>
+          </p>
         </div>
       )}
 

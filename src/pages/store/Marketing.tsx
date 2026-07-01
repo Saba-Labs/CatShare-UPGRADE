@@ -158,8 +158,8 @@ export default function Marketing() {
   if (loading || authLoading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8 max-w-3xl">
-          <div className="h-12 w-48 rounded bg-gray-200 dark:bg-gray-800" />
+        <PageHeader title="Marketing" />
+        <div className="animate-pulse space-y-6 py-4 max-w-3xl">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-48 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
@@ -173,7 +173,6 @@ export default function Marketing() {
       <div className={`${STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS} max-w-3xl`}>
         <PageHeader
           title="Marketing"
-          sticky
           actions={(
             <button
               type="button"

@@ -8,6 +8,7 @@ import PageHeader from './components/PageHeader';
 import AnalyticsMetricCard from './components/AnalyticsMetricCard';
 import AnalyticsDateFilter from './components/AnalyticsDateFilter';
 import AnalyticsSalesChart from './components/AnalyticsSalesChart';
+import AnalyticsBreakdownList from './components/AnalyticsBreakdownList';
 import type { AnalyticsDateRange } from './types/analytics';
 import {
   computeAnalyticsFromOrders,
@@ -62,15 +63,23 @@ export default function Analytics() {
   );
 
   const hasData = hasAnalyticsData(data);
+  const { metrics } = data;
 
-  const primaryMetrics = [
-    data.metrics.orders,
-    data.metrics.revenue,
-    data.metrics.conversionRate,
-    data.metrics.averageOrderValue,
+  const salesMetrics = [
+    metrics.totalOrders,
+    metrics.completedOrders,
+    metrics.revenue,
+    metrics.averageOrderValue,
   ];
 
-  const secondaryMetrics = [data.metrics.returningCustomers];
+  const customerMetrics = [
+    metrics.itemsSold,
+    metrics.uniqueCustomers,
+    metrics.returningCustomers,
+    metrics.shippedOrders,
+  ];
+
+  const pipelineMetrics = [metrics.activePipeline, metrics.cancelledOrders];
 
   return (
     <StoreLayout>
@@ -114,12 +123,31 @@ export default function Analytics() {
         ) : (
           <div className="space-y-6">
             <section>
-              <h2 className="sr-only">Key metrics</h2>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Sales
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                {primaryMetrics.map((metric) => (
+                {salesMetrics.map((metric) => (
                   <AnalyticsMetricCard key={metric.id} metric={metric} loading={loading} />
                 ))}
               </div>
+            </section>
+
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Customers & fulfillment
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                {customerMetrics.map((metric) => (
+                  <AnalyticsMetricCard key={metric.id} metric={metric} loading={loading} />
+                ))}
+              </div>
+            </section>
+
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {pipelineMetrics.map((metric) => (
+                <AnalyticsMetricCard key={metric.id} metric={metric} loading={loading} />
+              ))}
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,18 +164,31 @@ export default function Analytics() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                {secondaryMetrics.map((metric) => (
-                  <AnalyticsMetricCard key={metric.id} metric={metric} loading={loading} />
-                ))}
-              </div>
+              <AnalyticsBreakdownList
+                title="Order status"
+                rows={data.orderStatusBreakdown}
+                loading={loading}
+              />
+            </section>
+
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <AnalyticsBreakdownList
+                title="Order sources"
+                rows={data.orderSourceBreakdown}
+                loading={loading}
+              />
+              <AnalyticsBreakdownList
+                title="Payment methods"
+                rows={data.paymentMethodBreakdown}
+                loading={loading}
+              />
             </section>
 
             {data.popularProducts.length > 0 ? (
-              <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section>
                 <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-sm">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                    Popular Products
+                    Top products
                   </h3>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
@@ -157,7 +198,7 @@ export default function Analytics() {
                             Product
                           </th>
                           <th className="pb-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                            Qty
+                            Qty sold
                           </th>
                           <th className="pb-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             Revenue

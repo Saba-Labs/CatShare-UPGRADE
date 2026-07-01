@@ -87,7 +87,7 @@ export const INTEGRATIONS_PAGE_CSS = `
     width: 100%;
     max-width: 480px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 0;
   }
 
   .int-section-title {

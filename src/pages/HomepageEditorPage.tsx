@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useEffect, useMemo, useState, useLayoutEffect } from 'react';
-import { FiArrowLeft } from 'react-icons/fi';
 import { getSellerStore, type Store } from '../services/storeService';
 import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
 import { isOfflineBuilderMode } from '../config/offlineBuilder';
@@ -12,6 +11,8 @@ import { getPersistedAuthUserId } from '../utils/authUserId';
 import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
 import { ProFeatureGate } from '../components/ProFeatureGate';
+import StoreLayout from './store/components/StoreLayout';
+import PageHeader from './store/components/PageHeader';
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 
@@ -133,94 +134,94 @@ export default function HomepageEditorPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 w-28 rounded bg-gray-200 dark:bg-gray-800" />
-            <div className="h-24 rounded-xl bg-gray-100 dark:bg-gray-800" />
-            <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
-          </div>
-          <div className="mt-6 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-blue-500 animate-spin" />
-            Preparing homepage builder...
-          </div>
+      <StoreLayout>
+        <PageHeader title="Homepage Builder" />
+        <div className="animate-pulse space-y-4 max-w-md py-8">
+          <div className="h-24 rounded-xl bg-gray-200 dark:bg-gray-800" />
+          <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
         </div>
-      </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Preparing homepage builder…</p>
+      </StoreLayout>
     );
   }
 
   if (!effectiveUid) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Sign in to edit your website</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Or open the app once while online so your account is cached on this device.
-          </p>
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
-          >
-            Log in
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/store')}
-            className="ml-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Back
-          </button>
+      <StoreLayout>
+        <PageHeader title="Homepage Builder" />
+        <div className="max-w-md py-8">
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Sign in to edit your website
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Or open the app once while online so your account is cached on this device.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+            >
+              Log in
+            </button>
+          </div>
         </div>
-      </div>
+      </StoreLayout>
     );
   }
 
   if (!store) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 flex items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
-          <div className="text-4xl mb-2" aria-hidden>⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Unable to Load Store</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">There was an error loading your store. Please try refreshing the page or go back to the store page.</p>
-          <button
-            onClick={() => navigate('/store')}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
-          >
-            Go Back to Store
-          </button>
+      <StoreLayout>
+        <PageHeader title="Homepage Builder" />
+        <div className="max-w-md py-8">
+          <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+            <div className="text-4xl mb-2" aria-hidden>⚠️</div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Unable to Load Store
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+              There was an error loading your store. Please try refreshing the page or go back to
+              the store page.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/store')}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+            >
+              Go Back to Store
+            </button>
+          </div>
         </div>
-      </div>
+      </StoreLayout>
     );
   }
 
   if (!isPro) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 relative">
-        <button
-          onClick={() => navigate('/store')}
-          className="fixed left-4 flex items-center justify-center h-8 w-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-gradient-to-br from-blue-50 to-gray-50 dark:from-blue-950/40 dark:to-gray-900 text-blue-600 dark:text-blue-400 hover:from-blue-100 hover:to-gray-100 dark:hover:from-blue-900/50 dark:hover:to-gray-800 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-          aria-label="Go back"
-          style={{ zIndex: 51, top: '56px' }}
-        >
-          <FiArrowLeft className="h-4 w-4" />
-        </button>
-        <ProFeatureGate featureName="Homepage Builder" locked={true}>
-          <div className="min-h-[600px]" />
+      <StoreLayout>
+        <PageHeader title="Homepage Builder" />
+        <ProFeatureGate featureName="Homepage Builder" locked>
+          <div className="min-h-[400px]" />
         </ProFeatureGate>
-      </div>
+      </StoreLayout>
     );
   }
 
   return (
-    <HomepageBuilder
-      storeId={store.id}
-      storeSlug={store.storeSlug}
-      sellerUserId={store.sellerUserId || effectiveUid}
-      catalogues={catalogues}
-      catalogueId={store.catalogueId}
-      storeWhatsapp={store.storeWhatsapp}
-      onClose={() => navigate('/store')}
-    />
+    <StoreLayout immersive>
+      <PageHeader title="Homepage Builder" />
+      <div className="flex min-h-0 flex-1 flex-col -mx-4 sm:-mx-6">
+        <HomepageBuilder
+          storeId={store.id}
+          storeSlug={store.storeSlug}
+          sellerUserId={store.sellerUserId || effectiveUid}
+          catalogues={catalogues}
+          catalogueId={store.catalogueId}
+          storeWhatsapp={store.storeWhatsapp}
+          onClose={() => navigate('/store')}
+        />
+      </div>
+    </StoreLayout>
   );
 }

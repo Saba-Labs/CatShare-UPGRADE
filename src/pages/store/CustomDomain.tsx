@@ -334,8 +334,8 @@ export default function CustomDomain() {
   if (loading || authLoading) {
     return (
       <StoreLayout>
-        <div className="animate-pulse space-y-6 py-8 max-w-3xl">
-          <div className="h-12 w-56 rounded bg-gray-200 dark:bg-gray-800" />
+        <PageHeader title="Custom Domain" />
+        <div className="animate-pulse space-y-6 py-4 max-w-3xl">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="h-40 rounded-2xl bg-gray-200 dark:bg-gray-800" />
           ))}
@@ -347,7 +347,7 @@ export default function CustomDomain() {
   if (!sellerId) {
     return (
       <StoreLayout>
-        <PageHeader title="Custom Domain" description="Connect your own domain to your storefront." />
+        <PageHeader title="Custom Domain" />
         <SettingsCard title="Sign in required" description="Log in to manage your custom domain.">
           <button
             type="button"
@@ -363,9 +363,7 @@ export default function CustomDomain() {
 
   return (
     <StoreLayout>
-      <PageHeader
-        title="Custom Domain"
-      />
+      <PageHeader title="Custom Domain" />
 
       <ProFeatureGate featureName="Custom Domain">
           <div className="max-w-3xl space-y-6 pb-8">

@@ -1,3 +1,5 @@
+import type { CouponValidationReason } from '../../services/couponRedemptionService';
+import { couponValidationMessage } from '../../services/couponRedemptionService';
 import CheckoutBreakdown from '../../components/Storefront/CheckoutBreakdown';
 import { getCatalogueData, normalizeOrderQuantityStep, type ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StoreCheckoutSettings } from '../../types/checkoutSettings';
@@ -50,6 +52,8 @@ interface CheckoutDetailsPageProps {
   checkoutSettings: StoreCheckoutSettings;
   couponCode: string;
   onCouponCodeChange: (value: string) => void;
+  couponBlockReason?: CouponValidationReason | null;
+  couponBlockMessage?: string | null;
   checkoutTotals: CheckoutTotals;
   hasCheckoutRules: boolean;
   orderItems: CheckoutOrderLine[];
@@ -98,6 +102,8 @@ export default function CheckoutDetailsPage({
   checkoutSettings,
   couponCode,
   onCouponCodeChange,
+  couponBlockReason = null,
+  couponBlockMessage = null,
   checkoutTotals,
   hasCheckoutRules,
   orderItems,
@@ -325,7 +331,12 @@ export default function CheckoutDetailsPage({
                 />
               </div>
               {couponCode.trim() && !checkoutTotals.appliedCouponCode ? (
-                <p className="sv-checkout-coupon-hint">Code not recognized or does not apply to this order.</p>
+                <p className="sv-checkout-coupon-hint">
+                  {couponBlockMessage ||
+                    (couponBlockReason
+                      ? couponValidationMessage(couponBlockReason)
+                      : 'Code not recognized or does not apply to this order.')}
+                </p>
               ) : null}
             </div>
           ) : null}

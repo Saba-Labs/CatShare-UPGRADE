@@ -614,8 +614,16 @@
     margin: 0 0 24px;
   }
 
+  .sv-checkout-panel .sv-checkout-steps {
+    padding: 12px 16px 10px;
+  }
+
+  .sv-checkout-panel .sv-checkout-steps .sv-steps {
+    padding: 0;
+  }
+
   .sv-checkout-panel .sv-checkout-content {
-    padding-bottom: 16px;
+    padding: 12px 16px 16px;
   }
 
   /*

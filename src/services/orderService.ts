@@ -79,6 +79,25 @@ export function formatStoreOrderError(error: unknown): string {
   if (msg.includes('seller_required') || msg.includes('customer_name_required')) {
     return 'Missing order details. Please fill in your name and try again.';
   }
+  if (msg.includes('coupon_not_allowed')) {
+    const reason = msg.split('coupon_not_allowed:')[1]?.trim() ?? '';
+    if (reason.includes('max_uses_reached')) {
+      return 'This coupon has reached its usage limit.';
+    }
+    if (reason.includes('already_used_by_phone')) {
+      return 'You have already used this coupon.';
+    }
+    if (reason.includes('phone_required')) {
+      return 'Enter your WhatsApp number to use this coupon.';
+    }
+    if (reason.includes('category_mismatch') || reason.includes('product_mismatch')) {
+      return 'This coupon does not apply to items in your cart.';
+    }
+    if (reason.includes('coupon_expired')) {
+      return 'This coupon has expired.';
+    }
+    return 'This coupon cannot be applied to your order.';
+  }
   const detail = String((error as { message?: string })?.message ?? '').trim();
   if (detail && import.meta.env.DEV) {
     return `Failed to place order: ${detail}`;
@@ -209,6 +228,8 @@ export interface OrderItem {
   unitPrice: number;
   rowTotal: number;
   category?: string;
+  /** All category labels on the product (for coupon restrictions) */
+  categories?: string[];
   subtitle?: string;
   priceUnit?: string;
   imageUrl?: string;
