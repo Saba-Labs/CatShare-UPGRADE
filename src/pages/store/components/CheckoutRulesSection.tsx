@@ -539,6 +539,9 @@ interface CheckoutRulesSectionProps {
   categoryOptions?: string[];
   /** Store products for product coupon rules */
   productOptions?: CheckoutProductOption[];
+  /** Cap how many rules can exist in this section (e.g. 1 for COD). */
+  maxRules?: number;
+  addRuleLabel?: string;
 }
 
 const APPLY_BASE_LABELS: Record<CheckoutApplyBase, string> = {
@@ -565,10 +568,12 @@ function StoreModal({
   const titleId = useId();
   const descId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', handleKeyDown);
@@ -577,7 +582,7 @@ function StoreModal({
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div
@@ -970,6 +975,8 @@ export default function CheckoutRulesSection({
   ruleFilter,
   categoryOptions = [],
   productOptions = [],
+  maxRules,
+  addRuleLabel = 'Add Rule',
 }: CheckoutRulesSectionProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editorDraft, setEditorDraft] = useState<CheckoutRule | null>(null);
@@ -989,6 +996,8 @@ export default function CheckoutRulesSection({
     return presetFilter ? base.filter(presetFilter) : base;
   }, [category, presetFilter]);
 
+  const canAddMore = maxRules == null || sectionRules.length < maxRules;
+
   const patchRule = (id: string, patch: Partial<CheckoutRule>) => {
     onChange(rules.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)));
   };
@@ -1007,6 +1016,15 @@ export default function CheckoutRulesSection({
     const newRule = createRuleFromPreset(preset);
     setPickerOpen(false);
     openEditor(newRule, true);
+  };
+
+  const handleAddClick = () => {
+    if (!canAddMore || presets.length === 0) return;
+    if (presets.length === 1) {
+      handlePickPreset(presets[0]);
+      return;
+    }
+    setPickerOpen(true);
   };
 
   const saveEditor = () => {
@@ -1103,15 +1121,23 @@ export default function CheckoutRulesSection({
           );
         })}
 
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          disabled={disabled || presets.length === 0}
-          className="inline-flex items-center gap-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <FiPlus className="h-4 w-4" />
-          Add Rule
-        </button>
+        {canAddMore ? (
+          <button
+            type="button"
+            onClick={handleAddClick}
+            disabled={disabled || presets.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FiPlus className="h-4 w-4" />
+            {addRuleLabel}
+          </button>
+        ) : maxRules != null ? (
+          <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+            {maxRules === 1
+              ? 'One charge per store. Edit the rule above to change the fee.'
+              : `Maximum of ${maxRules} rules in this section.`}
+          </p>
+        ) : null}
       </div>
 
       {pickerOpen ? (

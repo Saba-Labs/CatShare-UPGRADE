@@ -237,23 +237,22 @@ export function computeCheckoutTotals(
 
   taxTotal = roundMoney(taxTotal);
 
-  // —— COD charges ——
+  // —— COD charges (single fee — first matching rule only) ——
   if (paymentMethod === 'cod') {
-    const codRules = enabledRules.filter(
-      (r) =>
-        isCodRule(r) &&
-        ruleMatchesSubtotal(r, sub)
+    const codRule = enabledRules.find(
+      (r) => isCodRule(r) && ruleMatchesSubtotal(r, sub)
     );
-    for (const rule of codRules) {
-      const base = resolveBase(rule.applyBase, {
+    if (codRule) {
+      const base = resolveBase(codRule.applyBase, {
         subtotal: sub,
         afterDiscount,
         afterShipping,
       });
-      const amt = computeAmount(rule, base);
-      if (amt <= 0) continue;
-      codTotal += amt;
-      lines.push({ ruleId: rule.id, label: rule.label, category: 'shipping', amount: amt });
+      const amt = computeAmount(codRule, base);
+      if (amt > 0) {
+        codTotal += amt;
+        lines.push({ ruleId: codRule.id, label: codRule.label, category: 'shipping', amount: amt });
+      }
     }
   }
 

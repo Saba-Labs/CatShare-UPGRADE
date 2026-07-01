@@ -409,7 +409,7 @@ export default function Checkout() {
 
           <SettingsCard
             title="Cash on Delivery Charges"
-            info="Add COD fees that apply only when customers choose cash on delivery."
+            info="One COD fee applies when customers choose cash on delivery."
           >
             <CheckoutRulesSection
               category="shipping"
@@ -418,6 +418,8 @@ export default function Checkout() {
               disabled={saving}
               presetFilter={(preset) => preset.type === 'cod_charge'}
               ruleFilter={(rule) => rule.type === 'cod_charge'}
+              maxRules={1}
+              addRuleLabel="Add COD charge"
             />
           </SettingsCard>
 
