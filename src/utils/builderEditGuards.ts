@@ -1,4 +1,4 @@
-import type { HomepageLayout, HomepageSection } from '../types/homepage';
+import type { HomepageLayout, HomepageSection, LayoutSection } from '../types/homepage';
 
 export function sectionsShallowEqual(a: HomepageSection, b: HomepageSection): boolean {
   try {
@@ -9,10 +9,10 @@ export function sectionsShallowEqual(a: HomepageSection, b: HomepageSection): bo
 }
 
 export function mergeSectionUpdate(
-  section: HomepageSection,
+  section: LayoutSection,
   updates: Partial<HomepageSection>
-): HomepageSection {
-  return { ...section, ...updates } as HomepageSection;
+): LayoutSection {
+  return { ...section, ...updates } as LayoutSection;
 }
 
 export function commitInlineText(

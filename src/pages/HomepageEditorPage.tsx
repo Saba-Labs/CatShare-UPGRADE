@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useEffect, useMemo, useState, useLayoutEffect } from 'react';
-import { getSellerStore, type Store } from '../services/storeService';
+import { getSellerStore, type Store, type StorePublic } from '../services/storeService';
 import { ensureCataloguesForStorefront, getAllCatalogues } from '../config/catalogueConfig';
 import { isOfflineBuilderMode } from '../config/offlineBuilder';
 import { readCachedSellerStore } from '../utils/storePageCache';
@@ -44,6 +44,28 @@ function buildLocalFallbackStore(uid: string): Store {
   };
 }
 
+function toBuilderStorePublic(store: Store, sellerUserId: string): StorePublic {
+  return {
+    id: store.id,
+    storeId: store.id,
+    sellerUserId: store.sellerUserId || sellerUserId,
+    storeSlug: store.storeSlug,
+    catalogueId: store.catalogueId,
+    sellerCurrencyCode: 'INR',
+    sellerLogoUrl: '',
+    createdAt: store.createdAt,
+    storeWhatsapp: store.storeWhatsapp,
+    minimumOrderValue: store.minimumOrderValue,
+    viewMode: store.viewMode,
+    isLive: store.isLive,
+    maintenanceMode: store.maintenanceMode,
+    homepageEnabled: store.homepageEnabled,
+    websiteModeEnabled: store.websiteModeEnabled,
+    checkoutSettings: store.checkoutSettings,
+    productCategories: store.productCategories,
+  };
+}
+
 export default function HomepageEditorPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -69,6 +91,11 @@ export default function HomepageEditorPage() {
         ? ensureCataloguesForStorefront(getAllCatalogues(effectiveUid), store.catalogueId)
         : [],
     [effectiveUid, store]
+  );
+
+  const builderStore = useMemo(
+    () => (store && effectiveUid ? toBuilderStorePublic(store, effectiveUid) : null),
+    [store, effectiveUid]
   );
 
   useEffect(() => {
@@ -229,7 +256,7 @@ export default function HomepageEditorPage() {
           storeId={store.id}
           storeSlug={store.storeSlug}
           sellerUserId={store.sellerUserId || effectiveUid}
-          store={store}
+          store={builderStore}
           catalogues={catalogues}
           catalogueId={store.catalogueId}
           storeWhatsapp={store.storeWhatsapp}
