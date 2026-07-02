@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { HomepageLayout } from '../../types/homepage';
 import SectionRenderer from './sections/SectionRenderer';
 import { getBlockInnerStyle, getBlockRowStyle } from '../../utils/blockLayout';
+import { preventBuilderLinkNavigation } from '../../utils/builderNavigation';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
 
@@ -21,6 +22,7 @@ export default function PreviewPane({ layout }: PreviewPaneProps) {
       <div className="preview-header">Live Preview</div>
       <div
         className="preview-content preview-content--document"
+        onClickCapture={preventBuilderLinkNavigation}
         style={{
           color: layout.theme.textColor || '#1f2937',
           background: layout.theme.backgroundColor || '#ffffff',
@@ -40,7 +42,7 @@ export default function PreviewPane({ layout }: PreviewPaneProps) {
             {sections.map((section) => (
               <div key={section.id} style={getBlockRowStyle(section.blockLayout)}>
                 <div style={getBlockInnerStyle(section.blockLayout)}>
-                  <SectionRenderer section={section} theme={layout.theme} editMode={false} />
+                  <SectionRenderer section={section} theme={layout.theme} editMode={false} builderCanvas />
                 </div>
               </div>
             ))}

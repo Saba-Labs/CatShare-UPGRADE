@@ -24,7 +24,8 @@ import {
   normalizeHomepageLayoutForWebsiteMode,
 } from '../../config/homepageBuilderConfig';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
-import { HomepageConfig, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
+import type { StorePublic } from '../../services/storeService';
+import { HomepageConfig, HomepageLayout, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
 import { getSymbolForCurrencyCode } from '../../utils/currencyUtils';
 import BuilderProductPageOverlay from './BuilderProductPageOverlay';
 import { getWebsiteTemplate, type WebsiteTemplateId } from '../../config/websiteTemplates';
@@ -38,12 +39,14 @@ import GridCanvas from './GridCanvas';
 import PreviewPane from './PreviewPane';
 import { BuilderMediaProvider } from './media/BuilderMediaContext';
 import { BuilderCatalogueProvider } from './catalogue/BuilderCatalogueContext';
+import CookThemeWizard from './CookThemeWizard';
 import './HomepageBuilder.css';
 
 interface HomepageBuilderProps {
   storeId: string;
   storeSlug?: string;
   sellerUserId?: string;
+  store?: StorePublic | null;
   catalogues?: import('../../config/catalogueConfig').Catalogue[];
   catalogueId?: string;
   currencyCode?: string;
@@ -55,6 +58,7 @@ export default function HomepageBuilder({
   storeId,
   storeSlug,
   sellerUserId,
+  store,
   catalogues,
   catalogueId,
   currencyCode,
@@ -74,24 +78,9 @@ export default function HomepageBuilder({
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedFreeformElementId, setSelectedFreeformElementId] = useState<string | null>(null);
   const [previewProduct, setPreviewProduct] = useState<ProductWithCatalogueData | null>(null);
+  const [cookThemeOpen, setCookThemeOpen] = useState(false);
 
   const configPersisted = isPersistedHomepageConfigId(config?.id);
-
-  useHomepageAutosave({
-    configId: config?.id || '',
-    layout: state.layout,
-    isDirty: state.isDirty,
-    enabled: configPersisted,
-    debounceMs: 2000,
-    onSaveComplete: () => {
-      actions.markSaved();
-      showToast('Changes saved', 'success');
-    },
-    onSaveError: (error) => {
-      actions.setError(error.message);
-      showToast(`Failed to save: ${error.message}`, 'error');
-    },
-  });
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -180,8 +169,16 @@ export default function HomepageBuilder({
       const published = await publishHomepageConfig(persisted.id, draftLayout, {
         updatedBy: user?.uid,
       });
-      setConfig(published);
-      actions.setLayout(draftLayout);
+      const normalizedDraftLayout = normalizeHomepageLayoutForWebsiteMode(published.layout);
+      const normalizedPublishedLayout = published.publishedLayout
+        ? normalizeHomepageLayoutForWebsiteMode(published.publishedLayout)
+        : published.publishedLayout;
+      setConfig({
+        ...published,
+        layout: normalizedDraftLayout,
+        publishedLayout: normalizedPublishedLayout,
+      });
+      actions.setLayout(normalizedDraftLayout);
       actions.markSaved();
       showToast('Site published — customers will see your latest changes', 'success');
     } catch (error) {
@@ -202,6 +199,21 @@ export default function HomepageBuilder({
   };
 
   const draftLayoutForCompare = useMemo(() => buildDraftLayout(), [state.layout, editingPageId]);
+
+  useHomepageAutosave({
+    configId: config?.id || '',
+    layout: draftLayoutForCompare,
+    isDirty: state.isDirty,
+    enabled: configPersisted,
+    debounceMs: 2000,
+    onSaveComplete: () => {
+      actions.markSaved();
+    },
+    onSaveError: (error) => {
+      actions.setError(error.message);
+      showToast(`Failed to save: ${error.message}`, 'error');
+    },
+  });
 
   const hasUnpublishedChanges = useMemo(
     () => !homepageLayoutsEqual(draftLayoutForCompare, config?.publishedLayout),
@@ -336,48 +348,68 @@ export default function HomepageBuilder({
     const homeHasContent = (withSnapshot.pages.home.sections || []).length > 0;
     if (homeHasContent) {
       const ok = window.confirm(
-        `Apply the "${tpl.name}" template to your whole site? Your home page content will be replaced. Custom pages keep their sections but use the same colors, footer, and shop styling.`
+        `Apply the "${tpl.name}" theme to your whole site? Your home page content will be replaced. Custom pages keep their sections but use the same colors, footer, and shop styling.`
       );
       if (!ok) return;
     }
 
     const built = tpl.build();
-    const siteTheme = built.pages.home.theme;
-    const customPages = (withSnapshot.pages.custom || []).map((page) => ({
-      ...page,
-      layout: {
-        ...page.layout,
-        theme: siteTheme ? { ...siteTheme } : page.layout.theme,
-      },
-    }));
-    const customNavItems = customPages.map((page) => ({
-      id: uuid(),
-      label: page.title,
-      href: `/${page.slug}`,
-    }));
-    const mergedConfig: WebsiteModeConfig = {
-      ...built,
-      activeTemplateId: templateId,
-      siteSettings: {
-        ...built.siteSettings,
-        navItems: [...built.siteSettings.navItems, ...customNavItems],
-      },
-      pages: {
-        home: built.pages.home,
-        custom: customPages,
-      },
-    };
-
-    actions.switchEditingPage({
-      websiteConfig: mergedConfig,
-      sections: (built.pages.home.sections || []) as typeof state.layout.sections,
-      theme: built.pages.home.theme || state.layout.theme,
-    });
-    actions.selectSection(null);
+    applyBuiltWebsiteConfig(
+      built,
+      withSnapshot,
+      state.layout,
+      editingPageId,
+      actions,
+      { activeTemplateId: templateId, toastMessage: `Applied ${tpl.name} theme across your site` },
+      showToast
+    );
     setEditingPageId('home');
     setSidebarTab('insert');
-    showToast(`Applied ${tpl.name} across your site`, 'success');
   };
+
+  const handleCookThemeOpen = () => {
+    setCookThemeOpen(true);
+  };
+
+  const handleCookThemeComplete = (built: WebsiteModeConfig) => {
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+
+    applyBuiltWebsiteConfig(
+      built,
+      withSnapshot,
+      state.layout,
+      editingPageId,
+      actions,
+      { toastMessage: 'Your theme is ready — customize any block on the canvas' },
+      showToast
+    );
+    setEditingPageId('home');
+    setSidebarTab('insert');
+  };
+
+  const homeHasContent = (state.layout.sections || []).length > 0;
+
+  const showThemeHub =
+    editingPageId === 'home' &&
+    sidebarTab === 'templates' &&
+    !previewProduct &&
+    !showPreview;
+
+  useEffect(() => {
+    if (!isLoading && editingPageId === 'home' && state.layout.sections.length === 0) {
+      setSidebarTab('templates');
+    }
+  }, [isLoading, editingPageId, state.layout.sections.length]);
+
+  const handleSidebarTabChange = useCallback((tab: SidebarTab) => {
+    setSidebarTab(tab);
+    if (tab === 'templates') {
+      actions.selectSection(null);
+      setSelectedFreeformElementId(null);
+      setPreviewProduct(null);
+    }
+  }, [actions]);
 
   const handleStartBlank = () => {
     setSidebarTab('insert');
@@ -388,6 +420,12 @@ export default function HomepageBuilder({
     setSelectedFreeformElementId(null);
     setPreviewProduct(null);
   };
+
+  const handleOverlaySelectSection = useCallback((id: string | null) => {
+    // Keep product preview open while selecting header/footer/announcement in overlay.
+    actions.selectSection(id);
+    setSelectedFreeformElementId(null);
+  }, [actions]);
 
   const handleProductPreview = useCallback((product: ProductWithCatalogueData) => {
     setPreviewProduct(product);
@@ -444,6 +482,7 @@ export default function HomepageBuilder({
     editingPageId === 'home'
       ? 'Home'
       : state.layout.websiteConfig?.pages.custom?.find((p) => p.id === editingPageId)?.title || 'Page';
+  const viewportClassName = `viewport-${viewport}`;
 
   if (!responsiveState.canEdit) {
     return <BuilderMobileGate onClose={onClose} />;
@@ -508,8 +547,8 @@ export default function HomepageBuilder({
       )}
 
       {showPreview ? (
-        <div className="sites-editor-body">
-          <main className="sites-canvas-area">
+        <div className={`sites-editor-body ${viewportClassName}`}>
+          <main className={`sites-canvas-area ${viewportClassName}`}>
             <PreviewPane layout={state.layout} />
           </main>
         </div>
@@ -520,8 +559,8 @@ export default function HomepageBuilder({
           onInsertPresetAt={actions.insertPresetAt}
           onReorderSections={actions.reorderSections}
         >
-          <div className="sites-editor-body">
-            <main className="sites-canvas-area">
+          <div className={`sites-editor-body ${viewportClassName}${showThemeHub ? ' sites-editor-body--theme-hub' : ''}`}>
+            <main className={`sites-canvas-area ${viewportClassName}${showThemeHub ? ' sites-canvas-area--theme-hub' : ''}`}>
               {previewProduct ? (
                 <BuilderProductPageOverlay
                   product={previewProduct}
@@ -535,15 +574,16 @@ export default function HomepageBuilder({
                   catalogue={previewCatalogue}
                   viewport={viewport}
                   selectedSectionId={state.selectedSectionId}
-                  onSelectSection={handleSelectSection}
+                  onSelectSection={handleOverlaySelectSection}
                   onClose={() => setPreviewProduct(null)}
                 />
               ) : (
-                <div className={`sites-page-frame viewport-${viewport}`}>
+                <div className={`sites-page-frame viewport-${viewport}${showThemeHub ? ' sites-page-frame--theme-hub' : ''}`}>
                   <GridCanvas
                     layout={state.layout}
                     theme={state.layout.theme}
                     storeId={storeId}
+                    store={store}
                     editingPageId={editingPageId}
                     selectedSectionId={state.selectedSectionId}
                     selectedFreeformElementId={selectedFreeformElementId}
@@ -558,6 +598,8 @@ export default function HomepageBuilder({
                     onReorderSections={actions.reorderSections}
                     onApplyTemplate={editingPageId === 'home' ? handleApplyTemplate : undefined}
                     onStartBlank={handleStartBlank}
+                    onCookTheme={editingPageId === 'home' ? handleCookThemeOpen : undefined}
+                    themeHubMode={showThemeHub}
                     onProductPreview={handleProductPreview}
                   />
                 </div>
@@ -566,7 +608,8 @@ export default function HomepageBuilder({
 
             <BuilderSidebar
               activeTab={sidebarTab}
-              onTabChange={setSidebarTab}
+              onTabChange={handleSidebarTabChange}
+              themeHubMode={showThemeHub}
               previewProduct={previewProduct}
               onCloseProductPreview={() => setPreviewProduct(null)}
               selectedSectionId={state.selectedSectionId}
@@ -589,10 +632,19 @@ export default function HomepageBuilder({
               onRemovePage={handleRemovePage}
               onClearSectionSelection={() => actions.selectSection(null)}
               onApplyTemplate={handleApplyTemplate}
+              onCookTheme={handleCookThemeOpen}
             />
           </div>
         </BuilderDndProvider>
       )}
+
+      <CookThemeWizard
+        open={cookThemeOpen}
+        storeName={store?.sellerBusinessName || state.layout.websiteConfig?.siteSettings?.websiteName}
+        confirmReplace={homeHasContent}
+        onClose={() => setCookThemeOpen(false)}
+        onComplete={handleCookThemeComplete}
+      />
     </div>
     </BuilderCatalogueProvider>
     </BuilderMediaProvider>
@@ -643,4 +695,52 @@ function snapshotCurrentPageIntoWebsiteConfig(
       ),
     },
   });
+}
+
+type BuilderActions = ReturnType<typeof useHomepageBuilder>['actions'];
+
+function applyBuiltWebsiteConfig(
+  built: WebsiteModeConfig,
+  withSnapshot: WebsiteModeConfig,
+  layout: HomepageLayout,
+  _editingPageId: string,
+  actions: BuilderActions,
+  options?: { activeTemplateId?: WebsiteTemplateId; toastMessage?: string },
+  showToast?: (msg: string, type: 'success' | 'error' | 'warning') => void
+) {
+  const siteTheme = built.pages.home.theme;
+  const customPages = (withSnapshot.pages.custom || []).map((page) => ({
+    ...page,
+    layout: {
+      ...page.layout,
+      theme: siteTheme ? { ...siteTheme } : page.layout.theme,
+    },
+  }));
+  const customNavItems = customPages.map((page) => ({
+    id: uuid(),
+    label: page.title,
+    href: `/${page.slug}`,
+  }));
+  const mergedConfig: WebsiteModeConfig = {
+    ...built,
+    ...(options?.activeTemplateId ? { activeTemplateId: options.activeTemplateId } : {}),
+    siteSettings: {
+      ...built.siteSettings,
+      navItems: [...built.siteSettings.navItems, ...customNavItems],
+    },
+    pages: {
+      home: built.pages.home,
+      custom: customPages,
+    },
+  };
+
+  actions.switchEditingPage({
+    websiteConfig: mergedConfig,
+    sections: (built.pages.home.sections || []) as HomepageLayout['sections'],
+    theme: built.pages.home.theme || layout.theme,
+  });
+  actions.selectSection(null);
+  if (options?.toastMessage && showToast) {
+    showToast(options.toastMessage, 'success');
+  }
 }

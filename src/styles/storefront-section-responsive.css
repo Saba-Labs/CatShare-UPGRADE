@@ -1,0 +1,562 @@
+/**
+ * Responsive typography & spacing for all homepage section types.
+ * Works via container queries (live site + editor preview) and viewport toggle classes.
+ */
+
+/* ---- Text ---- */
+
+.text-section {
+  --section-title-size: var(--text-section-size, 1rem);
+  font-size: var(--section-title-size);
+  line-height: 1.55;
+}
+
+.text-section__body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.text-section--size-small {
+  --text-section-size: 0.875rem;
+}
+
+.text-section--size-medium {
+  --text-section-size: 1rem;
+}
+
+.text-section--size-large {
+  --text-section-size: 1.5rem;
+}
+
+.text-section--size-xlarge {
+  --text-section-size: 2rem;
+}
+
+/* ---- CTA ---- */
+
+.cta-section__title {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.2rem, 3.5vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.cta-section__description {
+  margin: 0 0 1.25rem;
+  font-size: clamp(0.88rem, 2.8vw, 1rem);
+  line-height: 1.5;
+  color: #5f6368;
+}
+
+/* ---- Announcement ---- */
+
+.announcement-bar-section {
+  font-size: 0.875rem;
+}
+
+.announcement-bar-section__message {
+  margin: 0;
+  flex: 1;
+  font-size: inherit;
+  line-height: 1.35;
+}
+
+/* ---- Footer (section block) ---- */
+
+.footer-section-block__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.footer-section-block__heading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.footer-section-block__text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  opacity: 0.8;
+}
+
+.footer-section-block__links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer-section-block__links li {
+  margin-bottom: 0.5rem;
+}
+
+.footer-section-block__link {
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.footer-section-block__social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.footer-section-block__copyright {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1.15rem;
+  text-align: center;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+/* ---- Image / Video / Carousel ---- */
+
+.image-section__caption {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #5f6368;
+  text-align: center;
+}
+
+.video-section__frame {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  aspect-ratio: 16 / 9;
+  min-height: 180px;
+}
+
+.video-section--ratio-4-3 .video-section__frame {
+  aspect-ratio: 4 / 3;
+}
+
+.carousel-section__title {
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.carousel-section__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.carousel-section__count {
+  margin: 0.65rem 0 0;
+  font-weight: 500;
+  font-size: 0.92rem;
+}
+
+.carousel-section__editor-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.carousel-section__media {
+  width: 100%;
+  max-height: 280px;
+  min-height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  background: #e5e7eb;
+}
+
+.carousel-section__media img {
+  width: 100%;
+  height: 100%;
+  max-height: 280px;
+  min-height: 120px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---- Product sections ---- */
+
+.website-section-products {
+  --products-section-title-size: clamp(1.2rem, 3.5vw, 1.5rem);
+  --products-section-pad-y: 1.5rem;
+  --products-section-pad-x: 1rem;
+}
+
+.website-section-products h2 {
+  font-size: var(--products-section-title-size);
+  line-height: 1.25;
+  margin-bottom: 0.85rem;
+}
+
+/* ---- Category showcase base type scale ---- */
+
+.cat-showcase {
+  --cat-heading-size: clamp(1.2rem, 3.5vw, 1.5rem);
+  --cat-label-size: 0.95rem;
+  --cat-count-size: 0.85rem;
+  --cat-section-pad: 1.25rem;
+  padding: var(--cat-section-pad);
+}
+
+.cat-showcase__heading {
+  font-size: var(--cat-heading-size);
+}
+
+.cat-showcase__label {
+  font-size: var(--cat-label-size);
+}
+
+.cat-showcase__count {
+  font-size: var(--cat-count-size);
+}
+
+/* ---- Tablet adjustments ---- */
+
+@container site-viewport (min-width: 30.01rem) and (max-width: 48rem) {
+  .text-section--size-large {
+    --text-section-size: 1.25rem;
+  }
+
+  .text-section--size-xlarge {
+    --text-section-size: 1.5rem;
+  }
+
+  .cta-section__title {
+    font-size: 1.3rem;
+  }
+
+  .cta-section__description {
+    font-size: 0.92rem;
+  }
+
+  .announcement-bar-section {
+    font-size: 0.82rem;
+  }
+
+  .footer-section-block__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+
+  .footer-section-block__heading {
+    font-size: 0.92rem;
+  }
+
+  .footer-section-block__text,
+  .footer-section-block__link,
+  .footer-section-block__social,
+  .footer-section-block__copyright {
+    font-size: 0.82rem;
+  }
+
+  .website-section-products {
+    --products-section-pad-y: 1.25rem;
+  }
+
+  .cat-showcase {
+    --cat-section-pad: 1rem;
+  }
+}
+
+/* ---- Mobile adjustments ---- */
+
+@container site-viewport (max-width: 30rem) {
+  .text-section--size-small {
+    --text-section-size: 0.8rem;
+  }
+
+  .text-section--size-medium {
+    --text-section-size: 0.88rem;
+  }
+
+  .text-section--size-large {
+    --text-section-size: 1rem;
+  }
+
+  .text-section--size-xlarge {
+    --text-section-size: 1.15rem;
+  }
+
+  .cta-section__title {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .cta-section__description {
+    font-size: 0.8rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .announcement-bar-section {
+    font-size: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .footer-section-block__grid {
+    grid-template-columns: 1fr;
+    gap: 1.15rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .footer-section-block__heading {
+    font-size: 0.88rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-section-block__text,
+  .footer-section-block__link {
+    font-size: 0.78rem;
+  }
+
+  .footer-section-block__social {
+    font-size: 0.78rem;
+    gap: 0.5rem;
+  }
+
+  .footer-section-block__copyright {
+    font-size: 0.75rem;
+    padding-top: 0.85rem;
+  }
+
+  .image-section__caption {
+    font-size: 0.75rem;
+  }
+
+  .carousel-section__title {
+    font-size: 0.9rem;
+  }
+
+  .carousel-section__hint,
+  .carousel-section__editor-note {
+    font-size: 0.75rem;
+  }
+
+  .carousel-section__count {
+    font-size: 0.82rem;
+  }
+
+  .carousel-section__media,
+  .carousel-section__media img {
+    max-height: 180px;
+    min-height: 90px;
+  }
+
+  .video-section__frame {
+    min-height: 140px;
+  }
+
+  .website-section-products {
+    --products-section-title-size: 1.1rem;
+    --products-section-pad-y: 1rem;
+    --products-section-pad-x: 0.75rem;
+    padding: var(--products-section-pad-y) var(--products-section-pad-x);
+  }
+
+  .website-section-products h2 {
+    margin-bottom: 0.65rem;
+  }
+
+  .website-product-card-body,
+  .website-product-card .website-product-card-body {
+    padding: 0.65rem;
+  }
+
+  .website-product-card-title {
+    font-size: 0.82rem;
+  }
+
+  .website-product-card-price {
+    font-size: 0.78rem;
+  }
+
+  .website-view-all-btn {
+    font-size: 0.82rem;
+    padding: 0.55rem 1rem;
+  }
+
+  .cat-showcase {
+    --cat-heading-size: 1.1rem;
+    --cat-label-size: 0.82rem;
+    --cat-count-size: 0.72rem;
+    --cat-section-pad: 0.85rem;
+  }
+
+  .cat-showcase__body {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .embed-section-title {
+    font-size: 0.78rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .embed-iframe-auto {
+    min-height: 200px;
+  }
+
+  .embed-placeholder {
+    font-size: 0.78rem;
+  }
+
+  .faq-section-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .faq-question {
+    font-size: 0.88rem;
+    padding: 0.7rem 0;
+    gap: 0.5rem;
+  }
+
+  .faq-chevron {
+    font-size: 0.95rem;
+  }
+
+  .faq-answer p {
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .divider-section--dots {
+    font-size: 0.55rem;
+    letter-spacing: 0.28em;
+  }
+}
+
+/* ---- Editor viewport mirrors (tablet) ---- */
+
+.sites-page-frame.viewport-tablet .text-section--size-large,
+.builder-product-page-root.viewport-tablet .text-section--size-large {
+  --text-section-size: 1.25rem;
+}
+
+.sites-page-frame.viewport-tablet .text-section--size-xlarge,
+.builder-product-page-root.viewport-tablet .text-section--size-xlarge {
+  --text-section-size: 1.5rem;
+}
+
+.sites-page-frame.viewport-tablet .footer-section-block__grid,
+.builder-product-page-root.viewport-tablet .footer-section-block__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.sites-page-frame.viewport-tablet .website-section-products,
+.builder-product-page-root.viewport-tablet .website-section-products {
+  --products-section-pad-y: 1.25rem;
+}
+
+/* ---- Editor viewport mirrors (mobile) ---- */
+
+.sites-page-frame.viewport-mobile .text-section--size-small,
+.builder-product-page-root.viewport-mobile .text-section--size-small {
+  --text-section-size: 0.8rem;
+}
+
+.sites-page-frame.viewport-mobile .text-section--size-medium,
+.builder-product-page-root.viewport-mobile .text-section--size-medium {
+  --text-section-size: 0.88rem;
+}
+
+.sites-page-frame.viewport-mobile .text-section--size-large,
+.builder-product-page-root.viewport-mobile .text-section--size-large {
+  --text-section-size: 1rem;
+}
+
+.sites-page-frame.viewport-mobile .text-section--size-xlarge,
+.builder-product-page-root.viewport-mobile .text-section--size-xlarge {
+  --text-section-size: 1.15rem;
+}
+
+.sites-page-frame.viewport-mobile .cta-section__title,
+.builder-product-page-root.viewport-mobile .cta-section__title {
+  font-size: 1.1rem;
+}
+
+.sites-page-frame.viewport-mobile .cta-section__description,
+.builder-product-page-root.viewport-mobile .cta-section__description {
+  font-size: 0.8rem;
+}
+
+.sites-page-frame.viewport-mobile .announcement-bar-section,
+.builder-product-page-root.viewport-mobile .announcement-bar-section {
+  font-size: 0.75rem;
+}
+
+.sites-page-frame.viewport-mobile .footer-section-block__grid,
+.builder-product-page-root.viewport-mobile .footer-section-block__grid {
+  grid-template-columns: 1fr;
+  gap: 1.15rem;
+}
+
+.sites-page-frame.viewport-mobile .footer-section-block__heading,
+.builder-product-page-root.viewport-mobile .footer-section-block__heading {
+  font-size: 0.88rem;
+}
+
+.sites-page-frame.viewport-mobile .footer-section-block__text,
+.sites-page-frame.viewport-mobile .footer-section-block__link,
+.builder-product-page-root.viewport-mobile .footer-section-block__text,
+.builder-product-page-root.viewport-mobile .footer-section-block__link {
+  font-size: 0.78rem;
+}
+
+.sites-page-frame.viewport-mobile .website-section-products,
+.builder-product-page-root.viewport-mobile .website-section-products {
+  --products-section-title-size: 1.1rem;
+  padding: 1rem 0.75rem;
+}
+
+.sites-page-frame.viewport-mobile .website-product-card-title,
+.builder-product-page-root.viewport-mobile .website-product-card-title {
+  font-size: 0.82rem;
+}
+
+.sites-page-frame.viewport-mobile .website-product-card-price,
+.builder-product-page-root.viewport-mobile .website-product-card-price {
+  font-size: 0.78rem;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase,
+.builder-product-page-root.viewport-mobile .cat-showcase {
+  --cat-heading-size: 1.1rem;
+  --cat-label-size: 0.82rem;
+  --cat-count-size: 0.72rem;
+  --cat-section-pad: 0.85rem;
+}
+
+.sites-page-frame.viewport-mobile .faq-section-title,
+.builder-product-page-root.viewport-mobile .faq-section-title {
+  font-size: 1.1rem;
+}
+
+.sites-page-frame.viewport-mobile .faq-question,
+.builder-product-page-root.viewport-mobile .faq-question {
+  font-size: 0.88rem;
+}
+
+.sites-page-frame.viewport-mobile .faq-answer p,
+.builder-product-page-root.viewport-mobile .faq-answer p {
+  font-size: 0.78rem;
+}
+
+.sites-page-frame.viewport-mobile .embed-section-title,
+.builder-product-page-root.viewport-mobile .embed-section-title {
+  font-size: 0.78rem;
+}
+
+.sites-page-frame.viewport-mobile .carousel-section__media,
+.sites-page-frame.viewport-mobile .carousel-section__media img,
+.builder-product-page-root.viewport-mobile .carousel-section__media,
+.builder-product-page-root.viewport-mobile .carousel-section__media img {
+  max-height: 180px;
+  min-height: 90px;
+}

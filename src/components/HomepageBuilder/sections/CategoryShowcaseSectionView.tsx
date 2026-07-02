@@ -10,11 +10,13 @@ import {
   resolveCategoryShowcaseSettings,
 } from '../../../utils/categoryShowcaseStyles';
 import { IconFolder, IconTag } from '../../Storefront/StorefrontIcons';
+import CategoryShowcaseMobileRow from './CategoryShowcaseMobileRow';
 import './category-showcase.css';
 
 interface CategoryShowcaseSectionViewProps {
   section: CategoryShowcaseSection & { id: string };
   editMode?: boolean;
+  builderCanvas?: boolean;
 }
 
 type ResolvedCategory = {
@@ -26,7 +28,7 @@ type ResolvedCategory = {
   href?: string;
 };
 
-export default function CategoryShowcaseSectionView({ section, editMode }: CategoryShowcaseSectionViewProps) {
+export default function CategoryShowcaseSectionView({ section, editMode, builderCanvas = false }: CategoryShowcaseSectionViewProps) {
   const { settings, content } = section;
   const resolved = resolveCategoryShowcaseSettings(settings);
   const storeCtx = useWebsiteStoreOptional();
@@ -38,15 +40,19 @@ export default function CategoryShowcaseSectionView({ section, editMode }: Categ
       ? (() => {
           const all = deriveStoreCategories(storeCtx.products);
           const selected = new Set(content.categoryIds.map((id) => id.toLowerCase()));
-          return all
-            .filter((c) => selected.has(c.id))
-            .map((c) => ({
-              id: c.id,
-              label: c.label,
-              count: c.count,
-              imageUrl: categoryImages[c.id] || c.imageUrl,
-              showCount: true,
-            }));
+          const picked =
+            selected.size > 0
+              ? all.filter((c) => selected.has(c.id))
+              : customCategories.length === 0
+                ? all.slice(0, Math.max(resolved.columns * 2, 4))
+                : [];
+          return picked.map((c) => ({
+            id: c.id,
+            label: c.label,
+            count: c.count,
+            imageUrl: categoryImages[c.id] || c.imageUrl,
+            showCount: true,
+          }));
         })()
       : [];
     const custom = customCategories.map((c) => ({
@@ -64,9 +70,9 @@ export default function CategoryShowcaseSectionView({ section, editMode }: Categ
       })),
       ...custom,
     ];
-  }, [storeCtx, content.categoryIds, categoryImages, customCategories]);
+  }, [storeCtx, content.categoryIds, categoryImages, customCategories, resolved.columns]);
 
-  const hasAnySelection = content.categoryIds.length > 0 || customCategories.length > 0;
+  const hasAnySelection = resolvedCategories.length > 0;
   const rootClass = getCategoryShowcaseClassName(resolved);
   const rootStyle = getCategoryShowcaseInlineStyle(resolved);
 
@@ -77,13 +83,23 @@ export default function CategoryShowcaseSectionView({ section, editMode }: Categ
         <SectionPlaceholder
           title="Category Showcase"
           icon={<IconFolder size={48} />}
-          description={editMode ? 'Select categories in the sidebar' : 'No categories selected'}
+          description={
+            editMode
+              ? 'Add categories in the sidebar, or they will appear from your product list'
+              : 'No categories in your store yet'
+          }
           editMode={editMode}
         />
+      ) : resolved.layout === 'grid' ? (
+        <CategoryShowcaseMobileRow>
+          {resolvedCategories.map((category) => (
+            <CategoryTile key={category.id} category={category} settings={resolved} builderCanvas={builderCanvas} />
+          ))}
+        </CategoryShowcaseMobileRow>
       ) : (
         <div className="cat-showcase__track">
           {resolvedCategories.map((category) => (
-            <CategoryTile key={category.id} category={category} settings={resolved} editMode={editMode} />
+            <CategoryTile key={category.id} category={category} settings={resolved} builderCanvas={builderCanvas} />
           ))}
         </div>
       )}
@@ -94,11 +110,11 @@ export default function CategoryShowcaseSectionView({ section, editMode }: Categ
 function CategoryTile({
   category,
   settings,
-  editMode,
+  builderCanvas = false,
 }: {
   category: ResolvedCategory;
   settings: ReturnType<typeof resolveCategoryShowcaseSettings>;
-  editMode?: boolean;
+  builderCanvas?: boolean;
 }) {
   const showCount = settings.showCount && category.showCount && category.count > 0;
   const media = (
@@ -132,7 +148,7 @@ function CategoryTile({
     </>
   );
 
-  if (category.href && !editMode) {
+  if (category.href && !builderCanvas) {
     return (
       <StorefrontLink href={category.href} className="cat-showcase__card">
         {inner}

@@ -101,24 +101,29 @@ export default function TestimonialsSectionView({ section, editMode, onUpdateSec
     />
   ));
 
-  const cardListStyle =
-    settings.displayMode === 'grid'
-      ? {
-          display: 'grid' as const,
-          gridTemplateColumns: `repeat(${settings.columns}, minmax(0, 1fr))`,
-          gap: '20px',
-        }
-      : undefined;
+  const cardList =
+    settings.displayMode === 'grid' ? (
+      <div
+        className="testimonials-grid"
+        style={{ ['--testimonial-cols' as string]: settings.columns }}
+      >
+        {cards}
+      </div>
+    ) : (
+      <TestimonialsCarousel>{cards}</TestimonialsCarousel>
+    );
 
   return (
     <div
       className="testimonials-section"
-      style={{ background: settings.backgroundColor || 'transparent', padding: '20px', borderRadius: '8px' }}
+      style={{
+        background: settings.backgroundColor || 'transparent',
+        ['--testimonial-cols' as string]: settings.columns,
+      }}
     >
       {editMode && onUpdateSection ? (
         <h2
-          className="sites-inline-editable sites-inline-heading"
-          style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center' }}
+          className="testimonials-section__title sites-inline-editable sites-inline-heading"
           contentEditable
           suppressContentEditableWarning
           onBlur={(e) => updateSettings({ title: e.currentTarget.textContent || '' })}
@@ -126,9 +131,7 @@ export default function TestimonialsSectionView({ section, editMode, onUpdateSec
           {settings.title}
         </h2>
       ) : (
-        <h2 style={{ margin: '0 0 20px 0', fontSize: '1.5rem', fontWeight: 600, textAlign: 'center' }}>
-          {settings.title}
-        </h2>
+        <h2 className="testimonials-section__title">{settings.title}</h2>
       )}
 
       {content.testimonials.length === 0 ? (
@@ -138,10 +141,8 @@ export default function TestimonialsSectionView({ section, editMode, onUpdateSec
           description={editMode ? 'Add testimonials in the properties panel' : 'No testimonials added'}
           editMode={editMode}
         />
-      ) : settings.displayMode === 'carousel' ? (
-        <TestimonialsCarousel>{cards}</TestimonialsCarousel>
       ) : (
-        <div style={cardListStyle}>{cards}</div>
+        cardList
       )}
     </div>
   );

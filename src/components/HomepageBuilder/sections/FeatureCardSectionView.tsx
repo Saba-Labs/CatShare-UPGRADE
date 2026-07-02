@@ -9,6 +9,7 @@ interface FeatureCardSectionViewProps {
   theme?: ThemeSettings;
   storeId?: string;
   editMode?: boolean;
+  builderCanvas?: boolean;
   onUpdateSection?: (updates: Partial<FeatureCardSection>) => void;
 }
 
@@ -17,6 +18,7 @@ export default function FeatureCardSectionView({
   theme,
   storeId,
   editMode,
+  builderCanvas = false,
   onUpdateSection,
 }: FeatureCardSectionViewProps) {
   const buttonStyles = getThemeButtonStyles(theme || {});
@@ -41,12 +43,10 @@ export default function FeatureCardSectionView({
 
   return (
     <div
-      className="feature-card-section"
+      className={`feature-card-section sites-section-pad--${settings.padding === 'small' ? 'small' : settings.padding === 'large' ? 'large' : 'medium'}`}
       style={{
         backgroundColor: settings.backgroundColor,
         color: settings.textColor,
-        padding:
-          settings.padding === 'small' ? '1.5rem' : settings.padding === 'large' ? '3rem' : '2rem',
       }}
     >
       <div className={`feature-card-content ${layoutClass}`}>
@@ -115,6 +115,7 @@ export default function FeatureCardSectionView({
                 <div className="button-group">
                   <StorefrontLink
                     href={content.buttonLink}
+                    preview={builderCanvas}
                     className={SITES_THEME_BUTTON_CLASS}
                     style={buttonStyles}
                   >

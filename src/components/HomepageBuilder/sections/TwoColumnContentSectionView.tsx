@@ -12,20 +12,15 @@ export default function TwoColumnContentSectionView({
   editMode,
 }: TwoColumnContentSectionViewProps) {
   const { settings, content } = section;
-  const paddingValue =
-    settings.padding === 'small' ? '1.5rem' : settings.padding === 'large' ? '3rem' : '2rem';
-  const gapValue = settings.gap === 'small' ? '1rem' : settings.gap === 'large' ? '2rem' : '1.5rem';
 
   return (
     <div
-      className="two-column-section"
+      className={`two-column-section sites-section-pad--${settings.padding === 'small' ? 'small' : settings.padding === 'large' ? 'large' : 'medium'}`}
       style={{
         backgroundColor: settings.backgroundColor,
-        padding: paddingValue,
       }}
     >
-      <div className="two-column-container" style={{ gap: gapValue }}>
-        {/* Left Column */}
+      <div className={`two-column-container two-column-container--gap-${settings.gap}`}>
         <div className="column">
           {content.leftContent.imageUrl && (
             <div className="column-image">
@@ -36,7 +31,6 @@ export default function TwoColumnContentSectionView({
           <p>{content.leftContent.description}</p>
         </div>
 
-        {/* Right Column */}
         <div className="column">
           {content.rightContent.imageUrl && (
             <div className="column-image">

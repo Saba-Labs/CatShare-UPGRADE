@@ -378,7 +378,12 @@ export default function FreeformSectionView({
               {element.content.label}
             </span>
           ) : (
-            <StorefrontLink href={element.content.href} className={SITES_THEME_BUTTON_CLASS} style={buttonStyles}>
+            <StorefrontLink
+              href={element.content.href}
+              preview={Boolean(onActivate)}
+              className={SITES_THEME_BUTTON_CLASS}
+              style={buttonStyles}
+            >
               {element.content.label}
             </StorefrontLink>
           )}

@@ -1,6 +1,7 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useDndContext } from '@dnd-kit/core';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
+import type { StorePublic } from '../../services/storeService';
 import {
   BlockAlign,
   BlockLayout,
@@ -34,6 +35,11 @@ import {
   snapBlockWidth,
   snapBlockHeight,
 } from '../../utils/blockLayout';
+import { preventBuilderLinkNavigation } from '../../utils/builderNavigation';
+import {
+  isBuilderEditInteractionTarget,
+  isBuilderSectionChromeTarget,
+} from '../../utils/builderEditGuards';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
 import SectionDropIndicator from './dnd/SectionDropIndicator';
@@ -44,6 +50,7 @@ interface GridCanvasProps {
   layout: HomepageLayout;
   theme: ThemeSettings;
   storeId: string;
+  store?: StorePublic | null;
   editingPageId?: string;
   selectedSectionId: string | null;
   selectedFreeformElementId?: string | null;
@@ -56,7 +63,9 @@ interface GridCanvasProps {
   onUpdateSectionLayout: (id: string, blockLayout: BlockLayout) => void;
   onReorderSections: (sections: HomepageSection[]) => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
+  onCookTheme?: () => void;
   onStartBlank?: () => void;
+  themeHubMode?: boolean;
   onProductPreview?: (product: ProductWithCatalogueData) => void;
   /** @deprecated Grid resize kept for API compat; editor uses document stack layout. */
   onUpdateSectionPosition?: (id: string, position: unknown) => void;
@@ -72,6 +81,7 @@ export default function GridCanvas({
   layout,
   theme,
   storeId,
+  store,
   editingPageId = 'home',
   selectedSectionId,
   selectedFreeformElementId = null,
@@ -85,6 +95,8 @@ export default function GridCanvas({
   onReorderSections,
   onApplyTemplate,
   onStartBlank,
+  onCookTheme,
+  themeHubMode = false,
   onProductPreview,
 }: GridCanvasProps) {
   const { openMediaPicker } = useBuilderMedia();
@@ -103,10 +115,11 @@ export default function GridCanvas({
   );
   const siteSettings = layout.websiteConfig?.siteSettings;
   const showTemplatePicker =
-    sortedSections.length === 0 &&
-    editingPageId === 'home' &&
-    !!onApplyTemplate &&
-    !blankStarted;
+    themeHubMode ||
+    (sortedSections.length === 0 &&
+      editingPageId === 'home' &&
+      !!onApplyTemplate &&
+      !blankStarted);
   const showSiteFooter = !!siteSettings && !showTemplatePicker && sortedSections.length > 0;
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
@@ -214,10 +227,16 @@ export default function GridCanvas({
     onUpdateSectionLayout(sectionId, { align });
   };
 
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isBuilderEditInteractionTarget(e.target) || isBuilderSectionChromeTarget(e.target)) return;
+    onSelectSection(null);
+  };
+
   return (
     <div
-      className="grid-canvas-container sites-canvas"
-      onClick={() => onSelectSection(null)}
+      className={`grid-canvas-container sites-canvas${showTemplatePicker ? ' sites-canvas--theme-hub-active' : ''}`}
+      onPointerDown={handleCanvasPointerDown}
+      onClickCapture={preventBuilderLinkNavigation}
       style={{
         fontFamily: theme.fontFamily || undefined,
         color: theme.textColor || undefined,
@@ -225,9 +244,11 @@ export default function GridCanvas({
         ['--site-primary' as string]: theme.primaryColor || '#1a73e8',
       }}
     >
-      {siteSettings && !showTemplatePicker ? (
+      <div className={`grid-canvas-chrome${showTemplatePicker ? ' grid-canvas-chrome--hidden' : ''}`}>
+      {siteSettings ? (
         <StorefrontSiteHeader
           siteSettings={siteSettings}
+          store={store}
           preview
           onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
           isAnnouncementSelected={isSiteAnnouncementSelected}
@@ -241,28 +262,41 @@ export default function GridCanvas({
           </div>
         </div>
       )}
-      {sortedSections.length === 0 ? (
+      </div>
+      <div className="grid-canvas-stage">
         <div
-          className={`canvas-empty sites-canvas-empty${showTemplatePicker ? ' sites-canvas-empty--template-picker' : ''}`}
+          className={`grid-canvas-layer grid-canvas-layer--theme-hub${showTemplatePicker ? ' is-active' : ''}`}
           onClick={(e) => e.stopPropagation()}
+          aria-hidden={!showTemplatePicker}
         >
-          <SectionDropIndicator index={0} expanded={paletteDragActive} />
-          {showTemplatePicker ? (
+          <div className="canvas-empty sites-canvas-empty sites-canvas-empty--template-picker sites-canvas-empty--theme-hub">
             <TemplateGallery
               variant="full"
-              onApply={onApplyTemplate}
+              onApply={onApplyTemplate!}
+              onCookTheme={onCookTheme}
               onStartBlank={() => {
                 setBlankStarted(true);
                 onStartBlank?.();
               }}
             />
-          ) : (
-            <p>
-              {editingPageId === 'home'
-                ? 'Drag a block here or click Insert to start'
-                : 'Drag blocks from Insert onto this page'}
-            </p>
-          )}
+          </div>
+        </div>
+
+        <div
+          className={`grid-canvas-layer grid-canvas-layer--editor${showTemplatePicker ? '' : ' is-active'}`}
+          aria-hidden={showTemplatePicker}
+        >
+      {sortedSections.length === 0 ? (
+        <div
+          className="canvas-empty sites-canvas-empty"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <SectionDropIndicator index={0} expanded={paletteDragActive} />
+          <p>
+            {editingPageId === 'home'
+              ? 'Drag a block here or click Insert to start'
+              : 'Drag blocks from Insert onto this page'}
+          </p>
         </div>
       ) : (
             <div className="sites-document-stack">
@@ -496,9 +530,15 @@ export default function GridCanvas({
               Footer
             </div>
           )}
-          <WebsiteFooter siteSettings={siteSettings} previewMode />
+          <WebsiteFooter
+            siteSettings={siteSettings}
+            previewMode
+            store={store}
+          />
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { EmbedSection } from '../../../types/homepage';
 import { normalizeEmbedUrl } from '../../../utils/embedUrl';
+import './EmbedSection.css';
 
 interface EmbedSectionViewProps {
   section: EmbedSection & { id: string };
@@ -10,16 +11,23 @@ interface EmbedSectionViewProps {
 export default function EmbedSectionView({ section, editMode }: EmbedSectionViewProps) {
   const { settings, content } = section;
   const embedSrc = normalizeEmbedUrl(content.embedUrl);
-  const maxWidthMap = { small: '480px', medium: '720px', full: '100%' };
   const aspectPadding = { '16:9': '56.25%', '4:3': '75%', auto: '0' };
-  const alignMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  const alignClass =
+    settings.alignment === 'left'
+      ? 'embed-section--align-left'
+      : settings.alignment === 'right'
+        ? 'embed-section--align-right'
+        : 'embed-section--align-center';
+  const maxWidthClass =
+    settings.maxWidth === 'small'
+      ? 'embed-section__inner--max-small'
+      : settings.maxWidth === 'full'
+        ? 'embed-section__inner--max-full'
+        : 'embed-section__inner--max-medium';
 
   return (
-    <div
-      className="embed-section"
-      style={{ display: 'flex', justifyContent: alignMap[settings.alignment], width: '100%' }}
-    >
-      <div style={{ width: '100%', maxWidth: maxWidthMap[settings.maxWidth] }}>
+    <div className={`embed-section ${alignClass}`}>
+      <div className={`embed-section__inner ${maxWidthClass}`}>
         {content.title && <h3 className="embed-section-title">{content.title}</h3>}
         {embedSrc ? (
           settings.aspectRatio === 'auto' ? (

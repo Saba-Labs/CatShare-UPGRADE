@@ -95,11 +95,17 @@ function VariantPills({ summary }: { summary: string }) {
   const parts = summary.split(/;\s*/).filter(Boolean);
   return (
     <div className="sv-variant-pills">
-      {parts.map((part) => (
-        <span key={part} className="sv-variant-pill">
-          {part}
-        </span>
-      ))}
+      {parts.map((part) => {
+        const colon = part.indexOf(':');
+        const label = colon >= 0 ? part.slice(0, colon).trim() : '';
+        const value = colon >= 0 ? part.slice(colon + 1).trim() : part;
+        return (
+          <span key={part} className="sv-variant-pill">
+            {label ? <span className="sv-variant-pill__label">{label}</span> : null}
+            <span className="sv-variant-pill__value">{value}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }

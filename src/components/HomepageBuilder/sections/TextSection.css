@@ -1,0 +1,8 @@
+.text-section {
+  line-height: 1.55;
+}
+
+.text-section__body {
+  margin: 0;
+  white-space: pre-wrap;
+}

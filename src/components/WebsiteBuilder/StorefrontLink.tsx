@@ -9,6 +9,8 @@ interface StorefrontLinkProps {
   style?: CSSProperties;
   children: ReactNode;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
+  /** Editor / preview: render without navigation (live site only). */
+  preview?: boolean;
 }
 
 export default function StorefrontLink({
@@ -17,9 +19,27 @@ export default function StorefrontLink({
   style,
   children,
   onClick,
+  preview = false,
 }: StorefrontLinkProps) {
   const store = useWebsiteStoreOptional();
   const resolved = resolveStorefrontHref(href, store?.basePath ?? '');
+
+  if (preview) {
+    return (
+      <span
+        className={className}
+        style={style}
+        role="link"
+        aria-disabled="true"
+        onClick={(e) => {
+          e.preventDefault();
+          onClick?.(e as unknown as React.MouseEvent<HTMLAnchorElement>);
+        }}
+      >
+        {children}
+      </span>
+    );
+  }
 
   if (isExternalHref(href)) {
     return (

@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { headerLayoutForVariant } from '../../config/headerVariants';
 import type { WebsiteNavItem, WebsiteSiteSettings } from '../../types/homepage';
 import { isExternalHref, normalizeStorefrontPath, resolveStorefrontHref } from '../../utils/storefrontHref';
+import type { StorePublic } from '../../services/storeService';
 import StorefrontOrderformHeader from './StorefrontOrderformHeader';
 import './storefront-site-header.css';
 
@@ -10,6 +12,7 @@ const DEFAULT_NAV: WebsiteNavItem[] = [{ id: 'home', label: 'Home', href: '/' }]
 
 interface StorefrontSiteHeaderProps {
   siteSettings: WebsiteSiteSettings;
+  store?: StorePublic | null;
   /** Base path for in-app routes, e.g. `/store/my-shop` or `` on subdomain */
   basePath?: string;
   /** Builder preview: non-navigating labels, drawer still works */
@@ -24,6 +27,7 @@ interface StorefrontSiteHeaderProps {
 
 export default function StorefrontSiteHeader({
   siteSettings,
+  store,
   basePath = '',
   preview = false,
   onSelectAnnouncement,
@@ -31,7 +35,9 @@ export default function StorefrontSiteHeader({
   onSelectHeader,
   isHeaderSelected = false,
 }: StorefrontSiteHeaderProps) {
+  const headerRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navPortalTarget, setNavPortalTarget] = useState<HTMLElement | null>(null);
   const [openMobileGroupId, setOpenMobileGroupId] = useState<string | null>(null);
   const [openDesktopGroupId, setOpenDesktopGroupId] = useState<string | null>(null);
   const navItems = siteSettings.navItems?.length ? siteSettings.navItems : DEFAULT_NAV;
@@ -40,11 +46,27 @@ export default function StorefrontSiteHeader({
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   useEffect(() => {
-    if (!menuOpen || preview) return;
+    if (!menuOpen) {
+      setNavPortalTarget(null);
+      return;
+    }
+    if (preview) {
+      const frame = headerRef.current?.closest('.sites-page-frame');
+      setNavPortalTarget((frame as HTMLElement | null) ?? document.body);
+    } else {
+      setNavPortalTarget(document.body);
+    }
+  }, [menuOpen, preview]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeMenu();
     };
     document.addEventListener('keydown', onKey);
+    if (preview) {
+      return () => document.removeEventListener('keydown', onKey);
+    }
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
@@ -194,6 +216,7 @@ export default function StorefrontSiteHeader({
         {announcementBlock}
         <StorefrontOrderformHeader
           siteSettings={siteSettings}
+          store={store}
           preview={preview}
           onSelectHeader={onSelectHeader}
           isHeaderSelected={isHeaderSelected}
@@ -265,9 +288,86 @@ export default function StorefrontSiteHeader({
     );
   }
 
+  const mobileMenu = menuOpen ? (
+    <>
+      <div
+        className="storefront-nav-overlay"
+        role="presentation"
+        onClick={(e) => {
+          e.stopPropagation();
+          closeMenu();
+        }}
+      />
+      <aside
+        className="storefront-nav-drawer"
+        style={headerStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+      >
+        <div className="storefront-nav-drawer__head">
+          <span>{siteSettings.websiteName || 'Menu'}</span>
+          <button type="button" className="storefront-nav-drawer__close" onClick={closeMenu} aria-label="Close menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        <nav className="storefront-nav-drawer__nav" aria-label="Main">
+          {navItems.map((item) =>
+            (item.children || []).length > 0 ? (
+              <div key={item.id} className="storefront-nav-drawer__group">
+                <button
+                  type="button"
+                  className="storefront-nav-drawer__link storefront-nav-drawer__link--group"
+                  onClick={() =>
+                    setOpenMobileGroupId((prev) => (prev === item.id ? null : item.id))
+                  }
+                >
+                  <span>{item.label}</span>
+                  <span aria-hidden>{openMobileGroupId === item.id ? '−' : '+'}</span>
+                </button>
+                {openMobileGroupId === item.id ? (
+                  <div className="storefront-nav-drawer__subnav">
+                    {(item.children || []).map((child) =>
+                      preview ? (
+                        <button
+                          key={child.id}
+                          type="button"
+                          className="storefront-nav-drawer__sublink"
+                          onClick={closeMenu}
+                        >
+                          {child.label}
+                        </button>
+                      ) : (
+                        renderNavLink(child, 'storefront-nav-drawer__sublink', closeMenu)
+                      )
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : preview ? (
+              <button
+                key={item.id}
+                type="button"
+                className="storefront-nav-drawer__link"
+                onClick={closeMenu}
+              >
+                {item.label}
+              </button>
+            ) : (
+              renderNavLink(item, 'storefront-nav-drawer__link', closeMenu)
+            )
+          )}
+        </nav>
+      </aside>
+    </>
+  ) : null;
+
   return (
     <>
       <header
+        ref={headerRef}
         className={`storefront-site-header storefront-site-header--layout-${layout}`}
         style={headerStyle}
       >
@@ -276,81 +376,7 @@ export default function StorefrontSiteHeader({
         {barContent}
       </header>
 
-      {menuOpen ? (
-        <>
-          <div
-            className="storefront-nav-overlay"
-            role="presentation"
-            onClick={(e) => {
-              e.stopPropagation();
-              closeMenu();
-            }}
-          />
-          <aside
-            className="storefront-nav-drawer"
-            style={headerStyle}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Site menu"
-          >
-            <div className="storefront-nav-drawer__head">
-              <span>{siteSettings.websiteName || 'Menu'}</span>
-              <button type="button" className="storefront-nav-drawer__close" onClick={closeMenu} aria-label="Close menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-            <nav className="storefront-nav-drawer__nav" aria-label="Main">
-              {navItems.map((item) =>
-                (item.children || []).length > 0 ? (
-                  <div key={item.id} className="storefront-nav-drawer__group">
-                    <button
-                      type="button"
-                      className="storefront-nav-drawer__link storefront-nav-drawer__link--group"
-                      onClick={() =>
-                        setOpenMobileGroupId((prev) => (prev === item.id ? null : item.id))
-                      }
-                    >
-                      <span>{item.label}</span>
-                      <span aria-hidden>{openMobileGroupId === item.id ? '−' : '+'}</span>
-                    </button>
-                    {openMobileGroupId === item.id ? (
-                      <div className="storefront-nav-drawer__subnav">
-                        {(item.children || []).map((child) =>
-                          preview ? (
-                            <button
-                              key={child.id}
-                              type="button"
-                              className="storefront-nav-drawer__sublink"
-                              onClick={closeMenu}
-                            >
-                              {child.label}
-                            </button>
-                          ) : (
-                            renderNavLink(child, 'storefront-nav-drawer__sublink', closeMenu)
-                          )
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : preview ? (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="storefront-nav-drawer__link"
-                    onClick={closeMenu}
-                  >
-                    {item.label}
-                  </button>
-                ) : (
-                  renderNavLink(item, 'storefront-nav-drawer__link', closeMenu)
-                )
-              )}
-            </nav>
-          </aside>
-        </>
-      ) : null}
+      {mobileMenu && navPortalTarget ? createPortal(mobileMenu, navPortalTarget) : null}
     </>
   );
 }

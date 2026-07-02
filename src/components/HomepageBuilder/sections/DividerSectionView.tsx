@@ -1,5 +1,6 @@
 import React from 'react';
 import { DividerSection } from '../../../types/homepage';
+import './DividerSection.css';
 
 interface DividerSectionViewProps {
   section: DividerSection & { id: string };
@@ -7,20 +8,18 @@ interface DividerSectionViewProps {
 
 export default function DividerSectionView({ section }: DividerSectionViewProps) {
   const { settings } = section;
-  const spacingMap = { small: '0.75rem', medium: '1.5rem', large: '2.5rem' };
+  const spacingClass = `divider-section--spacing-${settings.spacing}`;
   const thicknessMap = { thin: 1, medium: 2, thick: 4 };
   const widthMap = { full: '100%', medium: '60%', narrow: '36%' };
 
   if (settings.style === 'space') {
-    return <div style={{ height: spacingMap[settings.spacing], width: '100%' }} aria-hidden />;
+    return <div className={`divider-section divider-section--space ${spacingClass}`} aria-hidden />;
   }
 
-  const paddingY = spacingMap[settings.spacing];
-
   return (
-    <div style={{ padding: `${paddingY} 0`, display: 'flex', justifyContent: 'center' }}>
+    <div className={`divider-section ${spacingClass}`}>
       {settings.style === 'dots' ? (
-        <span style={{ color: settings.color || '#dadce0', letterSpacing: '0.35em', fontSize: '0.65rem' }}>
+        <span className="divider-section--dots" style={{ color: settings.color || '#dadce0' }}>
           • • • • •
         </span>
       ) : (

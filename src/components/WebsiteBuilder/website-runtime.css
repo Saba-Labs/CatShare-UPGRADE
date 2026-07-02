@@ -1,4 +1,5 @@
 @import '../HomepageBuilder/sites-theme-button.css';
+@import '../../styles/storefront-responsive.css';
 
 .website-breadcrumbs {
   max-width: 1200px;
@@ -139,7 +140,8 @@ button.website-product-card-details-link {
   color: var(--site-text, #202124);
 }
 
-.website-product-page {
+/* Legacy simple product template only — StoreProductOrderPanel pages use store-product-order-page.css */
+.website-product-page:not(.sv-product-order-page) {
   max-width: 960px;
   margin: 0 auto;
   padding: 16px;
@@ -149,26 +151,26 @@ button.website-product-card-details-link {
 }
 
 @media (max-width: 768px) {
-  .website-product-page {
+  .website-product-page:not(.sv-product-order-page) {
     grid-template-columns: 1fr;
   }
 }
 
-.website-product-gallery {
+.website-product-gallery:not(.sv-product-order-media) {
   border-radius: 12px;
   overflow: hidden;
   background: #f1f3f4;
   aspect-ratio: 1;
 }
 
-.website-product-gallery:has(.sv-drawer-img-wrap--thumbs),
-.website-product-gallery:has(.product-image-gallery--with-thumbs) {
+.website-product-gallery:not(.sv-product-order-media):has(.sv-drawer-img-wrap--thumbs),
+.website-product-gallery:not(.sv-product-order-media):has(.product-image-gallery--with-thumbs) {
   aspect-ratio: unset;
   overflow: visible;
   background: transparent;
 }
 
-.website-product-gallery img {
+.website-product-gallery:not(.sv-product-order-media) img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -439,12 +441,12 @@ button.website-product-card-details-link {
 /* ── Layout variants ─────────────────────────────────────────────── */
 
 /* editorial: large stacked gallery, generous spacing, centered intro */
-.wp-editorial .website-product-page {
+.wp-editorial .website-product-page:not(.sv-product-order-page) {
   max-width: 1100px;
   gap: 48px;
 }
 
-.wp-editorial .website-product-gallery {
+.wp-editorial .website-product-gallery:not(.sv-product-order-media) {
   aspect-ratio: 3 / 4;
 }
 
@@ -458,11 +460,11 @@ button.website-product-card-details-link {
 }
 
 /* tech: compact, spec-forward, dense gallery */
-.wp-tech .website-product-page {
+.wp-tech .website-product-page:not(.sv-product-order-page) {
   max-width: 1080px;
 }
 
-.wp-tech .website-product-gallery {
+.wp-tech .website-product-gallery:not(.sv-product-order-media) {
   aspect-ratio: 1;
   background: color-mix(in srgb, var(--site-text, #202124) 8%, var(--site-bg, #fff));
 }
@@ -474,7 +476,7 @@ button.website-product-card-details-link {
 }
 
 /* minimal: airy, tight column */
-.wp-minimal .website-product-page {
+.wp-minimal .website-product-page:not(.sv-product-order-page) {
   max-width: 880px;
   gap: 40px;
 }
@@ -485,14 +487,18 @@ button.website-product-card-details-link {
 }
 
 .website-section-products {
-  padding: 24px 16px;
+  --products-section-title-size: clamp(1.2rem, 3.5vw, 1.5rem);
+  --products-section-pad-y: 1.5rem;
+  --products-section-pad-x: 1rem;
+  padding: var(--products-section-pad-y) var(--products-section-pad-x);
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .website-section-products h2 {
   margin: 0 0 16px;
-  font-size: 1.5rem;
+  font-size: var(--products-section-title-size);
+  line-height: 1.25;
   padding: 0;
 }
 

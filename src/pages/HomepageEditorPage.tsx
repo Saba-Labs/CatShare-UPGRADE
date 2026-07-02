@@ -12,7 +12,14 @@ import HomepageBuilder from '../components/HomepageBuilder/HomepageBuilder';
 import { DEFAULT_CHECKOUT_SETTINGS } from '../types/checkoutSettings';
 import { ProFeatureGate } from '../components/ProFeatureGate';
 import StoreLayout from './store/components/StoreLayout';
-import PageHeader from './store/components/PageHeader';
+
+function HomepageBuilderShell({ children }: { children: React.ReactNode }) {
+  return (
+    <StoreLayout immersive hideBottomNav>
+      {children}
+    </StoreLayout>
+  );
+}
 
 const STORE_FETCH_TIMEOUT_MS = isOfflineBuilderMode() ? 1_500 : 6_000;
 
@@ -134,23 +141,23 @@ export default function HomepageEditorPage() {
 
   if (loading) {
     return (
-      <StoreLayout>
-        <PageHeader title="Homepage Builder" />
-        <div className="animate-pulse space-y-4 max-w-md py-8">
-          <div className="h-24 rounded-xl bg-gray-200 dark:bg-gray-800" />
-          <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
+      <HomepageBuilderShell>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+          <div className="animate-pulse space-y-4 w-full max-w-md">
+            <div className="h-24 rounded-xl bg-gray-200 dark:bg-gray-800" />
+            <div className="h-3 w-2/3 rounded bg-gray-200 dark:bg-gray-800" />
+          </div>
+          <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">Preparing homepage builder…</p>
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">Preparing homepage builder…</p>
-      </StoreLayout>
+      </HomepageBuilderShell>
     );
   }
 
   if (!effectiveUid) {
     return (
-      <StoreLayout>
-        <PageHeader title="Homepage Builder" />
-        <div className="max-w-md py-8">
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+      <HomepageBuilderShell>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="max-w-md w-full rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Sign in to edit your website
             </h2>
@@ -166,16 +173,15 @@ export default function HomepageEditorPage() {
             </button>
           </div>
         </div>
-      </StoreLayout>
+      </HomepageBuilderShell>
     );
   }
 
   if (!store) {
     return (
-      <StoreLayout>
-        <PageHeader title="Homepage Builder" />
-        <div className="max-w-md py-8">
-          <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
+      <HomepageBuilderShell>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="max-w-md w-full rounded-2xl border border-red-200 dark:border-red-900/40 bg-white dark:bg-gray-900 p-6 shadow-sm text-center">
             <div className="text-4xl mb-2" aria-hidden>⚠️</div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
               Unable to Load Store
@@ -193,35 +199,43 @@ export default function HomepageEditorPage() {
             </button>
           </div>
         </div>
-      </StoreLayout>
+      </HomepageBuilderShell>
     );
   }
 
   if (!isPro) {
     return (
-      <StoreLayout>
-        <PageHeader title="Homepage Builder" />
-        <ProFeatureGate featureName="Homepage Builder" locked>
-          <div className="min-h-[400px]" />
-        </ProFeatureGate>
-      </StoreLayout>
+      <HomepageBuilderShell>
+        <div className="flex flex-1 flex-col px-6 py-8">
+          <button
+            type="button"
+            onClick={() => navigate('/store')}
+            className="self-start mb-6 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            ← Back to Store
+          </button>
+          <ProFeatureGate featureName="Homepage Builder" locked>
+            <div className="min-h-[400px]" />
+          </ProFeatureGate>
+        </div>
+      </HomepageBuilderShell>
     );
   }
 
   return (
-    <StoreLayout immersive>
-      <PageHeader title="Homepage Builder" />
-      <div className="flex min-h-0 flex-1 flex-col -mx-4 sm:-mx-6">
+    <HomepageBuilderShell>
+      <div className="flex min-h-0 flex-1 flex-col">
         <HomepageBuilder
           storeId={store.id}
           storeSlug={store.storeSlug}
           sellerUserId={store.sellerUserId || effectiveUid}
+          store={store}
           catalogues={catalogues}
           catalogueId={store.catalogueId}
           storeWhatsapp={store.storeWhatsapp}
           onClose={() => navigate('/store')}
         />
       </div>
-    </StoreLayout>
+    </HomepageBuilderShell>
   );
 }

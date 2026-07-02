@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import { HomepageSection, ThemeSettings } from '../../../types/homepage';
+import '../../../styles/storefront-responsive.css';
 import CarouselSectionView from './CarouselSectionView';
 import TextSectionView from './TextSectionView';
 import ImageSectionView from './ImageSectionView';

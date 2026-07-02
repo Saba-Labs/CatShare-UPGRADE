@@ -1,6 +1,7 @@
 import React from 'react';
 import { ImageSection } from '../../../types/homepage';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
+import './ImageSection.css';
 
 interface ImageSectionViewProps {
   section: ImageSection & { id: string };
@@ -13,9 +14,20 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
   const { settings, content } = section;
   const media = useBuilderMediaOptional();
 
-  const widthMap = { small: '30%', medium: '50%', large: '80%', full: '100%' };
-  const width = widthMap[settings.width];
-  const alignMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  const widthClass =
+    settings.width === 'small'
+      ? 'image-section__inner--width-small'
+      : settings.width === 'large'
+        ? 'image-section__inner--width-large'
+        : settings.width === 'full'
+          ? 'image-section__inner--width-full'
+          : 'image-section__inner--width-medium';
+  const alignClass =
+    settings.alignment === 'left'
+      ? 'image-section--align-left'
+      : settings.alignment === 'right'
+        ? 'image-section--align-right'
+        : 'image-section--align-center';
 
   const openPicker = () => {
     if (!media || !storeId || !onUpdateSection) return;
@@ -28,10 +40,10 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: alignMap[settings.alignment as keyof typeof alignMap], width: '100%' }}>
-      <div style={{ width }}>
+    <div className={`image-section ${alignClass}`}>
+      <div className={widthClass}>
         {content.url ? (
-          <figure style={{ margin: 0 }}>
+          <figure className="image-section__figure">
             <img
               src={content.url}
               alt={content.alt}
@@ -46,8 +58,7 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
             />
             {editMode && onUpdateSection ? (
               <figcaption
-                className="sites-inline-editable"
-                style={{ marginTop: 8, fontSize: '0.85rem', color: '#5f6368', textAlign: 'center' }}
+                className="image-section__caption sites-inline-editable"
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={(e) => onUpdateSection({ content: { ...content, alt: e.currentTarget.textContent || '' } })}
@@ -55,9 +66,7 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
                 {content.alt || 'Caption'}
               </figcaption>
             ) : content.alt ? (
-              <figcaption style={{ marginTop: 8, fontSize: '0.85rem', color: '#5f6368', textAlign: 'center' }}>
-                {content.alt}
-              </figcaption>
+              <figcaption className="image-section__caption">{content.alt}</figcaption>
             ) : null}
           </figure>
         ) : (

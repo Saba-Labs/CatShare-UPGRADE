@@ -17,7 +17,17 @@ const ALLOWED_ALIGN = new Set(['left', 'center', 'right', 'justify']);
 
 const ALLOWED_STYLE_CLASSES = new Set(['pd-heading', 'pd-subheading', 'pd-body']);
 
-const FONT_SIZE_MAP = ['10px', '13px', '16px', '18px', '24px', '32px', '48px'];
+const FONT_SIZE_MAP = ['10px', '13px', '14px', '16px', '18px', '24px', '32px', '48px'];
+
+export const PRODUCT_DESCRIPTION_FONT_SIZES: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = FONT_SIZE_MAP.map((value) => ({
+  value,
+  label: value.replace('px', ''),
+}));
+
+export const DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE = '14px';
 
 const ALLOWED_FONT_FAMILY_TOKENS = new Set([
   'system-ui',
@@ -248,6 +258,49 @@ function expandCollapsedRangeToWord(range: Range): boolean {
   return true;
 }
 
+function classNameToLegacyFontSize(className: string): string | null {
+  if (className === 'pd-heading') return '24px';
+  if (className === 'pd-subheading') return '18px';
+  if (className === 'pd-body') return '16px';
+  return null;
+}
+
+function normalizeFontSizeValue(value: string): string | null {
+  const v = value.trim().toLowerCase();
+  if (!v || !isAllowedFontSize(v)) return null;
+  const match = FONT_SIZE_MAP.find((size) => size === v);
+  if (match) return match;
+  const px = Number.parseFloat(v);
+  if (!Number.isFinite(px)) return null;
+  const closest = FONT_SIZE_MAP.reduce((best, size) => {
+    const bestPx = Number.parseFloat(best);
+    const sizePx = Number.parseFloat(size);
+    return Math.abs(sizePx - px) < Math.abs(bestPx - px) ? size : best;
+  });
+  return closest;
+}
+
+function stripFontSizeFromNode(node: HTMLElement): void {
+  node.style.removeProperty('font-size');
+  stripDescriptionStyleClasses(node);
+}
+
+function stripFontSizeFromFragment(fragment: DocumentFragment): void {
+  fragment.querySelectorAll('span').forEach((node) => stripFontSizeFromNode(node as HTMLElement));
+}
+
+function wrapRangeWithFontSize(range: Range, fontSize: string): HTMLSpanElement {
+  const wrapper = document.createElement('span');
+  wrapper.style.fontSize = fontSize;
+
+  const fragment = range.extractContents();
+  stripFontSizeFromFragment(fragment);
+  wrapper.appendChild(fragment);
+  range.insertNode(wrapper);
+
+  return wrapper;
+}
+
 function wrapRangeWithStyle(range: Range, styleClass: ProductDescriptionStyleClass): HTMLSpanElement {
   const wrapper = document.createElement('span');
   wrapper.className = styleClass;
@@ -270,6 +323,71 @@ function stripDescriptionStyleClasses(node: HTMLElement): void {
   if (!node.className) {
     node.removeAttribute('class');
   }
+}
+
+/** Font size at the current caret/selection (for toolbar display). */
+export function getSelectionFontSize(
+  root?: HTMLElement | null,
+  savedRange?: Range | null,
+): string {
+  if (!root || typeof window === 'undefined') return DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE;
+
+  const selection = window.getSelection();
+  const range = savedRange?.cloneRange() ?? (selection?.rangeCount ? selection.getRangeAt(0) : null);
+  if (!range || !root.contains(range.commonAncestorContainer)) {
+    return DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE;
+  }
+
+  let node: Node | null = range.startContainer;
+  if (node.nodeType === Node.TEXT_NODE) {
+    node = node.parentElement;
+  }
+
+  while (node && node !== root) {
+    if (node instanceof HTMLElement) {
+      const inlineSize = normalizeFontSizeValue(node.style.fontSize ?? '');
+      if (inlineSize) return inlineSize;
+
+      const legacyClass = node.className
+        .split(/\s+/)
+        .map((name) => classNameToLegacyFontSize(name))
+        .find((size): size is string => Boolean(size));
+      if (legacyClass) return legacyClass;
+    }
+    node = node.parentNode;
+  }
+
+  return DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE;
+}
+
+/** Apply pixel font size to the current selection. */
+export function applyFontSizeToSelection(
+  fontSize: string,
+  root?: HTMLElement | null,
+  savedRange?: Range | null,
+): boolean {
+  const normalized = normalizeFontSizeValue(fontSize);
+  if (!root || !normalized) return false;
+
+  const selection = window.getSelection();
+  const range = savedRange?.cloneRange() ?? (selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null);
+  if (!range || !root.contains(range.commonAncestorContainer)) return false;
+
+  if (range.collapsed && !expandCollapsedRangeToWord(range)) {
+    return false;
+  }
+
+  if (range.collapsed) {
+    return false;
+  }
+
+  const wrapper = wrapRangeWithFontSize(range, normalized);
+
+  selection?.removeAllRanges();
+  const nextRange = document.createRange();
+  nextRange.selectNodeContents(wrapper);
+  selection?.addRange(nextRange);
+  return true;
 }
 
 /** Apply heading / subheading / body class to the current selection. */
@@ -296,8 +414,7 @@ export function applyDescriptionStyleToSelection(
 
   selection?.removeAllRanges();
   const nextRange = document.createRange();
-  nextRange.setStartAfter(wrapper);
-  nextRange.collapse(true);
+  nextRange.selectNodeContents(wrapper);
   selection?.addRange(nextRange);
   return true;
 }

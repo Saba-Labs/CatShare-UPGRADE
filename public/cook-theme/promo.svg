@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" fill="none">
+  <rect width="800" height="400" fill="#F6F6F6"/>
+  <rect x="40" y="40" width="340" height="320" rx="16" fill="#E8EAED"/>
+  <circle cx="210" cy="180" r="60" fill="#B8D4E3"/>
+  <path d="M180 200 L210 160 L240 200 L220 200 L220 230 L200 230 L200 200 Z" fill="#7BAF8E"/>
+  <rect x="420" y="80" width="280" height="16" rx="8" fill="#DADCE0"/>
+  <rect x="420" y="120" width="220" height="12" rx="6" fill="#E8EAED"/>
+  <rect x="420" y="160" width="180" height="12" rx="6" fill="#E8EAED"/>
+  <rect x="420" y="220" width="140" height="44" rx="22" fill="#1A73E8"/>
+  <text x="490" y="250" fill="#fff" font-family="system-ui,sans-serif" font-size="16" font-weight="600" text-anchor="middle">Shop now</text>
+</svg>

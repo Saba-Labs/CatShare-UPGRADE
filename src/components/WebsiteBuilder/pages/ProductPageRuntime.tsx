@@ -11,6 +11,7 @@ import { useWebsiteStore } from '../WebsiteStoreContext';
 import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
 import WebsiteCarousel from '../WebsiteCarousel';
 import WebsiteProductCard from '../WebsiteProductCard';
+import '../website-runtime.css';
 import '../../Storefront/store-product-order-page.css';
 import '../../ProductVariantsDisplay.css';
 
@@ -19,14 +20,22 @@ interface ProductPageRuntimeProps {
   template?: WebsiteProductTemplate;
   /** Homepage editor: non-navigating preview with close instead of checkout flow */
   previewMode?: boolean;
-  onPreviewClose?: () => void;
+  /** Override post-order navigation (e.g. catalog store closes product overlay) */
+  onAfterPlaceOrder?: () => void;
+  orderCtaLabel?: string;
+  /** Breadcrumb listing link — defaults to collection page */
+  shopLinkTo?: string;
+  shopBreadcrumbLabel?: string;
 }
 
 export default function ProductPageRuntime({
   product,
   template,
   previewMode = false,
-  onPreviewClose,
+  onAfterPlaceOrder,
+  orderCtaLabel = 'Place order',
+  shopLinkTo,
+  shopBreadcrumbLabel = 'Shop',
 }: ProductPageRuntimeProps) {
   const { basePath, collectionPath, store, products } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
@@ -83,7 +92,7 @@ export default function ProductPageRuntime({
 
   const handleDone = () => {
     if (previewMode) {
-      onPreviewClose?.();
+      // In editor preview mode, never navigate away from the preview canvas.
       return;
     }
     const groups = getProductVariantGroups(product);
@@ -93,6 +102,10 @@ export default function ProductPageRuntime({
     if (quantity <= 0) {
       orderBridge.changeProductQty(product.id, qstep, qstep);
     }
+    if (onAfterPlaceOrder) {
+      onAfterPlaceOrder();
+      return;
+    }
     if (canPopStorefrontHistory(location.key)) {
       navigate(-1);
       return;
@@ -100,11 +113,13 @@ export default function ProductPageRuntime({
     navigate(collectionPath);
   };
 
+  const listingPath = shopLinkTo ?? collectionPath;
+
   const breadcrumbItems = previewMode
-    ? [{ label: 'Home' }, { label: 'Shop' }, { label: product.name }]
+    ? [{ label: 'Home' }, { label: shopBreadcrumbLabel }, { label: product.name }]
     : [
         { label: 'Home', to: basePath || '/' },
-        { label: 'Shop', to: collectionPath },
+        { label: shopBreadcrumbLabel, to: listingPath },
         { label: product.name },
       ];
 
@@ -129,7 +144,7 @@ export default function ProductPageRuntime({
         onDone={handleDone}
         layout="page"
         layoutVariant={layoutVariant}
-        orderCtaLabel="Place order"
+        orderCtaLabel={orderCtaLabel}
         ctaStyle="solid"
         showQuantitySelector
       />
@@ -149,6 +164,7 @@ export default function ProductPageRuntime({
                   product={p}
                   cardsStyle="minimal"
                   viewMode="grid"
+                  builderPreview={previewMode}
                 />
               ))}
             </WebsiteCarousel>
@@ -160,6 +176,7 @@ export default function ProductPageRuntime({
                   product={p}
                   cardsStyle={suggestedLayout === 'cards' ? 'boxed' : 'minimal'}
                   viewMode={suggestedLayout === 'list' ? 'list' : 'grid'}
+                  builderPreview={previewMode}
                 />
               ))}
             </div>

@@ -1,0 +1,130 @@
+/**
+ * Shared padding tiers for homepage sections (overridable on mobile/tablet).
+ */
+
+.sites-section-pad--small {
+  padding: 1.5rem;
+}
+
+.sites-section-pad--medium {
+  padding: 2rem;
+}
+
+.sites-section-pad--large {
+  padding: 3rem;
+}
+
+.sites-section-pad--compact {
+  padding: 1.25rem 1rem;
+}
+
+.sites-section-pad--cta {
+  padding: 2.5rem 1.25rem;
+}
+
+.sites-section-pad--footer {
+  padding: 2.5rem 1.25rem;
+}
+
+@container site-viewport (min-width: 30.01rem) and (max-width: 48rem) {
+  .sites-section-pad--small {
+    padding: 1.25rem;
+  }
+
+  .sites-section-pad--medium {
+    padding: 1.5rem;
+  }
+
+  .sites-section-pad--large {
+    padding: 2rem;
+  }
+
+  .sites-section-pad--cta {
+    padding: 2rem 1.15rem;
+  }
+
+  .sites-section-pad--footer {
+    padding: 2rem 1.15rem;
+  }
+}
+
+@container site-viewport (max-width: 30rem) {
+  .sites-section-pad--small {
+    padding: 1rem;
+  }
+
+  .sites-section-pad--medium {
+    padding: 1.15rem;
+  }
+
+  .sites-section-pad--large {
+    padding: 1.35rem;
+  }
+
+  .sites-section-pad--compact {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .sites-section-pad--cta {
+    padding: 1.35rem 1rem;
+  }
+
+  .sites-section-pad--footer {
+    padding: 1.5rem 1rem;
+  }
+}
+
+.sites-page-frame.viewport-tablet .sites-section-pad--small,
+.builder-product-page-root.viewport-tablet .sites-section-pad--small {
+  padding: 1.25rem;
+}
+
+.sites-page-frame.viewport-tablet .sites-section-pad--medium,
+.builder-product-page-root.viewport-tablet .sites-section-pad--medium {
+  padding: 1.5rem;
+}
+
+.sites-page-frame.viewport-tablet .sites-section-pad--large,
+.builder-product-page-root.viewport-tablet .sites-section-pad--large {
+  padding: 2rem;
+}
+
+.sites-page-frame.viewport-tablet .sites-section-pad--cta,
+.builder-product-page-root.viewport-tablet .sites-section-pad--cta {
+  padding: 2rem 1.15rem;
+}
+
+.sites-page-frame.viewport-tablet .sites-section-pad--footer,
+.builder-product-page-root.viewport-tablet .sites-section-pad--footer {
+  padding: 2rem 1.15rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--small,
+.builder-product-page-root.viewport-mobile .sites-section-pad--small {
+  padding: 1rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--medium,
+.builder-product-page-root.viewport-mobile .sites-section-pad--medium {
+  padding: 1.15rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--large,
+.builder-product-page-root.viewport-mobile .sites-section-pad--large {
+  padding: 1.35rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--compact,
+.builder-product-page-root.viewport-mobile .sites-section-pad--compact {
+  padding: 0.65rem 0.75rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--cta,
+.builder-product-page-root.viewport-mobile .sites-section-pad--cta {
+  padding: 1.35rem 1rem;
+}
+
+.sites-page-frame.viewport-mobile .sites-section-pad--footer,
+.builder-product-page-root.viewport-mobile .sites-section-pad--footer {
+  padding: 1.5rem 1rem;
+}

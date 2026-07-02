@@ -82,6 +82,10 @@ import { isStorePasswordUnlocked } from '../utils/storePasswordAccess';
 import { getPublishedHomepageConfig } from '../services/homepageService';
 import '../components/HomepageBuilder/sites-theme-button.css';
 import WebsiteRuntime from '../components/WebsiteBuilder/WebsiteRuntime';
+import WebsiteFooter from '../components/WebsiteBuilder/WebsiteFooter';
+import ProductPageRuntime from '../components/WebsiteBuilder/pages/ProductPageRuntime';
+import { WebsiteStoreProvider } from '../components/WebsiteBuilder/WebsiteStoreContext';
+import StorefrontSiteHeader from '../components/Storefront/StorefrontSiteHeader';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
 import { collectionPagePath, findProductByHandle, findProductById, parseStorefrontProductHandle, parseStorefrontCheckoutRoute, productPagePath, checkoutDetailsPath, checkoutReviewPath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory, type StoreProductNavState } from '../utils/websiteStorefront';
 import StoreProductOrderPanel from '../components/Storefront/StoreProductOrderPanel';
@@ -168,7 +172,11 @@ const CSS = `
 .sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; position: relative; }
 .sv.sv-checkout-open { overflow: hidden; height: 100dvh; max-height: 100dvh; }
 .sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
-.sv-page.website-mode-full { max-width: none; width: 100%; margin: 0; padding: 0; }
+.sv-page.website-mode-full { max-width: none; width: 100%; margin: 0; padding: 0; min-height: 0; }
+
+.sv-page.sv-page--has-cart .catalog-layout-runtime {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+}
 
 /* ── Hero ── */
 .sv-hero { position: relative; background: var(--c-surface); border-bottom: 1px solid var(--c-border); }
@@ -417,7 +425,10 @@ body { background: var(--c-bg); }
 .sv-drawer-sub { font-size: 13px; color: var(--c-text3); margin-top: 3px; }
 .sv-drawer-variant-summary { font-size: 13px; color: var(--c-accent); font-weight: 500; margin-top: 4px; }
 .sv-variant-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; margin-bottom: 12px; }
-.sv-variant-pill { display: inline-flex; align-items: center; background: var(--c-accent-light); border: 1px solid rgba(26,107,74,0.2); border-radius: var(--r-full); padding: 3px 10px; font-size: 12px; font-weight: 500; color: var(--c-accent); }
+.sv-variant-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--c-surface2); border: 1px solid var(--c-border2); border-radius: 6px; padding: 4px 10px; font-size: 12px; line-height: 1.25; }
+.sv-variant-pill__label { color: var(--c-text3); font-weight: 500; }
+.sv-variant-pill__label::after { content: ':'; }
+.sv-variant-pill__value { color: var(--c-text); font-weight: 600; }
 .sv-drawer-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .sv-drawer-cat { height: 22px; padding: 0 10px; border-radius: var(--r-full); background: var(--c-surface3); border: 1px solid var(--c-border2); font-size: 11px; color: var(--c-text2); font-weight: 500; display: inline-flex; align-items: center; }
 .sv-drawer-price { font-family: var(--f-body); font-size: 24px; font-weight: 700; color: var(--c-text); letter-spacing: -0.6px; margin-top: 14px; }
@@ -553,6 +564,7 @@ body { background: var(--c-bg); }
     width: 100%;
     margin: 0;
     padding: 0;
+    min-height: 0;
   }
 
   .sv-hero {
@@ -904,9 +916,17 @@ function VariantPills({ summary }: { summary: string }) {
   const parts = summary.split(/;\s*/).filter(Boolean);
   return (
     <div className="sv-variant-pills">
-      {parts.map((part) => (
-        <span key={part} className="sv-variant-pill">{part}</span>
-      ))}
+      {parts.map((part) => {
+        const colon = part.indexOf(':');
+        const label = colon >= 0 ? part.slice(0, colon).trim() : '';
+        const value = colon >= 0 ? part.slice(colon + 1).trim() : part;
+        return (
+          <span key={part} className="sv-variant-pill">
+            {label ? <span className="sv-variant-pill__label">{label}</span> : null}
+            <span className="sv-variant-pill__value">{value}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -1747,6 +1767,21 @@ export default function StoreView() {
   );
   const websiteCheckoutVariant =
     homepageLayout?.websiteConfig?.templates?.product?.layoutVariant ?? 'minimal';
+  const useHomepageSiteChrome = !!homepageLayout?.websiteConfig?.siteSettings;
+  const homepageSiteSettings = homepageLayout?.websiteConfig?.siteSettings;
+  const publishedProductTemplate = homepageLayout?.websiteConfig?.templates?.product;
+  const publishedHomeTheme =
+    homepageLayout?.websiteConfig?.pages?.home?.theme ?? homepageLayout?.theme;
+  const publishedThemeVars = useMemo(
+    () => buildWebsiteThemeVars(publishedHomeTheme),
+    [publishedHomeTheme]
+  );
+  const usePublishedSiteLayout = !!homepageLayout?.websiteConfig;
+  const usePublishedProductPage = usePublishedSiteLayout && !!catalogProductHandle;
+  const svPageWebsiteClass =
+    store?.websiteModeEnabled || usePublishedSiteLayout ? ' website-mode-full' : '';
+  const svPageCartClass =
+    selectedProductCount > 0 && step === 'products' ? ' sv-page--has-cart' : '';
   const websiteCheckoutClass = store?.websiteModeEnabled
     ? `website-checkout wp-${websiteCheckoutVariant}`
     : '';
@@ -2296,7 +2331,7 @@ export default function StoreView() {
     return (
       <>
         <style>{CSS}</style>
-        <div className="sv"><div className={`sv-page${store?.websiteModeEnabled ? ' website-mode-full' : ''}`}>
+        <div className="sv"><div className={`sv-page${svPageWebsiteClass}${svPageCartClass}`}>
           <div className="sv-hero"><div className="sv-hero-bg" /><div className="sv-hero-inner">
             <div className="sv-hero-top">
               <div className="sv-skel" style={{ width: 54, height: 54, borderRadius: 12 }} />
@@ -2527,6 +2562,7 @@ export default function StoreView() {
   /* ── Main render ── */
   const showCatalogAnnouncement =
     !store.websiteModeEnabled &&
+    !useHomepageSiteChrome &&
     catalogMarketing.promotions.announcementBarEnabled &&
     catalogMarketing.promotions.announcementText.trim().length > 0;
 
@@ -2540,7 +2576,7 @@ export default function StoreView() {
         />
       ) : null}
       <div className={`sv${checkoutRoute ? ' sv-checkout-open' : ''}`}>
-        <div className={`sv-page${store?.websiteModeEnabled ? ' website-mode-full' : ''}`}>
+        <div className={`sv-page${svPageWebsiteClass}${svPageCartClass}`}>
 
           {showCatalogAnnouncement ? (
             <CatalogAnnouncementBar
@@ -2572,6 +2608,47 @@ export default function StoreView() {
           ) : (
             <>
           {catalogProductHandle ? (
+            homepageLoading && !homepageLayout ? (
+              <div className="sv-empty" style={{ minHeight: '40vh' }}>
+                <strong>Loading product…</strong>
+              </div>
+            ) : usePublishedProductPage && websiteOrderBridge && store ? (
+              <WebsiteStoreProvider
+                slug={effectiveSlug || slug || ''}
+                store={store}
+                products={storeProducts}
+                onSubdomain={dedicatedHost}
+              >
+                <WebsiteOrderBridgeProvider value={websiteOrderBridge}>
+                  <div
+                    className="website-runtime-root website-catalog-product-shell"
+                    style={{
+                      minHeight: '100%',
+                      background: publishedHomeTheme?.backgroundColor || '#fff',
+                      color: publishedHomeTheme?.textColor,
+                      fontFamily: publishedHomeTheme?.fontFamily,
+                      ...publishedThemeVars,
+                    }}
+                  >
+                    {useHomepageSiteChrome && homepageSiteSettings ? (
+                      <StorefrontSiteHeader
+                        siteSettings={homepageSiteSettings}
+                        store={store}
+                        basePath={storeBasePath(effectiveSlug || slug || '', dedicatedHost)}
+                      />
+                    ) : null}
+                    <ProductPageRuntime
+                      product={catalogActiveProduct}
+                      template={publishedProductTemplate}
+                      onAfterPlaceOrder={closeProductPage}
+                      orderCtaLabel="Done"
+                      shopLinkTo={storeBasePath(effectiveSlug || slug || '', dedicatedHost)}
+                      shopBreadcrumbLabel="Shop"
+                    />
+                  </div>
+                </WebsiteOrderBridgeProvider>
+              </WebsiteStoreProvider>
+            ) : (
             <div className="sv-catalog-product-page">
               <div className="sv-catalog-product-top">
                 <button type="button" className="sv-catalog-product-back" onClick={closeProductPage} aria-label="Back to items">
@@ -2624,6 +2701,7 @@ export default function StoreView() {
                 )}
               </div>
             </div>
+            )
           ) : catalogHomeLayout && store && websiteOrderBridge ? (
             <CatalogHomePage
               slug={effectiveSlug || slug || ''}
@@ -2632,12 +2710,23 @@ export default function StoreView() {
               layout={catalogHomeLayout}
               orderBridge={websiteOrderBridge}
               onSubdomain={dedicatedHost}
+              showSiteHeader={useHomepageSiteChrome}
             />
           ) : null}
             </>
           )}
 
-          {!store?.websiteModeEnabled && hasFooterDetails && !checkoutRoute && renderStoreFooter()}
+          {!store?.websiteModeEnabled && !checkoutRoute ? (
+            useHomepageSiteChrome && homepageSiteSettings ? (
+              <WebsiteFooter
+                siteSettings={homepageSiteSettings}
+                store={store}
+                products={storeProducts}
+              />
+            ) : hasFooterDetails ? (
+              renderStoreFooter()
+            ) : null
+          ) : null}
 
           {/* ══ FLOATING CART BAR ══ */}
           {selectedProductCount > 0 && step === 'products' && (
@@ -2682,7 +2771,21 @@ export default function StoreView() {
             primaryLabel={
               checkoutRoute === 'details' ? 'Continue →' : isSubmitting ? 'Placing…' : 'Confirm'
             }
-            footer={!store?.websiteModeEnabled && hasFooterDetails ? renderStoreFooter() : null}
+            footer={
+              !store?.websiteModeEnabled
+                ? useHomepageSiteChrome && homepageSiteSettings
+                  ? (
+                      <WebsiteFooter
+                        siteSettings={homepageSiteSettings}
+                        store={store}
+                        products={storeProducts}
+                      />
+                    )
+                  : hasFooterDetails
+                    ? renderStoreFooter()
+                    : null
+                : null
+            }
           >
             {checkoutRoute === 'details' ? (
               <CheckoutDetailsPage

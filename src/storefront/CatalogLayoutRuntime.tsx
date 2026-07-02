@@ -1,6 +1,6 @@
 import type { HomepageLayout } from '../types/homepage';
 import SectionRenderer from '../components/HomepageBuilder/sections/SectionRenderer';
-import { getBlockInnerStyle, getBlockRowStyle } from '../utils/blockLayout';
+import { getBlockInnerStyleForLive, getBlockRowStyle } from '../utils/blockLayout';
 
 interface CatalogLayoutRuntimeProps {
   layout: HomepageLayout;
@@ -25,7 +25,7 @@ export default function CatalogLayoutRuntime({ layout, storeId }: CatalogLayoutR
     >
       {sections.map((section) => (
         <div key={section.id} style={getBlockRowStyle(section.blockLayout)}>
-          <div style={getBlockInnerStyle(section.blockLayout)}>
+          <div style={getBlockInnerStyleForLive(section.blockLayout)}>
             <SectionRenderer section={section as HomepageLayout['sections'][number] & { id: string }} theme={layout.theme} storeId={storeId} />
           </div>
         </div>

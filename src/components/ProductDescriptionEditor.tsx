@@ -7,13 +7,16 @@ import {
   FaItalic,
   FaListOl,
   FaListUl,
+  FaRedo,
   FaSmile,
   FaUnderline,
+  FaUndo,
 } from 'react-icons/fa';
 import {
-  applyDescriptionStyleToSelection,
-  PRODUCT_DESCRIPTION_STYLES,
-  type ProductDescriptionStyleClass,
+  applyFontSizeToSelection,
+  DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE,
+  getSelectionFontSize,
+  PRODUCT_DESCRIPTION_FONT_SIZES,
   sanitizeProductDescriptionHtml,
 } from '../utils/productDescriptionHtml';
 import './ProductDescriptionEditor.css';
@@ -31,14 +34,18 @@ export interface ProductDescriptionEditorProps {
   compact?: boolean;
 }
 
+const HISTORY_LIMIT = 100;
+
 function ToolbarButton({
   label,
   active,
+  disabled,
   onClick,
   children,
 }: {
   label: string;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -48,35 +55,11 @@ function ToolbarButton({
       className={`pde-toolbar-btn${active ? ' is-active' : ''}`}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
     >
       {children}
-    </button>
-  );
-}
-
-function StyleButton({
-  label,
-  shortLabel,
-  compact,
-  onApply,
-}: {
-  label: string;
-  shortLabel: string;
-  compact: boolean;
-  onApply: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="pde-style-btn"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onApply}
-      aria-label={label}
-      title={label}
-    >
-      {compact ? shortLabel : label}
     </button>
   );
 }
@@ -90,9 +73,26 @@ export default function ProductDescriptionEditor({
 }: ProductDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+  const fontSizeRef = useRef<HTMLDivElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const syncingRef = useRef(false);
+  const suppressHistoryRef = useRef(false);
+  const historyRef = useRef<{ past: string[]; future: string[]; last: string }>({
+    past: [],
+    future: [],
+    last: '',
+  });
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [fontSizeOpen, setFontSizeOpen] = useState(false);
+  const [currentFontSize, setCurrentFontSize] = useState(DEFAULT_PRODUCT_DESCRIPTION_FONT_SIZE);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const syncHistoryFlags = useCallback(() => {
+    const h = historyRef.current;
+    setCanUndo(h.past.length > 0);
+    setCanRedo(h.future.length > 0);
+  }, []);
 
   const saveSelection = useCallback(() => {
     const editor = editorRef.current;
@@ -102,24 +102,111 @@ export default function ProductDescriptionEditor({
     const range = selection.getRangeAt(0);
     if (editor.contains(range.commonAncestorContainer)) {
       savedRangeRef.current = range.cloneRange();
+      setCurrentFontSize(getSelectionFontSize(editor, savedRangeRef.current));
     }
+  }, []);
+
+  const recordHistory = useCallback(
+    (html: string) => {
+      if (suppressHistoryRef.current) return;
+      const h = historyRef.current;
+      if (html === h.last) return;
+      h.past.push(h.last);
+      if (h.past.length > HISTORY_LIMIT) {
+        h.past.shift();
+      }
+      h.last = html;
+      h.future = [];
+      syncHistoryFlags();
+    },
+    [syncHistoryFlags],
+  );
+
+  const restoreHistoryEntry = useCallback(
+    (html: string) => {
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      suppressHistoryRef.current = true;
+      syncingRef.current = true;
+      const cleaned = sanitizeProductDescriptionHtml(html);
+      editor.innerHTML = cleaned;
+      historyRef.current.last = cleaned;
+      onChange(cleaned);
+
+      requestAnimationFrame(() => {
+        suppressHistoryRef.current = false;
+        syncingRef.current = false;
+        editor.focus();
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        saveSelection();
+      });
+    },
+    [onChange, saveSelection],
+  );
+
+  const handleUndo = useCallback(() => {
+    const h = historyRef.current;
+    if (h.past.length === 0) return;
+
+    h.future.unshift(h.last);
+    const previous = h.past.pop() ?? '';
+    h.last = previous;
+    restoreHistoryEntry(previous);
+    syncHistoryFlags();
+  }, [restoreHistoryEntry, syncHistoryFlags]);
+
+  const handleRedo = useCallback(() => {
+    const h = historyRef.current;
+    if (h.future.length === 0) return;
+
+    h.past.push(h.last);
+    const next = h.future.shift() ?? '';
+    h.last = next;
+    restoreHistoryEntry(next);
+    syncHistoryFlags();
+  }, [restoreHistoryEntry, syncHistoryFlags]);
+
+  const restoreSelection = useCallback(() => {
+    const editor = editorRef.current;
+    const range = savedRangeRef.current;
+    const selection = window.getSelection();
+    if (!editor || !range || !selection) return false;
+    if (!editor.contains(range.commonAncestorContainer)) return false;
+    selection.removeAllRanges();
+    selection.addRange(range.cloneRange());
+    return true;
   }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || syncingRef.current) return;
+    if (!editor || syncingRef.current || suppressHistoryRef.current) return;
     const next = sanitizeProductDescriptionHtml(value || '');
     if (editor.innerHTML !== next) {
       editor.innerHTML = next;
+      historyRef.current = { past: [], future: [], last: next };
+      syncHistoryFlags();
+      return;
     }
-  }, [value]);
+    if (!historyRef.current.last && historyRef.current.past.length === 0) {
+      historyRef.current.last = next;
+    }
+  }, [value, syncHistoryFlags]);
 
   useEffect(() => {
-    if (!emojiOpen) return;
+    if (!emojiOpen && !fontSizeOpen) return;
     const onPointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node | null;
-      if (emojiRef.current?.contains(target)) return;
+      if (emojiOpen && emojiRef.current?.contains(target)) return;
+      if (fontSizeOpen && fontSizeRef.current?.contains(target)) return;
       setEmojiOpen(false);
+      setFontSizeOpen(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('touchstart', onPointerDown);
@@ -127,7 +214,7 @@ export default function ProductDescriptionEditor({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('touchstart', onPointerDown);
     };
-  }, [emojiOpen]);
+  }, [emojiOpen, fontSizeOpen]);
 
   const emitChange = useCallback(() => {
     const editor = editorRef.current;
@@ -137,46 +224,70 @@ export default function ProductDescriptionEditor({
     if (editor.innerHTML !== cleaned) {
       editor.innerHTML = cleaned;
     }
+    recordHistory(cleaned);
     onChange(cleaned);
     requestAnimationFrame(() => {
       syncingRef.current = false;
     });
-  }, [onChange]);
+  }, [onChange, recordHistory]);
 
-  const applyTextStyle = useCallback(
-    (styleClass: ProductDescriptionStyleClass) => {
+  const handleEditorKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      const mod = event.ctrlKey || event.metaKey;
+      if (!mod) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        handleUndo();
+        return;
+      }
+      if (key === 'y' || (key === 'z' && event.shiftKey)) {
+        event.preventDefault();
+        handleRedo();
+      }
+    },
+    [handleRedo, handleUndo],
+  );
+
+  const applyFontSize = useCallback(
+    (fontSize: string) => {
       const editor = editorRef.current;
       if (!editor) return;
 
       editor.focus();
-      const applied = applyDescriptionStyleToSelection(styleClass, editor, savedRangeRef.current);
+      restoreSelection();
+      const applied = applyFontSizeToSelection(fontSize, editor, savedRangeRef.current);
       if (applied) {
         saveSelection();
         emitChange();
       }
+      setFontSizeOpen(false);
     },
-    [emitChange, saveSelection],
+    [emitChange, restoreSelection, saveSelection],
   );
 
   const runCommand = useCallback(
     (command: string, commandValue?: string) => {
       editorRef.current?.focus();
+      restoreSelection();
       document.execCommand(command, false, commandValue);
       saveSelection();
       emitChange();
     },
-    [emitChange, saveSelection],
+    [emitChange, restoreSelection, saveSelection],
   );
 
   const insertEmoji = useCallback(
     (emoji: string) => {
       editorRef.current?.focus();
+      restoreSelection();
       document.execCommand('insertText', false, emoji);
       saveSelection();
       emitChange();
       setEmojiOpen(false);
     },
-    [emitChange, saveSelection],
+    [emitChange, restoreSelection, saveSelection],
   );
 
   const handlePaste = useCallback(
@@ -185,6 +296,7 @@ export default function ProductDescriptionEditor({
       const text = event.clipboardData.getData('text/plain');
       event.preventDefault();
       editorRef.current?.focus();
+      restoreSelection();
       if (html) {
         document.execCommand('insertHTML', false, sanitizeProductDescriptionHtml(html));
       } else {
@@ -193,7 +305,7 @@ export default function ProductDescriptionEditor({
       saveSelection();
       emitChange();
     },
-    [emitChange, saveSelection],
+    [emitChange, restoreSelection, saveSelection],
   );
 
   return (
@@ -202,17 +314,63 @@ export default function ProductDescriptionEditor({
         className="pde-toolbar"
         role="toolbar"
         aria-label="Description formatting"
-        onMouseDown={saveSelection}
+        onMouseDownCapture={saveSelection}
       >
-        {PRODUCT_DESCRIPTION_STYLES.map((style) => (
-          <StyleButton
-            key={style.key}
-            label={style.label}
-            shortLabel={style.shortLabel}
-            compact={compact}
-            onApply={() => applyTextStyle(style.key)}
-          />
-        ))}
+        <ToolbarButton
+          label="Undo (Ctrl+Z)"
+          disabled={!canUndo}
+          onClick={handleUndo}
+        >
+          <FaUndo size={compact ? 12 : 13} />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Redo (Ctrl+Y)"
+          disabled={!canRedo}
+          onClick={handleRedo}
+        >
+          <FaRedo size={compact ? 12 : 13} />
+        </ToolbarButton>
+        <span className="pde-toolbar-sep" aria-hidden />
+        <div className="pde-font-size-wrap" ref={fontSizeRef}>
+          <button
+            type="button"
+            className={`pde-font-size-trigger${fontSizeOpen ? ' is-open' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              saveSelection();
+              setFontSizeOpen((open) => !open);
+              setEmojiOpen(false);
+            }}
+            aria-label="Font size"
+            aria-haspopup="listbox"
+            aria-expanded={fontSizeOpen}
+            title="Font size"
+          >
+            <span className="pde-font-size-value">
+              {PRODUCT_DESCRIPTION_FONT_SIZES.find((size) => size.value === currentFontSize)?.label ?? '14'}
+            </span>
+            <span className="pde-font-size-chevron" aria-hidden>
+              ▾
+            </span>
+          </button>
+          {fontSizeOpen ? (
+            <div className="pde-font-size-menu" role="listbox" aria-label="Font size">
+              {PRODUCT_DESCRIPTION_FONT_SIZES.map((size) => (
+                <button
+                  key={size.value}
+                  type="button"
+                  className={`pde-font-size-option${size.value === currentFontSize ? ' is-active' : ''}`}
+                  role="option"
+                  aria-selected={size.value === currentFontSize}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFontSize(size.value)}
+                >
+                  {size.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <span className="pde-toolbar-sep" aria-hidden />
         <ToolbarButton label="Bold" onClick={() => runCommand('bold')}>
           <FaBold size={compact ? 12 : 13} />
@@ -274,10 +432,12 @@ export default function ProductDescriptionEditor({
         style={{ minHeight }}
         onInput={emitChange}
         onBlur={emitChange}
+        onKeyDown={handleEditorKeyDown}
         onPaste={handlePaste}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         onFocus={saveSelection}
+        onSelect={saveSelection}
       />
     </div>
   );

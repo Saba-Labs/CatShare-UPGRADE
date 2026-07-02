@@ -13,11 +13,10 @@ export default function AnnouncementSectionView({ section, editMode, onUpdateSec
 
   return (
     <div
-      className="announcement-bar-section"
+      className="announcement-bar-section sites-section-pad--compact"
       style={{
         background: settings.backgroundColor || '#fef3c7',
         color: settings.textColor || '#92400e',
-        padding: '12px 16px',
         display: 'flex',
         gap: '12px',
         alignItems: 'center',
@@ -32,8 +31,7 @@ export default function AnnouncementSectionView({ section, editMode, onUpdateSec
       )}
       {editMode && onUpdateSection ? (
         <p
-          className="sites-inline-editable"
-          style={{ margin: 0, flex: 1, fontSize: '0.875rem' }}
+          className="announcement-bar-section__message sites-inline-editable"
           contentEditable
           suppressContentEditableWarning
           onBlur={(e) => onUpdateSection({ content: { message: e.currentTarget.textContent || '' } })}
@@ -41,7 +39,7 @@ export default function AnnouncementSectionView({ section, editMode, onUpdateSec
           {content.message}
         </p>
       ) : (
-        <p style={{ margin: 0, flex: 1, fontSize: '0.875rem' }}>{content.message}</p>
+        <p className="announcement-bar-section__message">{content.message}</p>
       )}
       {settings.dismissible && (
         <button

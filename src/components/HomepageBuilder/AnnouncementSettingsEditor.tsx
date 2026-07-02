@@ -24,7 +24,7 @@ export default function AnnouncementSettingsEditor({
         <span>Show announcement bar</span>
       </label>
       <p className="panel-hint" style={{ marginTop: 8 }}>
-        Turn off to remove the bar from every page. Templates 1 and 2 enable this by default.
+        Turn off to remove the bar from every page. Themes 1 and 2 enable this by default.
       </p>
 
       {siteSettings.showAnnouncement && (

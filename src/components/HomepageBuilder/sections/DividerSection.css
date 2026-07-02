@@ -1,0 +1,77 @@
+.divider-section {
+  display: flex;
+  justify-content: center;
+}
+
+.divider-section--spacing-small {
+  padding: 0.75rem 0;
+}
+
+.divider-section--spacing-medium {
+  padding: 1.5rem 0;
+}
+
+.divider-section--spacing-large {
+  padding: 2.5rem 0;
+}
+
+.divider-section--space.divider-section--spacing-small {
+  height: 0.75rem;
+  padding: 0;
+}
+
+.divider-section--space.divider-section--spacing-medium {
+  height: 1.5rem;
+  padding: 0;
+}
+
+.divider-section--space.divider-section--spacing-large {
+  height: 2.5rem;
+  padding: 0;
+}
+
+.divider-section--dots {
+  letter-spacing: 0.35em;
+  font-size: 0.65rem;
+}
+
+@container site-viewport (max-width: 30rem) {
+  .divider-section--spacing-small {
+    padding: 0.5rem 0;
+  }
+
+  .divider-section--spacing-medium {
+    padding: 0.85rem 0;
+  }
+
+  .divider-section--spacing-large {
+    padding: 1.25rem 0;
+  }
+
+  .divider-section--space.divider-section--spacing-small {
+    height: 0.5rem;
+  }
+
+  .divider-section--space.divider-section--spacing-medium {
+    height: 0.85rem;
+  }
+
+  .divider-section--space.divider-section--spacing-large {
+    height: 1.25rem;
+  }
+
+  .divider-section--dots {
+    font-size: 0.55rem;
+    letter-spacing: 0.28em;
+  }
+}
+
+.sites-page-frame.viewport-mobile .divider-section--spacing-medium,
+.builder-product-page-root.viewport-mobile .divider-section--spacing-medium {
+  padding: 0.85rem 0;
+}
+
+.sites-page-frame.viewport-mobile .divider-section--dots,
+.builder-product-page-root.viewport-mobile .divider-section--dots {
+  font-size: 0.55rem;
+}

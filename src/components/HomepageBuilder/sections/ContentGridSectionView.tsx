@@ -1,7 +1,7 @@
 import type { ContentGridSection } from '../../../types/homepage';
+import { commitInlineText } from '../../../utils/builderEditGuards';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './ContentGrid.css';
-
 interface ContentGridSectionViewProps {
   section: ContentGridSection & { id: string };
   storeId?: string;
@@ -17,9 +17,6 @@ export default function ContentGridSectionView({
 }: ContentGridSectionViewProps) {
   const { settings, content } = section;
   const media = useBuilderMediaOptional();
-  const paddingValue =
-    settings.padding === 'small' ? '1.5rem' : settings.padding === 'large' ? '3rem' : '2rem';
-  const gapValue = settings.gap === 'small' ? '1rem' : settings.gap === 'large' ? '2rem' : '1.5rem';
 
   const openItemImagePicker = (itemId: string) => {
     if (!media || !storeId || !onUpdateSection) return;
@@ -34,24 +31,63 @@ export default function ContentGridSectionView({
     });
   };
 
+  const stopEditPointer = (e: React.MouseEvent | React.PointerEvent) => {
+    e.stopPropagation();
+  };
+
+  const updateSectionTitle = (title: string) => {
+    if (!onUpdateSection) return;
+    commitInlineText(settings.title, title, (next) => {
+      onUpdateSection({
+        settings: {
+          ...settings,
+          title: next,
+        },
+      });
+    });
+  };
+
+  const updateItem = (itemId: string, patch: Partial<(typeof content.items)[number]>) => {
+    if (!onUpdateSection) return;
+    const existing = content.items.find((item) => item.id === itemId);
+    if (!existing) return;
+    const hasChange = (Object.keys(patch) as Array<keyof typeof patch>).some(
+      (key) => (existing[key] ?? '') !== (patch[key] ?? '')
+    );
+    if (!hasChange) return;
+    const items = content.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item));
+    onUpdateSection({ content: { items } });
+  };
   return (
     <div
-      className="content-grid-section"
+      className={`content-grid-section sites-section-pad--${settings.padding}`}
       style={{
         backgroundColor: settings.backgroundColor,
-        padding: paddingValue,
       }}
     >
-      {settings.title && <h2 className="grid-title">{settings.title}</h2>}
+      {settings.title ? (
+        editMode && onUpdateSection ? (
+          <h2
+            className="grid-title sites-inline-editable"
+            contentEditable
+            suppressContentEditableWarning
+            onMouseDown={stopEditPointer}
+            onPointerDown={stopEditPointer}
+            onClick={stopEditPointer}
+            onBlur={(e) => updateSectionTitle(e.currentTarget.textContent || '')}
+          >            {settings.title}
+          </h2>
+        ) : (
+          <h2 className="grid-title">{settings.title}</h2>
+        )
+      ) : null}
 
       <div
-        className="grid-container"
+        className={`content-grid__track content-grid__track--gap-${settings.gap}`}
         style={{
-          gridTemplateColumns: `repeat(${settings.columns}, 1fr)`,
-          gap: gapValue,
+          ['--grid-cols' as string]: settings.columns,
         }}
-      >
-        {content.items.map((item) => (
+      >        {content.items.map((item) => (
           <div key={item.id} className="grid-item">
             <div className="grid-item-image">
               {item.imageUrl ? (
@@ -74,8 +110,36 @@ export default function ContentGridSectionView({
               )}
             </div>
             <div className="grid-item-content">
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
+              {editMode && onUpdateSection ? (
+                <>
+                  <h3
+                    className="sites-inline-editable"
+                    contentEditable
+                    suppressContentEditableWarning
+                    onMouseDown={stopEditPointer}
+                    onPointerDown={stopEditPointer}
+                    onClick={stopEditPointer}
+                    onBlur={(e) => updateItem(item.id, { title: e.currentTarget.textContent || '' })}
+                  >
+                    {item.title}
+                  </h3>
+                  <p
+                    className="sites-inline-editable"
+                    contentEditable
+                    suppressContentEditableWarning
+                    onMouseDown={stopEditPointer}
+                    onPointerDown={stopEditPointer}
+                    onClick={stopEditPointer}
+                    onBlur={(e) => updateItem(item.id, { description: e.currentTarget.textContent || '' })}
+                  >                    {item.description}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </>
+              )}
             </div>
           </div>
         ))}

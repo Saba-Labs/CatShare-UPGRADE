@@ -1,0 +1,283 @@
+/**
+ * Storefront responsive layout — adapts to container width (editor preview + live site).
+ * Parent wrappers must set container-type (see .sites-page-frame, .website-runtime-root).
+ */
+
+@import './sites-section-shared.css';
+@import './storefront-section-responsive.css';
+
+.catalog-layout-runtime {
+  container-type: inline-size;
+  container-name: site-viewport;
+}
+
+.sites-page-frame,
+.website-runtime-root {
+  container-type: inline-size;
+  container-name: site-viewport;
+}
+
+/* Content grid (featured brands, buying guides, etc.) */
+
+.content-grid__track {
+  --grid-cols: 4;
+  --grid-gap: 1.5rem;
+  --grid-cols-mobile: min(var(--grid-cols), 3);
+  --grid-cols-tablet: min(var(--grid-cols), 4);
+  display: grid;
+  gap: var(--grid-gap);
+  grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr));
+}
+
+.content-grid__track > .grid-item {
+  min-width: 0;
+}
+
+/* Category showcase — column count scales tile size on desktop; caps columns on narrow widths */
+
+.cat-showcase--layout-grid .cat-showcase__track {
+  --cat-cols-mobile: min(var(--cat-cols, 3), 3);
+  --cat-cols-tablet: min(var(--cat-cols, 3), 4);
+  display: grid;
+  grid-template-columns: repeat(var(--cat-cols, 3), minmax(0, 1fr));
+}
+
+.testimonials-grid {
+  --testimonial-cols: 3;
+  --testimonial-gap: 1.25rem;
+  --testimonial-col-floor: 8rem;
+  --testimonial-col-ideal: calc(
+    (100% - (var(--testimonial-cols) - 1) * var(--testimonial-gap)) / var(--testimonial-cols)
+  );
+  display: grid;
+  gap: var(--testimonial-gap);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(var(--testimonial-col-floor), var(--testimonial-col-ideal))), 1fr)
+  );
+}
+
+.testimonials-carousel-track > .testimonial-card {
+  flex: 0 0
+    min(100%, max(8rem, calc((100% - 1rem) / min(var(--testimonial-cols, 3), 3))));
+  max-width: min(16rem, 100%);
+  scroll-snap-align: start;
+}
+
+.feature-card-content {
+  flex-wrap: wrap;
+}
+
+.feature-card-image,
+.feature-card-text {
+  flex: 1 1 min(100%, 17.5rem);
+  min-width: 0;
+}
+
+.website-products-grid:not(.website-products-grid--order-form) {
+  --products-col-min: 9.5rem;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(var(--products-col-min), 9.5rem)), 1fr)
+  );
+}
+
+.website-products-grid:not(.website-products-grid--order-form) > * {
+  min-width: 0;
+}
+
+/* Scale category tile imagery on narrow containers */
+
+@container site-viewport (max-width: 30rem) {
+  .cat-showcase--size-xl .cat-showcase__media {
+    --cat-image-height: 120px;
+  }
+
+  .cat-showcase--size-lg .cat-showcase__media {
+    --cat-image-height: 96px;
+  }
+
+  .cat-showcase--size-md .cat-showcase__media {
+    --cat-image-height: 80px;
+  }
+
+  .cat-showcase--size-sm .cat-showcase__media {
+    --cat-image-height: 64px;
+  }
+
+  .cat-showcase__heading {
+    font-size: 1.25rem;
+  }
+
+  .cat-showcase__label {
+    font-size: 0.82rem;
+  }
+
+  .cat-showcase__count {
+    font-size: 0.75rem;
+  }
+}
+
+/* Mobile: category grid uses horizontal row with 3 visible (see category-showcase.css) */
+
+@container site-viewport (max-width: 30rem) {
+  .content-grid__track {
+    grid-template-columns: repeat(var(--grid-cols-mobile), minmax(0, 1fr));
+  }
+
+  .testimonials-grid {
+    --testimonial-col-floor: max(7.5rem, calc((100% - var(--testimonial-gap)) / 2));
+  }
+
+  .testimonials-carousel-track > .testimonial-card {
+    flex-basis: min(calc((100% - 0.5rem) / 2), 14rem);
+    max-width: calc((100% - 0.5rem) / 2);
+  }
+
+  .website-products-grid:not(.website-products-grid--order-form) {
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, max(8.5rem, calc((100% - 16px) / 2))), 1fr)
+    );
+  }
+
+  .cat-showcase--label-overlay .cat-showcase__media,
+  .cat-showcase--overlay-labels .cat-showcase__media {
+    display: block;
+  }
+
+  .cat-showcase--label-overlay .cat-showcase__body,
+  .cat-showcase--overlay-labels .cat-showcase__body {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px 10px 10px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+    color: #fff;
+  }
+
+  .cat-showcase--label-overlay .cat-showcase__label,
+  .cat-showcase--overlay-labels .cat-showcase__label {
+    font-size: 0.72rem;
+    line-height: 1.25;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cat-showcase--label-overlay .cat-showcase__count,
+  .cat-showcase--overlay-labels .cat-showcase__count {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.85);
+    opacity: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Tablet: up to 4-across */
+
+@container site-viewport (min-width: 30.01rem) and (max-width: 48rem) {
+  .cat-showcase--layout-grid .cat-showcase__track {
+    grid-template-columns: repeat(var(--cat-cols-tablet), minmax(0, 1fr));
+  }
+
+  .content-grid__track {
+    grid-template-columns: repeat(var(--grid-cols-tablet), minmax(0, 1fr));
+  }
+}
+
+/* Editor viewport toggles (mirror container queries) */
+
+.sites-page-frame.viewport-mobile .content-grid__track,
+.builder-product-page-root.viewport-mobile .content-grid__track {
+  grid-template-columns: repeat(var(--grid-cols-mobile), minmax(0, 1fr));
+}
+
+.sites-page-frame.viewport-mobile .testimonials-grid,
+.builder-product-page-root.viewport-mobile .testimonials-grid {
+  --testimonial-col-floor: max(7.5rem, calc((100% - var(--testimonial-gap)) / 2));
+}
+
+.sites-page-frame.viewport-mobile .testimonials-carousel-track > .testimonial-card,
+.builder-product-page-root.viewport-mobile .testimonials-carousel-track > .testimonial-card {
+  flex-basis: min(calc((100% - 0.5rem) / 2), 14rem);
+  max-width: calc((100% - 0.5rem) / 2);
+}
+
+.sites-page-frame.viewport-mobile .website-products-grid:not(.website-products-grid--order-form),
+.builder-product-page-root.viewport-mobile .website-products-grid:not(.website-products-grid--order-form) {
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(8.5rem, calc((100% - 16px) / 2))), 1fr)
+  );
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--size-xl .cat-showcase__media {
+  --cat-image-height: 120px;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--size-lg .cat-showcase__media {
+  --cat-image-height: 96px;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--size-md .cat-showcase__media {
+  --cat-image-height: 80px;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--label-overlay .cat-showcase__media,
+.sites-page-frame.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__media,
+.builder-product-page-root.viewport-mobile .cat-showcase--label-overlay .cat-showcase__media,
+.builder-product-page-root.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__media {
+  display: block;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--label-overlay .cat-showcase__body,
+.sites-page-frame.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__body,
+.builder-product-page-root.viewport-mobile .cat-showcase--label-overlay .cat-showcase__body,
+.builder-product-page-root.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 10px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+  color: #fff;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--label-overlay .cat-showcase__label,
+.sites-page-frame.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__label,
+.builder-product-page-root.viewport-mobile .cat-showcase--label-overlay .cat-showcase__label,
+.builder-product-page-root.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__label {
+  font-size: 0.72rem;
+  line-height: 1.25;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sites-page-frame.viewport-mobile .cat-showcase--label-overlay .cat-showcase__count,
+.sites-page-frame.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__count,
+.builder-product-page-root.viewport-mobile .cat-showcase--label-overlay .cat-showcase__count,
+.builder-product-page-root.viewport-mobile .cat-showcase--overlay-labels .cat-showcase__count {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sites-page-frame.viewport-tablet .cat-showcase--layout-grid .cat-showcase__track,
+.builder-product-page-root.viewport-tablet .cat-showcase--layout-grid .cat-showcase__track {
+  grid-template-columns: repeat(var(--cat-cols-tablet), minmax(0, 1fr));
+}
+
+.sites-page-frame.viewport-tablet .content-grid__track,
+.builder-product-page-root.viewport-tablet .content-grid__track {
+  grid-template-columns: repeat(var(--grid-cols-tablet), minmax(0, 1fr));
+}

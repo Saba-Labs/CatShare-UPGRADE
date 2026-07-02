@@ -2,25 +2,30 @@ import type { BannerSection, ThemeSettings } from '../../../types/homepage';
 import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
+import './BannerSection.css';
 
 interface BannerSectionViewProps {
   section: BannerSection & { id: string };
   theme?: ThemeSettings;
   storeId?: string;
   editMode?: boolean;
+  builderCanvas?: boolean;
   onUpdateSection?: (updates: Partial<BannerSection>) => void;
 }
+
+const HEIGHT_MAP = { small: '150px', medium: '250px', large: '400px' } as const;
 
 export default function BannerSectionView({
   section,
   theme,
   storeId,
   editMode,
+  builderCanvas = false,
   onUpdateSection,
 }: BannerSectionViewProps) {
   const { settings, content } = section;
-  const heightMap = { small: '150px', medium: '250px', large: '400px' };
   const media = useBuilderMediaOptional();
+  const align = settings.textAlignment || 'center';
 
   const updateContent = (patch: Partial<BannerSection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
@@ -41,20 +46,17 @@ export default function BannerSectionView({
 
   return (
     <div
+      className={`banner-section banner-section--align-${align}`}
       style={{
-        height: heightMap[settings.height],
-        background: settings.backgroundColor || '#1a73e8',
+        ['--banner-min-height' as string]: HEIGHT_MAP[settings.height],
+        backgroundColor: settings.backgroundColor || '#1a73e8',
         backgroundImage: settings.backgroundImage ? `url(${settings.backgroundImage})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: settings.textAlignment as React.CSSProperties['justifyContent'],
-        overflow: 'hidden',
       }}
     >
-      <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${settings.overlayOpacity})` }} />
+      <div
+        className="banner-section__overlay"
+        style={{ background: `rgba(0,0,0,${settings.overlayOpacity})` }}
+      />
       {editMode && media && storeId && onUpdateSection ? (
         <button
           type="button"
@@ -67,20 +69,11 @@ export default function BannerSectionView({
           {settings.backgroundImage ? 'Change background' : '+ Add background image'}
         </button>
       ) : null}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          color: 'white',
-          textAlign: settings.textAlignment as React.CSSProperties['textAlign'],
-          padding: '20px',
-          width: '100%',
-        }}
-      >
+      <div className="banner-section__content">
         {editMode && onUpdateSection ? (
           <>
             <h2
-              className="sites-inline-editable sites-inline-heading"
+              className="banner-section__title sites-inline-editable sites-inline-heading"
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => updateContent({ title: e.currentTarget.textContent || '' })}
@@ -88,7 +81,7 @@ export default function BannerSectionView({
               {content.title}
             </h2>
             <p
-              className="sites-inline-editable"
+              className="banner-section__subtitle sites-inline-editable"
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => updateContent({ subtitle: e.currentTarget.textContent || '' })}
@@ -96,7 +89,7 @@ export default function BannerSectionView({
               {content.subtitle || 'Subtitle'}
             </p>
             <span
-              className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+              className={`banner-section__cta sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
               style={getThemeButtonStyles(theme || {})}
               contentEditable
               suppressContentEditableWarning
@@ -107,22 +100,24 @@ export default function BannerSectionView({
           </>
         ) : (
           <>
-            <h2 style={{ margin: '0 0 8px 0', fontSize: '1.875rem', fontWeight: 600 }}>{content.title}</h2>
-            {content.subtitle && <p style={{ margin: '0 0 16px 0', fontSize: '1rem' }}>{content.subtitle}</p>}
-            {content.buttonText &&
-              (content.buttonLink ? (
+            <h2 className="banner-section__title">{content.title}</h2>
+            {content.subtitle ? <p className="banner-section__subtitle">{content.subtitle}</p> : null}
+            {content.buttonText ? (
+              content.buttonLink ? (
                 <StorefrontLink
                   href={content.buttonLink}
-                  className={SITES_THEME_BUTTON_CLASS}
+                  preview={builderCanvas}
+                  className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`}
                   style={getThemeButtonStyles(theme || {})}
                 >
                   {content.buttonText}
                 </StorefrontLink>
               ) : (
-                <span className={SITES_THEME_BUTTON_CLASS} style={getThemeButtonStyles(theme || {})}>
+                <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={getThemeButtonStyles(theme || {})}>
                   {content.buttonText}
                 </span>
-              ))}
+              )
+            ) : null}
           </>
         )}
       </div>

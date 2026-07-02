@@ -1332,7 +1332,7 @@ useEffect(() => {
     ): number => {
       const { quantity, wasCapped, available } = applyInventoryCapToQuantity(
         rawQty,
-        item.quantityStep ?? 1,
+        1,
         1,
         orderCatalogueConfig,
         inventoryMap,

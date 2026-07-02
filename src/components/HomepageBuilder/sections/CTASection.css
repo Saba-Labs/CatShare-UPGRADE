@@ -1,0 +1,15 @@
+.cta-section {
+  text-align: center;
+}
+
+.cta-section--align-left {
+  text-align: left;
+}
+
+.cta-section--align-center {
+  text-align: center;
+}
+
+.cta-section--align-right {
+  text-align: right;
+}

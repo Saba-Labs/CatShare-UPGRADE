@@ -323,6 +323,16 @@
   animation: storefront-nav-fade-in 0.2s ease;
 }
 
+/* Builder preview: menu is portaled onto .sites-page-frame, not the browser window */
+.sites-page-frame > .storefront-nav-overlay {
+  position: absolute;
+}
+
+.sites-page-frame > .storefront-nav-drawer {
+  position: absolute;
+  width: min(300px, 88%);
+}
+
 .storefront-nav-drawer {
   position: fixed;
   top: 0;

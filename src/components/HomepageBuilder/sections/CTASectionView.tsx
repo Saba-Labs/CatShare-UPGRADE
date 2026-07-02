@@ -2,17 +2,25 @@ import React from 'react';
 import { CTASection, ThemeSettings } from '../../../types/homepage';
 import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
+import './CTASection.css';
 
 interface CTASectionViewProps {
   section: CTASection & { id: string };
   theme?: ThemeSettings;
   editMode?: boolean;
+  builderCanvas?: boolean;
   onUpdateSection?: (updates: Partial<CTASection>) => void;
 }
 
-export default function CTASectionView({ section, theme, editMode, onUpdateSection }: CTASectionViewProps) {
+export default function CTASectionView({ section, theme, editMode, builderCanvas = false, onUpdateSection }: CTASectionViewProps) {
   const { settings, content } = section;
   const buttonStyles = getThemeButtonStyles(theme || {}, settings.buttonColor);
+  const alignClass =
+    settings.textAlignment === 'left'
+      ? 'cta-section--align-left'
+      : settings.textAlignment === 'right'
+        ? 'cta-section--align-right'
+        : 'cta-section--align-center';
 
   const updateContent = (patch: Partial<CTASection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
@@ -20,16 +28,15 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
 
   return (
     <div
+      className={`cta-section sites-section-pad--cta ${alignClass}`}
       style={{
         background: settings.backgroundColor || '#f8f9fa',
-        padding: '40px 20px',
-        textAlign: settings.textAlignment as React.CSSProperties['textAlign'],
       }}
     >
       {editMode && onUpdateSection ? (
         <>
           <h2
-            className="sites-inline-editable sites-inline-heading"
+            className="cta-section__title sites-inline-editable sites-inline-heading"
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => updateContent({ title: e.currentTarget.textContent || '' })}
@@ -37,7 +44,7 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
             {content.title}
           </h2>
           <p
-            className="sites-inline-editable"
+            className="cta-section__description sites-inline-editable"
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => updateContent({ description: e.currentTarget.textContent || '' })}
@@ -56,13 +63,11 @@ export default function CTASectionView({ section, theme, editMode, onUpdateSecti
         </>
       ) : (
         <>
-          <h2 style={{ margin: '0 0 12px 0', fontSize: '1.5rem', fontWeight: 600 }}>{content.title}</h2>
-          {content.description && (
-            <p style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#5f6368' }}>{content.description}</p>
-          )}
+          <h2 className="cta-section__title">{content.title}</h2>
+          {content.description && <p className="cta-section__description">{content.description}</p>}
           {content.buttonText &&
             (content.buttonLink ? (
-              <StorefrontLink href={content.buttonLink} className={SITES_THEME_BUTTON_CLASS} style={buttonStyles}>
+              <StorefrontLink href={content.buttonLink} preview={builderCanvas} className={SITES_THEME_BUTTON_CLASS} style={buttonStyles}>
                 {content.buttonText}
               </StorefrontLink>
             ) : (

@@ -52,6 +52,8 @@ interface BuilderSidebarProps {
   onRemovePage: (pageId: string) => void;
   onClearSectionSelection: () => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
+  onCookTheme?: () => void;
+  themeHubMode?: boolean;
   previewProduct?: ProductWithCatalogueData | null;
   onCloseProductPreview?: () => void;
 }
@@ -81,6 +83,8 @@ export default function BuilderSidebar({
   onRemovePage,
   onClearSectionSelection,
   onApplyTemplate,
+  onCookTheme,
+  themeHubMode = false,
   previewProduct = null,
   onCloseProductPreview,
 }: BuilderSidebarProps) {
@@ -93,7 +97,7 @@ export default function BuilderSidebar({
   const ActiveTabIcon = activeMeta.Icon;
 
   return (
-    <aside className="builder-sidebar builder-sidebar--rail">
+    <aside className={`builder-sidebar builder-sidebar--rail${themeHubMode ? ' builder-sidebar--theme-hub' : ''}`}>
       <nav className="builder-sidebar-rail" aria-label="Editor panels">
         {TAB_ORDER.map((id) => {
           const { label, hint, Icon } = SIDEBAR_TAB_META[id];
@@ -117,7 +121,7 @@ export default function BuilderSidebar({
         })}
       </nav>
 
-      <div className="builder-sidebar-main">
+      <div className={`builder-sidebar-main${themeHubMode ? ' builder-sidebar-main--collapsed' : ''}`}>
         {!previewProduct && !selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
           <div className="builder-sidebar-main__head">
             <ActiveTabIcon className="builder-sidebar-main__head-icon" aria-hidden />
@@ -177,7 +181,7 @@ export default function BuilderSidebar({
               />
             )}
             {activeTab === 'templates' && onApplyTemplate && (
-              <TemplateGallery variant="compact" onApply={onApplyTemplate} />
+              <TemplateGallery variant="compact" onApply={onApplyTemplate} onCookTheme={onCookTheme} />
             )}
             {activeTab === 'pages' && (
               <PagesPanel
@@ -191,7 +195,7 @@ export default function BuilderSidebar({
             )}
             {activeTab === 'photos' && <MediaLibraryPanel storeId={storeId} />}
             {activeTab === 'theme' && (
-              <ThemePanel theme={theme} websiteConfig={websiteConfig} onUpdateTheme={onUpdateTheme} onUpdateWebsiteConfig={onUpdateWebsiteConfig} />
+              <ThemePanel theme={theme} onUpdateTheme={onUpdateTheme} />
             )}
             {activeTab === 'site' && (
               <SiteSettingsPanel

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FooterSection } from '../../../types/homepage';
+import './FooterSection.css';
 
 interface FooterSectionViewProps {
   section: FooterSection & { id: string };
@@ -11,25 +12,24 @@ export default function FooterSectionView({ section }: FooterSectionViewProps) {
 
   return (
     <footer
+      className="footer-section-block sites-section-pad--footer"
       style={{
         background: settings.backgroundColor || '#1f2937',
         color: settings.textColor || '#f9fafb',
-        padding: '40px 20px',
-        borderRadius: '8px',
       }}
     >
       {settings.layout === 'multi-column' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '40px', marginBottom: '30px' }}>
+        <div className="footer-section-block__grid">
           <div>
-            <h4 style={{ margin: '0 0 12px 0', fontWeight: 600 }}>{content.company}</h4>
-            <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.8 }}>{content.description}</p>
+            <h4 className="footer-section-block__heading">{content.company}</h4>
+            <p className="footer-section-block__text">{content.description}</p>
           </div>
           <div>
-            <h4 style={{ margin: '0 0 12px 0', fontWeight: 600 }}>Quick Links</h4>
-            <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+            <h4 className="footer-section-block__heading">Quick Links</h4>
+            <ul className="footer-section-block__links">
               {content.links.map((link) => (
-                <li key={link.url} style={{ marginBottom: '8px' }}>
-                  <a href={link.url} style={{ color: 'inherit', textDecoration: 'none', fontSize: '0.875rem' }}>
+                <li key={link.url}>
+                  <a href={link.url} className="footer-section-block__link">
                     {link.title}
                   </a>
                 </li>
@@ -37,10 +37,10 @@ export default function FooterSectionView({ section }: FooterSectionViewProps) {
             </ul>
           </div>
           <div>
-            <h4 style={{ margin: '0 0 12px 0', fontWeight: 600 }}>Follow Us</h4>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <h4 className="footer-section-block__heading">Follow Us</h4>
+            <div className="footer-section-block__social">
               {content.social?.map((s) => (
-                <a key={s.platform} href={s.url} style={{ color: 'inherit', textDecoration: 'none' }}>
+                <a key={s.platform} href={s.url} className="footer-section-block__link">
                   {s.platform}
                 </a>
               ))}
@@ -48,15 +48,15 @@ export default function FooterSectionView({ section }: FooterSectionViewProps) {
           </div>
         </div>
       ) : (
-        <div style={{ marginBottom: '30px' }}>
-          <h3 style={{ margin: '0 0 20px 0', fontWeight: 600 }}>{content.company}</h3>
-          <p style={{ margin: '0 0 20px 0', fontSize: '0.875rem', opacity: 0.8 }}>{content.description}</p>
+        <div style={{ marginBottom: '1.75rem' }}>
+          <h3 className="footer-section-block--simple-title">{content.company}</h3>
+          <p className="footer-section-block__text" style={{ marginBottom: '1.25rem' }}>
+            {content.description}
+          </p>
         </div>
       )}
 
-      <div style={{ borderTop: `1px solid rgba(255,255,255,0.1)`, paddingTop: '20px', textAlign: 'center', fontSize: '0.875rem', opacity: 0.8 }}>
-        {content.copyright}
-      </div>
+      <div className="footer-section-block__copyright">{content.copyright}</div>
     </footer>
   );
 }

@@ -86,7 +86,7 @@ export default function ProductGridSectionView({
           ) : (
             <div
               className="website-products-grid"
-              style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinCardWidth}, 1fr))` }}
+              style={{ ['--products-col-min' as string]: gridMinCardWidth }}
             >
               {limited.map((product) => (
                 <WebsiteProductCard

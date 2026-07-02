@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FaqSection } from '../../../types/homepage';
+import './FaqSection.css';
 
 interface FaqSectionViewProps {
   section: FaqSection & { id: string };
@@ -10,7 +11,6 @@ interface FaqSectionViewProps {
 export default function FaqSectionView({ section, editMode, onUpdateSection }: FaqSectionViewProps) {
   const { settings, content } = section;
   const [openId, setOpenId] = useState<string | null>(content.items[0]?.id || null);
-  const paddingMap = { small: '1.5rem', medium: '2rem', large: '3rem' };
 
   const updateItem = (id: string, patch: Partial<(typeof content.items)[0]>) => {
     onUpdateSection?.({
@@ -22,10 +22,9 @@ export default function FaqSectionView({ section, editMode, onUpdateSection }: F
 
   return (
     <section
-      className="faq-section"
+      className={`faq-section sites-section-pad--${settings.padding}`}
       style={{
         backgroundColor: settings.backgroundColor || '#fff',
-        padding: paddingMap[settings.padding],
       }}
     >
       {settings.title && (

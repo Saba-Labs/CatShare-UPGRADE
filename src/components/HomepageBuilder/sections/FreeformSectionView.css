@@ -234,9 +234,35 @@
   opacity: 0.85;
 }
 
-.freeform-element__move:active {
-  cursor: grabbing;
+@container site-viewport (max-width: 30rem) {
+  .freeform-canvas__empty {
+    padding: 1.15rem 0.85rem;
+  }
+
+  .freeform-canvas__empty-title {
+    font-size: 0.85rem;
+  }
+
+  .freeform-canvas__empty-sub {
+    font-size: 0.72rem;
+  }
+
+  .freeform-canvas__tap-hint {
+    font-size: 0.65rem;
+    padding: 4px 10px;
+  }
+
+  .freeform-text-body {
+    font-size: 0.88rem;
+    padding: 6px 8px;
+  }
 }
+
+.sites-page-frame.viewport-mobile .freeform-canvas__empty-title,
+.builder-product-page-root.viewport-mobile .freeform-canvas__empty-title {
+  font-size: 0.85rem;
+}
+
 
 .freeform-resize-handle {
   position: absolute;

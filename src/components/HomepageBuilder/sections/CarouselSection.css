@@ -1,0 +1,27 @@
+.carousel-section {
+  background: #f3f4f6;
+  padding: 1.25rem;
+  border-radius: 8px;
+  text-align: center;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-section__inner {
+  width: 100%;
+}
+
+@container site-viewport (max-width: 30rem) {
+  .carousel-section {
+    padding: 0.85rem;
+    min-height: 120px;
+  }
+}
+
+.sites-page-frame.viewport-mobile .carousel-section,
+.builder-product-page-root.viewport-mobile .carousel-section {
+  padding: 0.85rem;
+  min-height: 120px;
+}

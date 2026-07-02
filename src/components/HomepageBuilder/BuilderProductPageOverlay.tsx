@@ -6,6 +6,11 @@ import {
   SITE_FOOTER_SELECTION_ID,
   SITE_HEADER_SELECTION_ID,
 } from '../../config/homepageBuilderConfig';
+import { preventBuilderLinkNavigation } from '../../utils/builderNavigation';
+import {
+  isBuilderEditInteractionTarget,
+  isBuilderSectionChromeTarget,
+} from '../../utils/builderEditGuards';
 import ProductPageRuntime from '../WebsiteBuilder/pages/ProductPageRuntime';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
@@ -45,7 +50,7 @@ export default function BuilderProductPageOverlay({
   const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
 
   return (
-    <div className={`builder-product-page-root viewport-${viewport}`}>
+    <div className={`builder-product-page-root viewport-${viewport}${viewport === 'mobile' ? ' product-page-layout-mobile' : ''}`}>
       <div className="builder-product-overlay__toolbar">
         <div>
           <p className="builder-product-overlay__eyebrow">Product page</p>
@@ -56,10 +61,14 @@ export default function BuilderProductPageOverlay({
         </button>
       </div>
 
-      <div className={`sites-page-frame viewport-${viewport}`}>
+      <div className={`sites-page-frame viewport-${viewport}${viewport === 'mobile' ? ' product-page-layout-mobile' : ''}`}>
         <div
           className="grid-canvas-container sites-canvas builder-product-canvas"
-          onClick={() => onSelectSection(null)}
+          onPointerDown={(e) => {
+            if (isBuilderEditInteractionTarget(e.target) || isBuilderSectionChromeTarget(e.target)) return;
+            onSelectSection(null);
+          }}
+          onClickCapture={preventBuilderLinkNavigation}
           style={{
             fontFamily: theme.fontFamily || undefined,
             color: theme.textColor || undefined,
@@ -84,7 +93,6 @@ export default function BuilderProductPageOverlay({
               product={product}
               template={template}
               previewMode
-              onPreviewClose={onClose}
             />
           </BuilderProductPreviewBridge>
 

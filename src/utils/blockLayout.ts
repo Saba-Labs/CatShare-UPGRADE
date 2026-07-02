@@ -54,3 +54,9 @@ export function getBlockInnerStyle(blockLayout?: BlockLayout): CSSProperties {
   }
   return style;
 }
+
+/** Live storefront — width/align only; section height follows content (heightPx is editor canvas only). */
+export function getBlockInnerStyleForLive(blockLayout?: BlockLayout): CSSProperties {
+  const widthPercent = getBlockWidthPercent(blockLayout);
+  return { width: `${widthPercent}%`, maxWidth: '100%' };
+}

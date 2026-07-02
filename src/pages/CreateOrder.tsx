@@ -12,7 +12,6 @@ import { STRUCK_LIST_PRICE_STYLE } from '../utils/offerPriceUtils';
 import {
   applyQuantityDelta,
   getProductOrderQuantityRules,
-  roundQuantityToRules,
 } from '../utils/quantityPricingUtils';
 import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { Catalogue } from '../config/catalogueConfig';
@@ -620,13 +619,13 @@ export default function CreateOrder() {
       if (isCatalogueInventoryTracked(selectedCatalogue, inventoryMap)) {
         return rawQty > 0 && warn ? 0 : rawQty;
       }
-      return roundQuantityToRules(rawQty, rules.step, rules.moq);
+      return Math.max(0, Math.floor(rawQty));
     }
 
     const { quantity, wasCapped, available } = applyInventoryCapToQuantity(
       rawQty,
-      rules.step,
-      rules.moq,
+      1,
+      1,
       selectedCatalogue,
       inventoryMap,
       productId,
@@ -707,8 +706,7 @@ export default function CreateOrder() {
         Object.keys(selection).length > 0
           ? getVariantCombinationData(product, selection, selectedCatalogueId)
           : undefined;
-      const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
-      const rounded = roundQuantityToRules(raw, rules.step, rules.moq);
+      const rounded = Math.max(0, Math.floor(raw));
       const capped = applyStockCap(productId, rounded, true, variantId, needsSelection, selection);
       return setCartLineQty(prev, productId, selection, capped);
     });
@@ -726,8 +724,7 @@ export default function CreateOrder() {
       Object.keys(selection).length > 0
         ? getVariantCombinationData(product, selection, selectedCatalogueId)
         : undefined;
-    const rules = getProductOrderQuantityRules(catData, variantData?.customFields);
-    const rounded = roundQuantityToRules(line.quantity, rules.step, rules.moq);
+    const rounded = Math.max(0, Math.floor(line.quantity));
     const capped = applyStockCap(line.productId, rounded, true, variantId, needsSelection, selection);
     setCartLines((prev) => setCartLineQtyById(prev, lineId, capped));
   };

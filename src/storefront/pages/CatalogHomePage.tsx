@@ -9,6 +9,8 @@ import type { WebsiteOrderBridgeValue } from '../../components/WebsiteBuilder/We
 import { WebsiteOrderBridgeProvider } from '../../components/WebsiteBuilder/WebsiteOrderBridge';
 
 import { WebsiteStoreProvider } from '../../components/WebsiteBuilder/WebsiteStoreContext';
+import StorefrontSiteHeader from '../../components/Storefront/StorefrontSiteHeader';
+import { storeBasePath } from '../../utils/websiteStorefront';
 
 import CatalogLayoutRuntime from '../CatalogLayoutRuntime';
 
@@ -29,6 +31,7 @@ interface CatalogHomePageProps {
   orderBridge: WebsiteOrderBridgeValue;
 
   onSubdomain?: boolean;
+  showSiteHeader?: boolean;
 
 }
 
@@ -49,8 +52,12 @@ export default function CatalogHomePage({
   orderBridge,
 
   onSubdomain,
+  showSiteHeader = false,
 
 }: CatalogHomePageProps) {
+  const siteSettings = layout.websiteConfig?.siteSettings;
+  const hasSiteHeader = showSiteHeader && !!siteSettings;
+  const basePath = storeBasePath(slug, onSubdomain);
 
   return (
 
@@ -58,7 +65,15 @@ export default function CatalogHomePage({
 
       <WebsiteOrderBridgeProvider value={orderBridge}>
 
-        <CatalogStoreHero store={store} />
+        {hasSiteHeader ? (
+          <StorefrontSiteHeader
+            siteSettings={siteSettings}
+            store={store}
+            basePath={basePath}
+          />
+        ) : (
+          <CatalogStoreHero store={store} />
+        )}
 
         <CatalogLayoutRuntime layout={layout} storeId={store.id} />
 

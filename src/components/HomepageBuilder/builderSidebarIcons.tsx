@@ -46,10 +46,10 @@ export const SIDEBAR_TAB_META: Record<
   { label: string; hint: string; Icon: IconType }
 > = {
   insert: { label: 'Insert', hint: 'Add blocks & layouts', Icon: FiPlus },
-  templates: { label: 'Templates', hint: 'Site starters', Icon: FiLayout },
+  templates: { label: 'Theme Hub', hint: 'Themes & cook', Icon: FiLayout },
   pages: { label: 'Pages', hint: 'Manage pages', Icon: FiFile },
   photos: { label: 'Photos', hint: 'Image library', Icon: FiImage },
-  theme: { label: 'Theme', hint: 'Colors & fonts', Icon: FiDroplet },
+  theme: { label: 'Palette Lab', hint: 'Colors & fonts', Icon: FiDroplet },
   site: { label: 'Site', hint: 'SEO & tips', Icon: FiSettings },
 };
 

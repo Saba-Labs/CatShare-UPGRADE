@@ -22,6 +22,8 @@ interface StoreLayoutProps {
   storeUrl?: string;
   /** Child fills the viewport below the status bar (e.g. homepage builder). */
   immersive?: boolean;
+  /** Hide main app bottom tab bar (e.g. full-screen homepage builder). */
+  hideBottomNav?: boolean;
 }
 
 export function StoreStatusBar() {
@@ -33,10 +35,16 @@ export function StoreStatusBar() {
   );
 }
 
-export default function StoreLayout({ children, storeUrl, immersive = false }: StoreLayoutProps) {
+export default function StoreLayout({
+  children,
+  storeUrl,
+  immersive = false,
+  hideBottomNav = false,
+}: StoreLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMainStorePage = location.pathname === '/store';
+  const fullscreenChrome = immersive && hideBottomNav;
 
   return (
     <>
@@ -46,25 +54,29 @@ export default function StoreLayout({ children, storeUrl, immersive = false }: S
         <main
           className={`flex-1 min-h-0 pt-[40px] ${
             immersive
-              ? `flex flex-col overflow-hidden ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`
+              ? `flex flex-col overflow-hidden${hideBottomNav ? '' : ` ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`}`
               : `overflow-y-auto overscroll-contain ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`
           }`}
         >
           <div
-            className={`max-w-7xl mx-auto px-4 sm:px-6 ${
-              immersive
-                ? 'flex min-h-0 flex-1 flex-col pb-4 sm:pb-5'
-                : isMainStorePage
-                  ? 'py-4 sm:py-5'
-                  : 'pb-4 sm:pb-5'
-            }`}
+            className={
+              fullscreenChrome
+                ? 'flex min-h-0 flex-1 flex-col h-full w-full'
+                : `max-w-7xl mx-auto px-4 sm:px-6 ${
+                    immersive
+                      ? 'flex min-h-0 flex-1 flex-col pb-4 sm:pb-5'
+                      : isMainStorePage
+                        ? 'py-4 sm:py-5'
+                        : 'pb-4 sm:pb-5'
+                  }`
+            }
           >
             {children}
           </div>
         </main>
 
 
-        <MainAppBottomNav active="store" />
+        {!hideBottomNav ? <MainAppBottomNav active="store" /> : null}
         {isMainStorePage && <SupportWhatsAppFab />}
       </div>
     </>

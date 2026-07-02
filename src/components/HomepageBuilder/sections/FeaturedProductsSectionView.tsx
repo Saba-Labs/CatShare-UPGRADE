@@ -32,23 +32,30 @@ export default function FeaturedProductsSectionView({
   const carouselItemWidth = `${cardMinWidth}px`;
   // Keep "grid" truly grid-like: cards wrap to next line on smaller widths.
   const gridMinCardWidth = `${cardMinWidth}px`;
-  const resolvedProducts = storeCtx
-    ? content.productIds
+  const catalogProducts = storeCtx?.products ?? [];
+  const resolvedProducts = React.useMemo(() => {
+    if (content.productIds.length > 0) {
+      if (!storeCtx) return [];
+      return content.productIds
         .map((id) => storeCtx.products.find((p) => p.id === id))
-        .filter((p): p is NonNullable<typeof p> => !!p)
-    : [];
+        .filter((p): p is NonNullable<typeof p> => !!p);
+    }
+    return catalogProducts.slice(0, settings.itemsPerPage);
+  }, [storeCtx, content.productIds, catalogProducts, settings.itemsPerPage]);
+
+  const usesCatalogFallback = content.productIds.length === 0 && catalogProducts.length > 0;
 
   return (
     <div className="website-section-products" style={{ background: settings.backgroundColor || 'transparent' }}>
       <h2>{settings.title}</h2>
-      {content.productIds.length === 0 ? (
+      {resolvedProducts.length === 0 ? (
         <SectionPlaceholder
           title="Featured Products"
           icon={<IconShoppingBag size={48} />}
-          description={editMode ? 'Select products in the properties panel' : 'No products selected'}
+          description={editMode ? 'Select products in the properties panel' : 'No products in your store yet'}
           editMode={editMode}
         />
-      ) : storeCtx && resolvedProducts.length > 0 ? (
+      ) : storeCtx ? (
         <>
           {displayMode === 'carousel' ? (
             <WebsiteCarousel
@@ -72,7 +79,7 @@ export default function FeaturedProductsSectionView({
           ) : (
             <div
               className="website-products-grid"
-              style={{ gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinCardWidth}, 1fr))` }}
+              style={{ ['--products-col-min' as string]: gridMinCardWidth }}
             >
               {resolvedProducts.slice(0, settings.itemsPerPage).map((product) => (
                 <WebsiteProductCard
@@ -118,26 +125,29 @@ export default function FeaturedProductsSectionView({
                 }
           }
         >
-          {Array(Math.min(settings.itemsPerPage, content.productIds.length))
-            .fill(null)
-            .map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  background: '#f9fafb',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  textAlign: 'center',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                <IconImage size={40} style={{ marginBottom: 8, color: '#9ca3af' }} />
-                <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>Product {i + 1}</p>
-                {settings.showPrice && <p style={{ margin: 0, color: '#2563eb', fontWeight: 600 }}>—</p>}
-              </div>
-            ))}
+          {resolvedProducts.map((product) => (
+            <div
+              key={product.id}
+              style={{
+                background: '#f9fafb',
+                borderRadius: '8px',
+                padding: '16px',
+                textAlign: 'center',
+                border: '1px solid #e5e7eb',
+              }}
+            >
+              <IconImage size={40} style={{ marginBottom: 8, color: '#9ca3af' }} />
+              <p style={{ margin: '0 0 8px 0', fontWeight: 500 }}>{product.name}</p>
+              {settings.showPrice && <p style={{ margin: 0, color: '#2563eb', fontWeight: 600 }}>—</p>}
+            </div>
+          ))}
         </div>
       )}
+      {usesCatalogFallback && editMode ? (
+        <p style={{ marginTop: 12, fontSize: '0.82rem', color: '#5f6368', textAlign: 'center' }}>
+          Showing products from your store. Pick specific items in the sidebar to curate this section.
+        </p>
+      ) : null}
     </div>
   );
 }

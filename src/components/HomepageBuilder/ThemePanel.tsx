@@ -1,4 +1,4 @@
-import { ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
+import { ThemeSettings } from '../../types/homepage';
 import { THEME_PRESETS, FONT_FAMILY_OPTIONS, BUTTON_STYLE_OPTIONS } from '../../config/themePresets';
 import SidebarSection from './SidebarSection';
 import ColorPickerField from './ColorPickerField';
@@ -7,9 +7,7 @@ import SidebarDropdownField from './SidebarDropdownField';
 
 interface ThemePanelProps {
   theme: ThemeSettings;
-  websiteConfig: WebsiteModeConfig;
   onUpdateTheme: (updates: Partial<ThemeSettings>) => void;
-  onUpdateWebsiteConfig: (updates: Partial<WebsiteModeConfig>) => void;
 }
 
 const COLOR_FIELDS: Array<{ key: keyof ThemeSettings; label: string; fallback: string }> = [
@@ -21,9 +19,7 @@ const COLOR_FIELDS: Array<{ key: keyof ThemeSettings; label: string; fallback: s
 
 export default function ThemePanel({
   theme,
-  websiteConfig,
   onUpdateTheme,
-  onUpdateWebsiteConfig,
 }: ThemePanelProps) {
   return (
     <div className="sidebar-panel">
@@ -88,45 +84,6 @@ export default function ThemePanel({
         </div>
       </SidebarSection>
 
-      <SidebarSection title="Shop" icon={<FiGrid />} description="Collection & product pages">
-        <div className="sidebar-field sidebar-field--inline">
-          <span className="field-icon" title="Collection columns">#</span>
-          <input
-            type="number"
-            min={2}
-            max={4}
-            className="panel-input panel-input--grow"
-            value={websiteConfig.templates.collection.columns}
-            onChange={(e) =>
-              onUpdateWebsiteConfig({
-                templates: {
-                  ...websiteConfig.templates,
-                  collection: {
-                    ...websiteConfig.templates.collection,
-                    columns: Math.min(4, Math.max(2, Number(e.target.value) || 2)) as 2 | 3 | 4,
-                  },
-                },
-              })
-            }
-            aria-label="Collection columns"
-          />
-        </div>
-        <label className="sidebar-toggle sidebar-toggle--compact" title="Show product recommendations">
-          <input
-            type="checkbox"
-            checked={websiteConfig.templates.product.showRecommendations}
-            onChange={(e) =>
-              onUpdateWebsiteConfig({
-                templates: {
-                  ...websiteConfig.templates,
-                  product: { ...websiteConfig.templates.product, showRecommendations: e.target.checked },
-                },
-              })
-            }
-          />
-          <span>Recommendations</span>
-        </label>
-      </SidebarSection>
     </div>
   );
 }

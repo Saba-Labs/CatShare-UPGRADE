@@ -5,10 +5,19 @@ export function homepageLayoutsEqual(a: HomepageLayout | undefined | null, b: Ho
   if (!a && !b) return true;
   if (!a || !b) return false;
   try {
-    return JSON.stringify(a) === JSON.stringify(b);
+    return JSON.stringify(canonicalizeLayoutForCompare(a)) === JSON.stringify(canonicalizeLayoutForCompare(b));
   } catch {
     return false;
   }
+}
+
+function canonicalizeLayoutForCompare(layout: HomepageLayout): HomepageLayout {
+  const cloned = JSON.parse(JSON.stringify(layout)) as HomepageLayout;
+  // Publish metadata is expected to differ immediately after publish; ignore it for dirty-state detection.
+  if (cloned.websiteConfig?.versioning) {
+    delete cloned.websiteConfig.versioning;
+  }
+  return cloned;
 }
 
 export function formatPublishDate(iso: string | null | undefined): string {

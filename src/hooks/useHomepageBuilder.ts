@@ -15,6 +15,7 @@ import { buildBlockPresetSections } from '../config/blockPresets';
 import type { FreeformElementType } from '../types/homepage';
 import { createFreeformElement, createStarterFreeformSection } from '../utils/freeformElements';
 import { v4 as uuid } from 'uuid';
+import { layoutsShallowEqual, mergeSectionUpdate, sectionsShallowEqual } from '../utils/builderEditGuards';
 
 const initialState: BuilderState = {
   layout: { sections: [], theme: {} },
@@ -135,11 +136,13 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
 
     case 'UPDATE_SECTION': {
       const { id, updates } = action.payload;
+      const existing = state.layout.sections.find((s) => s.id === id);
+      if (!existing) return state;
+      const merged = mergeSectionUpdate(existing, updates);
+      if (sectionsShallowEqual(existing, merged)) return state;
       return withHistory(state, {
         ...state.layout,
-        sections: state.layout.sections.map((s) =>
-          s.id === id ? { ...s, ...updates } : s
-        ),
+        sections: state.layout.sections.map((s) => (s.id === id ? merged : s)),
       });
     }
 
@@ -159,9 +162,11 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
     }
 
     case 'UPDATE_THEME': {
+      const nextTheme = { ...state.layout.theme, ...action.payload };
+      if (JSON.stringify(state.layout.theme) === JSON.stringify(nextTheme)) return state;
       return withHistory(state, {
         ...state.layout,
-        theme: { ...state.layout.theme, ...action.payload },
+        theme: nextTheme,
       });
     }
 
@@ -191,6 +196,12 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
     }
 
     case 'UPDATE_WEBSITE_CONFIG': {
+      if (
+        state.layout.websiteConfig &&
+        JSON.stringify(state.layout.websiteConfig) === JSON.stringify(action.payload)
+      ) {
+        return state;
+      }
       return withHistory(state, {
         ...state.layout,
         websiteConfig: action.payload,
@@ -199,22 +210,28 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
 
     case 'UPDATE_SECTION_LAYOUT': {
       const { id, blockLayout } = action.payload;
+      const existing = state.layout.sections.find((s) => s.id === id);
+      if (!existing) return state;
+      const nextBlockLayout = { ...existing.blockLayout, ...blockLayout };
+      if (JSON.stringify(existing.blockLayout) === JSON.stringify(nextBlockLayout)) return state;
       return withHistory(state, {
         ...state.layout,
         sections: state.layout.sections.map((s) =>
-          s.id === id ? { ...s, blockLayout: { ...s.blockLayout, ...blockLayout } } : s
+          s.id === id ? { ...s, blockLayout: nextBlockLayout } : s
         ),
       });
     }
 
     case 'SWITCH_EDITING_PAGE': {
       const { websiteConfig, sections, theme } = action.payload;
-      return withHistory(state, {
+      const nextLayout = {
         ...state.layout,
         websiteConfig,
         sections,
         theme,
-      });
+      };
+      if (layoutsShallowEqual(state.layout, nextLayout)) return state;
+      return withHistory(state, nextLayout);
     }
 
     case 'UNDO': {
