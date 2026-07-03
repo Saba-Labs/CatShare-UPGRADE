@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productImageDisplayUrl } from "../utils/imageUrl";
+import { getVideoPlaybackInfo } from "../utils/productGallery";
 import "./ProductImageGallery.css";
 
 type Props = {
   urls: string[];
-  /** Which slot is the designated primary (optional badge / initial slide). */
+  /** Hosted video URLs (YouTube, Vimeo, direct mp4, etc.) shown after images. */
+  videoUrls?: string[];
+  /** Which image slot is the designated primary (optional badge / initial slide). */
   primaryIndex?: number;
   className?: string;
   /** Optional per-URL version (e.g. product.imageVersion for primary only). */
@@ -21,6 +24,10 @@ type Props = {
   showThumbnails?: boolean;
 };
 
+type GallerySlide =
+  | { type: "image"; url: string; imageIndex: number }
+  | { type: "video"; url: string; src: string; native: boolean };
+
 function thumbSrc(
   url: string,
   index: number,
@@ -31,11 +38,25 @@ function thumbSrc(
   return productImageDisplayUrl(url, v);
 }
 
+function buildSlides(imageUrls: string[], videoUrls: string[]): GallerySlide[] {
+  const images: GallerySlide[] = imageUrls.map((url, imageIndex) => ({
+    type: "image",
+    url,
+    imageIndex,
+  }));
+  const videos: GallerySlide[] = videoUrls.map((url) => {
+    const { src, native } = getVideoPlaybackInfo(url);
+    return { type: "video", url, src, native };
+  });
+  return [...images, ...videos];
+}
+
 /**
- * Simple swipe gallery for product images (used in preview, store, and public views).
+ * Simple swipe gallery for product images and videos (used in preview, store, and public views).
  */
 export default function ProductImageGallery({
   urls,
+  videoUrls = [],
   primaryIndex = 0,
   className = "",
   primaryImageVersion,
@@ -49,6 +70,11 @@ export default function ProductImageGallery({
 }: Props) {
   const touchStartX = useRef<number | null>(null);
   const safeUrls = (urls || []).map((u) => String(u || "").trim()).filter(Boolean);
+  const safeVideoUrls = (videoUrls || []).map((u) => String(u || "").trim()).filter(Boolean);
+  const slides = useMemo(
+    () => buildSlides(safeUrls, safeVideoUrls),
+    [safeUrls.join("\0"), safeVideoUrls.join("\0")]
+  );
   const controlled =
     typeof controlledSlideIndex === "number" && typeof onSlideIndexChange === "function";
   const [internalIx, setInternalIx] = useState(0);
@@ -57,9 +83,9 @@ export default function ProductImageGallery({
     if (controlled) return;
     const pi = Math.min(Math.max(0, primaryIndex ?? 0), Math.max(0, safeUrls.length - 1));
     setInternalIx(pi);
-  }, [primaryIndex, JSON.stringify(safeUrls), controlled]);
+  }, [primaryIndex, safeUrls.length, controlled]);
 
-  const n = safeUrls.length;
+  const n = slides.length;
   const safeIx =
     n === 0
       ? 0
@@ -67,7 +93,7 @@ export default function ProductImageGallery({
           Math.max(0, controlled ? controlledSlideIndex! : internalIx),
           n - 1
         );
-  const current = safeUrls[safeIx] || "";
+  const current = slides[safeIx];
 
   const setSlide = useCallback(
     (next: number) => {
@@ -87,11 +113,9 @@ export default function ProductImageGallery({
     [n, safeIx, setSlide]
   );
 
-  if (n === 0) return null;
+  if (n === 0 || !current) return null;
 
-  const primarySlot = Math.min(Math.max(0, primaryIndex ?? 0), Math.max(0, n - 1));
-  const src = thumbSrc(current, safeIx, primarySlot, primaryImageVersion);
-
+  const primarySlot = Math.min(Math.max(0, primaryIndex ?? 0), Math.max(0, safeUrls.length - 1));
   const multi = n > 1;
   const withThumbs = showThumbnails && multi;
 
@@ -130,9 +154,17 @@ export default function ProductImageGallery({
     "product-image-gallery__main",
     mainBgClass,
     !fillContainer ? "product-image-gallery__main--square" : mainSizeClass,
+    current.type === "video" ? "product-image-gallery__main--video" : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const showPrimaryOnSlide =
+    showPrimaryBadge &&
+    current.type === "image" &&
+    typeof primaryIndex === "number" &&
+    current.imageIndex === primarySlot &&
+    safeUrls.length > 1;
 
   return (
     <div className={rootClass}>
@@ -141,18 +173,43 @@ export default function ProductImageGallery({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        <img
-          key={src || `idx-${safeIx}`}
-          src={src}
-          alt=""
-          className={`${withThumbs ? "w-full" : "h-full w-full"} ${imgFitClass}`}
-          draggable={false}
-        />
+        {current.type === "video" ? (
+          current.native ? (
+            <video
+              key={current.src}
+              src={current.src}
+              controls
+              controlsList="nodownload noplaybackrate noremoteplayback"
+              disablePictureInPicture
+              playsInline
+              className={`product-image-gallery__native-video ${withThumbs ? "w-full" : "h-full w-full"} ${imgFitClass}`}
+            />
+          ) : (
+            <iframe
+              key={current.src}
+              src={current.src}
+              title="Product video"
+              className="product-image-gallery__embed"
+              allow="accelerometer; autoplay; encrypted-media; gyroscope"
+              referrerPolicy="strict-origin-when-cross-origin"
+              loading="lazy"
+              allowFullScreen={false}
+            />
+          )
+        ) : (
+          <img
+            key={thumbSrc(current.url, current.imageIndex, primarySlot, primaryImageVersion) || `idx-${safeIx}`}
+            src={thumbSrc(current.url, current.imageIndex, primarySlot, primaryImageVersion)}
+            alt=""
+            className={`${withThumbs ? "w-full" : "h-full w-full"} ${imgFitClass}`}
+            draggable={false}
+          />
+        )}
         {multi && (
           <>
             <button
               type="button"
-              aria-label="Previous image"
+              aria-label="Previous"
               className="product-image-gallery__nav product-image-gallery__nav--prev"
               onClick={(e) => {
                 e.stopPropagation();
@@ -163,7 +220,7 @@ export default function ProductImageGallery({
             </button>
             <button
               type="button"
-              aria-label="Next image"
+              aria-label="Next"
               className="product-image-gallery__nav product-image-gallery__nav--next"
               onClick={(e) => {
                 e.stopPropagation();
@@ -174,12 +231,12 @@ export default function ProductImageGallery({
             </button>
             {!showThumbnails && (
               <div className="product-image-gallery__dots">
-                {safeUrls.map((_, i) => (
+                {slides.map((slide, i) => (
                   <button
-                    key={i}
+                    key={`dot-${i}-${slide.type === "video" ? slide.url : slide.url}`}
                     type="button"
-                    aria-label={`Image ${i + 1}`}
-                    className={`product-image-gallery__dot${i === safeIx ? " product-image-gallery__dot--active" : ""}`}
+                    aria-label={slide.type === "video" ? `Video ${i + 1}` : `Image ${i + 1}`}
+                    className={`product-image-gallery__dot${i === safeIx ? " product-image-gallery__dot--active" : ""}${slide.type === "video" ? " product-image-gallery__dot--video" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSlide(i);
@@ -190,30 +247,39 @@ export default function ProductImageGallery({
             )}
           </>
         )}
-        {showPrimaryBadge &&
-          typeof primaryIndex === "number" &&
-          primaryIndex === safeIx &&
-          multi && (
-            <span className="product-image-gallery__primary-badge">Primary</span>
-          )}
+        {showPrimaryOnSlide && (
+          <span className="product-image-gallery__primary-badge">Primary</span>
+        )}
       </div>
       {showThumbnails && multi && (
         <div className="product-image-gallery__thumbs">
-          <div className="product-image-gallery__thumbs-track" role="tablist" aria-label="Product images">
-            {safeUrls.map((url, i) => (
+          <div className="product-image-gallery__thumbs-track" role="tablist" aria-label="Product gallery">
+            {slides.map((slide, i) => (
               <button
-                key={`${url}-${i}`}
+                key={`${slide.type}-${slide.url}-${i}`}
                 type="button"
                 role="tab"
                 aria-selected={i === safeIx}
-                aria-label={`View image ${i + 1}`}
-                className={`product-image-gallery__thumb${i === safeIx ? " product-image-gallery__thumb--active" : ""}`}
+                aria-label={slide.type === "video" ? `View video ${i + 1}` : `View image ${i + 1}`}
+                className={`product-image-gallery__thumb${i === safeIx ? " product-image-gallery__thumb--active" : ""}${slide.type === "video" ? " product-image-gallery__thumb--video" : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setSlide(i);
                 }}
               >
-                <img src={thumbSrc(url, i, primarySlot, primaryImageVersion)} alt="" draggable={false} />
+                {slide.type === "video" ? (
+                  <span className="product-image-gallery__thumb-play" aria-hidden>
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                ) : (
+                  <img
+                    src={thumbSrc(slide.url, slide.imageIndex, primarySlot, primaryImageVersion)}
+                    alt=""
+                    draggable={false}
+                  />
+                )}
               </button>
             ))}
           </div>

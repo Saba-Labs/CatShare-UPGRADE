@@ -10,13 +10,15 @@ import {
   resolveCategoryShowcaseSettings,
 } from '../../../utils/categoryShowcaseStyles';
 import { IconFolder, IconTag } from '../../Storefront/StorefrontIcons';
-import CategoryShowcaseMobileRow from './CategoryShowcaseMobileRow';
+import CategoryShowcaseScrollRow from './CategoryShowcaseScrollRow';
 import './category-showcase.css';
 
 interface CategoryShowcaseSectionViewProps {
   section: CategoryShowcaseSection & { id: string };
   editMode?: boolean;
   builderCanvas?: boolean;
+  onUpdateSection?: (updates: Partial<CategoryShowcaseSection>) => void;
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
 }
 
 type ResolvedCategory = {
@@ -28,7 +30,21 @@ type ResolvedCategory = {
   href?: string;
 };
 
-export default function CategoryShowcaseSectionView({ section, editMode, builderCanvas = false }: CategoryShowcaseSectionViewProps) {
+function formatItemCount(count: number): string {
+  return count === 1 ? '1 item' : `${count} items`;
+}
+
+function stopEditPointer(e: React.MouseEvent | React.PointerEvent) {
+  e.stopPropagation();
+}
+
+export default function CategoryShowcaseSectionView({
+  section,
+  editMode,
+  builderCanvas = false,
+  onUpdateSection,
+  onCategoryPreview,
+}: CategoryShowcaseSectionViewProps) {
   const { settings, content } = section;
   const resolved = resolveCategoryShowcaseSettings(settings);
   const storeCtx = useWebsiteStoreOptional();
@@ -44,7 +60,7 @@ export default function CategoryShowcaseSectionView({ section, editMode, builder
             selected.size > 0
               ? all.filter((c) => selected.has(c.id))
               : customCategories.length === 0
-                ? all.slice(0, Math.max(resolved.columns * 2, 4))
+                ? all.slice(0, 8)
                 : [];
           return picked.map((c) => ({
             id: c.id,
@@ -70,38 +86,71 @@ export default function CategoryShowcaseSectionView({ section, editMode, builder
       })),
       ...custom,
     ];
-  }, [storeCtx, content.categoryIds, categoryImages, customCategories, resolved.columns]);
+  }, [storeCtx, content.categoryIds, categoryImages, customCategories]);
 
   const hasAnySelection = resolvedCategories.length > 0;
   const rootClass = getCategoryShowcaseClassName(resolved);
   const rootStyle = getCategoryShowcaseInlineStyle(resolved);
+  const canEditHeading = editMode && !!onUpdateSection;
 
   return (
     <section className={rootClass} style={rootStyle}>
-      {resolved.title ? <h2 className="cat-showcase__heading">{resolved.title}</h2> : null}
+      {resolved.title ? (
+        canEditHeading ? (
+          <h2
+            className="cat-showcase__heading sites-inline-editable"
+            contentEditable
+            suppressContentEditableWarning
+            onPointerDown={stopEditPointer}
+            onMouseDown={stopEditPointer}
+            onClick={stopEditPointer}
+            onBlur={(e) =>
+              onUpdateSection({
+                settings: { ...settings, title: e.currentTarget.textContent || '' },
+              })
+            }
+          >
+            {resolved.title}
+          </h2>
+        ) : (
+          <h2 className="cat-showcase__heading">{resolved.title}</h2>
+        )
+      ) : null}
       {!hasAnySelection ? (
         <SectionPlaceholder
           title="Category Showcase"
           icon={<IconFolder size={48} />}
           description={
             editMode
-              ? 'Add categories in the sidebar, or they will appear from your product list'
+              ? 'Select categories in the sidebar, or they will appear from your products'
               : 'No categories in your store yet'
           }
           editMode={editMode}
         />
-      ) : resolved.layout === 'grid' ? (
-        <CategoryShowcaseMobileRow>
-          {resolvedCategories.map((category) => (
-            <CategoryTile key={category.id} category={category} settings={resolved} builderCanvas={builderCanvas} />
-          ))}
-        </CategoryShowcaseMobileRow>
-      ) : (
+      ) : resolved.layout === 'grid' || resolved.layout === 'list' ? (
         <div className="cat-showcase__track">
           {resolvedCategories.map((category) => (
-            <CategoryTile key={category.id} category={category} settings={resolved} builderCanvas={builderCanvas} />
+            <CategoryTile
+              key={category.id}
+              category={category}
+              settings={resolved}
+              builderCanvas={builderCanvas}
+              onCategoryPreview={onCategoryPreview}
+            />
           ))}
         </div>
+      ) : (
+        <CategoryShowcaseScrollRow navigation={resolved.navigation}>
+          {resolvedCategories.map((category) => (
+            <CategoryTile
+              key={category.id}
+              category={category}
+              settings={resolved}
+              builderCanvas={builderCanvas}
+              onCategoryPreview={onCategoryPreview}
+            />
+          ))}
+        </CategoryShowcaseScrollRow>
       )}
     </section>
   );
@@ -111,23 +160,27 @@ function CategoryTile({
   category,
   settings,
   builderCanvas = false,
+  onCategoryPreview,
 }: {
   category: ResolvedCategory;
   settings: ReturnType<typeof resolveCategoryShowcaseSettings>;
   builderCanvas?: boolean;
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
 }) {
   const showCount = settings.showCount && category.showCount && category.count > 0;
   const media = (
     <div className="cat-showcase__media">
       {category.imageUrl ? (
-        <img src={category.imageUrl} alt={category.label} loading="lazy" />
+        <img src={category.imageUrl} alt="" loading="lazy" />
       ) : (
-        <IconTag size={40} className="cat-showcase__placeholder" />
+        <span className="cat-showcase__placeholder-wrap" aria-hidden>
+          <IconTag size={28} className="cat-showcase__placeholder" />
+        </span>
       )}
       {settings.labelStyle === 'overlay' ? (
         <div className="cat-showcase__body">
           <p className="cat-showcase__label">{category.label}</p>
-          {showCount ? <p className="cat-showcase__count">{category.count} items</p> : null}
+          {showCount ? <p className="cat-showcase__count">{formatItemCount(category.count)}</p> : null}
         </div>
       ) : null}
     </div>
@@ -137,7 +190,7 @@ function CategoryTile({
     settings.labelStyle === 'below' ? (
       <div className="cat-showcase__body">
         <p className="cat-showcase__label">{category.label}</p>
-        {showCount ? <p className="cat-showcase__count">{category.count} items</p> : null}
+        {showCount ? <p className="cat-showcase__count">{formatItemCount(category.count)}</p> : null}
       </div>
     ) : null;
 
@@ -148,9 +201,26 @@ function CategoryTile({
     </>
   );
 
+  if (builderCanvas && onCategoryPreview) {
+    return (
+      <button
+        type="button"
+        className="cat-showcase__card"
+        aria-label={`Edit ${category.label} category page`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onCategoryPreview({ id: category.id, label: category.label });
+        }}
+      >
+        {inner}
+      </button>
+    );
+  }
+
   if (category.href && !builderCanvas) {
     return (
-      <StorefrontLink href={category.href} className="cat-showcase__card">
+      <StorefrontLink href={category.href} className="cat-showcase__card" aria-label={category.label}>
         {inner}
       </StorefrontLink>
     );

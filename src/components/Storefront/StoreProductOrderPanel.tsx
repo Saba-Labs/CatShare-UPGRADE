@@ -21,6 +21,7 @@ import {
   isDisplayableProductImage,
   unitLabel,
 } from './storefrontOrderHelpers';
+import { shouldUseProductMediaGallery } from '../../utils/productGallery';
 import { formatQuantitySlabRange, type QuantityPriceSlab } from '../../utils/quantityPricingUtils';
 import { IconImage, MoqHint, PackHint } from './StorefrontIcons';
 import ProductDescriptionView from '../ProductDescriptionView';
@@ -172,6 +173,7 @@ export default function StoreProductOrderPanel({
   const variantSummary = formatVariantSelectionSummary(groups, variantSelection);
   const gallery = getStorefrontProductGalleryProps(product, variantData);
   const imageSrc = gallery.fallback;
+  const useGallery = shouldUseProductMediaGallery(gallery.urls.length, gallery.videoUrls.length);
 
   const rootClass =
     layout === 'page'
@@ -180,11 +182,12 @@ export default function StoreProductOrderPanel({
 
   const imageBlock = (
     <div
-      className={`sv-drawer-img-wrap${gallery.urls.length > 1 ? ' sv-drawer-img-wrap--gallery sv-drawer-img-wrap--thumbs' : ''}`}
+      className={`sv-drawer-img-wrap${useGallery ? ' sv-drawer-img-wrap--gallery sv-drawer-img-wrap--thumbs' : ''}`}
     >
-      {gallery.urls.length > 1 ? (
+      {useGallery ? (
         <ProductImageGallery
           urls={gallery.urls}
+          videoUrls={gallery.videoUrls}
           primaryIndex={gallery.primaryIndex}
           primaryImageVersion={gallery.primaryImageVersion}
           fillContainer

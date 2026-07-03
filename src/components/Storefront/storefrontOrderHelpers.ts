@@ -7,6 +7,7 @@ import type { Catalogue } from '../../config/catalogueConfig';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../../config/fieldConfig';
 import { productImageDisplayUrl } from '../../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../../utils/productImages';
+import { getProductVideoUrls } from '../../utils/productGallery';
 import { normalizeProductCategories } from '../../utils/productCategoryUtils';
 import {
   formatQuantitySlabRange,
@@ -306,13 +307,14 @@ export function buildStorefrontDetailFields(
 
 export function getStoreProductGalleryProps(p: ProductWithCatalogueData) {
   const urls = filterGalleryUrls(getProductImageUrls(p));
+  const videoUrls = getProductVideoUrls(p);
   const rawPrimary = getPrimaryImageIndex(p);
   const primaryIndex =
     urls.length === 0 ? 0 : Math.min(Math.max(0, rawPrimary), urls.length - 1);
   const r = p as Record<string, unknown>;
   const v = r.imageVersion ?? r.image_version;
   const primaryImageVersion = typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-  return { urls, primaryIndex, primaryImageVersion, fallback: displayStoreProductImage(p) };
+  return { urls, videoUrls, primaryIndex, primaryImageVersion, fallback: displayStoreProductImage(p) };
 }
 
 /** Product gallery with optional variant-specific overrides (uploads + selected base images). */
@@ -323,12 +325,14 @@ export function getStorefrontProductGalleryProps(
   const base = getStoreProductGalleryProps(product);
   const variantUrls = getVariantGalleryUrls(product, variantDetails ?? undefined);
   const urls = filterGalleryUrls(variantUrls?.length ? variantUrls : base.urls);
-  if (urls.length === 0) {
-    return { ...base, urls: [] };
+  const videoUrls = base.videoUrls;
+  if (urls.length === 0 && videoUrls.length === 0) {
+    return { ...base, urls: [], videoUrls: [] };
   }
   const usesVariantGallery = Boolean(variantUrls?.length);
   return {
     urls,
+    videoUrls,
     primaryIndex: usesVariantGallery ? 0 : Math.min(base.primaryIndex, Math.max(0, urls.length - 1)),
     primaryImageVersion: base.primaryImageVersion,
     fallback: urls[0] || base.fallback,

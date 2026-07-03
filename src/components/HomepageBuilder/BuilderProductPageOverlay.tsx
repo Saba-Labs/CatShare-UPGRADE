@@ -11,6 +11,7 @@ import {
   isBuilderEditInteractionTarget,
   isBuilderSectionChromeTarget,
 } from '../../utils/builderEditGuards';
+import { isCatalogClassicFooter } from '../../config/footerVariants';
 import ProductPageRuntime from '../WebsiteBuilder/pages/ProductPageRuntime';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
@@ -48,6 +49,7 @@ export default function BuilderProductPageOverlay({
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
   const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
+  const catalogClassicFooter = !!siteSettings && isCatalogClassicFooter(siteSettings);
 
   return (
     <div className={`builder-product-page-root viewport-${viewport}${viewport === 'mobile' ? ' product-page-layout-mobile' : ''}`}>
@@ -99,6 +101,8 @@ export default function BuilderProductPageOverlay({
           {siteSettings ? (
             <div
               className={`sites-editor-footer-preview${
+                catalogClassicFooter ? ' sites-editor-footer-preview--catalog' : ''
+              }${
                 siteSettings.footerWidth === 'full' ? ' sites-editor-footer-preview--full' : ''
               }${isSiteFooterSelected ? ' selected' : ''}`}
               role="button"

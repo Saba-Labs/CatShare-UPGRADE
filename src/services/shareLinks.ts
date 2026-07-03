@@ -21,6 +21,7 @@ import {
   getProductPrimaryImageUrl,
   getProductPrimaryImageVersion,
 } from '../utils/productImages';
+import { getProductVideoUrls } from '../utils/productGallery';
 import { getProductVariantGroups } from '../utils/productVariants';
 import type { ProductVariantGroup } from '../utils/productVariants';
 
@@ -79,6 +80,8 @@ export type ShareLinkItem = {
   imageVersion?: number;
   /** Full gallery for public order form (max 5). */
   imageUrls?: string[];
+  /** Hosted video URLs for gallery (YouTube, Vimeo, direct links). */
+  videoUrls?: string[];
   primaryImageIndex?: number;
   category?: string[];
   field1?: string;  field1Label?: string;  field1Unit?: string;
@@ -167,6 +170,7 @@ export function productToShareLinkItem(
       : undefined;
 
   const galleryUrls = getProductImageUrls(product);
+  const galleryVideos = getProductVideoUrls(product);
   const primaryIx = getPrimaryImageIndex(product);
   const variantGroups = getProductVariantGroups(product);
 
@@ -182,6 +186,7 @@ export function productToShareLinkItem(
         ? { imageVersion: getProductPrimaryImageVersion(product) }
         : {}),
     ...(galleryUrls.length > 0 ? { imageUrls: galleryUrls } : {}),
+    ...(galleryVideos.length > 0 ? { videoUrls: galleryVideos } : {}),
     ...(galleryUrls.length > 0 ? { primaryImageIndex: primaryIx } : {}),
     price: effectivePrice !== undefined ? String(effectivePrice) : undefined,
     priceUnit: priceUnit && priceUnit !== 'None' ? priceUnit : undefined,

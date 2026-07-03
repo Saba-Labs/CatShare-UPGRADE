@@ -8,7 +8,6 @@ import { canPopStorefrontHistory } from '../../../utils/websiteStorefront';
 import StoreProductOrderPanel from '../../Storefront/StoreProductOrderPanel';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import { useWebsiteStore } from '../WebsiteStoreContext';
-import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
 import WebsiteCarousel from '../WebsiteCarousel';
 import WebsiteProductCard from '../WebsiteProductCard';
 import '../website-runtime.css';
@@ -23,9 +22,6 @@ interface ProductPageRuntimeProps {
   /** Override post-order navigation (e.g. catalog store closes product overlay) */
   onAfterPlaceOrder?: () => void;
   orderCtaLabel?: string;
-  /** Breadcrumb listing link — defaults to collection page */
-  shopLinkTo?: string;
-  shopBreadcrumbLabel?: string;
 }
 
 export default function ProductPageRuntime({
@@ -34,10 +30,8 @@ export default function ProductPageRuntime({
   previewMode = false,
   onAfterPlaceOrder,
   orderCtaLabel = 'Place order',
-  shopLinkTo,
-  shopBreadcrumbLabel = 'Shop',
 }: ProductPageRuntimeProps) {
-  const { basePath, collectionPath, store, products } = useWebsiteStore();
+  const { collectionPath, store, products } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,13 +59,6 @@ export default function ProductPageRuntime({
   if (!product) {
     return (
       <main className="website-product-runtime">
-        <WebsiteBreadcrumbs
-          items={[
-            { label: 'Home', to: basePath || '/' },
-            { label: 'Products', to: collectionPath },
-            { label: 'Not found' },
-          ]}
-        />
         <p>Product not found.</p>
       </main>
     );
@@ -113,23 +100,12 @@ export default function ProductPageRuntime({
     navigate(collectionPath);
   };
 
-  const listingPath = shopLinkTo ?? collectionPath;
-
-  const breadcrumbItems = previewMode
-    ? [{ label: 'Home' }, { label: shopBreadcrumbLabel }, { label: product.name }]
-    : [
-        { label: 'Home', to: basePath || '/' },
-        { label: shopBreadcrumbLabel, to: listingPath },
-        { label: product.name },
-      ];
-
   const suggestedProducts = (products || []).filter((p) => p.id !== product.id).slice(0, suggestedCount);
 
   return (
     <main
       className={`website-product-runtime wp-${layoutVariant} wp-image-${imageLook} wp-fields-${fieldsInBox ? 'boxed' : 'open'}${fieldsStriped ? ' wp-fields-striped' : ''}`}
     >
-      <WebsiteBreadcrumbs items={breadcrumbItems} />
       <StoreProductOrderPanel
         product={product}
         store={store}

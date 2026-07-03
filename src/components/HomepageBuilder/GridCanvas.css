@@ -39,6 +39,12 @@
     filter var(--theme-hub-duration, 0.52s) var(--theme-hub-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
+/* Order-form store hero is taller than a nav bar — don't clip it in the builder */
+.grid-canvas-chrome:has(.storefront-site-header--layout-orderform) {
+  max-height: none;
+  overflow: visible;
+}
+
 .grid-canvas-chrome--hidden {
   opacity: 0;
   transform: translate3d(0, -8px, 0);

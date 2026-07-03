@@ -5,6 +5,7 @@ import { ProductGridSection } from '../../../types/homepage';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
 import WebsiteCarousel from '../../WebsiteBuilder/WebsiteCarousel';
 import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
+import { normalizeProductCardStyle } from '../../../utils/productCardStyles';
 import { IconImage } from '../../Storefront/StorefrontIcons';
 import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 
@@ -24,7 +25,7 @@ export default function ProductGridSectionView({
   const { settings, content } = section;
   const storeCtx = useWebsiteStoreOptional();
   const displayMode = settings.displayMode === 'carousel' || settings.displayMode === 'list' ? 'carousel' : 'grid';
-  const cardsStyle = settings.cardStyle || 'boxed';
+  const cardsStyle = normalizeProductCardStyle(settings.cardStyle);
   const resolvedCardSize = settings.cardSize || 'md';
   const cardMinWidthMap: Record<'sm' | 'md' | 'lg', number> = { sm: 140, md: 190, lg: 240 };
   const cardMinWidth = cardMinWidthMap[resolvedCardSize];

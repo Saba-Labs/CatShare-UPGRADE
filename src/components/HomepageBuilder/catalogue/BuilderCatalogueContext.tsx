@@ -3,7 +3,12 @@ import type { ProductWithCatalogueData } from '../../../config/catalogueProductU
 import type { Catalogue } from '../../../config/catalogueConfig';
 import { getStoreProducts, type StorePublic } from '../../../services/storeService';
 import { getCatalogueRowsFromDeviceStorage } from '../../../utils/catalogueCachePersist';
-import { parseBusinessProfile } from '../../../config/businessProfile';
+import type { BusinessProfile } from '../../../config/businessProfile';
+import {
+  BUSINESS_PROFILE_UPDATED_EVENT,
+  businessProfileToPreviewStoreFields,
+  readCachedBusinessProfile,
+} from '../../../utils/businessProfileStorefront';
 import { deriveStoreCategories, type StoreCategory } from '../../../utils/storefrontCategories';
 import { getSymbolForCurrencyCode } from '../../../utils/currencyUtils';
 import { WebsiteStoreProvider } from '../../WebsiteBuilder/WebsiteStoreContext';
@@ -48,6 +53,16 @@ export function BuilderCatalogueProvider({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => readCachedBusinessProfile());
+
+  useEffect(() => {
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<BusinessProfile>).detail;
+      setBusinessProfile(detail ?? readCachedBusinessProfile());
+    };
+    window.addEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, []);
 
   // Keep the latest catalogues without retriggering fetches on identity changes.
   const cataloguesRef = useRef(catalogues);
@@ -131,13 +146,8 @@ export function BuilderCatalogueProvider({
   );
 
   const previewStore = useMemo<StorePublic>(() => {
-    let bp = parseBusinessProfile(null);
-    try {
-      const raw = localStorage.getItem('businessProfile');
-      if (raw) bp = parseBusinessProfile(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
+    const bp = businessProfile;
+    const fromProfile = businessProfileToPreviewStoreFields(bp);
     return {
       id: storeId,
       storeId,
@@ -145,22 +155,22 @@ export function BuilderCatalogueProvider({
       storeSlug: storeSlug || '',
       catalogueId: catalogueId || '',
       sellerCurrencyCode: currencyCode || 'INR',
-      sellerLogoUrl: '',
+      sellerLogoUrl: fromProfile.sellerLogoUrl || '',
       createdAt: new Date().toISOString(),
-      sellerBusinessName: bp.businessName || undefined,
-      sellerAbout: bp.about || undefined,
-      sellerDescription: bp.description || undefined,
-      sellerEmail: bp.email || undefined,
-      sellerPhone: bp.phone || undefined,
-      sellerWebsite: bp.website || undefined,
-      sellerAddress: bp.address || undefined,
-      instagram: bp.instagram || undefined,
-      twitter: bp.twitter || undefined,
-      facebook: bp.facebook || undefined,
+      sellerBusinessName: fromProfile.sellerBusinessName,
+      sellerAbout: fromProfile.sellerAbout,
+      sellerDescription: fromProfile.sellerDescription,
+      sellerEmail: fromProfile.sellerEmail,
+      sellerPhone: fromProfile.sellerPhone,
+      sellerWebsite: fromProfile.sellerWebsite,
+      sellerAddress: fromProfile.sellerAddress,
+      instagram: fromProfile.instagram,
+      twitter: fromProfile.twitter,
+      facebook: fromProfile.facebook,
       whatsapp: storeWhatsapp || undefined,
       cataloguesDefinition: catalogues as StorePublic['cataloguesDefinition'],
     };
-  }, [storeId, storeSlug, sellerUserId, catalogueId, currencyCode, catalogues, storeWhatsapp]);
+  }, [storeId, storeSlug, sellerUserId, catalogueId, currencyCode, catalogues, storeWhatsapp, businessProfile]);
 
   return (
     <BuilderCatalogueContext.Provider value={value}>

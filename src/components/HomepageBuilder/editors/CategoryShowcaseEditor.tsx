@@ -8,6 +8,7 @@ import SidebarDropdownField from '../SidebarDropdownField';
 import { useBuilderCatalogue } from '../catalogue/BuilderCatalogueContext';
 import { resolveCategoryShowcaseSettings } from '../../../utils/categoryShowcaseStyles';
 import ColorPickerField from '../ColorPickerField';
+import PanelFieldLabel, { SidebarPanelHeading } from '../PanelFieldLabel';
 
 interface CategoryShowcaseEditorProps {
   section: CategoryShowcaseSection & { id: string };
@@ -49,7 +50,7 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
   const removeCustomCategory = (id: string) =>
     updateContent({ customCategories: customCategories.filter((c) => c.id !== id) });
 
-  const showColumnControl = resolved.layout === 'grid' || resolved.layout === 'carousel';
+  const showImageShape = resolved.cardShape !== 'circle';
 
   return (
     <>
@@ -71,90 +72,100 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
           options={[
             { value: 'left', label: 'Left' },
             { value: 'center', label: 'Center' },
-            { value: 'right', label: 'Right' },
           ]}
           onChange={(next) => updateSettings({ titleAlign: next as CategoryShowcaseSection['settings']['titleAlign'] })}
         />
       </div>
 
+      <div className="sidebar-panel-divider" />
+      <SidebarPanelHeading title="Layout" />
+
       <div className="panel-section">
-        <label className="panel-label">Layout</label>
+        <PanelFieldLabel
+          label="Display"
+          hint="Grid wraps to fit the screen. Scroll row is a horizontal strip on all devices."
+        />
         <SidebarDropdownField
-          ariaLabel="Category layout"
-          value={resolved.layout}
+          ariaLabel="Category display"
+          value={resolved.layout === 'carousel' ? 'carousel' : 'grid'}
           options={[
             { value: 'grid', label: 'Grid' },
-            { value: 'list', label: 'List (wide rows)' },
-            { value: 'carousel', label: 'Carousel (scroll row)' },
+            { value: 'carousel', label: 'Scroll row' },
           ]}
-          onChange={(next) => updateSettings({ layout: next as CategoryShowcaseSection['settings']['layout'] })}
+          onChange={(next) =>
+            updateSettings({ layout: next as 'grid' | 'carousel' })
+          }
         />
       </div>
 
-      {showColumnControl && (
+      {resolved.layout === 'carousel' && (
         <div className="panel-section">
-          <label className="panel-label">{resolved.layout === 'carousel' ? 'Visible tiles' : 'Columns'}</label>
+          <PanelFieldLabel
+            label="Navigation"
+            hint="Arrows and dots help visitors scroll when tiles overflow the row."
+          />
           <SidebarDropdownField
-            ariaLabel={resolved.layout === 'carousel' ? 'Visible tiles' : 'Columns'}
-            value={String(settings.columns)}
-            options={['2', '3', '4', '5', '6'].map((v) => ({ value: v, label: v }))}
+            ariaLabel="Scroll row navigation"
+            value={resolved.navigation}
+            options={[
+              { value: 'both', label: 'Arrows and dots' },
+              { value: 'arrows', label: 'Arrows only' },
+              { value: 'dots', label: 'Dots only' },
+              { value: 'none', label: 'None (swipe only)' },
+            ]}
             onChange={(next) =>
-              updateSettings({ columns: parseInt(next, 10) as CategoryShowcaseSection['settings']['columns'] })
+              updateSettings({ navigation: next as CategoryShowcaseSection['settings']['navigation'] })
             }
           />
         </div>
       )}
 
       <div className="panel-section">
-        <label className="panel-label">Spacing between tiles</label>
+        <PanelFieldLabel
+          label="Tile alignment"
+          hint="When there are only a few categories, align tiles left, center, or right."
+        />
         <SidebarDropdownField
-          ariaLabel="Tile gap"
+          ariaLabel="Tile alignment"
+          value={resolved.tilesAlign}
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Center' },
+            { value: 'right', label: 'Right' },
+          ]}
+          onChange={(next) =>
+            updateSettings({ tilesAlign: next as CategoryShowcaseSection['settings']['tilesAlign'] })
+          }
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Spacing</label>
+        <SidebarDropdownField
+          ariaLabel="Tile spacing"
           value={resolved.gap}
           options={[
             { value: 'sm', label: 'Compact' },
             { value: 'md', label: 'Comfortable' },
-            { value: 'lg', label: 'Airy' },
+            { value: 'lg', label: 'Wide' },
           ]}
           onChange={(next) => updateSettings({ gap: next as CategoryShowcaseSection['settings']['gap'] })}
         />
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Card style</label>
-        <SidebarDropdownField
-          ariaLabel="Card style"
-          value={resolved.cardStyle}
-          options={[
-            { value: 'minimal', label: 'Minimal (no frame)' },
-            { value: 'card', label: 'Card (shadow)' },
-            { value: 'bordered', label: 'Bordered' },
-            { value: 'overlay', label: 'Image focus' },
-          ]}
-          onChange={(next) => updateSettings({ cardStyle: next as CategoryShowcaseSection['settings']['cardStyle'] })}
-        />
-      </div>
+      <div className="sidebar-panel-divider" />
+      <SidebarPanelHeading title="Tile style" />
 
       <div className="panel-section">
-        <label className="panel-label">Tile shape</label>
-        <SidebarDropdownField
-          ariaLabel="Tile shape"
-          value={resolved.cardShape}
-          options={[
-            { value: 'rounded', label: 'Rounded corners' },
-            { value: 'sharp', label: 'Square corners' },
-            { value: 'pill', label: 'Pill / capsule' },
-            { value: 'circle', label: 'Circle image' },
-          ]}
-          onChange={(next) => updateSettings({ cardShape: next as CategoryShowcaseSection['settings']['cardShape'] })}
+        <PanelFieldLabel
+          label="Size"
+          hint="Controls tile width and image area. Applies on desktop and mobile."
         />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Tile size</label>
         <SidebarDropdownField
           ariaLabel="Tile size"
           value={resolved.cardSize}
           options={[
+            { value: 'xs', label: 'Extra small' },
             { value: 'sm', label: 'Small' },
             { value: 'md', label: 'Medium' },
             { value: 'lg', label: 'Large' },
@@ -165,63 +176,63 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
       </div>
 
       <div className="panel-section">
-        <label className="panel-label">Image proportions</label>
+        <label className="panel-label">Shape</label>
         <SidebarDropdownField
-          ariaLabel="Image proportions"
-          value={resolved.imageRatio}
+          ariaLabel="Tile shape"
+          value={resolved.cardShape}
           options={[
-            { value: '1:1', label: 'Square (1:1)' },
-            { value: '4:3', label: 'Landscape (4:3)' },
-            { value: '3:4', label: 'Portrait (3:4)' },
-            { value: '16:9', label: 'Wide (16:9)' },
-            { value: '2:3', label: 'Tall (2:3)' },
+            { value: 'rounded', label: 'Rounded square' },
+            { value: 'circle', label: 'Circle' },
           ]}
-          onChange={(next) => updateSettings({ imageRatio: next as CategoryShowcaseSection['settings']['imageRatio'] })}
-          disabled={resolved.cardShape === 'circle' && resolved.layout !== 'list'}
+          onChange={(next) => updateSettings({ cardShape: next as CategoryShowcaseSection['settings']['cardShape'] })}
         />
-        {resolved.cardShape === 'circle' && resolved.layout !== 'list' && (
-          <p className="catalogue-picker-hint">Circle tiles always use a square image frame.</p>
-        )}
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Image fit</label>
-        <SidebarDropdownField
-          ariaLabel="Image fit"
-          value={resolved.imageFit}
-          options={[
-            { value: 'cover', label: 'Fill frame (crop)' },
-            { value: 'contain', label: 'Fit inside frame' },
-          ]}
-          onChange={(next) => updateSettings({ imageFit: next as CategoryShowcaseSection['settings']['imageFit'] })}
-        />
-      </div>
+      {showImageShape && (
+        <div className="panel-section">
+          <label className="panel-label">Image crop</label>
+          <SidebarDropdownField
+            ariaLabel="Image crop"
+            value={
+              resolved.imageRatio === '4:3' || resolved.imageRatio === '16:9'
+                ? '4:3'
+                : resolved.imageRatio === '3:4' || resolved.imageRatio === '2:3'
+                  ? '3:4'
+                  : '1:1'
+            }
+            options={[
+              { value: '1:1', label: 'Square' },
+              { value: '4:3', label: 'Landscape' },
+              { value: '3:4', label: 'Portrait' },
+            ]}
+            onChange={(next) => updateSettings({ imageRatio: next as CategoryShowcaseSection['settings']['imageRatio'] })}
+          />
+        </div>
+      )}
 
       <div className="panel-section">
         <label className="panel-label">Category name</label>
         <SidebarDropdownField
-          ariaLabel="Category name style"
+          ariaLabel="Category name placement"
           value={resolved.labelStyle}
           options={[
             { value: 'below', label: 'Below image' },
-            { value: 'overlay', label: 'On image (gradient)' },
+            { value: 'overlay', label: 'On image' },
           ]}
           onChange={(next) => updateSettings({ labelStyle: next as CategoryShowcaseSection['settings']['labelStyle'] })}
         />
       </div>
 
       <div className="panel-section">
-        <label className="panel-label">Hover effect</label>
+        <label className="panel-label">Card frame</label>
         <SidebarDropdownField
-          ariaLabel="Hover effect"
-          value={resolved.hoverEffect}
+          ariaLabel="Card frame"
+          value={resolved.cardStyle}
           options={[
-            { value: 'lift', label: 'Lift up' },
-            { value: 'zoom', label: 'Zoom image' },
-            { value: 'border', label: 'Highlight border' },
-            { value: 'none', label: 'None' },
+            { value: 'card', label: 'Card with shadow' },
+            { value: 'minimal', label: 'No frame' },
           ]}
-          onChange={(next) => updateSettings({ hoverEffect: next as CategoryShowcaseSection['settings']['hoverEffect'] })}
+          onChange={(next) => updateSettings({ cardStyle: next as CategoryShowcaseSection['settings']['cardStyle'] })}
         />
       </div>
 
@@ -237,26 +248,22 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
       </div>
 
       <ColorPickerField
-        label="Section"
+        label="Background"
         value={settings.backgroundColor || '#ffffff'}
         onChange={(backgroundColor) => updateSettings({ backgroundColor })}
       />
 
-      <ColorPickerField
-        label="Cards"
-        value={settings.cardBackground || '#ffffff'}
-        onChange={(cardBackground) => updateSettings({ cardBackground })}
-      />
-
-      <ColorPickerField
-        label="Text"
-        value={settings.labelColor || '#111827'}
-        defaultValue="#111827"
-        onChange={(labelColor) => updateSettings({ labelColor })}
+      <div className="sidebar-panel-divider" />
+      <SidebarPanelHeading
+        title="Categories"
+        hint="Pick categories from your catalogue or add custom tiles with their own links."
       />
 
       <div className="panel-section">
-        <label className="panel-label">Categories from your catalogue</label>
+        <PanelFieldLabel
+          label="From your catalogue"
+          hint="Pick categories to show. Leave empty to auto-list categories from your products."
+        />
         <CategoryPicker
           selectedIds={content.categoryIds}
           onChange={(categoryIds) => updateContent({ categoryIds })}
@@ -265,8 +272,10 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
 
       {selectedDerived.length > 0 && (
         <div className="panel-section">
-          <label className="panel-label">Category images</label>
-          <p className="catalogue-picker-hint">Set a custom image for each selected category (optional).</p>
+          <PanelFieldLabel
+            label="Category images"
+            hint="Optional custom image per category."
+          />
           {selectedDerived.map((category) => (
             <div key={category.id} className="category-image-row">
               <span className="category-image-row-label">{category.label}</span>
@@ -284,16 +293,14 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
 
       <div className="panel-section">
         <div className="sidebar-panel-header" style={{ padding: 0 }}>
-          <label className="panel-label" style={{ margin: 0 }}>
-            Custom categories
-          </label>
+          <PanelFieldLabel
+            label="Custom tiles"
+            hint="Add links that are not tied to a product category."
+          />
           <button type="button" className="btn-text" onClick={addCustomCategory}>
             + Add
           </button>
         </div>
-        <p className="catalogue-picker-hint">
-          Add your own category tiles with a custom name, image and optional link.
-        </p>
         {customCategories.map((category) => (
           <div key={category.id} className="custom-category-card">
             <div className="custom-category-card-head">

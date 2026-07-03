@@ -15,10 +15,14 @@ interface CTASectionViewProps {
 export default function CTASectionView({ section, theme, editMode, builderCanvas = false, onUpdateSection }: CTASectionViewProps) {
   const { settings, content } = section;
   const buttonStyles = getThemeButtonStyles(theme || {}, settings.buttonColor);
+  const align =
+    settings.textAlignment ||
+    (settings as { alignment?: 'left' | 'center' | 'right' }).alignment ||
+    'center';
   const alignClass =
-    settings.textAlignment === 'left'
+    align === 'left'
       ? 'cta-section--align-left'
-      : settings.textAlignment === 'right'
+      : align === 'right'
         ? 'cta-section--align-right'
         : 'cta-section--align-center';
 

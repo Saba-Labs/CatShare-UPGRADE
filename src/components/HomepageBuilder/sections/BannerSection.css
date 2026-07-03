@@ -28,8 +28,9 @@
   z-index: 1;
   color: #fff;
   padding: clamp(1rem, 4vw, 1.5rem);
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: min(100%, 40rem);
+  flex: 0 1 auto;
   box-sizing: border-box;
 }
 

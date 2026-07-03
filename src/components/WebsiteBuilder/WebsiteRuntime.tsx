@@ -14,7 +14,7 @@ import WebsiteFooter from './WebsiteFooter';
 import HomePageRuntime from './pages/HomePageRuntime';
 import CollectionPageRuntime from './pages/CollectionPageRuntime';
 import ProductPageRuntime from './pages/ProductPageRuntime';
-import './website-runtime.css';
+import { resolveCollectionPageSettings } from '../../utils/collectionPageSettings';
 
 interface WebsiteRuntimeProps {
   slug: string;
@@ -100,7 +100,10 @@ export default function WebsiteRuntime({
 
   const themeVars = buildWebsiteThemeVars(homeLayout.theme);
   const productTemplate = websiteConfig.templates?.product;
-  const collectionTemplate = websiteConfig.templates?.collection;
+  const collectionSettings = useMemo(
+    () => resolveCollectionPageSettings(runtimeLayout),
+    [runtimeLayout]
+  );
 
   return (
     <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
@@ -115,7 +118,20 @@ export default function WebsiteRuntime({
       >
         <WebsiteHeader slug={slug} siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }} onSubdomain={onSubdomain} />
         {section === 'collections' ? (
-          <CollectionPageRuntime products={products} columns={collectionTemplate?.columns || 4} cardsStyle={collectionTemplate?.cardsStyle} />
+          <CollectionPageRuntime
+            products={products}
+            embedded
+            columns={collectionSettings.columns}
+            cardsStyle={collectionSettings.cardsStyle}
+            showSearch={collectionSettings.showSearch}
+            showCategoryFilters={collectionSettings.showCategoryFilters}
+            showSort={collectionSettings.showSort}
+            viewMode={collectionSettings.viewMode}
+            productImageRatio={collectionSettings.productImageRatio}
+            showPrice={collectionSettings.showPrice}
+            showAvailability={collectionSettings.showAvailability}
+            defaultSorting={collectionSettings.defaultSorting}
+          />
         ) : section === 'products' ? (
           <ProductPageRuntime product={product} template={productTemplate} />
         ) : customPageLayout ? (

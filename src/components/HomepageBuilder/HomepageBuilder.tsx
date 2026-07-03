@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -28,8 +28,21 @@ import type { StorePublic } from '../../services/storeService';
 import { HomepageConfig, HomepageLayout, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
 import { getSymbolForCurrencyCode } from '../../utils/currencyUtils';
 import BuilderProductPageOverlay from './BuilderProductPageOverlay';
+import BuilderCategoryPageOverlay, { type BuilderPreviewCategory } from './BuilderCategoryPageOverlay';
 import { getWebsiteTemplate, type WebsiteTemplateId } from '../../config/websiteTemplates';
 import { getSiteTheme, syncSiteThemeAcrossPages } from '../../utils/websiteSiteTheme';
+import {
+  BUSINESS_PROFILE_UPDATED_EVENT,
+  businessProfilePatchFromSiteSettings,
+  hydrateSiteSettingsFromBusinessProfile,
+  mergeThemeSeoWithSeller,
+  mergeThemeSiteSettingsWithSeller,
+  patchCachedBusinessProfile,
+  readCachedBusinessProfile,
+  siteSettingsPatchFromBusinessProfile,
+} from '../../utils/businessProfileStorefront';
+import type { BusinessProfile } from '../../config/businessProfile';
+import { syncUserSettings } from '../../services/supabaseSync';
 import { isOfflineBuilderMode } from '../../config/offlineBuilder';
 import BuilderMobileGate from './BuilderMobileGate';
 import BuilderToolbar, { ViewportSize } from './BuilderToolbar';
@@ -78,7 +91,10 @@ export default function HomepageBuilder({
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedFreeformElementId, setSelectedFreeformElementId] = useState<string | null>(null);
   const [previewProduct, setPreviewProduct] = useState<ProductWithCatalogueData | null>(null);
+  const [previewCategory, setPreviewCategory] = useState<BuilderPreviewCategory | null>(null);
   const [cookThemeOpen, setCookThemeOpen] = useState(false);
+  const baselineLayoutRef = useRef<HomepageLayout | null>(null);
+  const preThemeLayoutRef = useRef<HomepageLayout | null>(null);
 
   const configPersisted = isPersistedHomepageConfigId(config?.id);
 
@@ -112,8 +128,17 @@ export default function HomepageBuilder({
         }
 
         const normalizedLayout = normalizeHomepageLayoutForWebsiteMode(existingConfig.layout);
-        setConfig({ ...existingConfig, layout: normalizedLayout });
-        actions.setLayout(normalizedLayout);
+        const websiteConfig = normalizedLayout.websiteConfig || createDefaultWebsiteModeConfig();
+        const hydratedLayout = {
+          ...normalizedLayout,
+          websiteConfig: {
+            ...websiteConfig,
+            siteSettings: hydrateSiteSettingsFromBusinessProfile(websiteConfig.siteSettings),
+          },
+        };
+        setConfig({ ...existingConfig, layout: hydratedLayout });
+        actions.setLayout(hydratedLayout);
+        baselineLayoutRef.current = JSON.parse(JSON.stringify(hydratedLayout)) as HomepageLayout;
         setEditingPageId('home');
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Failed to load homepage config';
@@ -139,11 +164,39 @@ export default function HomepageBuilder({
     };
   };
 
+  /** Normalized full-site layout for publish + draft vs live comparison. */
+  const buildPublishComparableLayout = (layout: HomepageLayout, pageId: string) => {
+    const snapshotWebsiteConfig = snapshotCurrentPageIntoWebsiteConfig(
+      layout.websiteConfig || createDefaultWebsiteModeConfig(),
+      layout,
+      pageId
+    );
+    return normalizeHomepageLayoutForWebsiteMode({
+      ...layout,
+      websiteConfig: snapshotWebsiteConfig,
+      sections: (snapshotWebsiteConfig.pages.home.sections ||
+        layout.sections ||
+        []) as HomepageLayout['sections'],
+      theme: snapshotWebsiteConfig.pages.home.theme || layout.theme,
+    });
+  };
+
   const resolvePersistedConfig = async () => {
     const draftLayout = buildDraftLayout();
     const persisted = await ensureHomepageConfig(storeId, config, draftLayout);
     setConfig(persisted);
     return persisted;
+  };
+
+  const syncBrandToBusinessProfileCloud = async () => {
+    const siteSettings = buildDraftLayout().websiteConfig?.siteSettings;
+    if (!siteSettings || !user?.uid) return;
+    const profile = {
+      ...readCachedBusinessProfile(),
+      ...businessProfilePatchFromSiteSettings(siteSettings),
+    };
+    patchCachedBusinessProfile(profile);
+    await syncUserSettings(user.uid, { data: { businessProfile: profile } });
   };
 
   const handleSave = async () => {
@@ -152,6 +205,11 @@ export default function HomepageBuilder({
       const updated = await updateHomepageLayout(persisted.id, buildDraftLayout());
       setConfig(updated);
       actions.markSaved();
+      try {
+        await syncBrandToBusinessProfileCloud();
+      } catch {
+        /* non-blocking */
+      }
       showToast('Draft saved', 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to save';
@@ -164,22 +222,23 @@ export default function HomepageBuilder({
     try {
       setIsPublishing(true);
       const persisted = await resolvePersistedConfig();
-      const draftLayout = buildDraftLayout();
+      const draftLayout = buildPublishComparableLayout(state.layout, editingPageId);
       await updateHomepageLayout(persisted.id, draftLayout);
       const published = await publishHomepageConfig(persisted.id, draftLayout, {
         updatedBy: user?.uid,
       });
-      const normalizedDraftLayout = normalizeHomepageLayoutForWebsiteMode(published.layout);
-      const normalizedPublishedLayout = published.publishedLayout
-        ? normalizeHomepageLayoutForWebsiteMode(published.publishedLayout)
-        : published.publishedLayout;
       setConfig({
         ...published,
-        layout: normalizedDraftLayout,
-        publishedLayout: normalizedPublishedLayout,
+        layout: draftLayout,
+        publishedLayout: draftLayout,
       });
-      actions.setLayout(normalizedDraftLayout);
+      actions.setLayout(draftLayout);
       actions.markSaved();
+      try {
+        await syncBrandToBusinessProfileCloud();
+      } catch {
+        /* non-blocking */
+      }
       showToast('Site published — customers will see your latest changes', 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to publish';
@@ -198,7 +257,18 @@ export default function HomepageBuilder({
     window.open(buildStorefrontUrl(storeSlug), '_blank', 'noopener,noreferrer');
   };
 
-  const draftLayoutForCompare = useMemo(() => buildDraftLayout(), [state.layout, editingPageId]);
+  const draftLayoutForCompare = useMemo(
+    () => buildPublishComparableLayout(state.layout, editingPageId),
+    [state.layout, editingPageId]
+  );
+
+  const publishedLayoutForCompare = useMemo(
+    () =>
+      config?.publishedLayout
+        ? buildPublishComparableLayout(config.publishedLayout, 'home')
+        : null,
+    [config?.publishedLayout]
+  );
 
   useHomepageAutosave({
     configId: config?.id || '',
@@ -216,8 +286,8 @@ export default function HomepageBuilder({
   });
 
   const hasUnpublishedChanges = useMemo(
-    () => !homepageLayoutsEqual(draftLayoutForCompare, config?.publishedLayout),
-    [draftLayoutForCompare, config?.publishedLayout]
+    () => !homepageLayoutsEqual(draftLayoutForCompare, publishedLayoutForCompare),
+    [draftLayoutForCompare, publishedLayoutForCompare]
   );
 
   const isLive = !!config?.publishedLayout && !!config?.publishedAt;
@@ -240,6 +310,25 @@ export default function HomepageBuilder({
     };
     actions.updateWebsiteConfig(syncSiteThemeAcrossPages(merged));
   };
+
+  useEffect(() => {
+    const onBusinessProfileUpdated = (event: Event) => {
+      const profile =
+        (event as CustomEvent<BusinessProfile>).detail ?? readCachedBusinessProfile();
+      const current = state.layout.websiteConfig;
+      if (!current) return;
+      const merged: WebsiteModeConfig = {
+        ...current,
+        siteSettings: {
+          ...current.siteSettings,
+          ...siteSettingsPatchFromBusinessProfile(profile),
+        },
+      };
+      actions.updateWebsiteConfig(syncSiteThemeAcrossPages(merged));
+    };
+    window.addEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onBusinessProfileUpdated);
+    return () => window.removeEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onBusinessProfileUpdated);
+  }, [state.layout.websiteConfig, actions]);
 
   const handleUpdateTheme = (updates: Partial<ThemeSettings>) => {
     const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
@@ -340,6 +429,19 @@ export default function HomepageBuilder({
     }
   };
 
+  const capturePreThemeSnapshot = () => {
+    preThemeLayoutRef.current = JSON.parse(JSON.stringify(buildDraftLayout())) as HomepageLayout;
+  };
+
+  const resetEditorChromeAfterLayoutChange = () => {
+    setEditingPageId('home');
+    setSelectedFreeformElementId(null);
+    setPreviewProduct(null);
+    setPreviewCategory(null);
+    setBlankStarted(false);
+    setSidebarTab('insert');
+  };
+
   const handleApplyTemplate = (templateId: WebsiteTemplateId) => {
     const tpl = getWebsiteTemplate(templateId);
     if (!tpl) return;
@@ -353,6 +455,8 @@ export default function HomepageBuilder({
       if (!ok) return;
     }
 
+    capturePreThemeSnapshot();
+
     const built = tpl.build();
     applyBuiltWebsiteConfig(
       built,
@@ -363,6 +467,7 @@ export default function HomepageBuilder({
       { activeTemplateId: templateId, toastMessage: `Applied ${tpl.name} theme across your site` },
       showToast
     );
+    setBlankStarted(false);
     setEditingPageId('home');
     setSidebarTab('insert');
   };
@@ -375,6 +480,8 @@ export default function HomepageBuilder({
     const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
     const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
 
+    capturePreThemeSnapshot();
+
     applyBuiltWebsiteConfig(
       built,
       withSnapshot,
@@ -384,9 +491,53 @@ export default function HomepageBuilder({
       { toastMessage: 'Your theme is ready — customize any block on the canvas' },
       showToast
     );
+    setBlankStarted(false);
     setEditingPageId('home');
     setSidebarTab('insert');
   };
+
+  const getRestoreOriginalMessage = useCallback(() => {
+    const preTheme = preThemeLayoutRef.current;
+    const baseline = baselineLayoutRef.current;
+    const restoreCandidate = preTheme ?? baseline;
+    return restoreCandidate
+      ? 'Remove the current theme and restore your previous layout? Unsaved changes will be lost.'
+      : 'Remove the current theme and restore the classic default store layout? Your home page content will be replaced.';
+  }, []);
+
+  const performRestoreOriginal = useCallback(() => {
+    const currentDraft = buildDraftLayout();
+    const preTheme = preThemeLayoutRef.current;
+    const baseline = baselineLayoutRef.current;
+    const restoreCandidate = preTheme ?? baseline;
+
+    if (
+      restoreCandidate &&
+      layoutHasHomeContent(restoreCandidate) &&
+      !homepageLayoutsEqual(restoreCandidate, currentDraft)
+    ) {
+      applyRestoredLayout(restoreCandidate, currentDraft, actions);
+      resetEditorChromeAfterLayoutChange();
+      showToast('Theme removed — restored your previous layout', 'success');
+      return;
+    }
+
+    const tpl = getWebsiteTemplate('default-store');
+    if (!tpl) return;
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+    applyBuiltWebsiteConfig(
+      tpl.build(),
+      withSnapshot,
+      state.layout,
+      editingPageId,
+      actions,
+      { activeTemplateId: 'default-store', toastMessage: 'Theme removed — restored classic store layout' },
+      showToast
+    );
+    preThemeLayoutRef.current = null;
+    resetEditorChromeAfterLayoutChange();
+  }, [actions, editingPageId, showToast, state.layout]);
 
   const homeHasContent = (state.layout.sections || []).length > 0;
 
@@ -394,13 +545,21 @@ export default function HomepageBuilder({
     editingPageId === 'home' &&
     sidebarTab === 'templates' &&
     !previewProduct &&
+    !previewCategory &&
     !showPreview;
 
+  const [blankStarted, setBlankStarted] = useState(false);
+
   useEffect(() => {
-    if (!isLoading && editingPageId === 'home' && state.layout.sections.length === 0) {
+    if (
+      !isLoading &&
+      editingPageId === 'home' &&
+      state.layout.sections.length === 0 &&
+      !blankStarted
+    ) {
       setSidebarTab('templates');
     }
-  }, [isLoading, editingPageId, state.layout.sections.length]);
+  }, [isLoading, editingPageId, state.layout.sections.length, blankStarted]);
 
   const handleSidebarTabChange = useCallback((tab: SidebarTab) => {
     setSidebarTab(tab);
@@ -408,10 +567,27 @@ export default function HomepageBuilder({
       actions.selectSection(null);
       setSelectedFreeformElementId(null);
       setPreviewProduct(null);
+      setPreviewCategory(null);
     }
   }, [actions]);
 
   const handleStartBlank = () => {
+    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+    const blankConfig = createEmptyHomepageLayout().websiteConfig!;
+
+    applyBuiltWebsiteConfig(
+      blankConfig,
+      withSnapshot,
+      state.layout,
+      editingPageId,
+      actions
+    );
+    setBlankStarted(true);
+    setEditingPageId('home');
+    setSelectedFreeformElementId(null);
+    setPreviewProduct(null);
+    setPreviewCategory(null);
     setSidebarTab('insert');
   };
 
@@ -419,6 +595,7 @@ export default function HomepageBuilder({
     actions.selectSection(id);
     setSelectedFreeformElementId(null);
     setPreviewProduct(null);
+    setPreviewCategory(null);
   };
 
   const handleOverlaySelectSection = useCallback((id: string | null) => {
@@ -429,9 +606,21 @@ export default function HomepageBuilder({
 
   const handleProductPreview = useCallback((product: ProductWithCatalogueData) => {
     setPreviewProduct(product);
+    setPreviewCategory(null);
     actions.selectSection(null);
     setSelectedFreeformElementId(null);
   }, [actions]);
+
+  const handleCategoryPreview = useCallback((category: BuilderPreviewCategory) => {
+    setPreviewCategory(category);
+    setPreviewProduct(null);
+    actions.selectSection(null);
+    setSelectedFreeformElementId(null);
+  }, [actions]);
+
+  const handleOpenShopCatalog = useCallback(() => {
+    handleCategoryPreview({ id: 'all', label: 'All products' });
+  }, [handleCategoryPreview]);
 
   const previewCatalogue = useMemo(() => {
     if (!catalogues?.length) return null;
@@ -577,6 +766,18 @@ export default function HomepageBuilder({
                   onSelectSection={handleOverlaySelectSection}
                   onClose={() => setPreviewProduct(null)}
                 />
+              ) : previewCategory ? (
+                <BuilderCategoryPageOverlay
+                  category={previewCategory}
+                  layout={state.layout}
+                  theme={state.layout.theme}
+                  siteSettings={state.layout.websiteConfig?.siteSettings}
+                  viewport={viewport}
+                  selectedSectionId={state.selectedSectionId}
+                  onSelectSection={handleOverlaySelectSection}
+                  onClose={() => setPreviewCategory(null)}
+                  onProductPreview={handleProductPreview}
+                />
               ) : (
                 <div className={`sites-page-frame viewport-${viewport}${showThemeHub ? ' sites-page-frame--theme-hub' : ''}`}>
                   <GridCanvas
@@ -600,7 +801,9 @@ export default function HomepageBuilder({
                     onStartBlank={handleStartBlank}
                     onCookTheme={editingPageId === 'home' ? handleCookThemeOpen : undefined}
                     themeHubMode={showThemeHub}
+                    blankStarted={blankStarted}
                     onProductPreview={handleProductPreview}
+                    onCategoryPreview={handleCategoryPreview}
                   />
                 </div>
               )}
@@ -611,7 +814,10 @@ export default function HomepageBuilder({
               onTabChange={handleSidebarTabChange}
               themeHubMode={showThemeHub}
               previewProduct={previewProduct}
+              previewCategory={previewCategory}
               onCloseProductPreview={() => setPreviewProduct(null)}
+              onCloseCategoryPreview={() => setPreviewCategory(null)}
+              onOpenShopCatalog={handleOpenShopCatalog}
               selectedSectionId={state.selectedSectionId}
               selectedFreeformElementId={selectedFreeformElementId}
               onSelectFreeformElement={setSelectedFreeformElementId}
@@ -633,6 +839,9 @@ export default function HomepageBuilder({
               onClearSectionSelection={() => actions.selectSection(null)}
               onApplyTemplate={handleApplyTemplate}
               onCookTheme={handleCookThemeOpen}
+              onStartBlank={editingPageId === 'home' ? handleStartBlank : undefined}
+              onRestoreOriginal={editingPageId === 'home' ? performRestoreOriginal : undefined}
+              restoreOriginalMessage={getRestoreOriginalMessage()}
             />
           </div>
         </BuilderDndProvider>
@@ -699,6 +908,44 @@ function snapshotCurrentPageIntoWebsiteConfig(
 
 type BuilderActions = ReturnType<typeof useHomepageBuilder>['actions'];
 
+function layoutHasHomeContent(layout: HomepageLayout): boolean {
+  const sectionCount =
+    layout.sections?.length ||
+    layout.websiteConfig?.pages?.home?.sections?.length ||
+    0;
+  return sectionCount > 0;
+}
+
+function applyRestoredLayout(
+  snapshot: HomepageLayout,
+  sellerSnapshot: HomepageLayout,
+  actions: BuilderActions
+) {
+  const normalized = normalizeHomepageLayoutForWebsiteMode(snapshot);
+  const sellerConfig = sellerSnapshot.websiteConfig || createDefaultWebsiteModeConfig();
+  const baseWebsiteConfig = normalized.websiteConfig || createDefaultWebsiteModeConfig();
+  const websiteConfig: WebsiteModeConfig = {
+    ...baseWebsiteConfig,
+    siteSettings: mergeThemeSiteSettingsWithSeller(
+      baseWebsiteConfig.siteSettings,
+      sellerConfig.siteSettings
+    ),
+    seo: mergeThemeSeoWithSeller(baseWebsiteConfig.seo, sellerConfig.seo),
+  };
+  const homeSections = (websiteConfig.pages.home.sections ||
+    normalized.sections ||
+    []) as HomepageLayout['sections'];
+  const homeTheme = websiteConfig.pages.home.theme || normalized.theme;
+
+  actions.setLayout({
+    ...normalized,
+    websiteConfig,
+    sections: homeSections,
+    theme: homeTheme,
+  });
+  actions.selectSection(null);
+}
+
 function applyBuiltWebsiteConfig(
   built: WebsiteModeConfig,
   withSnapshot: WebsiteModeConfig,
@@ -721,12 +968,21 @@ function applyBuiltWebsiteConfig(
     label: page.title,
     href: `/${page.slug}`,
   }));
+  const sellerSiteSettings = withSnapshot.siteSettings;
+  const mergedSiteSettings = mergeThemeSiteSettingsWithSeller(built.siteSettings, sellerSiteSettings);
+  const sellerNav =
+    sellerSiteSettings.navItems?.length > 0 ? sellerSiteSettings.navItems : built.siteSettings.navItems;
+  const seenNavHrefs = new Set(sellerNav.map((item) => item.href));
   const mergedConfig: WebsiteModeConfig = {
     ...built,
     ...(options?.activeTemplateId ? { activeTemplateId: options.activeTemplateId } : {}),
+    seo: mergeThemeSeoWithSeller(built.seo, withSnapshot.seo),
     siteSettings: {
-      ...built.siteSettings,
-      navItems: [...built.siteSettings.navItems, ...customNavItems],
+      ...mergedSiteSettings,
+      navItems: [
+        ...sellerNav,
+        ...customNavItems.filter((item) => !seenNavHrefs.has(item.href)),
+      ],
     },
     pages: {
       home: built.pages.home,

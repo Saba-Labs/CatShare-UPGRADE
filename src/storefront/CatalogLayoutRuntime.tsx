@@ -25,7 +25,7 @@ export default function CatalogLayoutRuntime({ layout, storeId }: CatalogLayoutR
     >
       {sections.map((section) => (
         <div key={section.id} style={getBlockRowStyle(section.blockLayout)}>
-          <div style={getBlockInnerStyleForLive(section.blockLayout)}>
+          <div style={getBlockInnerStyleForLive(section.blockLayout, section.type)}>
             <SectionRenderer section={section as HomepageLayout['sections'][number] & { id: string }} theme={layout.theme} storeId={storeId} />
           </div>
         </div>

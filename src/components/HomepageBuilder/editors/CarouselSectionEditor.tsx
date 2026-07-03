@@ -135,11 +135,15 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
             type="number"
             className="panel-input"
             value={section.settings.interval}
-            onChange={(e) =>
+            onChange={(e) => {
+              const parsed = parseInt(e.target.value, 10);
               onUpdate({
-                settings: { ...section.settings, interval: parseInt(e.target.value, 10) },
-              })
-            }
+                settings: {
+                  ...section.settings,
+                  interval: Number.isFinite(parsed) ? Math.max(1000, parsed) : section.settings.interval,
+                },
+              });
+            }}
             min="1000"
             step="1000"
           />

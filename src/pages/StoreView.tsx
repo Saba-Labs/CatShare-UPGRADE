@@ -24,6 +24,7 @@ import { getSymbolForCurrencyCode } from '../utils/currencyUtils';
 import { getFieldsDefinition, isFieldVisibleOnSurface } from '../config/fieldConfig';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { getProductImageUrls, getPrimaryImageIndex } from '../utils/productImages';
+import { getProductVideoUrls, shouldUseProductMediaGallery } from '../utils/productGallery';
 import { normalizeProductCategories, buildStorefrontCategoryFilterList } from '../utils/productCategoryUtils';
 import {
   filterProductsByBehaviorScope,
@@ -87,7 +88,7 @@ import ProductPageRuntime from '../components/WebsiteBuilder/pages/ProductPageRu
 import { WebsiteStoreProvider } from '../components/WebsiteBuilder/WebsiteStoreContext';
 import StorefrontSiteHeader from '../components/Storefront/StorefrontSiteHeader';
 import { WebsiteOrderBridgeProvider, type WebsiteOrderBridgeValue } from '../components/WebsiteBuilder/WebsiteOrderBridge';
-import { collectionPagePath, findProductByHandle, findProductById, parseStorefrontProductHandle, parseStorefrontCheckoutRoute, productPagePath, checkoutDetailsPath, checkoutReviewPath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory, type StoreProductNavState } from '../utils/websiteStorefront';
+import { findProductByHandle, findProductById, parseStorefrontProductHandle, parseStorefrontCollectionRoute, parseStorefrontCheckoutRoute, productPagePath, checkoutDetailsPath, checkoutReviewPath, resolveStoreWhatsapp, storeBasePath, canPopStorefrontHistory, type StoreProductNavState } from '../utils/websiteStorefront';
 import StoreProductOrderPanel from '../components/Storefront/StoreProductOrderPanel';
 import '../components/Storefront/store-product-order-page.css';
 import { buildWebsiteThemeVars } from '../utils/websiteThemeVars';
@@ -119,6 +120,7 @@ import { normalizeHomepageLayoutForWebsiteMode } from '../config/homepageBuilder
 import { getWebsiteTemplate } from '../config/websiteTemplates';
 import type { HomepageLayout } from '../types/homepage';
 import CatalogHomePage from '../storefront/pages/CatalogHomePage';
+import CatalogCollectionPage from '../storefront/pages/CatalogCollectionPage';
 import CheckoutPanelShell from '../storefront/components/CheckoutPanelShell';
 import CheckoutDetailsPage from '../storefront/pages/CheckoutDetailsPage';
 import CheckoutReviewPage from '../storefront/pages/CheckoutReviewPage';
@@ -730,12 +732,13 @@ function displayStoreProductImage(p: ProductWithCatalogueData | Record<string, u
 
 function getStoreProductGalleryProps(p: ProductWithCatalogueData | Record<string, unknown>) {
   const urls = getProductImageUrls(p);
+  const videoUrls = getProductVideoUrls(p);
   const primaryIndex = getPrimaryImageIndex(p);
   const r = p as Record<string, unknown>;
   const v = r.imageVersion ?? r.image_version;
   const primaryImageVersion =
     typeof v === 'number' && Number.isFinite(v) ? v : undefined;
-  return { urls, primaryIndex, primaryImageVersion };
+  return { urls, videoUrls, primaryIndex, primaryImageVersion };
 }
 
 function StoreProductImageArea({
@@ -745,13 +748,15 @@ function StoreProductImageArea({
   product: ProductWithCatalogueData;
   variant: 'card' | 'drawer';
 }) {
-  const { urls, primaryIndex, primaryImageVersion } = getStoreProductGalleryProps(product);
+  const { urls, videoUrls, primaryIndex, primaryImageVersion } = getStoreProductGalleryProps(product);
   const fallback = displayStoreProductImage(product);
+  const useGallery = shouldUseProductMediaGallery(urls.length, videoUrls.length);
 
-  if (urls.length > 1) {
+  if (useGallery) {
     return (
       <ProductImageGallery
         urls={urls}
+        videoUrls={videoUrls}
         primaryIndex={primaryIndex}
         primaryImageVersion={primaryImageVersion}
         fillContainer
@@ -1070,7 +1075,17 @@ export default function StoreView() {
     () => {
       if (store?.websiteModeEnabled) return null;
       if (parseStorefrontCheckoutRoute(location.pathname, dedicatedHost)) return null;
+      if (parseStorefrontCollectionRoute(location.pathname, dedicatedHost)) return null;
       return parseStorefrontProductHandle(location.pathname, dedicatedHost);
+    },
+    [store?.websiteModeEnabled, location.pathname, dedicatedHost]
+  );
+
+  const catalogCollectionRoute = useMemo(
+    () => {
+      if (store?.websiteModeEnabled) return false;
+      if (parseStorefrontCheckoutRoute(location.pathname, dedicatedHost)) return false;
+      return parseStorefrontCollectionRoute(location.pathname, dedicatedHost);
     },
     [store?.websiteModeEnabled, location.pathname, dedicatedHost]
   );
@@ -1119,6 +1134,15 @@ export default function StoreView() {
     navigate(slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/');
   }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate, location.key]);
 
+  const closeCollectionPage = useCallback(() => {
+    if (canPopStorefrontHistory(location.key)) {
+      navigate(-1);
+      return;
+    }
+    const slugForPath = effectiveSlug || store?.storeSlug || '';
+    navigate(slugForPath ? storeBasePath(slugForPath, dedicatedHost) : '/');
+  }, [effectiveSlug, store?.storeSlug, dedicatedHost, navigate, location.key]);
+
   // Catalog listing ↔ product page: keep scroll on the listing, start product page at top.
   useEffect(() => {
     if (store?.websiteModeEnabled) return;
@@ -1136,7 +1160,12 @@ export default function StoreView() {
   }, [store?.websiteModeEnabled, catalogProductHandle]);
 
   useEffect(() => {
-    if (store?.websiteModeEnabled || catalogProductHandle) return;
+    if (store?.websiteModeEnabled || !catalogCollectionRoute) return;
+    window.scrollTo(0, 0);
+  }, [store?.websiteModeEnabled, catalogCollectionRoute]);
+
+  useEffect(() => {
+    if (store?.websiteModeEnabled || catalogProductHandle || catalogCollectionRoute) return;
     const y = pendingListingScrollRef.current;
     if (y == null || y <= 0) return;
 
@@ -1145,7 +1174,7 @@ export default function StoreView() {
     const timers = [16, 50, 100, 200, 400, 800].map((ms) => window.setTimeout(restore, ms));
     pendingListingScrollRef.current = null;
     return () => timers.forEach((id) => window.clearTimeout(id));
-  }, [store?.websiteModeEnabled, catalogProductHandle]);
+  }, [store?.websiteModeEnabled, catalogProductHandle, catalogCollectionRoute]);
 
   // Listen for store-updated custom events from Store.tsx toggle
   useEffect(() => {
@@ -1791,6 +1820,10 @@ export default function StoreView() {
       closeProductPage();
       return;
     }
+    if (catalogCollectionRoute) {
+      closeCollectionPage();
+      return;
+    }
     if (checkoutRoute === 'review') {
       goToCheckoutDetails();
       return;
@@ -1804,7 +1837,7 @@ export default function StoreView() {
       return;
     }
     window.history.back();
-  }, [catalogProductHandle, checkoutRoute, closeProductPage, goToCheckoutDetails, goToStoreHome, location.key, navigate]);
+  }, [catalogProductHandle, catalogCollectionRoute, closeProductPage, closeCollectionPage, checkoutRoute, goToCheckoutDetails, goToStoreHome, location.key, navigate]);
 
   // Filter out 0-quantity items for final submission
   const reviewSummary = useMemo(() => {
@@ -2642,8 +2675,6 @@ export default function StoreView() {
                       template={publishedProductTemplate}
                       onAfterPlaceOrder={closeProductPage}
                       orderCtaLabel="Done"
-                      shopLinkTo={storeBasePath(effectiveSlug || slug || '', dedicatedHost)}
-                      shopBreadcrumbLabel="Shop"
                     />
                   </div>
                 </WebsiteOrderBridgeProvider>
@@ -2702,6 +2733,17 @@ export default function StoreView() {
               </div>
             </div>
             )
+          ) : catalogCollectionRoute && store && websiteOrderBridge ? (
+            <CatalogCollectionPage
+              slug={effectiveSlug || slug || ''}
+              store={store}
+              products={storeProducts}
+              layout={homepageLayout}
+              orderBridge={websiteOrderBridge}
+              onSubdomain={dedicatedHost}
+              showSiteHeader={useHomepageSiteChrome}
+              onBack={useHomepageSiteChrome ? undefined : closeCollectionPage}
+            />
           ) : catalogHomeLayout && store && websiteOrderBridge ? (
             <CatalogHomePage
               slug={effectiveSlug || slug || ''}

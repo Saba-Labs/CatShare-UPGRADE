@@ -6,3 +6,9 @@
   margin: 0;
   white-space: pre-wrap;
 }
+
+.text-section__body.sites-inline-editable[contenteditable='true'] {
+  cursor: text;
+  display: block;
+  min-height: 1em;
+}

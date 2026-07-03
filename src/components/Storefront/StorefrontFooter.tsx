@@ -322,14 +322,7 @@ export default function StorefrontFooter({
         );
       case 'info-cards':
       default:
-        return (
-          <>
-            {footerHead}
-            {hasLinkColumns ? (
-              <div className="sf-footer-menus-wrap">{linkColumnsNav({})}</div>
-            ) : null}
-          </>
-        );
+        return <>{footerHead}</>;
     }
   })();
 

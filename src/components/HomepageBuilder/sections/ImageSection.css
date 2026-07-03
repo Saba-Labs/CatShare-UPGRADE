@@ -1,6 +1,17 @@
 .image-section {
   display: flex;
   width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.image-section__inner {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.sites-document-block[style*='height'] > .image-section {
+  height: 100%;
 }
 
 .image-section--align-left {
@@ -13,6 +24,18 @@
 
 .image-section--align-right {
   justify-content: flex-end;
+}
+
+.image-section--valign-top {
+  align-items: flex-start;
+}
+
+.image-section--valign-center {
+  align-items: center;
+}
+
+.image-section--valign-bottom {
+  align-items: flex-end;
 }
 
 .image-section__inner--width-small {

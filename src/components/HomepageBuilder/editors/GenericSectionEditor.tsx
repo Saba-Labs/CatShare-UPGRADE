@@ -176,54 +176,6 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
                 })
               }
             />
-
-            <div className="panel-section">
-              <label className="panel-label">Height</label>
-              <SidebarDropdownField
-                ariaLabel="Banner height"
-                value={(section as any).settings.height}
-                options={[
-                  { value: 'small', label: 'Small' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'large', label: 'Large' },
-                ]}
-                onChange={(next) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, height: next },
-                  })
-                }
-              />
-            </div>
-
-            <ColorPickerField
-              label="Background"
-              value={(section as any).settings.backgroundColor || '#2563eb'}
-              defaultValue="#2563eb"
-              onChange={(backgroundColor) =>
-                onUpdate({
-                  settings: { ...(section as any).settings, backgroundColor },
-                })
-              }
-            />
-
-            <div className="panel-section">
-              <label className="panel-label">
-                Overlay darkness ({Math.round(((section as any).settings.overlayOpacity ?? 0.3) * 100)}%)
-              </label>
-              <input
-                type="range"
-                className="panel-input"
-                min={0}
-                max={1}
-                step={0.05}
-                value={(section as any).settings.overlayOpacity ?? 0.3}
-                onChange={(e) =>
-                  onUpdate({
-                    settings: { ...(section as any).settings, overlayOpacity: parseFloat(e.target.value) },
-                  })
-                }
-              />
-            </div>
           </>
         );
 

@@ -14,6 +14,7 @@ import SortableGridSection from './SortableGridSection';
 import SectionRenderer from './sections/SectionRenderer';
 import TemplateGallery from './TemplateGallery';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
+import { isCatalogClassicFooter } from '../../config/footerVariants';
 import {
   SECTION_TYPE_LABELS,
   SITE_ANNOUNCEMENT_SELECTION_ID,
@@ -66,7 +67,9 @@ interface GridCanvasProps {
   onCookTheme?: () => void;
   onStartBlank?: () => void;
   themeHubMode?: boolean;
+  blankStarted?: boolean;
   onProductPreview?: (product: ProductWithCatalogueData) => void;
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
   /** @deprecated Grid resize kept for API compat; editor uses document stack layout. */
   onUpdateSectionPosition?: (id: string, position: unknown) => void;
 }
@@ -97,7 +100,9 @@ export default function GridCanvas({
   onStartBlank,
   onCookTheme,
   themeHubMode = false,
+  blankStarted = false,
   onProductPreview,
+  onCategoryPreview,
 }: GridCanvasProps) {
   const { openMediaPicker } = useBuilderMedia();
   const { active } = useDndContext();
@@ -107,7 +112,6 @@ export default function GridCanvas({
   const sectionCountRef = useRef(layout.sections.length);
   const [dragState, setDragState] = useState<{ id: string; widthPercent: number } | null>(null);
   const [heightDragState, setHeightDragState] = useState<{ id: string; heightPx: number } | null>(null);
-  const [blankStarted, setBlankStarted] = useState(false);
 
   const sortedSections = useMemo(
     () => [...layout.sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
@@ -121,6 +125,7 @@ export default function GridCanvas({
       !!onApplyTemplate &&
       !blankStarted);
   const showSiteFooter = !!siteSettings && !showTemplatePicker && sortedSections.length > 0;
+  const catalogClassicFooter = !!siteSettings && isCatalogClassicFooter(siteSettings);
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
   const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
@@ -248,7 +253,6 @@ export default function GridCanvas({
       {siteSettings ? (
         <StorefrontSiteHeader
           siteSettings={siteSettings}
-          store={store}
           preview
           onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
           isAnnouncementSelected={isSiteAnnouncementSelected}
@@ -274,10 +278,7 @@ export default function GridCanvas({
               variant="full"
               onApply={onApplyTemplate!}
               onCookTheme={onCookTheme}
-              onStartBlank={() => {
-                setBlankStarted(true);
-                onStartBlank?.();
-              }}
+              onStartBlank={onStartBlank}
             />
           </div>
         </div>
@@ -450,6 +451,7 @@ export default function GridCanvas({
                     editMode={isSelected}
                     builderCanvas
                     onProductPreview={onProductPreview}
+                    onCategoryPreview={onCategoryPreview}
                     selectedFreeformElementId={
                       isFreeform && isSelected ? selectedFreeformElementId : null
                     }
@@ -507,6 +509,8 @@ export default function GridCanvas({
       {showSiteFooter && (
         <div
           className={`sites-editor-footer-preview${
+            catalogClassicFooter ? ' sites-editor-footer-preview--catalog' : ''
+          }${
             siteSettings.footerWidth === 'full' ? ' sites-editor-footer-preview--full' : ''
           }${isSiteFooterSelected ? ' selected' : ''}`}
           role="button"
@@ -533,7 +537,6 @@ export default function GridCanvas({
           <WebsiteFooter
             siteSettings={siteSettings}
             previewMode
-            store={store}
           />
         </div>
       )}

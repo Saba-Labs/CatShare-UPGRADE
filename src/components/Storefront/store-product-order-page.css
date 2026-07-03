@@ -903,13 +903,13 @@
 
   .website-product-runtime .website-breadcrumbs,
   .product-page-layout-mobile .website-product-runtime .website-breadcrumbs {
-    padding: 8px 12px 0;
+    padding: 8px 16px 0;
     font-size: 0.72rem;
   }
 
   .website-product-runtime .sv-product-order-page,
   .product-page-layout-mobile .website-product-runtime .sv-product-order-page {
-    padding: 0 0 8px;
+    padding: 8px 16px 40px;
   }
 
   .website-product-runtime .sv-product-order-media,
@@ -1154,7 +1154,7 @@
   .website-product-runtime .website-product-recommendations,
   .product-page-layout-mobile .website-product-runtime .website-product-recommendations {
     margin-top: 20px;
-    padding: 0 12px 32px;
+    padding: 0 16px 32px;
   }
 
   .website-product-runtime .website-product-recommendations h2,
@@ -1208,12 +1208,12 @@
 }
 
 .product-page-layout-mobile .website-product-runtime .website-breadcrumbs {
-  padding: 8px 12px 0;
+  padding: 8px 16px 0;
   font-size: 0.72rem;
 }
 
 .product-page-layout-mobile .website-product-runtime .sv-product-order-page {
-  padding: 0 0 8px;
+  padding: 8px 16px 40px;
 }
 
 .product-page-layout-mobile .website-product-runtime .sv-product-order-media {
@@ -1420,7 +1420,7 @@
 
 .product-page-layout-mobile .website-product-runtime .website-product-recommendations {
   margin-top: 20px;
-  padding: 0 12px 32px;
+  padding: 0 16px 32px;
 }
 
 .product-page-layout-mobile .website-product-runtime .website-product-recommendations h2 {
@@ -1470,12 +1470,12 @@
 /* Expand real-device mobile block to match container rules */
 @media (max-width: 768px) {
   .website-product-runtime .website-breadcrumbs {
-    padding: 8px 12px 0;
+    padding: 8px 16px 0;
     font-size: 0.72rem;
   }
 
   .website-product-runtime .sv-product-order-page {
-    padding: 0 0 8px;
+    padding: 8px 16px 40px;
   }
 
   .website-product-runtime .sv-product-order-media {
@@ -1585,7 +1585,7 @@
 
   .website-product-runtime .website-product-recommendations {
     margin-top: 20px;
-    padding: 0 12px 32px;
+    padding: 0 16px 32px;
   }
 
   .website-product-runtime .website-product-recommendations h2 {

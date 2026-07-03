@@ -15,7 +15,9 @@ export function buildWebsiteThemeVars(theme?: ThemeSettings): CSSProperties {
   };
   if (t.fontFamily) {
     vars['--site-font'] = t.fontFamily;
-    vars['--site-font-head'] = t.fontFamily;
+    vars['--site-font-head'] = t.headingFontFamily || t.fontFamily;
+  } else if (t.headingFontFamily) {
+    vars['--site-font-head'] = t.headingFontFamily;
   }
   return vars as CSSProperties;
 }

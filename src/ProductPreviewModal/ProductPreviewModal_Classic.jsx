@@ -27,6 +27,7 @@ import {
   getProductPrimaryImageVersion,
   normalizeProductImageFields,
 } from "../utils/productImages";
+import { getProductVideoUrls, shouldUseProductMediaGallery } from "../utils/productGallery";
 import { productImageDisplayUrl } from "../utils/imageUrl";
 import ProductImageGallery from "../components/ProductImageGallery";
 import { useAuth } from "../context/AuthContext";
@@ -548,7 +549,8 @@ export default function ProductPreviewModal_Classic({
         product && typeof product === "object" ? { ...product } : {}
       );
       const multi = getProductImageUrls(p);
-      if (multi.length > 1) {
+      const videos = getProductVideoUrls(p);
+      if (shouldUseProductMediaGallery(multi.length, videos.length)) {
         setMultiGalleryUrls(multi);
         setImageUrl("");
         setImageLoaded(true);
@@ -597,7 +599,7 @@ export default function ProductPreviewModal_Classic({
   }, [product]);
 
   useEffect(() => {
-    if (!multiGalleryUrls || multiGalleryUrls.length <= 1) return;
+    if (multiGalleryUrls === null) return;
     const pi = getPrimaryImageIndex(product) ?? 0;
     setPreviewGallerySlide(
       Math.min(Math.max(0, pi), multiGalleryUrls.length - 1)
@@ -899,10 +901,11 @@ export default function ProductPreviewModal_Classic({
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   </div>
                 )}
-                {multiGalleryUrls && multiGalleryUrls.length > 1 ? (
+                {multiGalleryUrls !== null ? (
                   <div style={{ width: "100%", height: "100%", position: "relative" }}>
                     <ProductImageGallery
                       urls={multiGalleryUrls}
+                      videoUrls={getProductVideoUrls(product)}
                       primaryIndex={getPrimaryImageIndex(product)}
                       primaryImageVersion={product.imageVersion}
                       className="h-full"

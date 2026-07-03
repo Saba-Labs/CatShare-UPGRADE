@@ -130,6 +130,23 @@ export function collectionPagePath(slug: string, onSubdomain = false): string {
   return `${storePathPrefix(slug, onSubdomain)}/collections/all`;
 }
 
+export function collectionCategoryPagePath(
+  slug: string,
+  categoryId: string,
+  onSubdomain = false
+): string {
+  const base = collectionPagePath(slug, onSubdomain);
+  const id = String(categoryId).trim();
+  if (!id) return base;
+  return `${base}?category=${encodeURIComponent(id)}`;
+}
+
+/** True when pathname is a storefront collection listing route. */
+export function parseStorefrontCollectionRoute(pathname: string, onSubdomain = false): boolean {
+  const pageSegments = storefrontPageSegments(pathname, onSubdomain);
+  return pageSegments[0] === 'collections';
+}
+
 export function checkoutDetailsPath(slug: string, onSubdomain = false): string {
   return `${storePathPrefix(slug, onSubdomain)}/checkout/details`;
 }

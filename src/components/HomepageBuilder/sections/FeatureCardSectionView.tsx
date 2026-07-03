@@ -96,15 +96,17 @@ export default function FeatureCardSectionView({
                 {content.description}
               </p>
               {content.buttonText && (
-                <span
-                  className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
-                  style={buttonStyles}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
-                >
-                  {content.buttonText}
-                </span>
+                <div className="button-group">
+                  <span
+                    className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+                    style={buttonStyles}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
+                  >
+                    {content.buttonText}
+                  </span>
+                </div>
               )}
             </>
           ) : (

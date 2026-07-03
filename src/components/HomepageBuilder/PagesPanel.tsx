@@ -1,25 +1,30 @@
 import { WebsiteModeConfig } from '../../types/homepage';
 import SidebarSection from './SidebarSection';
-import { FiChevronDown, FiChevronUp, FiFile, FiHome, FiPlus, FiTrash2 } from './builderSidebarIcons';
+import { FiChevronDown, FiChevronUp, FiFile, FiGrid, FiHome, FiPlus, FiTrash2 } from './builderSidebarIcons';
 
 interface PagesPanelProps {
   websiteConfig: WebsiteModeConfig;
   editingPageId: string;
+  previewCategoryId?: string | null;
   onUpdateWebsiteConfig: (updates: Partial<WebsiteModeConfig>) => void;
   onSelectEditingPage: (pageId: string) => void;
   onAddPage: () => void;
   onRemovePage: (pageId: string) => void;
+  onOpenShopCatalog?: () => void;
 }
 
 export default function PagesPanel({
   websiteConfig,
   editingPageId,
+  previewCategoryId = null,
   onUpdateWebsiteConfig,
   onSelectEditingPage,
   onAddPage,
   onRemovePage,
+  onOpenShopCatalog,
 }: PagesPanelProps) {
   const customPages = websiteConfig.pages.custom || [];
+  const shopCatalogActive = previewCategoryId != null;
 
   return (
     <div className="sidebar-panel">
@@ -36,9 +41,9 @@ export default function PagesPanel({
         <div className="pages-list">
           <button
             type="button"
-            className={`page-list-item ${editingPageId === 'home' ? 'active' : ''}`}
+            className={`page-list-item ${editingPageId === 'home' && !shopCatalogActive ? 'active' : ''}`}
             onClick={() => onSelectEditingPage('home')}
-            title="Home — default landing page"
+            title="Home — your marketing cover page"
           >
             <span className="page-list-icon" aria-hidden>
               <FiHome />
@@ -46,8 +51,24 @@ export default function PagesPanel({
             <span className="page-list-label">Home</span>
             <span className="page-list-badge">★</span>
           </button>
+
+          {onOpenShopCatalog ? (
+            <button
+              type="button"
+              className={`page-list-item ${shopCatalogActive ? 'active' : ''}`}
+              onClick={onOpenShopCatalog}
+              title="Shop catalog — built-in category pages with your full product list"
+            >
+              <span className="page-list-icon" aria-hidden>
+                <FiGrid />
+              </span>
+              <span className="page-list-label">Shop catalog</span>
+              <span className="page-list-badge page-list-badge--builtin">Built-in</span>
+            </button>
+          ) : null}
+
           {customPages.map((page, index) => (
-            <div key={page.id} className={`page-list-item-wrap ${editingPageId === page.id ? 'active' : ''}`}>
+            <div key={page.id} className={`page-list-item-wrap ${editingPageId === page.id && !shopCatalogActive ? 'active' : ''}`}>
               <button
                 type="button"
                 className="page-list-item"
@@ -93,6 +114,11 @@ export default function PagesPanel({
             </div>
           ))}
         </div>
+
+        <p className="panel-hint" style={{ marginTop: 12 }}>
+          Home is your custom storefront cover. <strong>Shop catalog</strong> is always underneath — category
+          pages show your full product list with search, filters, and ordering.
+        </p>
       </SidebarSection>
     </div>
   );
@@ -113,4 +139,3 @@ function reorderPage(
   pages.splice(next, 0, moved);
   onUpdateWebsiteConfig({ pages: { ...websiteConfig.pages, custom: pages } });
 }
-

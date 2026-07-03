@@ -3,6 +3,7 @@ import { HomepageSection, ProductGridSection } from '../../../types/homepage';
 import CategoryPicker from './catalogue/CategoryPicker';
 import ProductPicker from './catalogue/ProductPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
+import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
 
 type GridSource = 'all' | 'category' | 'specific';
 
@@ -103,10 +104,7 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
         <SidebarDropdownField
           ariaLabel="Product card style"
           value={settings.cardStyle || 'boxed'}
-          options={[
-            { value: 'boxed', label: 'Boxed' },
-            { value: 'minimal', label: 'Minimal' },
-          ]}
+          options={PRODUCT_CARD_STYLE_OPTIONS}
           onChange={(next) => updateSettings({ cardStyle: next as NonNullable<ProductGridSection['settings']['cardStyle']> })}
         />
       </div>

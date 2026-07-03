@@ -103,6 +103,19 @@ export function footerLayoutForVariant(variant: WebsiteFooterVariant): FooterLay
   }
 }
 
+/** Classic bar uses info cards only — Shop/Legal link columns belong to other layouts. */
+export function footerShowsLinkColumns(variant: WebsiteFooterVariant): boolean {
+  return footerLayoutForVariant(variant) !== 'info-cards';
+}
+
+/** Order-link catalog footer: classic info cards in a boxed card (not full-width shop footer). */
+export function isCatalogClassicFooter(siteSettings: WebsiteSiteSettings): boolean {
+  return (
+    footerLayoutForVariant(siteSettings.footerVariant || 'classic') === 'info-cards' &&
+    siteSettings.footerWidth !== 'full'
+  );
+}
+
 /** Layout structure and section visibility only — colors stay in the Colors panel. */
 export function footerPresetForVariant(variant: WebsiteFooterVariant): Partial<WebsiteSiteSettings> {
   const layout = footerLayoutForVariant(variant);
@@ -200,5 +213,11 @@ export function footerVariantForTemplate(templateId: string): WebsiteFooterVaria
   if (templateId === 'pulse-tech') return 'pulse';
   if (templateId === 'clean-market') return 'clean';
   if (templateId === 'studio-commerce') return 'clean';
+  if (templateId === 'default-store') return 'classic';
+  if (templateId === 'fashion-wardrobe' || templateId === 'fashion-boutique-list') return 'classic';
+  if (templateId === 'fashion-linen' || templateId === 'jewel-pearl') return 'clean';
+  if (templateId === 'fashion-runway' || templateId === 'jewel-apex') return 'pulse';
+  if (templateId === 'fashion-maharani' || templateId === 'jewel-royal') return 'aurora';
+  if (templateId === 'jewel-tray' || templateId === 'jewel-counter') return 'classic';
   return 'classic';
 }

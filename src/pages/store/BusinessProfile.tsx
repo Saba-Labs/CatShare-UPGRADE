@@ -10,6 +10,7 @@ import {
   parseBusinessProfile,
   type BusinessProfile as BusinessProfileData,
 } from '../../config/businessProfile';
+import { BUSINESS_PROFILE_UPDATED_EVENT, writeCachedBusinessProfile } from '../../utils/businessProfileStorefront';
 import StoreLayout, { STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS } from './components/StoreLayout';
 import StoreSaveBar from './components/StoreSaveBar';
 import PageHeader from './components/PageHeader';
@@ -24,26 +25,14 @@ function loadBusinessProfileFromCache(
   userSettings: Parameters<typeof businessProfileFromUserSettings>[0]
 ): BusinessProfileData {
   const fromSettings = businessProfileFromUserSettings(userSettings);
-  const hasDetail = [
-    fromSettings.businessName,
-    fromSettings.address,
-    fromSettings.email,
-    fromSettings.phone,
-    fromSettings.website,
-    fromSettings.logoUrl,
-    fromSettings.about,
-    fromSettings.description,
-  ].some((s) => typeof s === 'string' && s.trim().length > 0);
-
-  if (hasDetail) return fromSettings;
-
+  let fromLocal = EMPTY_BUSINESS_PROFILE;
   try {
     const raw = localStorage.getItem('businessProfile');
-    if (raw) return parseBusinessProfile(JSON.parse(raw));
+    if (raw) fromLocal = parseBusinessProfile(JSON.parse(raw));
   } catch {
     /* ignore */
   }
-  return fromSettings;
+  return { ...fromSettings, ...fromLocal };
 }
 
 export default function BusinessProfile() {
@@ -70,6 +59,16 @@ export default function BusinessProfile() {
   }, [loadProfile]);
 
   const hasChanges = JSON.stringify(profile) !== JSON.stringify(originalProfile);
+
+  useEffect(() => {
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<BusinessProfileData>).detail;
+      if (detail) setProfile(detail);
+    };
+    window.addEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(BUSINESS_PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, []);
+
   const canSave = hasChanges && !saving && !logoUploading;
 
   useEffect(() => {
@@ -83,7 +82,11 @@ export default function BusinessProfile() {
   }, [hasChanges]);
 
   const updateProfile = (patch: Partial<BusinessProfileData>) => {
-    setProfile((prev) => ({ ...prev, ...patch }));
+    setProfile((prev) => {
+      const next = { ...prev, ...patch };
+      writeCachedBusinessProfile(next);
+      return next;
+    });
   };
 
   const handleLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +141,8 @@ export default function BusinessProfile() {
     } catch {
       /* ignore */
     }
+
+    writeCachedBusinessProfile(profile);
 
     await refreshSupabaseData();
     const strictOnline = localStorage.getItem('strictOnlineMode::device') === 'true';

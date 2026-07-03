@@ -2,6 +2,7 @@ import React from 'react';
 import { FeaturedProductsSection, HomepageSection } from '../../../types/homepage';
 import ProductPicker from './catalogue/ProductPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
+import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
 
 interface FeaturedProductsEditorProps {
   section: FeaturedProductsSection & { id: string };
@@ -44,10 +45,7 @@ export default function FeaturedProductsEditor({ section, onUpdate }: FeaturedPr
         <SidebarDropdownField
           ariaLabel="Featured product card style"
           value={settings.cardStyle || 'boxed'}
-          options={[
-            { value: 'boxed', label: 'Boxed' },
-            { value: 'minimal', label: 'Minimal' },
-          ]}
+          options={PRODUCT_CARD_STYLE_OPTIONS}
           onChange={(next) => updateSettings({ cardStyle: next as NonNullable<FeaturedProductsSection['settings']['cardStyle']> })}
         />
       </div>

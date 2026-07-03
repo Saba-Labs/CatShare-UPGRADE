@@ -39,6 +39,22 @@ export function deriveStoreCategories(products: ProductWithCatalogueData[]): Sto
   return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
 }
 
+/** Match URL `?category=` value to a product category label when possible. */
+export function resolveStoreCategoryParam(
+  param: string | null | undefined,
+  availableCategories: string[]
+): string {
+  const raw = param?.trim();
+  if (!raw) return 'all';
+  const target = raw.toLowerCase();
+  const match = availableCategories.find((c) => c.toLowerCase() === target);
+  return match ?? raw;
+}
+
+export function storeCategoriesMatch(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 /** Products belonging to a given category id (case-insensitive match). */
 export function productsInCategory(
   products: ProductWithCatalogueData[],

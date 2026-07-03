@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { TextSection } from '../../../types/homepage';
 import './TextSection.css';
 
@@ -10,6 +10,26 @@ interface TextSectionViewProps {
 
 export default function TextSectionView({ section, editMode, onUpdateSection }: TextSectionViewProps) {
   const { settings, content } = section;
+  const editableRef = useRef<HTMLDivElement>(null);
+  const isFocusedRef = useRef(false);
+
+  const syncDomFromProp = useCallback(() => {
+    const el = editableRef.current;
+    if (!el || isFocusedRef.current) return;
+    const next = content.text || '';
+    if (el.textContent !== next) {
+      el.textContent = next;
+    }
+  }, [content.text]);
+
+  useEffect(() => {
+    syncDomFromProp();
+  }, [syncDomFromProp, editMode]);
+
+  const commitText = (text: string) => {
+    if (text === content.text) return;
+    onUpdateSection?.({ content: { text } });
+  };
 
   return (
     <div
@@ -22,17 +42,24 @@ export default function TextSectionView({ section, editMode, onUpdateSection }: 
     >
       {editMode && onUpdateSection ? (
         <div
+          ref={editableRef}
           className="text-section__body sites-inline-editable"
+          style={{ textAlign: settings.alignment as React.CSSProperties['textAlign'] }}
           contentEditable
           suppressContentEditableWarning
-          onBlur={(e) =>
-            onUpdateSection({
-              content: { text: e.currentTarget.textContent || '' },
-            })
-          }
-        >
-          {content.text}
-        </div>
+          role="textbox"
+          aria-multiline="true"
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={(e) => {
+            isFocusedRef.current = false;
+            commitText(e.currentTarget.textContent || '');
+          }}
+          onInput={(e) => {
+            commitText(e.currentTarget.textContent || '');
+          }}
+        />
       ) : (
         <p className="text-section__body">{content.text}</p>
       )}

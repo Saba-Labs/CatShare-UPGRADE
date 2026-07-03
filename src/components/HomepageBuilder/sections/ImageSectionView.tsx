@@ -28,6 +28,18 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
       : settings.alignment === 'right'
         ? 'image-section--align-right'
         : 'image-section--align-center';
+  const verticalAlignClass =
+    settings.verticalAlignment === 'center'
+      ? 'image-section--valign-center'
+      : settings.verticalAlignment === 'bottom'
+        ? 'image-section--valign-bottom'
+        : 'image-section--valign-top';
+  const imageObjectPosition =
+    settings.alignment === 'left'
+      ? 'left center'
+      : settings.alignment === 'right'
+        ? 'right center'
+        : 'center center';
 
   const openPicker = () => {
     if (!media || !storeId || !onUpdateSection) return;
@@ -40,8 +52,8 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
   };
 
   return (
-    <div className={`image-section ${alignClass}`}>
-      <div className={widthClass}>
+    <div className={`image-section ${alignClass} ${verticalAlignClass}`}>
+      <div className={`image-section__inner ${widthClass}`}>
         {content.url ? (
           <figure className="image-section__figure">
             <img
@@ -49,6 +61,8 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
               alt={content.alt}
               style={{
                 width: '100%',
+                objectFit: 'cover',
+                objectPosition: imageObjectPosition,
                 borderRadius: settings.rounded ? '8px' : '0',
                 boxShadow: settings.shadow ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
                 cursor: editMode && media ? 'pointer' : undefined,

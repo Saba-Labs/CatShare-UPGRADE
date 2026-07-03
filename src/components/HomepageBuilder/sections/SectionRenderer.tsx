@@ -36,6 +36,7 @@ interface SectionRendererProps {
   onUpdateSection?: (updates: Partial<HomepageSection>) => void;
   builderCanvas?: boolean;
   onProductPreview?: (product: ProductWithCatalogueData) => void;
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
 }
 
 export default function SectionRenderer({
@@ -50,8 +51,18 @@ export default function SectionRenderer({
   onUpdateSection,
   builderCanvas = false,
   onProductPreview,
+  onCategoryPreview,
 }: SectionRendererProps) {
-  const commonProps = { section, theme, storeId, editMode, onUpdateSection, builderCanvas, onProductPreview };
+  const commonProps = {
+    section,
+    theme,
+    storeId,
+    editMode,
+    onUpdateSection,
+    builderCanvas,
+    onProductPreview,
+    onCategoryPreview,
+  };
 
   switch (section.type) {
     case 'carousel':

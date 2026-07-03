@@ -7,8 +7,16 @@ import {
   FOOTER_COLUMN_PRESETS,
   FOOTER_VARIANT_OPTIONS,
   footerPresetForVariant,
+  footerShowsLinkColumns,
 } from '../../config/footerVariants';
 import type { WebsiteFooterVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
+import {
+  getLinkedBrandDisplay,
+  useLinkedBusinessProfile,
+  withLinkedTaglinePatch,
+} from '../../hooks/useLinkedBusinessProfile';
+import { syncSiteSettingsPatchToBusinessProfile, patchCachedBusinessProfile } from '../../utils/businessProfileStorefront';
+import type { BusinessProfile } from '../../config/businessProfile';
 
 interface FooterSettingsEditorProps {
   siteSettings: WebsiteSiteSettings;
@@ -27,11 +35,19 @@ export default function FooterSettingsEditor({
 }: FooterSettingsEditorProps) {
   const variant = siteSettings.footerVariant || 'classic';
   const columns = siteSettings.footerColumns || [];
+  const businessProfile = useLinkedBusinessProfile();
+  const brand = getLinkedBrandDisplay(siteSettings, businessProfile);
 
   const patch = (patchSettings: Partial<WebsiteSiteSettings>) => {
+    const linked = withLinkedTaglinePatch(patchSettings);
+    syncSiteSettingsPatchToBusinessProfile(linked);
     onUpdateWebsiteConfig({
-      siteSettings: { ...websiteConfig.siteSettings, ...patchSettings },
+      siteSettings: { ...websiteConfig.siteSettings, ...linked },
     });
+  };
+
+  const patchProfile = (patchSettings: Partial<BusinessProfile>) => {
+    patchCachedBusinessProfile(patchSettings);
   };
 
   /** Layout/toggles only — custom colors are kept unless user resets them. */
@@ -87,10 +103,11 @@ export default function FooterSettingsEditor({
 
       <div className="sidebar-field">
         <label className="panel-label">Tagline</label>
+        <p className="panel-hint">Same as Business Profile → Short about / tagline (and header hero tagline).</p>
         <textarea
           className="panel-input"
           rows={2}
-          value={siteSettings.footerDescription || ''}
+          value={brand.footerDescription}
           placeholder="Short line under your store name"
           onChange={(e) => patch({ footerDescription: e.target.value })}
         />
@@ -119,12 +136,19 @@ export default function FooterSettingsEditor({
         <h3>Contact overrides</h3>
       </div>
       <p className="panel-hint">Leave blank to use your business profile. These appear in the footer cards.</p>
+      <p className="panel-hint">
+        Edit all contact details in{' '}
+        <a href="/store/business" className="panel-hint-link">
+          Business Profile
+        </a>
+        .
+      </p>
       <div className="sidebar-panel-section">
         <label className="panel-label">Address</label>
         <textarea
           className="panel-input"
           rows={2}
-          value={siteSettings.footerLocationText || ''}
+          value={brand.footerLocationText}
           placeholder="From business profile"
           onChange={(e) => patch({ footerLocationText: e.target.value })}
         />
@@ -133,7 +157,7 @@ export default function FooterSettingsEditor({
         <label className="panel-label">Phone</label>
         <input
           className="panel-input"
-          value={siteSettings.footerPhoneText || ''}
+          value={brand.footerPhoneText}
           placeholder="From business profile"
           onChange={(e) => patch({ footerPhoneText: e.target.value })}
         />
@@ -142,9 +166,53 @@ export default function FooterSettingsEditor({
         <label className="panel-label">Email</label>
         <input
           className="panel-input"
-          value={siteSettings.footerEmailText || ''}
+          value={brand.footerEmailText}
           placeholder="From business profile"
           onChange={(e) => patch({ footerEmailText: e.target.value })}
+        />
+      </div>
+
+      <div className="sidebar-panel-divider" />
+      <div className="sidebar-panel-header">
+        <h3>Social links</h3>
+      </div>
+      <p className="panel-hint">
+        Linked to Business Profile → Social Links. Updates the Follow section in the preview.
+      </p>
+      <div className="sidebar-panel-section">
+        <label className="panel-label">Instagram</label>
+        <input
+          className="panel-input"
+          value={brand.instagram}
+          placeholder="https://instagram.com/yourstore"
+          onChange={(e) => patchProfile({ instagram: e.target.value.trim() })}
+        />
+      </div>
+      <div className="sidebar-panel-section">
+        <label className="panel-label">Facebook</label>
+        <input
+          className="panel-input"
+          value={brand.facebook}
+          placeholder="https://facebook.com/yourstore"
+          onChange={(e) => patchProfile({ facebook: e.target.value.trim() })}
+        />
+      </div>
+      <div className="sidebar-panel-section">
+        <label className="panel-label">Twitter / X</label>
+        <input
+          className="panel-input"
+          value={brand.twitter}
+          placeholder="https://x.com/yourstore"
+          onChange={(e) => patchProfile({ twitter: e.target.value.trim() })}
+        />
+      </div>
+      <div className="sidebar-panel-section">
+        <label className="panel-label">Website</label>
+        <input
+          className="panel-input"
+          value={brand.website}
+          placeholder="https://"
+          onChange={(e) => patchProfile({ website: e.target.value.trim() })}
         />
       </div>
 
@@ -171,6 +239,8 @@ export default function FooterSettingsEditor({
         </div>
       ))}
 
+      {footerShowsLinkColumns(variant) ? (
+        <>
       <div className="sidebar-panel-divider" />
       <div className="sidebar-panel-header">
         <h3>Link columns</h3>
@@ -299,6 +369,13 @@ export default function FooterSettingsEditor({
           </button>
         </div>
       ))}
+
+        </>
+      ) : (
+        <p className="panel-hint panel-hint--static">
+          Classic bar shows Location, Contact, Store info, and Follow cards — not Shop/Legal link columns. Switch to Link columns, Centered, or Split to add menu links.
+        </p>
+      )}
 
       <p className="panel-hint panel-hint--static">
         “Powered by CatShare” always appears at the bottom of your site footer and links to catshare.app. It cannot be removed or edited.

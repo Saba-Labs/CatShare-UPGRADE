@@ -12,7 +12,7 @@ export default function HomePageRuntime({ layout }: HomePageRuntimeProps) {
     <main style={{ background: layout.theme?.backgroundColor || '#ffffff', color: layout.theme?.textColor || '#111827' }}>
       {sections.map((section) => (
         <div key={section.id} style={getBlockRowStyle(section.blockLayout)}>
-          <div style={getBlockInnerStyleForLive(section.blockLayout)}>
+          <div style={getBlockInnerStyleForLive(section.blockLayout, section.type)}>
             <SectionRenderer section={section} theme={layout.theme} editMode={false} />
           </div>
         </div>

@@ -15,7 +15,7 @@ import ContentGridSectionEditor from './editors/ContentGridSectionEditor';
 import FreeformSectionEditor from './editors/FreeformSectionEditor';
 import type { FreeformSection } from '../../types/homepage';
 import FooterSettingsEditor from './FooterSettingsEditor';
-import SectionStyleControls from './SectionStyleControls';
+import SectionStyleControls, { sectionHasStyleControls } from './SectionStyleControls';
 import SidebarSection from './SidebarSection';
 import { FiArrowLeft, FiDroplet, FiSliders, SECTION_ICONS } from './builderSidebarIcons';
 
@@ -68,7 +68,7 @@ export default function SectionQuickPanel({
         </div>
       </div>
 
-      {section.type !== 'footer' && section.type !== 'freeform' && (
+      {section.type !== 'footer' && section.type !== 'freeform' && sectionHasStyleControls(section.type) && (
         <SidebarSection title="Style" icon={<FiDroplet />} description="Spacing, colors & layout">
           <SectionStyleControls section={section} onUpdate={onUpdate} />
         </SidebarSection>

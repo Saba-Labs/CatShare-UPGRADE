@@ -1,6 +1,9 @@
 // Homepage Builder Types
 
 import type { DefaultSorting } from './storeBehaviorSettings';
+import type { ProductCardStyle } from '../utils/productCardStyles';
+
+export type { ProductCardStyle };
 
 export type HomepageSectionType =
   | 'carousel'
@@ -66,6 +69,7 @@ export interface ImageSection {
   settings: {
     width: 'small' | 'medium' | 'large' | 'full';
     alignment: 'left' | 'center' | 'right';
+    verticalAlignment?: 'top' | 'center' | 'bottom';
     rounded: boolean;
     shadow: boolean;
     link?: string;
@@ -100,7 +104,7 @@ export interface FeaturedProductsSection {
     /** list/slider are legacy values kept for backward compatibility. */
     displayMode: 'grid' | 'carousel' | 'list' | 'slider';
     columns: 1 | 2 | 3 | 4 | 5 | 6;
-    cardStyle?: 'minimal' | 'boxed';
+    cardStyle?: ProductCardStyle;
     /** Responsive card density; layout auto-fits by viewport width. */
     cardSize?: 'sm' | 'md' | 'lg';
     itemsPerPage: number;
@@ -124,9 +128,14 @@ export interface CategoryShowcaseSection {
   type: 'category-showcase';
   settings: {
     title: string;
+    /** Legacy scroll-row density; tile width now comes from cardSize. */
     columns: 2 | 3 | 4 | 5 | 6;
     /** How category tiles are arranged. */
     layout: 'grid' | 'list' | 'carousel';
+    /** Scroll-row navigation controls. */
+    navigation?: 'dots' | 'arrows' | 'both' | 'none';
+    /** Align tiles when the row or grid is not full. */
+    tilesAlign?: 'left' | 'center' | 'right';
     backgroundColor?: string;
     showCount: boolean;
     /** Card surface treatment. */
@@ -134,7 +143,7 @@ export interface CategoryShowcaseSection {
     /** Outer shape of each tile. */
     cardShape?: 'rounded' | 'sharp' | 'pill' | 'circle';
     /** Overall tile scale (image area height). */
-    cardSize?: 'sm' | 'md' | 'lg' | 'xl';
+    cardSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     /** Image frame proportions (ignored for circle tiles in grid). */
     imageRatio?: '1:1' | '4:3' | '3:4' | '16:9' | '2:3';
     imageFit?: 'cover' | 'contain';
@@ -162,7 +171,7 @@ export interface ProductGridSection {
     columns: 1 | 2 | 3 | 4 | 5 | 6;
     /** list is a legacy value kept for backward compatibility. */
     displayMode: 'grid' | 'carousel' | 'list';
-    cardStyle?: 'minimal' | 'boxed';
+    cardStyle?: ProductCardStyle;
     /** Responsive card density; layout auto-fits by viewport width. */
     cardSize?: 'sm' | 'md' | 'lg';
     sortBy: 'default' | 'alphabetical' | 'price-low' | 'price-high' | 'newest';
@@ -188,6 +197,7 @@ export interface FullProductListSection {
     showCategoryFilters: boolean;
     showSort: boolean;
     viewMode: 'list' | 'grid';
+    cardStyle?: ProductCardStyle;
     productImageRatio: 'square' | 'portrait' | 'landscape';
     showPrice: boolean;
     showAvailability: boolean;
@@ -204,6 +214,9 @@ export interface AnnouncementSection {
     textColor?: string;
     icon?: 'info' | 'warning' | 'success' | 'none';
     dismissible: boolean;
+    animation?: 'none' | 'marquee' | 'pulse';
+    alignment?: 'left' | 'center' | 'right';
+    fontSize?: 'small' | 'medium' | 'large';
   };
   content: {
     message: string;
@@ -482,6 +495,8 @@ export interface ThemeSettings {
   backgroundColor?: string;
   textColor?: string;
   fontFamily?: string;
+  /** Display / heading font (e.g. DM Serif Display on classic catalog stores). */
+  headingFontFamily?: string;
   accentColor?: string;
   buttonStyle?: 'solid' | 'outline' | 'soft';
 }
@@ -605,8 +620,14 @@ export interface WebsiteSiteSettings {
 export interface WebsiteCollectionTemplate {
   showFilters: boolean;
   showSort: boolean;
+  showSearch?: boolean;
   columns: 2 | 3 | 4;
-  cardsStyle: 'minimal' | 'boxed';
+  cardsStyle: ProductCardStyle;
+  viewMode?: 'list' | 'grid';
+  productImageRatio?: 'square' | 'portrait' | 'landscape';
+  showPrice?: boolean;
+  showAvailability?: boolean;
+  defaultSorting?: DefaultSorting;
 }
 
 export interface WebsiteProductTemplate {
@@ -653,7 +674,17 @@ export type WebsiteActiveTemplateId =
   | 'pulse-tech'
   | 'clean-market'
   | 'studio-commerce'
-  | 'default-store';
+  | 'default-store'
+  | 'fashion-wardrobe'
+  | 'fashion-boutique-list'
+  | 'fashion-linen'
+  | 'fashion-runway'
+  | 'fashion-maharani'
+  | 'jewel-tray'
+  | 'jewel-counter'
+  | 'jewel-pearl'
+  | 'jewel-apex'
+  | 'jewel-royal';
 
 export interface WebsiteModeConfig {
   siteSettings: WebsiteSiteSettings;

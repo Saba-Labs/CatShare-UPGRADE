@@ -12,7 +12,20 @@ export function mergeSectionUpdate(
   section: LayoutSection,
   updates: Partial<HomepageSection>
 ): LayoutSection {
-  return { ...section, ...updates } as LayoutSection;
+  const merged = { ...section, ...updates } as LayoutSection;
+  if (updates.settings) {
+    merged.settings = {
+      ...(section.settings && typeof section.settings === 'object' ? section.settings : {}),
+      ...updates.settings,
+    };
+  }
+  if (updates.content) {
+    merged.content = {
+      ...(section.content && typeof section.content === 'object' ? section.content : {}),
+      ...updates.content,
+    };
+  }
+  return merged;
 }
 
 export function commitInlineText(
@@ -33,22 +46,30 @@ export function layoutsShallowEqual(a: HomepageLayout, b: HomepageLayout): boole
   }
 }
 
+function eventTargetElement(target: EventTarget | null): Element | null {
+  if (target instanceof Element) return target;
+  if (target instanceof Text && target.parentElement) return target.parentElement;
+  return null;
+}
+
 /** Stop canvas deselect when interacting with inline editor fields. */
 export function isBuilderEditInteractionTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
+  const el = eventTargetElement(target);
+  if (!el) return false;
   return Boolean(
-    target.closest(
-      '.sites-inline-editable, [contenteditable="true"], input, textarea, select, button, a, .sidebar-dropdown, .sites-floating-toolbar'
+    el.closest(
+      '.sites-inline-editable, [contenteditable="true"], input, textarea, select, button, a, .sidebar-dropdown, .sites-floating-toolbar, .sites-resize-handle, .carousel-section__arrow, .carousel-section__dot, .cat-showcase-scroll__dot, .website-carousel-nav-btn'
     )
   );
 }
 
 /** Regions that should keep the current section selection when clicked. */
 export function isBuilderSectionChromeTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
+  const el = eventTargetElement(target);
+  if (!el) return false;
   return Boolean(
-    target.closest(
-      '.sites-document-block, .sites-section-drag-grip, .sites-editor-footer-preview, .storefront-site-header, .sites-editor-header-preview, .builder-product-overlay__toolbar'
+    el.closest(
+      '.sites-document-block, .sites-section-drag-grip, .sites-resize-handle, .sites-editor-footer-preview, .storefront-site-header, .sites-editor-header-preview, .builder-product-overlay__toolbar'
     )
   );
 }

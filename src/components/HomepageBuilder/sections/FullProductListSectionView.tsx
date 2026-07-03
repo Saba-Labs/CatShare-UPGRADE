@@ -2,6 +2,7 @@ import type { FullProductListSection } from '../../../types/homepage';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
 import CollectionPageRuntime from '../../WebsiteBuilder/pages/CollectionPageRuntime';
+import { normalizeProductCardStyle } from '../../../utils/productCardStyles';
 
 interface FullProductListSectionViewProps {
   section: FullProductListSection & { id: string };
@@ -59,6 +60,7 @@ export default function FullProductListSectionView({
         showCategoryFilters={settings.showCategoryFilters ?? true}
         showSort={settings.showSort ?? true}
         viewMode={settings.viewMode ?? 'list'}
+        cardsStyle={normalizeProductCardStyle(settings.cardStyle)}
         productImageRatio={settings.productImageRatio ?? 'square'}
         showPrice={settings.showPrice ?? true}
         showAvailability={settings.showAvailability ?? true}

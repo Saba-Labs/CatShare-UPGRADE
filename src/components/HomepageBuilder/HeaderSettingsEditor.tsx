@@ -10,6 +10,12 @@ import {
   headerPresetForVariant,
 } from '../../config/headerVariants';
 import type { WebsiteHeaderVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
+import {
+  getLinkedBrandDisplay,
+  useLinkedBusinessProfile,
+  withLinkedTaglinePatch,
+} from '../../hooks/useLinkedBusinessProfile';
+import { syncSiteSettingsPatchToBusinessProfile } from '../../utils/businessProfileStorefront';
 import { FiChevronDown, FiChevronUp, FiLink, FiPlus, FiTrash2, FiType } from './builderSidebarIcons';
 
 interface HeaderSettingsEditorProps {
@@ -27,10 +33,14 @@ export default function HeaderSettingsEditor({
 }: HeaderSettingsEditorProps) {
   const variant = siteSettings.headerVariant || 'classic';
   const navItems = siteSettings.navItems || [];
+  const businessProfile = useLinkedBusinessProfile();
+  const brand = getLinkedBrandDisplay(siteSettings, businessProfile);
 
   const patch = (patchSettings: Partial<WebsiteSiteSettings>) => {
+    const linked = withLinkedTaglinePatch(patchSettings);
+    syncSiteSettingsPatchToBusinessProfile(linked);
     onUpdateWebsiteConfig({
-      siteSettings: { ...websiteConfig.siteSettings, ...patchSettings },
+      siteSettings: { ...websiteConfig.siteSettings, ...linked },
     });
   };
 
@@ -58,13 +68,20 @@ export default function HeaderSettingsEditor({
       <div className="sidebar-panel-header">
         <h3>Brand</h3>
       </div>
+      <p className="panel-hint">
+        Linked to{' '}
+        <a href="/store/business" className="panel-hint-link">
+          Business Profile
+        </a>
+        . Changes here update your profile and storefront header.
+      </p>
       <div className="sidebar-field sidebar-field--inline">
         <span className="field-icon" title="Site name">
           <FiType aria-hidden />
         </span>
         <input
           className="panel-input panel-input--grow"
-          value={siteSettings.websiteName || ''}
+          value={brand.websiteName}
           placeholder="Site name"
           onChange={(e) => patch({ websiteName: e.target.value })}
           aria-label="Site name"
@@ -74,7 +91,7 @@ export default function HeaderSettingsEditor({
         storeId={storeId}
         assetKey="site-logo"
         label="Logo"
-        currentUrl={siteSettings.logoUrl}
+        currentUrl={brand.logoUrl || siteSettings.logoUrl}
         onUrl={(url) => patch({ logoUrl: url })}
       />
 
@@ -84,12 +101,13 @@ export default function HeaderSettingsEditor({
           <div className="sidebar-panel-header">
             <h3>Store hero text</h3>
           </div>
+          <p className="panel-hint">Same as Business Profile → Short about / tagline and Full description.</p>
           <div className="sidebar-field">
             <label className="panel-label">Tagline</label>
             <textarea
               className="panel-input panel-input--textarea"
               rows={2}
-              value={siteSettings.headerTagline || ''}
+              value={brand.headerTagline}
               placeholder="Short intro under your store name"
               onChange={(e) => patch({ headerTagline: e.target.value })}
             />
@@ -99,7 +117,7 @@ export default function HeaderSettingsEditor({
             <textarea
               className="panel-input panel-input--textarea"
               rows={3}
-              value={siteSettings.headerAbout || ''}
+              value={brand.headerAbout}
               placeholder="Optional longer text (up to 3 lines on the site)"
               onChange={(e) => patch({ headerAbout: e.target.value })}
             />

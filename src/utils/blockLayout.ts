@@ -55,8 +55,16 @@ export function getBlockInnerStyle(blockLayout?: BlockLayout): CSSProperties {
   return style;
 }
 
-/** Live storefront — width/align only; section height follows content (heightPx is editor canvas only). */
-export function getBlockInnerStyleForLive(blockLayout?: BlockLayout): CSSProperties {
+/** Live storefront — width/align only; image blocks keep editor frame height when set. */
+export function getBlockInnerStyleForLive(
+  blockLayout?: BlockLayout,
+  sectionType?: string
+): CSSProperties {
   const widthPercent = getBlockWidthPercent(blockLayout);
-  return { width: `${widthPercent}%`, maxWidth: '100%' };
+  const style: CSSProperties = { width: `${widthPercent}%`, maxWidth: '100%' };
+  if (sectionType === 'image' && blockLayout?.heightPx) {
+    style.height = `${clampBlockHeight(blockLayout.heightPx)}px`;
+    style.overflow = 'hidden';
+  }
+  return style;
 }

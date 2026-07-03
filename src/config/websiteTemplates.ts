@@ -1,19 +1,15 @@
 import { v4 as uuid } from 'uuid';
 import { createDefaultFooterLinkColumns, footerPresetForVariant } from './footerVariants';
+import { INDUSTRY_WEBSITE_TEMPLATES } from './industryWebsiteTemplates';
 import { headerVariantForTemplate } from './headerVariants';
+import type { TemplateIndustry, WebsiteTemplateId } from './websiteTemplateIds';
+export type { TemplateIndustry, WebsiteTemplateId } from './websiteTemplateIds';
 import type {
   HomepageLayout,
   HomepageSection,
   ThemeSettings,
   WebsiteModeConfig,
 } from '../types/homepage';
-
-export type WebsiteTemplateId =
-  | 'aurora-boutique'
-  | 'pulse-tech'
-  | 'clean-market'
-  | 'studio-commerce'
-  | 'default-store';
 
 export interface WebsiteTemplateMeta {
   id: WebsiteTemplateId;
@@ -24,6 +20,7 @@ export interface WebsiteTemplateMeta {
   previewImage: string;
   /** Swatch colors shown on the gallery card. */
   palette: string[];
+  industry?: TemplateIndustry;
   build: () => WebsiteModeConfig;
 }
 
@@ -582,6 +579,7 @@ function buildDefaultStore(): WebsiteModeConfig {
     textColor: '#1a1a1a',
     accentColor: '#1a6b4a',
     fontFamily: "'DM Sans', system-ui, sans-serif",
+    headingFontFamily: "'DM Serif Display', Georgia, serif",
     buttonStyle: 'solid',
   };
 
@@ -607,9 +605,16 @@ function buildDefaultStore(): WebsiteModeConfig {
     siteSettings: {
       websiteName: 'My Store',
       showAnnouncement: false,
-      headerVariant: 'minimal',
-      ...footerPresetForVariant('clean'),
-      footerColumns: createDefaultFooterLinkColumns(),
+      headerBg: '#f7f7f5',
+      headerTextColor: '#1a1a1a',
+      headerVariant: 'orderform',
+      headerTagline: 'Quality products at honest prices.',
+      footerBg: '#ffffff',
+      footerTextColor: '#1a1a1a',
+      footerAccentColor: '#1a6b4a',
+      footerAccentBg: '#e8f4ef',
+      footerWidth: 'boxed',
+      ...footerPresetForVariant('classic'),
       navItems: [{ id: uuid(), label: 'Home', href: '/' }],
     },
     seo: {
@@ -655,6 +660,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     description: 'Clean, modern, and professional — crisp typography, generous whitespace, and a layout that feels like a premium Shopify theme.',
     previewImage: '/templates/studio-commerce/preview.jpg',
     palette: ['#121212', '#f6f6f6', '#ffffff', '#6b7280'],
+    industry: 'general',
     build: buildStudioCommerce,
   },
   {
@@ -664,6 +670,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     description: 'Elegant, editorial layout with a warm palette — perfect for clothing, jewellery and lifestyle brands.',
     previewImage: '/templates/aurora-boutique/preview.jpg',
     palette: ['#9c6644', '#ede0d4', '#3b3026', '#fdfaf6'],
+    industry: 'general',
     build: buildAuroraBoutique,
   },
   {
@@ -673,6 +680,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     description: 'Bold, dark, modern storefront with a sticky buy bar — built for tech and electronics stores.',
     previewImage: '/templates/pulse-tech/preview.jpg',
     palette: ['#2563eb', '#22d3ee', '#0b1120', '#e2e8f0'],
+    industry: 'general',
     build: buildPulseTech,
   },
   {
@@ -682,6 +690,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     description: 'A clean, neutral, distraction-free layout that fits any kind of store.',
     previewImage: '/templates/clean-market/preview.jpg',
     palette: ['#111827', '#2563eb', '#f3f4f6', '#ffffff'],
+    industry: 'general',
     build: buildCleanMarket,
   },
   {
@@ -689,11 +698,22 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     name: 'Default Store',
     tagline: 'Classic catalog',
     description:
-      'The familiar order-form catalog — full product list with search, categories, and quantity controls. Fully editable in the builder.',
-    previewImage: '/templates/clean-market/preview.jpg',
+      'The familiar order-link catalog — store hero, search, categories, and quantity controls. Fully editable in the builder.',
+    previewImage: '/templates/default-store/preview.svg',
     palette: ['#1a6b4a', '#f7f7f5', '#1a1a1a', '#ffffff'],
+    industry: 'general',
     build: buildDefaultStore,
   },
+  ...INDUSTRY_WEBSITE_TEMPLATES.map((tpl) => ({
+    id: tpl.id,
+    name: tpl.name,
+    tagline: tpl.tagline,
+    description: tpl.description,
+    previewImage: tpl.previewImage,
+    palette: tpl.palette,
+    industry: tpl.industry,
+    build: tpl.build,
+  })),
 ];
 
 export function getWebsiteTemplate(id: WebsiteTemplateId): WebsiteTemplateMeta | undefined {

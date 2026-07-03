@@ -125,6 +125,7 @@ export function createDefaultSection(
         settings: {
           width: 'large',
           alignment: 'center',
+          verticalAlignment: 'top',
           rounded: false,
           shadow: true,
         },
@@ -183,10 +184,11 @@ export function createDefaultSection(
           columns: 3,
           layout: 'grid',
           showCount: true,
+          navigation: 'both',
           cardStyle: 'card',
           cardShape: 'rounded',
           cardSize: 'md',
-          imageRatio: '4:3',
+          imageRatio: '1:1',
           imageFit: 'cover',
           gap: 'md',
           titleAlign: 'left',
@@ -232,6 +234,7 @@ export function createDefaultSection(
           showCategoryFilters: true,
           showSort: true,
           viewMode: 'list',
+          cardStyle: 'boxed',
           productImageRatio: 'square',
           showPrice: true,
           showAvailability: true,
@@ -250,6 +253,9 @@ export function createDefaultSection(
           textColor: '#92400E',
           icon: 'info',
           dismissible: true,
+          animation: 'none',
+          alignment: 'center',
+          fontSize: 'medium',
         },
         content: {
           message: 'Important announcement goes here',
@@ -305,7 +311,15 @@ export function createDefaultSection(
           showRating: true,
         },
         content: {
-          testimonials: [],
+          testimonials: [
+            {
+              id: uuid(),
+              text: 'Share what customers love about your products.',
+              author: 'Customer name',
+              role: 'Verified buyer',
+              rating: 5,
+            },
+          ],
         },
       } as any;
 
@@ -546,8 +560,14 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
+        showSearch: true,
         columns: 4,
         cardsStyle: 'boxed',
+        viewMode: 'list',
+        productImageRatio: 'square',
+        showPrice: true,
+        showAvailability: true,
+        defaultSorting: 'newest',
       },
       product: {
         galleryLayout: 'left-thumbs',

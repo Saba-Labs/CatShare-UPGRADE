@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Apex Jewels preview">
+  <rect width="800" height="500" fill="#60a5fa"/>
+  <rect x="220" y="36" width="360" height="428" rx="20" fill="#fff" stroke="#c9a22722" stroke-width="2"/>
+  <rect x="220" y="36" width="360" height="88" fill="#c9a227"/>
+  <text x="248" y="88" fill="#fff" font-family="Georgia,serif" font-size="22">Apex Jewels</text>
+  <rect x="248" y="148" width="120" height="72" rx="10" fill="#060912"/>
+  <rect x="380" y="148" width="120" height="72" rx="10" fill="#060912"/>
+  <rect x="512" y="148" width="48" height="72" rx="10" fill="#060912"/>
+  <rect x="248" y="240" width="312" height="56" rx="12" fill="#fff" stroke="#c9a22733"/>
+  <rect x="248" y="312" width="312" height="56" rx="12" fill="#fff" stroke="#c9a22733"/>
+  <rect x="248" y="384" width="312" height="56" rx="12" fill="#fff" stroke="#c9a22733"/>
+  <text x="40" y="56" fill="#e8edf5" font-family="Georgia,serif" font-size="26">Apex Jewels</text>
+  <text x="40" y="88" fill="#e8edf5" opacity="0.7" font-family="system-ui,sans-serif" font-size="14">Modern</text>
+  <rect x="40" y="108" width="16" height="16" rx="3" fill="#c9a227"/>
+  <rect x="62" y="108" width="16" height="16" rx="3" fill="#060912"/>
+  <rect x="84" y="108" width="16" height="16" rx="3" fill="#60a5fa" stroke="#c9a22755"/>
+  <rect x="106" y="108" width="16" height="16" rx="3" fill="#fff" stroke="#c9a22733"/>
+</svg>

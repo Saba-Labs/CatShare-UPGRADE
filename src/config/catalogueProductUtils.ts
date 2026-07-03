@@ -155,6 +155,8 @@ export interface ProductWithCatalogueData {
   imageUrl?: string;
   imageVersion?: number;
   imageUrls?: string[];
+  /** Hosted video URLs shown in the product gallery (YouTube, Vimeo, direct links). */
+  videoUrls?: string[];
   primaryImageIndex?: number;
   fontColor?: string;
   bgColor?: string;

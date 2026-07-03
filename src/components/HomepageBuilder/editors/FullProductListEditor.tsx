@@ -1,5 +1,6 @@
 import { HomepageSection, FullProductListSection } from '../../../types/homepage';
 import SidebarDropdownField from '../SidebarDropdownField';
+import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
 
 interface FullProductListEditorProps {
   section: FullProductListSection & { id: string };
@@ -36,6 +37,18 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
           ]}
           onChange={(next) =>
             updateSettings({ viewMode: next as FullProductListSection['settings']['viewMode'] })
+          }
+        />
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card style</label>
+        <SidebarDropdownField
+          ariaLabel="Full product list card style"
+          value={settings.cardStyle ?? 'boxed'}
+          options={PRODUCT_CARD_STYLE_OPTIONS}
+          onChange={(next) =>
+            updateSettings({ cardStyle: next as FullProductListSection['settings']['cardStyle'] })
           }
         />
       </div>
@@ -132,8 +145,8 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
       </div>
 
       <p className="panel-hint">
-        Full catalog with quantity controls — layout and display options apply to this block on your
-        storefront.
+        Optional block for your homepage only. Category and shop pages use the built-in catalog — edit
+        those styles from Pages → Shop catalog or by clicking a category tile.
       </p>
     </>
   );

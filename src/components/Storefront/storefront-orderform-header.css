@@ -158,15 +158,6 @@
 }
 
 @media (min-width: 900px) {
-  .sf-of-header {
-    border: 1px solid var(--sf-of-border, rgba(0, 0, 0, 0.08));
-    border-radius: 22px;
-    overflow: hidden;
-    margin: 12px auto 0;
-    max-width: 1200px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
-  }
-
   .sf-of-header__inner {
     padding: 28px 30px 24px;
   }

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { FiTrash2 } from 'react-icons/fi';
 import ComponentPalette from './ComponentPalette';
 import PagesPanel from './PagesPanel';
 import ThemePanel from './ThemePanel';
@@ -17,15 +18,17 @@ import {
 } from '../../config/homepageBuilderConfig';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
-import {
+import type {
+  FreeformElementType,
   HomepageSection,
   HomepageSectionType,
   ThemeSettings,
   WebsiteModeConfig,
-  FreeformElementType,
 } from '../../types/homepage';
 import ProductTemplateQuickPanel from './ProductTemplateQuickPanel';
+import CollectionTemplateQuickPanel from './CollectionTemplateQuickPanel';
 import { BlockPresetId } from '../../config/blockPresets';
+import RestoreThemeDialog from './RestoreThemeDialog';
 
 export type SidebarTab = 'insert' | 'templates' | 'pages' | 'theme' | 'site' | 'photos';
 
@@ -53,9 +56,15 @@ interface BuilderSidebarProps {
   onClearSectionSelection: () => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
   onCookTheme?: () => void;
+  onStartBlank?: () => void;
+  onRestoreOriginal?: () => void;
+  restoreOriginalMessage?: string;
   themeHubMode?: boolean;
   previewProduct?: ProductWithCatalogueData | null;
   onCloseProductPreview?: () => void;
+  previewCategory?: { id: string; label: string } | null;
+  onCloseCategoryPreview?: () => void;
+  onOpenShopCatalog?: () => void;
 }
 
 const TAB_ORDER: SidebarTab[] = ['insert', 'templates', 'pages', 'photos', 'theme', 'site'];
@@ -84,10 +93,17 @@ export default function BuilderSidebar({
   onClearSectionSelection,
   onApplyTemplate,
   onCookTheme,
+  onStartBlank,
+  onRestoreOriginal,
+  restoreOriginalMessage = 'Remove the current theme and restore your previous layout? Unsaved changes will be lost.',
   themeHubMode = false,
   previewProduct = null,
   onCloseProductPreview,
+  previewCategory = null,
+  onCloseCategoryPreview,
+  onOpenShopCatalog,
 }: BuilderSidebarProps) {
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
@@ -99,30 +115,58 @@ export default function BuilderSidebar({
   return (
     <aside className={`builder-sidebar builder-sidebar--rail${themeHubMode ? ' builder-sidebar--theme-hub' : ''}`}>
       <nav className="builder-sidebar-rail" aria-label="Editor panels">
-        {TAB_ORDER.map((id) => {
-          const { label, hint, Icon } = SIDEBAR_TAB_META[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`builder-sidebar-tab builder-sidebar-tab--rail${activeTab === id ? ' active' : ''}`}
-              onClick={() => onTabChange(id)}
-              aria-label={`${label}. ${hint}`}
-              aria-current={activeTab === id ? 'page' : undefined}
-            >
-              <Icon className="builder-sidebar-tab__icon" aria-hidden />
-              <span className="builder-sidebar-tab__label">{label}</span>
-              <span className="builder-sidebar-tab__tooltip" role="tooltip">
-                <span className="builder-sidebar-tab__tooltip-title">{label}</span>
-                <span className="builder-sidebar-tab__tooltip-hint">{hint}</span>
-              </span>
-            </button>
-          );
-        })}
+        <div className="builder-sidebar-rail__tabs">
+          {TAB_ORDER.map((id) => {
+            const { label, hint, Icon } = SIDEBAR_TAB_META[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`builder-sidebar-tab builder-sidebar-tab--rail${activeTab === id ? ' active' : ''}`}
+                onClick={() => onTabChange(id)}
+                aria-label={`${label}. ${hint}`}
+                aria-current={activeTab === id ? 'page' : undefined}
+              >
+                <Icon className="builder-sidebar-tab__icon" aria-hidden />
+                <span className="builder-sidebar-tab__label">{label}</span>
+                <span className="builder-sidebar-tab__tooltip" role="tooltip">
+                  <span className="builder-sidebar-tab__tooltip-title">{label}</span>
+                  <span className="builder-sidebar-tab__tooltip-hint">{hint}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {onRestoreOriginal ? (
+          <button
+            type="button"
+            className="builder-sidebar-rail-restore"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setRestoreDialogOpen(true);
+            }}
+            aria-label="Remove theme and restore original layout"
+            title="Remove theme · restore original"
+          >
+            <FiTrash2 className="builder-sidebar-rail-restore__icon" aria-hidden />
+          </button>
+        ) : null}
       </nav>
 
+      <RestoreThemeDialog
+        open={restoreDialogOpen}
+        message={restoreOriginalMessage}
+        onCancel={() => setRestoreDialogOpen(false)}
+        onConfirm={() => {
+          setRestoreDialogOpen(false);
+          onRestoreOriginal?.();
+        }}
+      />
+
       <div className={`builder-sidebar-main${themeHubMode ? ' builder-sidebar-main--collapsed' : ''}`}>
-        {!previewProduct && !selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
+        {!previewProduct && !previewCategory && !selectedSection && !isSiteFooterSelected && !isSiteAnnouncementSelected && !isSiteHeaderSelected ? (
           <div className="builder-sidebar-main__head">
             <ActiveTabIcon className="builder-sidebar-main__head-icon" aria-hidden />
             <span className="builder-sidebar-main__head-title">{activeMeta.label}</span>
@@ -131,6 +175,7 @@ export default function BuilderSidebar({
 
       <div className="builder-sidebar-body">
         {previewProduct &&
+        !previewCategory &&
         !isSiteFooterSelected &&
         !isSiteHeaderSelected &&
         !isSiteAnnouncementSelected &&
@@ -140,6 +185,18 @@ export default function BuilderSidebar({
             websiteConfig={websiteConfig}
             onUpdateWebsiteConfig={onUpdateWebsiteConfig}
             onBack={onCloseProductPreview}
+          />
+        ) : previewCategory &&
+          !previewProduct &&
+          !isSiteFooterSelected &&
+          !isSiteHeaderSelected &&
+          !isSiteAnnouncementSelected &&
+          onCloseCategoryPreview ? (
+          <CollectionTemplateQuickPanel
+            categoryLabel={previewCategory.label}
+            websiteConfig={websiteConfig}
+            onUpdateWebsiteConfig={onUpdateWebsiteConfig}
+            onBack={onCloseCategoryPreview}
           />
         ) : selectedSection ? (
           <SectionQuickPanel
@@ -181,16 +238,23 @@ export default function BuilderSidebar({
               />
             )}
             {activeTab === 'templates' && onApplyTemplate && (
-              <TemplateGallery variant="compact" onApply={onApplyTemplate} onCookTheme={onCookTheme} />
+              <TemplateGallery
+                variant="compact"
+                onApply={onApplyTemplate}
+                onCookTheme={onCookTheme}
+                onStartBlank={onStartBlank}
+              />
             )}
             {activeTab === 'pages' && (
               <PagesPanel
                 websiteConfig={websiteConfig}
                 editingPageId={editingPageId}
+                previewCategoryId={previewCategory?.id ?? null}
                 onUpdateWebsiteConfig={onUpdateWebsiteConfig}
                 onSelectEditingPage={onSelectEditingPage}
                 onAddPage={onAddPage}
                 onRemovePage={onRemovePage}
+                onOpenShopCatalog={onOpenShopCatalog}
               />
             )}
             {activeTab === 'photos' && <MediaLibraryPanel storeId={storeId} />}

@@ -88,6 +88,12 @@ export function headerVariantForTemplate(templateId: string): WebsiteHeaderVaria
   if (templateId === 'aurora-boutique') return 'centered';
   if (templateId === 'pulse-tech') return 'split';
   if (templateId === 'clean-market') return 'minimal';
+  if (templateId === 'default-store') return 'orderform';
   if (templateId === 'studio-commerce') return 'classic';
+  if (templateId === 'fashion-wardrobe' || templateId === 'fashion-boutique-list') return 'orderform';
+  if (templateId === 'fashion-linen' || templateId === 'jewel-pearl') return 'minimal';
+  if (templateId === 'fashion-runway' || templateId === 'jewel-apex') return 'split';
+  if (templateId === 'fashion-maharani' || templateId === 'jewel-royal') return 'centered';
+  if (templateId === 'jewel-tray' || templateId === 'jewel-counter') return 'orderform';
   return 'classic';
 }

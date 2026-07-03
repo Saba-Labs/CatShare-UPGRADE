@@ -18,12 +18,12 @@ export default function EmbedSectionEditor({ section, onUpdate }: EmbedSectionEd
         <input
           type="url"
           className="panel-input"
-          placeholder="https://www.youtube.com/watch?v=..."
+          placeholder="https://www.youtube.com/watch?v=... or /shorts/..."
           value={section.content.embedUrl}
           onChange={(e) => onUpdate({ content: { ...section.content, embedUrl: e.target.value } })}
         />
         <p className="sidebar-hint" style={{ marginTop: 6 }}>
-          YouTube, Vimeo, or any HTTPS iframe URL. Maps links supported.
+          YouTube (watch, Shorts), Vimeo, or any HTTPS iframe URL. Maps links supported.
         </p>
         {preview && preview !== section.content.embedUrl && (
           <p className="sidebar-hint">Preview URL: {preview}</p>

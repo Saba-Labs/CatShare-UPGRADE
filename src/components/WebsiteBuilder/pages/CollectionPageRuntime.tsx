@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   getCatalogueData,
@@ -7,7 +7,11 @@ import {
   type ProductWithCatalogueData,
 } from '../../../config/catalogueProductUtils';
 import type { DefaultSorting, ProductImageRatio } from '../../../types/storeBehaviorSettings';
-import { productsInCategory } from '../../../utils/storefrontCategories';
+import {
+  productsInCategory,
+  resolveStoreCategoryParam,
+  storeCategoriesMatch,
+} from '../../../utils/storefrontCategories';
 import { productImageAspectRatio, sortStorefrontProducts } from '../../../utils/storefrontBehavior';
 import {
   formatStorePrice,
@@ -17,14 +21,16 @@ import { ProductImagePlaceholder } from '../../Storefront/StorefrontIcons';
 import { getStorefrontPriceAndUnit, unitLabel } from '../../Storefront/storefrontOrderHelpers';
 import { getProductVariantGroups } from '../../../utils/productVariants';
 import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
-import WebsiteBreadcrumbs from '../WebsiteBreadcrumbs';
+import ProductCardVariantPicker from '../ProductCardVariantPicker';
+import ProductCardFlipShop from '../ProductCardFlipShop';
 import { useWebsiteStore } from '../WebsiteStoreContext';
+import { normalizeProductCardStyle, type ProductCardStyle } from '../../../utils/productCardStyles';
 import '../website-runtime.css';
 
 interface CollectionPageRuntimeProps {
   products: ProductWithCatalogueData[];
   columns?: number;
-  cardsStyle?: 'minimal' | 'boxed';
+  cardsStyle?: ProductCardStyle | string;
   /** When true, hides breadcrumbs and uses optional section title (homepage block). */
   embedded?: boolean;
   sectionTitle?: string;
@@ -39,6 +45,9 @@ interface CollectionPageRuntimeProps {
   /** Builder canvas: open in-editor product preview instead of navigating away. */
   builderPreview?: boolean;
   onBuilderProductClick?: (product: ProductWithCatalogueData) => void;
+  /** Builder category page preview: fixed category (ignores URL). */
+  previewCategoryId?: string;
+  onPreviewCategoryChange?: (categoryId: string) => void;
 }
 
 export default function CollectionPageRuntime({
@@ -57,18 +66,29 @@ export default function CollectionPageRuntime({
   defaultSorting = 'newest',
   builderPreview = false,
   onBuilderProductClick,
+  previewCategoryId,
+  onPreviewCategoryChange,
 }: CollectionPageRuntimeProps) {
-  const { basePath, collectionPath, productPath, store } = useWebsiteStore();
+  const { collectionPath, productPath, store } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const location = useLocation();
-  const isListView = embedded ? (viewMode ?? 'list') === 'list' : store.viewMode === 'list';
+  const navigate = useNavigate();
+  const isListView = embedded
+    ? (viewMode ?? 'list') === 'list'
+    : viewMode != null
+      ? viewMode === 'list'
+      : store.viewMode === 'list';
+  const resolvedCardsStyle = normalizeProductCardStyle(cardsStyle);
+  const overlayProductLayout = resolvedCardsStyle === 'overlay';
+  const productsUseListLayout = isListView;
   const imageAspect = productImageAspectRatio(productImageRatio);
-  void columns;
+  const gridColumnCount = Math.min(4, Math.max(2, Number(columns) || 4)) as 2 | 3 | 4;
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
 
-  const categoryFilter = new URLSearchParams(location.search).get('category');
-  const [selectedCategory, setSelectedCategory] = useState(categoryFilter?.trim() || 'all');
+  const categoryParam =
+    previewCategoryId ??
+    new URLSearchParams(location.search).get('category');
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const availableCategories = useMemo(() => {
@@ -79,6 +99,38 @@ export default function CollectionPageRuntime({
     );
     return Array.from(new Set(all));
   }, [products]);
+
+  const selectedCategory = useMemo(
+    () => resolveStoreCategoryParam(categoryParam, availableCategories),
+    [categoryParam, availableCategories]
+  );
+
+  const setCategoryFilter = (category: string) => {
+    if (builderPreview && onPreviewCategoryChange) {
+      onPreviewCategoryChange(category === 'all' ? '' : category);
+      return;
+    }
+    const params = new URLSearchParams();
+    if (category !== 'all') {
+      params.set('category', category);
+    }
+    const search = params.toString();
+    if (embedded) {
+      navigate({
+        pathname: collectionPath,
+        search: search ? `?${search}` : '',
+      });
+      return;
+    }
+    const nextParams = new URLSearchParams(location.search);
+    if (category === 'all') {
+      nextParams.delete('category');
+    } else {
+      nextParams.set('category', category);
+    }
+    const nextSearch = nextParams.toString();
+    navigate({ pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' });
+  };
 
   const filteredProducts = useMemo(() => {
     const byCategory =
@@ -143,7 +195,7 @@ export default function CollectionPageRuntime({
   }, [selectedCategory, products]);
 
   const pageTitle = embedded
-    ? (sectionTitle?.trim() || 'Products')
+    ? (sectionTitle?.trim() || categoryLabel || 'Products')
     : categoryLabel
       ? String(categoryLabel)
       : 'All products';
@@ -153,20 +205,7 @@ export default function CollectionPageRuntime({
       className={`website-section-products website-section-products--order-form${embedded ? ' website-section-products--embedded' : ''}`}
     >
       <div className="website-of-panel">
-        {!embedded ? (
-          <WebsiteBreadcrumbs
-            items={[
-              { label: 'Home', to: basePath || '/' },
-              ...(categoryLabel
-                ? [
-                    { label: 'Shop', to: collectionPath },
-                    { label: String(categoryLabel) },
-                  ]
-                : [{ label: 'All products' }]),
-            ]}
-          />
-        ) : null}
-        {!embedded || sectionTitle?.trim() ? (
+        {!embedded || sectionTitle?.trim() || categoryLabel ? (
           embedded ? (
             <h2 className="website-section-products__title">{pageTitle}</h2>
           ) : (
@@ -225,7 +264,7 @@ export default function CollectionPageRuntime({
               <button
                 type="button"
                 className={`website-of-category-chip${selectedCategory === 'all' ? ' is-active' : ''}`}
-                onClick={() => setSelectedCategory('all')}
+                onClick={() => setCategoryFilter('all')}
               >
                 All
               </button>
@@ -233,8 +272,8 @@ export default function CollectionPageRuntime({
                 <button
                   key={category}
                   type="button"
-                  className={`website-of-category-chip${selectedCategory === category ? ' is-active' : ''}`}
-                  onClick={() => setSelectedCategory(category)}
+                  className={`website-of-category-chip${storeCategoriesMatch(selectedCategory, category) ? ' is-active' : ''}`}
+                  onClick={() => setCategoryFilter(category)}
                 >
                   {category}
                 </button>
@@ -248,17 +287,22 @@ export default function CollectionPageRuntime({
       ) : (
         <div
           className={
-            isListView
+            productsUseListLayout
               ? 'website-products-list website-products-list--order-form'
-              : 'website-products-grid website-products-grid--order-form'
+              : 'website-products-grid website-products-grid--order-form website-products-grid--fixed-cols'
+          }
+          style={
+            productsUseListLayout
+              ? undefined
+              : ({ ['--catalog-grid-columns' as string]: gridColumnCount } as CSSProperties)
           }
         >
           {sortedProducts.map((product) => (
             <CollectionProductCard
               key={product.id}
               product={product}
-              cardsStyle={cardsStyle}
-              listView={isListView}
+              cardsStyle={resolvedCardsStyle}
+              listView={isListView && !overlayProductLayout}
               href={productPath(product)}
               catalogue={orderBridge?.catalogue ?? null}
               quantity={orderBridge?.getProductQty(product.id) ?? 0}
@@ -266,9 +310,9 @@ export default function CollectionPageRuntime({
               onQtyChange={(delta, step) => orderBridge?.changeProductQty(product.id, delta, step)}
               builderPreview={builderPreview}
               onBuilderProductClick={onBuilderProductClick}
-              imageAspect={embedded ? imageAspect : '1 / 1'}
-              showPrice={embedded ? showPrice : true}
-              showAvailability={embedded ? showAvailability : false}
+              imageAspect={imageAspect}
+              showPrice={showPrice}
+              showAvailability={showAvailability}
             />
           ))}
         </div>
@@ -293,7 +337,7 @@ function CollectionProductCard({
   showAvailability = false,
 }: {
   product: ProductWithCatalogueData;
-  cardsStyle: 'minimal' | 'boxed';
+  cardsStyle: ProductCardStyle;
   listView: boolean;
   href: string;
   catalogue: import('../../../config/catalogueConfig').Catalogue | null;
@@ -314,6 +358,11 @@ function CollectionProductCard({
   const clampedStep = normalizeOrderQuantityStep(quantityStep);
   const variantGroups = getProductVariantGroups(product);
   const inStock = isProductInStockForCatalogue(product, store.catalogueId, catalogue ?? undefined);
+  const resolvedStyle = normalizeProductCardStyle(cardsStyle);
+  const isBoutique = resolvedStyle === 'boutique';
+  const isQuickShop = resolvedStyle === 'quick-shop';
+  const isFlipShop = resolvedStyle === 'flip-shop';
+  const brandLabel = product.subtitle?.trim() || store.sellerBusinessName?.trim() || undefined;
 
   const openInBuilder = (e: MouseEvent) => {
     e.preventDefault();
@@ -354,19 +403,176 @@ function CollectionProductCard({
     onQtyChange(delta, clampedStep);
   };
 
+  const orderRow = (
+    <div className="website-product-card-order-row">
+      <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
+        <button
+          type="button"
+          className="website-qty-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleQtyChange(-clampedStep);
+          }}
+        >
+          -
+        </button>
+        <span className="website-qty-val">{quantity}</span>
+        <button
+          type="button"
+          className="website-qty-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleQtyChange(clampedStep);
+          }}
+        >
+          +
+        </button>
+      </div>
+      <ProductNav className="website-product-card-details-link">Details</ProductNav>
+    </div>
+  );
+
+  const packRow =
+    clampedStep > 1 ? (
+      <div className="website-product-card-pack-row">
+        <span className="website-pack-hint">Pack of {clampedStep}</span>
+      </div>
+    ) : null;
+
+  const detailsBody = (
+    <div
+      className={`website-product-card-body${
+        isQuickShop ? ' website-product-card-body--quick' : isBoutique ? ' website-product-card-body--boutique' : ''
+      }`}
+    >
+      {isQuickShop && !listView ? (
+        <div className="website-product-card-quick-head">
+          <ProductNav className="website-product-card-title-link">
+            <p className="website-product-card-title">{product.name}</p>
+          </ProductNav>
+          {showPrice && Number.isFinite(price) && price > 0 ? (
+            <p className="website-product-card-price">
+              {formatStorePrice(price, store.sellerCurrencyCode)}
+              {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <ProductNav className="website-product-card-title-link">
+            <p className="website-product-card-title">{product.name}</p>
+          </ProductNav>
+          {isBoutique && brandLabel && !listView ? (
+            <p className="website-product-card-brand">{brandLabel}</p>
+          ) : product.subtitle ? (
+            <p className="website-product-card-subtitle">{product.subtitle}</p>
+          ) : null}
+          {showPrice && Number.isFinite(price) && price > 0 ? (
+            <p className="website-product-card-price">
+              {formatStorePrice(price, store.sellerCurrencyCode)}
+              {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
+            </p>
+          ) : null}
+        </>
+      )}
+      {!listView && isBoutique ? (
+        <ProductNav className="website-product-card-cta-wrap">
+          <span className="website-product-card-cta website-product-card-cta--boutique">View product</span>
+        </ProductNav>
+      ) : !listView && isQuickShop ? (
+        <ProductCardVariantPicker
+          product={product}
+          productHref={href}
+          builderPreview={builderPreview}
+          onBuilderProductClick={onBuilderProductClick}
+        />
+      ) : listView && isQuickShop ? (
+        <ProductCardVariantPicker
+          product={product}
+          productHref={href}
+          builderPreview={builderPreview}
+          onBuilderProductClick={onBuilderProductClick}
+        />
+      ) : (
+        <>
+          {orderRow}
+          {packRow}
+        </>
+      )}
+    </div>
+  );
+
+  const flipImageBlock = (
+    <div className="website-product-card-img" style={{ aspectRatio: imageAspect }}>
+      {img ? (
+        <img src={img} alt={product.name} loading="lazy" />
+      ) : (
+        <ProductImagePlaceholder size={40} className="website-product-card-ph" />
+      )}
+      {showAvailability && !inStock ? (
+        <span className="website-product-card-oos">Out of stock</span>
+      ) : null}
+    </div>
+  );
+
+  if (!listView && isFlipShop) {
+    return (
+      <article
+        className={`website-product-card website-product-card-flip-shop website-product-card-grid${
+          builderPreview ? ' website-product-card--builder' : ''
+        }`}
+      >
+        <ProductCardFlipShop
+          product={product}
+          productHref={href}
+          title={product.name}
+          subtitle={product.subtitle}
+          priceLabel={
+            showPrice && Number.isFinite(price) && price > 0 ? (
+              <p className="website-product-card-price">
+                {formatStorePrice(price, store.sellerCurrencyCode)}
+                {priceUnit ? (
+                  <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span>
+                ) : null}
+              </p>
+            ) : null
+          }
+          image={flipImageBlock}
+          quantity={quantity}
+          quantityStep={clampedStep}
+          onQtyChange={onQtyChange}
+          builderPreview={builderPreview}
+          onBuilderProductClick={onBuilderProductClick}
+        />
+      </article>
+    );
+  }
+
+  const imageBlock = (
+    <ProductNav className="website-product-card-linkwrap">
+      <div className="website-product-card-img" style={{ aspectRatio: imageAspect }}>
+        {img ? (
+          <img src={img} alt={product.name} loading="lazy" />
+        ) : (
+          <ProductImagePlaceholder size={40} className="website-product-card-ph" />
+        )}
+        {showAvailability && !inStock ? (
+          <span className="website-product-card-oos">Out of stock</span>
+        ) : null}
+      </div>
+    </ProductNav>
+  );
+
   return (
     <article
-      className={`website-product-card website-product-card-${cardsStyle} ${
+      className={`website-product-card website-product-card-${resolvedStyle} ${
         listView ? 'website-product-card-list' : 'website-product-card-grid'
       }${builderPreview ? ' website-product-card--builder' : ''}`}
     >
       {listView ? (
         <div className="website-product-card-list-inner">
           <ProductNav className="website-product-card-linkwrap website-product-card-list-media">
-            <div
-              className="website-product-card-img"
-              style={{ aspectRatio: imageAspect }}
-            >
+            <div className="website-product-card-img" style={{ aspectRatio: imageAspect }}>
               {img ? (
                 <img src={img} alt={product.name} loading="lazy" />
               ) : (
@@ -377,110 +583,17 @@ function CollectionProductCard({
               ) : null}
             </div>
           </ProductNav>
-          <div className="website-product-card-body">
-            <ProductNav className="website-product-card-title-link">
-              <p className="website-product-card-title">{product.name}</p>
-            </ProductNav>
-            {product.subtitle ? <p className="website-product-card-subtitle">{product.subtitle}</p> : null}
-            {showPrice && Number.isFinite(price) && price > 0 ? (
-              <p className="website-product-card-price">
-                {formatStorePrice(price, store.sellerCurrencyCode)}
-                {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
-              </p>
-            ) : null}
-            <div className="website-product-card-order-row">
-              <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
-                <button
-                  type="button"
-                  className="website-qty-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQtyChange(-clampedStep);
-                  }}
-                >
-                  -
-                </button>
-                <span className="website-qty-val">{quantity}</span>
-                <button
-                  type="button"
-                  className="website-qty-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleQtyChange(clampedStep);
-                  }}
-                >
-                  +
-                </button>
-              </div>
-              <ProductNav className="website-product-card-details-link">Details</ProductNav>
-            </div>
-            {clampedStep > 1 ? (
-              <div className="website-product-card-pack-row">
-                <span className="website-pack-hint">Pack of {clampedStep}</span>
-              </div>
-            ) : null}
-          </div>
+          {detailsBody}
+        </div>
+      ) : resolvedStyle === 'overlay' ? (
+        <div className="website-product-card-media-stack" style={{ aspectRatio: imageAspect }}>
+          {imageBlock}
+          {detailsBody}
         </div>
       ) : (
         <>
-      <ProductNav className="website-product-card-linkwrap">
-        <div
-          className="website-product-card-img"
-          style={{ aspectRatio: imageAspect }}
-        >
-          {img ? (
-            <img src={img} alt={product.name} loading="lazy" />
-          ) : (
-            <ProductImagePlaceholder size={40} className="website-product-card-ph" />
-          )}
-          {showAvailability && !inStock ? (
-            <span className="website-product-card-oos">Out of stock</span>
-          ) : null}
-        </div>
-      </ProductNav>
-      <div className="website-product-card-body">
-        <ProductNav className="website-product-card-title-link">
-          <p className="website-product-card-title">{product.name}</p>
-        </ProductNav>
-        {product.subtitle ? <p className="website-product-card-subtitle">{product.subtitle}</p> : null}
-        {showPrice && Number.isFinite(price) && price > 0 ? (
-          <p className="website-product-card-price">
-            {formatStorePrice(price, store.sellerCurrencyCode)}
-            {priceUnit ? <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span> : null}
-          </p>
-        ) : null}
-        <div className="website-product-card-order-row">
-          <div className="website-qty" aria-label={`Quantity for ${product.name}`}>
-            <button
-              type="button"
-              className="website-qty-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQtyChange(-clampedStep);
-              }}
-            >
-              -
-            </button>
-            <span className="website-qty-val">{quantity}</span>
-            <button
-              type="button"
-              className="website-qty-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQtyChange(clampedStep);
-              }}
-            >
-              +
-            </button>
-          </div>
-          <ProductNav className="website-product-card-details-link">Details</ProductNav>
-        </div>
-        {clampedStep > 1 ? (
-          <div className="website-product-card-pack-row">
-            <span className="website-pack-hint">Pack of {clampedStep}</span>
-          </div>
-        ) : null}
-      </div>
+          {imageBlock}
+          {detailsBody}
         </>
       )}
     </article>

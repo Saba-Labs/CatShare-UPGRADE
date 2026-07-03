@@ -3,6 +3,7 @@ import ProductImageGallery from '../components/ProductImageGallery';
 import ProductVariantsDisplay from '../components/ProductVariantsDisplay';
 import { getShareLinkItemUnitPrice, type ShareLinkItem } from '../services/shareLinks';
 import { productImageDisplayUrl } from '../utils/imageUrl';
+import { shouldUseProductMediaGallery } from '../utils/productGallery';
 import {
   formatVariantSelectionSummary,
   isVariantSelectionComplete,
@@ -183,10 +184,11 @@ export default function OrderLinkProductDetail({
   return (
     <article className="of-product-page-layout">
       <div className="of-product-page-media">
-        {item.imageUrls && item.imageUrls.length > 1 ? (
+        {shouldUseProductMediaGallery(item.imageUrls?.length ?? 0, item.videoUrls?.length ?? 0) ? (
           <div className="of-product-page-gallery">
             <ProductImageGallery
-              urls={item.imageUrls}
+              urls={item.imageUrls ?? (item.imageUrl ? [item.imageUrl] : [])}
+              videoUrls={item.videoUrls}
               primaryIndex={item.primaryImageIndex ?? 0}
               primaryImageVersion={item.imageVersion}
             />

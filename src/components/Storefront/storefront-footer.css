@@ -11,6 +11,8 @@
   box-sizing: border-box;
   max-width: 100%;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: sf-footer;
 }
 
 .sf-footer--width-full {
@@ -203,10 +205,17 @@
   pointer-events: auto;
 }
 
-@media (min-width: 640px) {
+/* Grid columns follow footer card width, not browser viewport (catalog = single column). */
+@container sf-footer (min-width: 640px) {
   .sf-footer-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+  }
+}
+
+@container sf-footer (min-width: 900px) {
+  .sf-footer-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
@@ -412,10 +421,6 @@
     margin: 0;
     max-width: none;
     padding: 20px 24px 24px;
-  }
-
-  .sf-footer-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

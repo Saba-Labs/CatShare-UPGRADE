@@ -1,27 +1,222 @@
 .carousel-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.carousel-section--empty {
   background: #f3f4f6;
   padding: 1.25rem;
   border-radius: 8px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   min-height: 160px;
+}
+
+.carousel-section__title {
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.carousel-section__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Viewport reserves height in document flow (fixes footer overlap with fade slides). */
+.carousel-section__viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.carousel-section--ratio-16-9 .carousel-section__viewport {
+  aspect-ratio: 16 / 9;
+}
+
+.carousel-section--ratio-4-3 .carousel-section__viewport {
+  aspect-ratio: 4 / 3;
+}
+
+.carousel-section--ratio-square .carousel-section__viewport {
+  aspect-ratio: 1 / 1;
+}
+
+.carousel-section--height-small .carousel-section__viewport {
+  max-height: 200px;
+}
+
+.carousel-section--height-medium .carousel-section__viewport {
+  max-height: 320px;
+}
+
+.carousel-section--height-large .carousel-section__viewport {
+  max-height: 480px;
+}
+
+.carousel-section__track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.carousel-section__track--fade .carousel-section__slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+.carousel-section__track--fade .carousel-section__slide.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.carousel-section__track--slide {
+  display: flex;
+  transition: transform 0.45s ease;
+}
+
+.carousel-section__track--slide .carousel-section__slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+.carousel-section__slide {
+  width: 100%;
+  height: 100%;
+}
+
+.carousel-section__frame {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+
+.carousel-section__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.carousel-section__arrows {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.carousel-section__arrow {
+  pointer-events: auto;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.carousel-section__inner {
-  width: 100%;
+.carousel-section__arrow:hover {
+  background: #fff;
+}
+
+.carousel-section__dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 12px;
+  pointer-events: none;
+}
+
+.carousel-section__dot {
+  pointer-events: auto;
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.carousel-section__dot.is-active {
+  background: #1a73e8;
+  transform: scale(1.2);
 }
 
 @container site-viewport (max-width: 30rem) {
-  .carousel-section {
+  .carousel-section--empty {
     padding: 0.85rem;
     min-height: 120px;
   }
+
+  .carousel-section--height-small .carousel-section__viewport {
+    max-height: 160px;
+  }
+
+  .carousel-section--height-medium .carousel-section__viewport {
+    max-height: 220px;
+  }
+
+  .carousel-section--height-large .carousel-section__viewport {
+    max-height: 280px;
+  }
+
+  .carousel-section__arrow {
+    width: 32px;
+    height: 32px;
+    font-size: 1.25rem;
+  }
 }
 
-.sites-page-frame.viewport-mobile .carousel-section,
-.builder-product-page-root.viewport-mobile .carousel-section {
+.sites-page-frame.viewport-mobile .carousel-section--empty,
+.builder-product-page-root.viewport-mobile .carousel-section--empty {
   padding: 0.85rem;
   min-height: 120px;
+}
+
+.sites-page-frame.viewport-mobile .carousel-section--height-small .carousel-section__viewport,
+.builder-product-page-root.viewport-mobile .carousel-section--height-small .carousel-section__viewport {
+  max-height: 160px;
+}
+
+.sites-page-frame.viewport-mobile .carousel-section--height-medium .carousel-section__viewport,
+.builder-product-page-root.viewport-mobile .carousel-section--height-medium .carousel-section__viewport {
+  max-height: 220px;
+}
+
+.sites-page-frame.viewport-mobile .carousel-section--height-large .carousel-section__viewport,
+.builder-product-page-root.viewport-mobile .carousel-section--height-large .carousel-section__viewport {
+  max-height: 280px;
 }

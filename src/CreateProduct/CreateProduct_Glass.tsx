@@ -29,6 +29,8 @@ import {
   normalizeProductImageFields,
   primaryIndexAfterSlotRemoved,
 } from "../utils/productImages";
+import { getProductVideoUrls, normalizeProductVideoUrls } from "../utils/productGallery";
+import ProductGalleryVideoEditor from "../components/ProductGalleryVideoEditor";
 import { InfoTooltip } from "../components/InfoTooltip";
 import {
   initializeCatalogueData,
@@ -484,6 +486,7 @@ export default function CreateProduct() {
   const [fetchFieldsChecked, setFetchFieldsChecked] = useState(false);
   const [fetchPriceChecked, setFetchPriceChecked] = useState(false);
   const [imageSlots, setImageSlots] = useState<string[]>([]);
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [primarySlotIndex, setPrimarySlotIndex] = useState(0);
   const [cropSessionPreview, setCropSessionPreview] = useState<string | null>(null);
   const cropModeRef = useRef<"append" | number | null>(null);
@@ -726,6 +729,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
         const urlsFromProduct = getProductImageUrls(migratedProduct);
         const pi = getPrimaryImageIndex(migratedProduct);
+        setVideoUrls(getProductVideoUrls(migratedProduct));
         if (urlsFromProduct.length > 0) {
           setImageSlots(urlsFromProduct);
           setPrimarySlotIndex(Math.min(pi, urlsFromProduct.length - 1));
@@ -1299,6 +1303,8 @@ if (migratedProduct.suggestedColors?.length > 0) {
     const defaultCatalogueData = getCatalogueData(formData, 'cat1');
     const allCatalogues = getAllCatalogues();
 
+    const persistedVideos = normalizeProductVideoUrls(videoUrls);
+
     const newItem: ProductWithCatalogueData = {
       ...formData,
       id,
@@ -1313,6 +1319,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
       cropAspectRatio: appliedAspectRatio,
       renderingType: "glass",
     };
+    if (persistedVideos.length > 0) {
+      newItem.videoUrls = persistedVideos;
+    } else {
+      delete newItem.videoUrls;
+    }
 
     if (newItem.catalogueData) {
       for (const cat of allCatalogues) {
@@ -2017,6 +2028,11 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     Upgrade to Pro to add more images
                   </button>
                 )}
+                <ProductGalleryVideoEditor
+                  className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800"
+                  videoUrls={videoUrls}
+                  onChange={setVideoUrls}
+                />
               </div>
 
               {/* Colors Section */}
