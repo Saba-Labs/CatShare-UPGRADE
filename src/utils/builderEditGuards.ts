@@ -17,13 +17,13 @@ export function mergeSectionUpdate(
     merged.settings = {
       ...(section.settings && typeof section.settings === 'object' ? section.settings : {}),
       ...updates.settings,
-    };
+    } as typeof section.settings;
   }
   if (updates.content) {
     merged.content = {
       ...(section.content && typeof section.content === 'object' ? section.content : {}),
       ...updates.content,
-    };
+    } as typeof section.content;
   }
   return merged;
 }

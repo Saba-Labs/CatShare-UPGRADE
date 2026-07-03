@@ -80,6 +80,7 @@ export default function TwoColumnContentSectionView({
     if (!hasChange) return;
     onUpdateSection({
       content: {
+        ...content,
         [side]: { ...existing, ...patch },
       },
     });
