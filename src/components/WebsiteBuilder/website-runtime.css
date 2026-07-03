@@ -1176,7 +1176,27 @@ button.website-product-card-cta--boutique:hover {
 }
 
 .website-products-grid--order-form.website-products-grid--fixed-cols {
-  grid-template-columns: repeat(var(--catalog-grid-columns, 4), minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(
+    min(var(--catalog-grid-columns, 4), 2),
+    minmax(0, 1fr)
+  );
+}
+
+@container site-viewport (min-width: 30.01rem) {
+  .website-products-grid--order-form.website-products-grid--fixed-cols {
+    gap: 10px;
+    grid-template-columns: repeat(
+      min(var(--catalog-grid-columns, 4), 3),
+      minmax(0, 1fr)
+    );
+  }
+}
+
+@container site-viewport (min-width: 48.01rem) {
+  .website-products-grid--order-form.website-products-grid--fixed-cols {
+    grid-template-columns: repeat(var(--catalog-grid-columns, 4), minmax(0, 1fr));
+  }
 }
 
 /* Shared carousel: track + centered nav row below (< >) */
@@ -1727,6 +1747,13 @@ a.website-product-card-details-link {
   .website-products-grid--order-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+  }
+
+  .website-products-grid--order-form.website-products-grid--fixed-cols {
+    grid-template-columns: repeat(
+      min(var(--catalog-grid-columns, 4), 2),
+      minmax(0, 1fr)
+    );
   }
 
   .website-products-grid--order-form > * {
