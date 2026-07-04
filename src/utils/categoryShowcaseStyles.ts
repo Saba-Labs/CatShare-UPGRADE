@@ -8,6 +8,7 @@ export type CategoryImageRatio = NonNullable<CategoryShowcaseSection['settings']
 export type CategoryImageFit = NonNullable<CategoryShowcaseSection['settings']['imageFit']>;
 export type CategoryGap = NonNullable<CategoryShowcaseSection['settings']['gap']>;
 export type CategoryLabelStyle = NonNullable<CategoryShowcaseSection['settings']['labelStyle']>;
+export type CategoryLabelAlign = NonNullable<CategoryShowcaseSection['settings']['labelAlign']>;
 export type CategoryHoverEffect = NonNullable<CategoryShowcaseSection['settings']['hoverEffect']>;
 export type CategoryTitleAlign = NonNullable<CategoryShowcaseSection['settings']['titleAlign']>;
 export type CategoryScrollNavigation = NonNullable<CategoryShowcaseSection['settings']['navigation']>;
@@ -27,6 +28,7 @@ export type ResolvedCategoryShowcaseSettings = Required<
     | 'gap'
     | 'titleAlign'
     | 'labelStyle'
+    | 'labelAlign'
     | 'hoverEffect'
     | 'navigation'
     | 'tilesAlign'
@@ -101,6 +103,13 @@ function normalizeImageRatio(
   return '1:1';
 }
 
+function normalizeLabelAlign(
+  align: CategoryShowcaseSection['settings']['labelAlign'] | undefined
+): CategoryLabelAlign {
+  if (align === 'center' || align === 'right') return align;
+  return 'left';
+}
+
 function normalizeNavigation(
   navigation: CategoryShowcaseSection['settings']['navigation'] | undefined
 ): CategoryScrollNavigation {
@@ -130,6 +139,7 @@ export function resolveCategoryShowcaseSettings(
     gap: settings.gap ?? 'md',
     titleAlign: settings.titleAlign ?? 'left',
     labelStyle: settings.labelStyle ?? 'below',
+    labelAlign: normalizeLabelAlign(settings.labelAlign),
     hoverEffect: settings.hoverEffect === 'none' ? 'none' : 'lift',
     navigation: layout === 'carousel' ? normalizeNavigation(settings.navigation) : 'none',
     tilesAlign: normalizeTilesAlign(settings.tilesAlign),
@@ -147,6 +157,7 @@ export function getCategoryShowcaseClassName(settings: ResolvedCategoryShowcaseS
     `cat-showcase--size-${settings.cardSize}`,
     `cat-showcase--gap-${settings.gap}`,
     `cat-showcase--label-${settings.labelStyle}`,
+    `cat-showcase--label-align-${settings.labelAlign}`,
     `cat-showcase--hover-${settings.hoverEffect}`,
     `cat-showcase--title-${settings.titleAlign}`,
     `cat-showcase--tiles-${settings.tilesAlign}`,

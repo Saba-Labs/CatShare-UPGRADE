@@ -11,6 +11,7 @@ import { WebsiteOrderBridgeProvider } from '../../components/WebsiteBuilder/Webs
 import { WebsiteStoreProvider } from '../../components/WebsiteBuilder/WebsiteStoreContext';
 import StorefrontSiteHeader from '../../components/Storefront/StorefrontSiteHeader';
 import { storeBasePath } from '../../utils/websiteStorefront';
+import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
 
 import CatalogLayoutRuntime from '../CatalogLayoutRuntime';
 
@@ -58,6 +59,10 @@ export default function CatalogHomePage({
   const siteSettings = layout.websiteConfig?.siteSettings;
   const hasSiteHeader = showSiteHeader && !!siteSettings;
   const basePath = storeBasePath(slug, onSubdomain);
+  const immersiveHeroOverlay = homepageUsesImmersiveHeroOverlay(
+    siteSettings?.headerVariant,
+    layout.sections ?? layout.websiteConfig?.pages?.home?.sections
+  );
 
   return (
 
@@ -65,17 +70,22 @@ export default function CatalogHomePage({
 
       <WebsiteOrderBridgeProvider value={orderBridge}>
 
+        <div
+          className={`website-runtime-root${immersiveHeroOverlay ? ' website-runtime-root--immersive-hero' : ''}`}
+        >
         {hasSiteHeader ? (
           <StorefrontSiteHeader
             siteSettings={siteSettings}
             store={store}
             basePath={basePath}
+            immersiveOverHero={immersiveHeroOverlay}
           />
         ) : (
           <CatalogStoreHero store={store} />
         )}
 
         <CatalogLayoutRuntime layout={layout} storeId={store.id} />
+        </div>
 
       </WebsiteOrderBridgeProvider>
 

@@ -1,6 +1,6 @@
 import type { WebsiteCollectionTemplate } from '../../../types/homepage';
 import SidebarDropdownField from '../SidebarDropdownField';
-import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
+import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
 
 interface CollectionTemplateEditorProps {
   template: WebsiteCollectionTemplate;
@@ -14,66 +14,20 @@ export default function CollectionTemplateEditor({
 }: CollectionTemplateEditorProps) {
   return (
     <>
-      <div className="panel-section">
-        <label className="panel-label">View mode</label>
-        <SidebarDropdownField
-          ariaLabel="Catalog view mode"
-          value={template.viewMode ?? 'list'}
-          options={[
-            { value: 'list', label: 'List' },
-            { value: 'grid', label: 'Grid' },
-          ]}
-          onChange={(next) =>
-            onUpdate({ viewMode: next as WebsiteCollectionTemplate['viewMode'] })
-          }
-        />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Card style</label>
-        <SidebarDropdownField
-          ariaLabel="Catalog card style"
-          value={template.cardsStyle ?? 'boxed'}
-          options={PRODUCT_CARD_STYLE_OPTIONS}
-          onChange={(next) =>
-            onUpdate({ cardsStyle: next as WebsiteCollectionTemplate['cardsStyle'] })
-          }
-        />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Product image ratio</label>
-        <SidebarDropdownField
-          ariaLabel="Product image ratio"
-          value={template.productImageRatio ?? 'square'}
-          options={[
-            { value: 'square', label: 'Square' },
-            { value: 'portrait', label: 'Portrait' },
-            { value: 'landscape', label: 'Landscape' },
-          ]}
-          onChange={(next) =>
-            onUpdate({
-              productImageRatio: next as WebsiteCollectionTemplate['productImageRatio'],
-            })
-          }
-        />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Grid columns (desktop)</label>
-        <SidebarDropdownField
-          ariaLabel="Catalog grid columns"
-          value={String(template.columns ?? 4)}
-          options={[
-            { value: '2', label: '2 columns' },
-            { value: '3', label: '3 columns' },
-            { value: '4', label: '4 columns' },
-          ]}
-          onChange={(next) =>
-            onUpdate({ columns: Number(next) as WebsiteCollectionTemplate['columns'] })
-          }
-        />
-      </div>
+      <ProductCardStyleSettingsPanel
+        cardStyle={template.cardsStyle}
+        cardStyleAriaLabel="Catalog card style"
+        showViewMode
+        showImageRatio
+        showGridColumns
+        viewMode={template.viewMode}
+        productImageRatio={template.productImageRatio}
+        columns={template.columns}
+        onCardStyleChange={(cardsStyle, layoutPatch) => onUpdate({ cardsStyle, ...layoutPatch })}
+        onViewModeChange={(viewMode) => onUpdate({ viewMode })}
+        onProductImageRatioChange={(productImageRatio) => onUpdate({ productImageRatio })}
+        onColumnsChange={(columns) => onUpdate({ columns })}
+      />
 
       <div className="panel-section">
         <label className="panel-label panel-label--checkbox">

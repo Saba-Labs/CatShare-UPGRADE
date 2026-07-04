@@ -151,6 +151,8 @@ export interface CategoryShowcaseSection {
     titleAlign?: 'left' | 'center' | 'right';
     /** Where the category name appears. */
     labelStyle?: 'below' | 'overlay';
+    /** Alignment of category name and count on each tile. */
+    labelAlign?: 'left' | 'center' | 'right';
     hoverEffect?: 'none' | 'lift' | 'zoom' | 'border';
     cardBackground?: string;
     labelColor?: string;
@@ -568,8 +570,8 @@ export type WebsiteFooterVariant = 'classic' | 'aurora' | 'pulse' | 'clean';
 /** Boxed card vs edge-to-edge footer on the page. */
 export type WebsiteFooterWidth = 'boxed' | 'full';
 
-/** Header layout on the storefront (classic bar, centered, minimal, split, orderform hero). */
-export type WebsiteHeaderVariant = 'classic' | 'centered' | 'minimal' | 'split' | 'orderform';
+/** Header layout on the storefront (classic bar, centered, floating, immersive, orderform hero). */
+export type WebsiteHeaderVariant = 'classic' | 'centered' | 'floating' | 'immersive' | 'orderform';
 
 export interface WebsiteSiteSettings {
   websiteName: string;
@@ -579,10 +581,26 @@ export interface WebsiteSiteSettings {
   announcementBg?: string;
   announcementTextColor?: string;
   navItems: WebsiteNavItem[];
-  /** Header layout — classic, centered, minimal, split bar, or orderform store hero. */
+  /** Header layout — classic, centered, floating, immersive, or orderform store hero. */
   headerVariant?: WebsiteHeaderVariant;
   headerBg?: string;
   headerTextColor?: string;
+  /** Classic bar: show bottom border at rest (hidden when pinned if off). */
+  headerClassicBorder?: boolean;
+  /** Centered bar: vertical space between logo and navigation. */
+  headerCenteredGap?: 'compact' | 'normal' | 'wide';
+  /** Floating bar: pill background opacity (0–1) before scroll. */
+  headerFloatingOpacity?: number;
+  /** Floating bar: backdrop blur on the pill (px). */
+  headerFloatingBlur?: number;
+  /** Floating bar: corner radius style of the pill. */
+  headerFloatingRadius?: 'soft' | 'round' | 'pill';
+  /** Immersive bar: background tint opacity (0–1) over the hero before scroll. */
+  headerImmersiveOpacity?: number;
+  /** Immersive bar: subtle text shadow for readability on photos. */
+  headerImmersiveTextShadow?: boolean;
+  /** Store hero: vertical padding around hero content. */
+  headerHeroPadding?: 'compact' | 'comfortable' | 'spacious';
   /** Tagline under the store name (orderform hero layout; falls back to footer description). */
   headerTagline?: string;
   /** Longer blurb under the tagline (orderform hero layout). */

@@ -1,6 +1,6 @@
 import { HomepageSection, FullProductListSection } from '../../../types/homepage';
+import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
 import SidebarDropdownField from '../SidebarDropdownField';
-import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
 
 interface FullProductListEditorProps {
   section: FullProductListSection & { id: string };
@@ -26,50 +26,19 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
         />
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">View mode</label>
-        <SidebarDropdownField
-          ariaLabel="Product list view mode"
-          value={settings.viewMode ?? 'list'}
-          options={[
-            { value: 'list', label: 'List' },
-            { value: 'grid', label: 'Grid' },
-          ]}
-          onChange={(next) =>
-            updateSettings({ viewMode: next as FullProductListSection['settings']['viewMode'] })
-          }
-        />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Card style</label>
-        <SidebarDropdownField
-          ariaLabel="Full product list card style"
-          value={settings.cardStyle ?? 'boxed'}
-          options={PRODUCT_CARD_STYLE_OPTIONS}
-          onChange={(next) =>
-            updateSettings({ cardStyle: next as FullProductListSection['settings']['cardStyle'] })
-          }
-        />
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label">Product image ratio</label>
-        <SidebarDropdownField
-          ariaLabel="Product image ratio"
-          value={settings.productImageRatio ?? 'square'}
-          options={[
-            { value: 'square', label: 'Square' },
-            { value: 'portrait', label: 'Portrait' },
-            { value: 'landscape', label: 'Landscape' },
-          ]}
-          onChange={(next) =>
-            updateSettings({
-              productImageRatio: next as FullProductListSection['settings']['productImageRatio'],
-            })
-          }
-        />
-      </div>
+      <ProductCardStyleSettingsPanel
+        cardStyle={settings.cardStyle}
+        cardStyleAriaLabel="Full product list card style"
+        showViewMode
+        showImageRatio
+        viewMode={settings.viewMode}
+        productImageRatio={settings.productImageRatio}
+        onCardStyleChange={(cardStyle, layoutPatch) =>
+          updateSettings({ cardStyle, ...layoutPatch })
+        }
+        onViewModeChange={(viewMode) => updateSettings({ viewMode })}
+        onProductImageRatioChange={(productImageRatio) => updateSettings({ productImageRatio })}
+      />
 
       <div className="panel-section">
         <label className="panel-label panel-label--checkbox">

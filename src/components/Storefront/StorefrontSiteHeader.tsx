@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { headerLayoutForVariant } from '../../config/headerVariants';
+import { headerLayoutForPageSurface } from '../../config/headerVariants';
 import type { WebsiteNavItem, WebsiteSiteSettings } from '../../types/homepage';
 import { isExternalHref, normalizeStorefrontPath, resolveStorefrontHref } from '../../utils/storefrontHref';
 import type { StorePublic } from '../../services/storeService';
 import StorefrontOrderformHeader from './StorefrontOrderformHeader';
+import { buildHeaderSurfaceStyle, headerLayoutDataAttributes } from '../../utils/headerSurfaceStyle';
 import './storefront-site-header.css';
 
 const DEFAULT_NAV: WebsiteNavItem[] = [{ id: 'home', label: 'Home', href: '/' }];
@@ -23,6 +24,10 @@ interface StorefrontSiteHeaderProps {
   /** Builder: click the header bar (not announcement) to edit header settings */
   onSelectHeader?: () => void;
   isHeaderSelected?: boolean;
+  /** Inner pages (product, category, etc.) always render the classic top bar. */
+  pageSurface?: 'homepage' | 'inner';
+  /** Immersive layout only overlays when the first homepage block is a hero section. */
+  immersiveOverHero?: boolean;
 }
 
 export default function StorefrontSiteHeader({
@@ -34,14 +39,17 @@ export default function StorefrontSiteHeader({
   isAnnouncementSelected = false,
   onSelectHeader,
   isHeaderSelected = false,
+  pageSurface = 'homepage',
+  immersiveOverHero = false,
 }: StorefrontSiteHeaderProps) {
   const headerRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
   const [navPortalTarget, setNavPortalTarget] = useState<HTMLElement | null>(null);
   const [openMobileGroupId, setOpenMobileGroupId] = useState<string | null>(null);
   const [openDesktopGroupId, setOpenDesktopGroupId] = useState<string | null>(null);
   const navItems = siteSettings.navItems?.length ? siteSettings.navItems : DEFAULT_NAV;
-  const layout = headerLayoutForVariant(siteSettings.headerVariant || 'classic');
+  const layout = headerLayoutForPageSurface(siteSettings.headerVariant, pageSurface);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -89,13 +97,41 @@ export default function StorefrontSiteHeader({
     };
   }, [openDesktopGroupId, preview]);
 
+  useEffect(() => {
+    const headerEl = headerRef.current;
+    if (!headerEl) return;
+
+    const scrollRoot = headerEl.closest('.sites-canvas-area') as HTMLElement | null;
+
+    const onScroll = () => {
+      const offset = scrollRoot ? scrollRoot.scrollTop : window.scrollY;
+      setHeaderScrolled(offset > 12);
+    };
+
+    onScroll();
+    if (scrollRoot) {
+      scrollRoot.addEventListener('scroll', onScroll, { passive: true });
+      return () => scrollRoot.removeEventListener('scroll', onScroll);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [layout]);
+
   const headerStyle = useMemo(
-    () => ({
-      background: siteSettings.headerBg || '#fff',
-      color: siteSettings.headerTextColor || '#111827',
-    }),
-    [siteSettings.headerBg, siteSettings.headerTextColor]
+    () => buildHeaderSurfaceStyle(siteSettings, { scrolled: headerScrolled, layout, immersiveOverHero }),
+    [siteSettings, headerScrolled, layout, immersiveOverHero]
   );
+
+  const layoutDataAttrs = useMemo(
+    () => headerLayoutDataAttributes(siteSettings, layout),
+    [siteSettings, layout]
+  );
+
+  const headerClassName = `storefront-site-header storefront-site-header--layout-${layout}${
+    headerScrolled ? ' is-scrolled' : ''
+  }${preview ? ' storefront-site-header--preview' : ''}${
+    layout === 'immersive' && immersiveOverHero ? ' storefront-site-header--immersive-over-hero' : ''
+  }`;
 
   const brandName = siteSettings.websiteName || 'My Store';
 
@@ -212,7 +248,7 @@ export default function StorefrontSiteHeader({
 
   if (layout === 'orderform') {
     return (
-      <div className="storefront-site-header storefront-site-header--layout-orderform">
+      <header ref={headerRef} className={headerClassName} style={headerStyle} {...layoutDataAttrs}>
         {announcementBlock}
         <StorefrontOrderformHeader
           siteSettings={siteSettings}
@@ -221,7 +257,7 @@ export default function StorefrontSiteHeader({
           onSelectHeader={onSelectHeader}
           isHeaderSelected={isHeaderSelected}
         />
-      </div>
+      </header>
     );
   }
 
@@ -366,11 +402,7 @@ export default function StorefrontSiteHeader({
 
   return (
     <>
-      <header
-        ref={headerRef}
-        className={`storefront-site-header storefront-site-header--layout-${layout}`}
-        style={headerStyle}
-      >
+      <header ref={headerRef} className={headerClassName} style={headerStyle} {...layoutDataAttrs}>
         {announcementBlock}
 
         {barContent}

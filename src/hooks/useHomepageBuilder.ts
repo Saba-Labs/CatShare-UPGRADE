@@ -124,11 +124,14 @@ function builderReducer(state: BuilderState, action: BuilderAction): BuilderStat
 
     case 'REMOVE_SECTION': {
       const sectionId: string = action.payload;
+      const sections = state.layout.sections
+        .filter((s) => s.id !== sectionId)
+        .map((s, idx) => ({ ...s, order: idx }));
       return withHistory(
         state,
         {
           ...state.layout,
-          sections: state.layout.sections.filter((s) => s.id !== sectionId),
+          sections,
         },
         state.selectedSectionId === sectionId ? null : state.selectedSectionId
       );

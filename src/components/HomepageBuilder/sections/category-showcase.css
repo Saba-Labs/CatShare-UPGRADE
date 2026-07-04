@@ -27,6 +27,18 @@
   text-align: right;
 }
 
+.cat-showcase--label-align-left .cat-showcase__body {
+  text-align: left;
+}
+
+.cat-showcase--label-align-center .cat-showcase__body {
+  text-align: center;
+}
+
+.cat-showcase--label-align-right .cat-showcase__body {
+  text-align: right;
+}
+
 .cat-showcase__track {
   display: grid;
   gap: var(--cat-gap, 16px);

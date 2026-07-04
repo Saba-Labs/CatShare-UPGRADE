@@ -130,6 +130,35 @@ export default function WebsiteProductCard({
       );
     }
 
+    if (resolvedStyle === 'catalog') {
+      return (
+        <>
+          <div className="website-product-card-body website-product-card-body--catalog">
+            <p className="website-product-card-title">{product.name}</p>
+            {priceLabel ? (
+              <div className="website-product-card-catalog-meta">
+                <p className="website-product-card-price">{priceLabel}</p>
+                <span className="website-product-card-catalog-wish" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M12 20.5 10.55 19.1C5.4 14.55 2 11.55 2 7.75 2 4.85 4.25 2.75 7.1 2.75c1.65 0 3.25.8 4.25 2.05C12.35 3.55 13.95 2.75 15.6 2.75 18.45 2.75 20.7 4.85 20.7 7.75c0 3.8-3.4 6.8-8.55 11.35L12 20.5Z" />
+                  </svg>
+                </span>
+              </div>
+            ) : null}
+          </div>
+          <div className="website-product-card-catalog-action">
+            <span className="website-product-card-catalog-action__add">Add to cart</span>
+            <span className="website-product-card-catalog-action__divider" aria-hidden="true" />
+            <span className="website-product-card-catalog-action__link" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </div>
+        </>
+      );
+    }
+
     return (
       <div className="website-product-card-body">
         <p className="website-product-card-title">{product.name}</p>
@@ -147,6 +176,11 @@ export default function WebsiteProductCard({
         {imageBlock}
         {renderBody()}
       </div>
+    ) : resolvedStyle === 'catalog' ? (
+      <>
+        {imageBlock}
+        {renderBody()}
+      </>
     ) : (
       <>
         {imageBlock}

@@ -2668,6 +2668,7 @@ export default function StoreView() {
                         siteSettings={homepageSiteSettings}
                         store={store}
                         basePath={storeBasePath(effectiveSlug || slug || '', dedicatedHost)}
+                        pageSurface="inner"
                       />
                     ) : null}
                     <ProductPageRuntime

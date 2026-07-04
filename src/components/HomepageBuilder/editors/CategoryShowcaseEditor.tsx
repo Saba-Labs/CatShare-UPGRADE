@@ -224,6 +224,22 @@ export default function CategoryShowcaseEditor({ section, storeId, websiteConfig
       </div>
 
       <div className="panel-section">
+        <label className="panel-label">Category text alignment</label>
+        <SidebarDropdownField
+          ariaLabel="Category text alignment"
+          value={resolved.labelAlign}
+          options={[
+            { value: 'left', label: 'Left' },
+            { value: 'center', label: 'Center' },
+            { value: 'right', label: 'Right' },
+          ]}
+          onChange={(next) =>
+            updateSettings({ labelAlign: next as CategoryShowcaseSection['settings']['labelAlign'] })
+          }
+        />
+      </div>
+
+      <div className="panel-section">
         <label className="panel-label">Card frame</label>
         <SidebarDropdownField
           ariaLabel="Card frame"

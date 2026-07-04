@@ -2,7 +2,13 @@ import React from 'react';
 import { FeaturedProductsSection, HomepageSection } from '../../../types/homepage';
 import ProductPicker from './catalogue/ProductPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
-import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
+import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
+import {
+  coerceProductSectionDisplayMode,
+  getProductCardStyleMeta,
+  normalizeProductCardStyle,
+  productCardStyleSupportsCarousel,
+} from '../../../utils/productCardStyles';
 
 interface FeaturedProductsEditorProps {
   section: FeaturedProductsSection & { id: string };
@@ -11,6 +17,9 @@ interface FeaturedProductsEditorProps {
 
 export default function FeaturedProductsEditor({ section, onUpdate }: FeaturedProductsEditorProps) {
   const { settings, content } = section;
+  const resolvedCardStyle = normalizeProductCardStyle(settings.cardStyle);
+  const carouselDisabled = !productCardStyleSupportsCarousel(resolvedCardStyle);
+  const effectiveDisplayMode = coerceProductSectionDisplayMode(settings.cardStyle, settings.displayMode);
 
   const updateSettings = (patch: Partial<FeaturedProductsSection['settings']>) =>
     onUpdate({ settings: { ...settings, ...patch } } as Partial<HomepageSection>);
@@ -31,25 +40,33 @@ export default function FeaturedProductsEditor({ section, onUpdate }: FeaturedPr
         <label className="panel-label">Product view</label>
         <SidebarDropdownField
           ariaLabel="Featured product view mode"
-          value={settings.displayMode || 'grid'}
+          value={effectiveDisplayMode}
           options={[
             { value: 'grid', label: 'Grid' },
-            { value: 'carousel', label: 'Carousel' },
+            { value: 'carousel', label: 'Carousel', disabled: carouselDisabled },
           ]}
           onChange={(next) => updateSettings({ displayMode: next as FeaturedProductsSection['settings']['displayMode'] })}
         />
+        {carouselDisabled ? (
+          <p className="sidebar-field-hint">
+            {`${getProductCardStyleMeta(resolvedCardStyle).label} only works as a grid.`}
+          </p>
+        ) : null}
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Card style</label>
-        <SidebarDropdownField
-          ariaLabel="Featured product card style"
-          value={settings.cardStyle || 'boxed'}
-          options={PRODUCT_CARD_STYLE_OPTIONS}
-          onChange={(next) => updateSettings({ cardStyle: next as NonNullable<FeaturedProductsSection['settings']['cardStyle']> })}
-        />
-      </div>
+      <ProductCardStyleSettingsPanel
+        cardStyle={settings.cardStyle}
+        cardStyleAriaLabel="Featured product card style"
+        displayMode={settings.displayMode}
+        onCardStyleChange={(cardStyle, layoutPatch) =>
+          updateSettings({
+            cardStyle,
+            ...(layoutPatch?.displayMode ? { displayMode: layoutPatch.displayMode } : {}),
+          })
+        }
+      />
 
+      {normalizeProductCardStyle(settings.cardStyle) !== 'catalog' ? (
       <div className="panel-section">
         <label className="panel-label">Card size</label>
         <SidebarDropdownField
@@ -63,6 +80,7 @@ export default function FeaturedProductsEditor({ section, onUpdate }: FeaturedPr
           onChange={(next) => updateSettings({ cardSize: next as NonNullable<FeaturedProductsSection['settings']['cardSize']> })}
         />
       </div>
+      ) : null}
 
       <div className="panel-section">
         <label className="panel-label">Max products to show</label>

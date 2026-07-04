@@ -24,7 +24,12 @@ import { useWebsiteOrderBridge } from '../WebsiteOrderBridge';
 import ProductCardVariantPicker from '../ProductCardVariantPicker';
 import ProductCardFlipShop from '../ProductCardFlipShop';
 import { useWebsiteStore } from '../WebsiteStoreContext';
-import { normalizeProductCardStyle, type ProductCardStyle } from '../../../utils/productCardStyles';
+import {
+  getProductCardStyleGridColumns,
+  normalizeProductCardStyle,
+  productCardStyleForcesGridLayout,
+  type ProductCardStyle,
+} from '../../../utils/productCardStyles';
 import '../website-runtime.css';
 
 interface CollectionPageRuntimeProps {
@@ -79,10 +84,11 @@ export default function CollectionPageRuntime({
       ? viewMode === 'list'
       : store.viewMode === 'list';
   const resolvedCardsStyle = normalizeProductCardStyle(cardsStyle);
-  const overlayProductLayout = resolvedCardsStyle === 'overlay';
-  const productsUseListLayout = isListView;
+  const gridCardLayout = productCardStyleForcesGridLayout(resolvedCardsStyle);
+  const productsUseListLayout = isListView && !gridCardLayout;
   const imageAspect = productImageAspectRatio(productImageRatio);
-  const gridColumnCount = Math.min(4, Math.max(2, Number(columns) || 4)) as 2 | 3 | 4;
+  const gridColumnCount = getProductCardStyleGridColumns(resolvedCardsStyle, columns);
+  const catalogProductLayout = resolvedCardsStyle === 'catalog';
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
 
@@ -289,7 +295,9 @@ export default function CollectionPageRuntime({
           className={
             productsUseListLayout
               ? 'website-products-list website-products-list--order-form'
-              : 'website-products-grid website-products-grid--order-form website-products-grid--fixed-cols'
+              : `website-products-grid website-products-grid--order-form website-products-grid--fixed-cols${
+                  catalogProductLayout ? ' website-products-grid--catalog' : ''
+                }`
           }
           style={
             productsUseListLayout
@@ -302,7 +310,7 @@ export default function CollectionPageRuntime({
               key={product.id}
               product={product}
               cardsStyle={resolvedCardsStyle}
-              listView={isListView && !overlayProductLayout}
+              listView={isListView && !gridCardLayout}
               href={productPath(product)}
               catalogue={orderBridge?.catalogue ?? null}
               quantity={orderBridge?.getProductQty(product.id) ?? 0}
@@ -362,6 +370,7 @@ function CollectionProductCard({
   const isBoutique = resolvedStyle === 'boutique';
   const isQuickShop = resolvedStyle === 'quick-shop';
   const isFlipShop = resolvedStyle === 'flip-shop';
+  const isCatalog = resolvedStyle === 'catalog';
   const brandLabel = product.subtitle?.trim() || store.sellerBusinessName?.trim() || undefined;
 
   const openInBuilder = (e: MouseEvent) => {
@@ -544,6 +553,79 @@ function CollectionProductCard({
           builderPreview={builderPreview}
           onBuilderProductClick={onBuilderProductClick}
         />
+      </article>
+    );
+  }
+
+  const openProductPage = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (builderPreview) {
+      onBuilderProductClick?.(product);
+      return;
+    }
+    navigate(href);
+  };
+
+  const handleCatalogAdd = openProductPage;
+
+  const catalogUnavailable = showAvailability && !inStock;
+
+  if (!listView && isCatalog) {
+    return (
+      <article
+        className={`website-product-card website-product-card-catalog website-product-card-grid${
+          builderPreview ? ' website-product-card--builder' : ''
+        }${catalogUnavailable ? ' website-product-card-catalog--unavailable' : ''}`}
+      >
+        <ProductNav className="website-product-card-linkwrap">
+          <div className="website-product-card-img">
+            {img ? (
+              <img src={img} alt={product.name} loading="lazy" />
+            ) : (
+              <ProductImagePlaceholder size={40} className="website-product-card-ph" />
+            )}
+            {catalogUnavailable ? (
+              <span className="website-product-card-oos">Out of stock</span>
+            ) : null}
+          </div>
+        </ProductNav>
+        <div className="website-product-card-body website-product-card-body--catalog">
+          <ProductNav className="website-product-card-title-link">
+            <p className="website-product-card-title">{product.name}</p>
+          </ProductNav>
+          {showPrice && Number.isFinite(price) && price > 0 ? (
+            <div className="website-product-card-catalog-meta">
+              <p className="website-product-card-price">
+                {formatStorePrice(price, store.sellerCurrencyCode)}
+                {priceUnit ? (
+                  <span className="website-product-card-price-unit">/{unitLabel(priceUnit)}</span>
+                ) : null}
+              </p>
+              <span className="website-product-card-catalog-wish" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 20.5 10.55 19.1C5.4 14.55 2 11.55 2 7.75 2 4.85 4.25 2.75 7.1 2.75c1.65 0 3.25.8 4.25 2.05C12.35 3.55 13.95 2.75 15.6 2.75 18.45 2.75 20.7 4.85 20.7 7.75c0 3.8-3.4 6.8-8.55 11.35L12 20.5Z" />
+                </svg>
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <div className="website-product-card-catalog-action">
+          <button
+            type="button"
+            className="website-product-card-catalog-action__add"
+            disabled={catalogUnavailable}
+            onClick={handleCatalogAdd}
+          >
+            {catalogUnavailable ? 'Out of stock' : 'Add to cart'}
+          </button>
+          <span className="website-product-card-catalog-action__divider" aria-hidden="true" />
+          <ProductNav className="website-product-card-catalog-action__link" aria-label={`View ${product.name}`}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </ProductNav>
+        </div>
       </article>
     );
   }

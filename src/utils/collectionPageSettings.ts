@@ -1,7 +1,7 @@
 import { createDefaultWebsiteModeConfig } from '../config/homepageBuilderConfig';
 import type { HomepageLayout, WebsiteModeConfig, WebsiteCollectionTemplate } from '../types/homepage';
 import type { FullProductListSection } from '../types/homepage';
-import { normalizeProductCardStyle } from './productCardStyles';
+import { normalizeProductCardStyle, coerceProductListViewMode, getProductCardStyleGridColumns } from './productCardStyles';
 
 const DEFAULT_LIST_SETTINGS: FullProductListSection['settings'] = {
   showSearch: true,
@@ -60,13 +60,15 @@ export function resolveCollectionPageSettings(
 ): ResolvedCollectionPageSettings {
   const template = resolveCollectionTemplate(layout?.websiteConfig ?? null);
 
+  const cardsStyle = normalizeProductCardStyle(template.cardsStyle);
+
   return {
-    columns: template.columns ?? 4,
+    columns: getProductCardStyleGridColumns(cardsStyle, template.columns ?? 4),
     showSearch: template.showSearch ?? true,
     showCategoryFilters: template.showFilters ?? true,
     showSort: template.showSort ?? true,
-    viewMode: template.viewMode ?? 'list',
-    cardsStyle: normalizeProductCardStyle(template.cardsStyle),
+    viewMode: coerceProductListViewMode(cardsStyle, template.viewMode ?? 'list'),
+    cardsStyle,
     productImageRatio: template.productImageRatio ?? 'square',
     showPrice: template.showPrice ?? true,
     showAvailability: template.showAvailability ?? true,

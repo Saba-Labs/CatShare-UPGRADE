@@ -3,7 +3,13 @@ import { HomepageSection, ProductGridSection } from '../../../types/homepage';
 import CategoryPicker from './catalogue/CategoryPicker';
 import ProductPicker from './catalogue/ProductPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
-import { PRODUCT_CARD_STYLE_OPTIONS } from '../../../utils/productCardStyles';
+import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
+import {
+  coerceProductSectionDisplayMode,
+  getProductCardStyleMeta,
+  normalizeProductCardStyle,
+  productCardStyleSupportsCarousel,
+} from '../../../utils/productCardStyles';
 
 type GridSource = 'all' | 'category' | 'specific';
 
@@ -22,6 +28,9 @@ function currentSource(content: ProductGridSection['content']): GridSource {
 export default function ProductGridEditor({ section, onUpdate }: ProductGridEditorProps) {
   const { settings, content } = section;
   const source = currentSource(content);
+  const resolvedCardStyle = normalizeProductCardStyle(settings.cardStyle);
+  const carouselDisabled = !productCardStyleSupportsCarousel(resolvedCardStyle);
+  const effectiveDisplayMode = coerceProductSectionDisplayMode(settings.cardStyle, settings.displayMode);
 
   const updateSettings = (patch: Partial<ProductGridSection['settings']>) =>
     onUpdate({ settings: { ...settings, ...patch } } as Partial<HomepageSection>);
@@ -90,25 +99,33 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
         <label className="panel-label">Product view</label>
         <SidebarDropdownField
           ariaLabel="Product view mode"
-          value={settings.displayMode || 'grid'}
+          value={effectiveDisplayMode}
           options={[
             { value: 'grid', label: 'Grid' },
-            { value: 'carousel', label: 'Carousel' },
+            { value: 'carousel', label: 'Carousel', disabled: carouselDisabled },
           ]}
           onChange={(next) => updateSettings({ displayMode: next as ProductGridSection['settings']['displayMode'] })}
         />
+        {carouselDisabled ? (
+          <p className="sidebar-field-hint">
+            {`${getProductCardStyleMeta(resolvedCardStyle).label} only works as a grid.`}
+          </p>
+        ) : null}
       </div>
 
-      <div className="panel-section">
-        <label className="panel-label">Card style</label>
-        <SidebarDropdownField
-          ariaLabel="Product card style"
-          value={settings.cardStyle || 'boxed'}
-          options={PRODUCT_CARD_STYLE_OPTIONS}
-          onChange={(next) => updateSettings({ cardStyle: next as NonNullable<ProductGridSection['settings']['cardStyle']> })}
-        />
-      </div>
+      <ProductCardStyleSettingsPanel
+        cardStyle={settings.cardStyle}
+        cardStyleAriaLabel="Product card style"
+        displayMode={settings.displayMode}
+        onCardStyleChange={(cardStyle, layoutPatch) =>
+          updateSettings({
+            cardStyle,
+            ...(layoutPatch?.displayMode ? { displayMode: layoutPatch.displayMode } : {}),
+          })
+        }
+      />
 
+      {normalizeProductCardStyle(settings.cardStyle) !== 'catalog' ? (
       <div className="panel-section">
         <label className="panel-label">Card size</label>
         <SidebarDropdownField
@@ -122,6 +139,7 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
           onChange={(next) => updateSettings({ cardSize: next as NonNullable<ProductGridSection['settings']['cardSize']> })}
         />
       </div>
+      ) : null}
 
       <div className="panel-section">
         <label className="panel-label">Max products to show</label>

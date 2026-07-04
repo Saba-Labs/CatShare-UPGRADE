@@ -43,6 +43,8 @@ import {
 } from '../../utils/builderEditGuards';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
+import { headerLayoutForVariant } from '../../config/headerVariants';
+import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
 import SectionDropIndicator from './dnd/SectionDropIndicator';
 import { isPaletteDragId } from './dnd/builderDndTypes';
 import './GridCanvas.css';
@@ -118,6 +120,9 @@ export default function GridCanvas({
     [layout.sections]
   );
   const siteSettings = layout.websiteConfig?.siteSettings;
+  const headerLayout = headerLayoutForVariant(siteSettings?.headerVariant);
+  const immersiveHeroOverlay = homepageUsesImmersiveHeroOverlay(siteSettings?.headerVariant, sortedSections);
+  const overlayHeaderInEditor = headerLayout === 'floating' || immersiveHeroOverlay;
   const showTemplatePicker =
     themeHubMode ||
     (sortedSections.length === 0 &&
@@ -239,7 +244,11 @@ export default function GridCanvas({
 
   return (
     <div
-      className={`grid-canvas-container sites-canvas${showTemplatePicker ? ' sites-canvas--theme-hub-active' : ''}`}
+      className={`grid-canvas-container sites-canvas${
+        overlayHeaderInEditor ? ' sites-canvas--overlay-header' : ''
+      }${immersiveHeroOverlay ? ' sites-canvas--immersive-hero' : ''}${
+        showTemplatePicker ? ' sites-canvas--theme-hub-active' : ''
+      }`}
       onPointerDown={handleCanvasPointerDown}
       onClickCapture={preventBuilderLinkNavigation}
       style={{
@@ -254,6 +263,7 @@ export default function GridCanvas({
         <StorefrontSiteHeader
           siteSettings={siteSettings}
           preview
+          immersiveOverHero={immersiveHeroOverlay}
           onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
           isAnnouncementSelected={isSiteAnnouncementSelected}
           onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}

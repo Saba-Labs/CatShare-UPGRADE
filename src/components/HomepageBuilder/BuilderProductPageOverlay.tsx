@@ -83,6 +83,7 @@ export default function BuilderProductPageOverlay({
             <StorefrontSiteHeader
               siteSettings={siteSettings}
               preview
+              pageSurface="inner"
               onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
               isAnnouncementSelected={isSiteAnnouncementSelected}
               onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}

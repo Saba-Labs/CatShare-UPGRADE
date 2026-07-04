@@ -485,7 +485,7 @@ export function buildCookedWebsiteConfig(input: CookThemeInput): WebsiteModeConf
       announcementTextColor: '#ffffff',
       headerBg: showHeader ? theme.backgroundColor : '#ffffff',
       headerTextColor: showHeader ? theme.textColor : '#111827',
-      headerVariant: showHeader ? headerVariantForTemplate('studio-commerce') : 'minimal',
+      headerVariant: showHeader ? headerVariantForTemplate('studio-commerce') : 'classic',
       ...(showFooter ? footerPreset : footerPresetForVariant('clean')),
       footerDescription: showFooter
         ? 'Modern essentials, thoughtfully made. Quality products with a shopping experience you can trust.'

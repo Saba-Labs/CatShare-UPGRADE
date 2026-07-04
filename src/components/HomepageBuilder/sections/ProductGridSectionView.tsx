@@ -5,7 +5,7 @@ import { ProductGridSection } from '../../../types/homepage';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
 import WebsiteCarousel from '../../WebsiteBuilder/WebsiteCarousel';
 import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
-import { normalizeProductCardStyle } from '../../../utils/productCardStyles';
+import { resolveWebsiteSectionProductsLayout } from '../../../utils/websiteSectionProductsLayout';
 import { IconImage } from '../../Storefront/StorefrontIcons';
 import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 
@@ -24,14 +24,12 @@ export default function ProductGridSectionView({
 }: ProductGridSectionViewProps) {
   const { settings, content } = section;
   const storeCtx = useWebsiteStoreOptional();
-  const displayMode = settings.displayMode === 'carousel' || settings.displayMode === 'list' ? 'carousel' : 'grid';
-  const cardsStyle = normalizeProductCardStyle(settings.cardStyle);
-  const resolvedCardSize = settings.cardSize || 'md';
-  const cardMinWidthMap: Record<'sm' | 'md' | 'lg', number> = { sm: 140, md: 190, lg: 240 };
-  const cardMinWidth = cardMinWidthMap[resolvedCardSize];
-  const carouselItemWidth = `${cardMinWidth}px`;
-  // Keep "grid" truly grid-like: cards wrap to next line on smaller widths.
-  const gridMinCardWidth = `${cardMinWidth}px`;
+  const layout = resolveWebsiteSectionProductsLayout({
+    cardStyle: settings.cardStyle,
+    displayMode: settings.displayMode,
+    cardSize: settings.cardSize,
+    columns: settings.columns,
+  });
   const source =
     content.productSource ||
     (content.productIds?.length ? 'specific' : content.categoryId ? 'category' : 'all');
@@ -51,6 +49,18 @@ export default function ProductGridSectionView({
   }
   const limited = displayProducts.slice(0, settings.itemsToShow);
 
+  const renderProductCards = (products: typeof limited) =>
+    products.map((product) => (
+      <WebsiteProductCard
+        key={product.id}
+        product={product}
+        cardsStyle={layout.cardsStyle}
+        viewMode="grid"
+        builderPreview={builderCanvas}
+        onBuilderProductClick={onProductPreview}
+      />
+    ));
+
   return (
     <div className="website-section-products" style={{ background: settings.backgroundColor || 'transparent' }}>
       {settings.showSearch && editMode && (
@@ -67,38 +77,19 @@ export default function ProductGridSectionView({
 
       {storeCtx && limited.length > 0 ? (
         <>
-          {displayMode === 'carousel' ? (
+          {layout.displayMode === 'carousel' ? (
             <WebsiteCarousel
-              style={{ ['--carousel-item-width' as string]: `minmax(${carouselItemWidth}, ${carouselItemWidth})` }}
+              style={{
+                ['--carousel-item-width' as string]: `minmax(${layout.carouselItemWidth}, ${layout.carouselItemWidth})`,
+              }}
               prevLabel="Scroll products left"
               nextLabel="Scroll products right"
             >
-              {limited.map((product) => (
-                <WebsiteProductCard
-                  key={product.id}
-                  product={product}
-                  cardsStyle={cardsStyle}
-                  viewMode="grid"
-                  builderPreview={builderCanvas}
-                  onBuilderProductClick={onProductPreview}
-                />
-              ))}
+              {renderProductCards(limited)}
             </WebsiteCarousel>
           ) : (
-            <div
-              className="website-products-grid"
-              style={{ ['--products-col-min' as string]: gridMinCardWidth }}
-            >
-              {limited.map((product) => (
-                <WebsiteProductCard
-                  key={product.id}
-                  product={product}
-                  cardsStyle={cardsStyle}
-                  viewMode="grid"
-                  builderPreview={builderCanvas}
-                  onBuilderProductClick={onProductPreview}
-                />
-              ))}
+            <div className={layout.gridClassName} style={layout.gridStyle}>
+              {renderProductCards(limited)}
             </div>
           )}
           {limited.length < displayProducts.length && (
@@ -121,17 +112,17 @@ export default function ProductGridSectionView({
       ) : (
         <div
           style={
-            displayMode === 'carousel'
+            layout.displayMode === 'carousel'
               ? {
                   display: 'grid',
                   gridAutoFlow: 'column',
-                  gridAutoColumns: carouselItemWidth,
+                  gridAutoColumns: layout.carouselItemWidth,
                   gap: '12px',
                   overflowX: 'auto',
                 }
               : {
                   display: 'grid',
-                  gridTemplateColumns: `repeat(auto-fit, minmax(${gridMinCardWidth}, 1fr))`,
+                  gridTemplateColumns: `repeat(auto-fit, minmax(${layout.carouselItemWidth}, 1fr))`,
                   gap: '16px',
                 }
           }

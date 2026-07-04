@@ -14,6 +14,7 @@ import WebsiteFooter from './WebsiteFooter';
 import HomePageRuntime from './pages/HomePageRuntime';
 import CollectionPageRuntime from './pages/CollectionPageRuntime';
 import ProductPageRuntime from './pages/ProductPageRuntime';
+import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
 import { resolveCollectionPageSettings } from '../../utils/collectionPageSettings';
 
 interface WebsiteRuntimeProps {
@@ -105,6 +106,13 @@ export default function WebsiteRuntime({
     [runtimeLayout]
   );
 
+  const innerPage =
+    section === 'collections' || section === 'products' || section === 'checkout' || !!customPage;
+
+  const immersiveHeroOverlay =
+    pageKind === 'home' &&
+    homepageUsesImmersiveHeroOverlay(websiteConfig.siteSettings.headerVariant, homeLayout.sections);
+
   return (
     <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
       <StorefrontSeo
@@ -113,10 +121,16 @@ export default function WebsiteRuntime({
         faviconUrl={websiteConfig.seo?.faviconUrl}
       />
       <div
-        className="website-runtime-root"
+        className={`website-runtime-root${immersiveHeroOverlay ? ' website-runtime-root--immersive-hero' : ''}`}
         style={{ minHeight: '100vh', background: homeLayout.theme?.backgroundColor || '#fff', color: homeLayout.theme?.textColor, fontFamily: homeLayout.theme?.fontFamily, ...themeVars }}
       >
-        <WebsiteHeader slug={slug} siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }} onSubdomain={onSubdomain} />
+        <WebsiteHeader
+          slug={slug}
+          siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }}
+          onSubdomain={onSubdomain}
+          pageSurface={innerPage ? 'inner' : 'homepage'}
+          immersiveOverHero={immersiveHeroOverlay}
+        />
         {section === 'collections' ? (
           <CollectionPageRuntime
             products={products}

@@ -427,14 +427,23 @@
   outline: none;
 }
 
-.sidebar-panel-header--with-hint {
-  justify-content: flex-start;
+.sidebar-panel-header__lead {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.sidebar-panel-header--with-hint h3 {
+.sidebar-panel-header__lead h3 {
   flex: 0 1 auto;
   min-width: 0;
+}
+
+.sidebar-panel-header__actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .panel-input {
@@ -999,7 +1008,8 @@
 /* Desktop canvas should mirror live runtime flow */
 .sites-canvas-area.viewport-desktop {
   overflow-x: hidden;
-  padding: 0;
+  /* Keep a slim editor gutter so section drag grips stay visible (see .sites-document-stack) */
+  padding: 0 0 0 48px;
   align-items: stretch;
 }
 
@@ -2955,6 +2965,10 @@
   padding: 0;
 }
 
+.preview-content--immersive-hero {
+  position: relative;
+}
+
 .preview-document-stack {
   display: flex;
   flex-direction: column;
@@ -3891,8 +3905,9 @@
 
 .section-image-edit-btn {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   right: 12px;
+  top: auto;
   z-index: 2;
   padding: 8px 12px;
   border: none;
@@ -3911,7 +3926,6 @@
 }
 
 .section-image-edit-btn--on-image {
-  top: auto;
   bottom: 10px;
   right: 10px;
 }

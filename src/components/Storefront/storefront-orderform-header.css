@@ -55,6 +55,9 @@
   max-width: 1200px;
   margin: 0 auto;
   box-sizing: border-box;
+  transition:
+    padding 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    gap 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sf-of-header__top {
@@ -77,6 +80,10 @@
   overflow: hidden;
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  transition:
+    width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sf-of-header__logo img {
@@ -134,6 +141,10 @@
   line-height: 1.1;
   letter-spacing: -0.3px;
   color: var(--sf-of-text, #1a1a1a);
+  transition:
+    font-size 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    font-family 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    margin 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sf-of-header__tagline {
@@ -143,6 +154,7 @@
   max-width: 300px;
   color: var(--sf-of-text2, #555);
   font-weight: 400;
+  transition: opacity 0.24s ease;
 }
 
 .sf-of-header__desc {
@@ -155,6 +167,7 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: opacity 0.24s ease;
 }
 
 @media (min-width: 900px) {

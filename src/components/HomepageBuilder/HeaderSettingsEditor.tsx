@@ -8,6 +8,7 @@ import {
   HEADER_VARIANT_OPTIONS,
   headerColorPresetForVariant,
   headerPresetForVariant,
+  normalizeHeaderVariant,
 } from '../../config/headerVariants';
 import type { WebsiteHeaderVariant, WebsiteModeConfig, WebsiteSiteSettings } from '../../types/homepage';
 import {
@@ -16,7 +17,8 @@ import {
   withLinkedTaglinePatch,
 } from '../../hooks/useLinkedBusinessProfile';
 import { syncSiteSettingsPatchToBusinessProfile } from '../../utils/businessProfileStorefront';
-import { FiChevronDown, FiChevronUp, FiLink, FiPlus, FiTrash2, FiType } from './builderSidebarIcons';
+import PanelFieldLabel, { SidebarPanelHeading } from './PanelFieldLabel';
+import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2, FiType } from './builderSidebarIcons';
 
 interface HeaderSettingsEditorProps {
   siteSettings: WebsiteSiteSettings;
@@ -31,7 +33,7 @@ export default function HeaderSettingsEditor({
   storeId,
   onUpdateWebsiteConfig,
 }: HeaderSettingsEditorProps) {
-  const variant = siteSettings.headerVariant || 'classic';
+  const variant = normalizeHeaderVariant(siteSettings.headerVariant);
   const navItems = siteSettings.navItems || [];
   const businessProfile = useLinkedBusinessProfile();
   const brand = getLinkedBrandDisplay(siteSettings, businessProfile);
@@ -49,32 +51,34 @@ export default function HeaderSettingsEditor({
     patch({ ...headerPresetForVariant(next) });
   };
 
+  const headerLayoutHint =
+    'Changes how your logo and menu are arranged. Use Colors below for background and text. Click the announcement strip in the preview to edit the top banner.' +
+    (variant === 'floating' || variant === 'immersive'
+      ? ' For overlay layouts, click the header bar to edit the header, or click the hero below it to edit sections.'
+      : '') +
+    (variant === 'immersive'
+      ? ' Immersive only overlays image hero blocks at the top of the page.'
+      : '');
+
   return (
     <>
       <div className="sidebar-field">
-        <label className="panel-label">Header layout</label>
+        <PanelFieldLabel label="Header layout" hint={headerLayoutHint} />
         <SidebarDropdownField
           ariaLabel="Header layout"
           value={variant}
           options={HEADER_VARIANT_OPTIONS.map((opt) => ({ value: opt.id, label: opt.label }))}
           onChange={applyVariant}
         />
-        <p className="panel-hint">
-          Changes how your logo and menu are arranged. Use Colors below for background and text. Click the announcement strip in the preview to edit the top banner.
-        </p>
       </div>
 
+      <HeaderLayoutOptions variant={variant} siteSettings={siteSettings} onPatch={patch} />
+
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Brand</h3>
-      </div>
-      <p className="panel-hint">
-        Linked to{' '}
-        <a href="/store/business" className="panel-hint-link">
-          Business Profile
-        </a>
-        . Changes here update your profile and storefront header.
-      </p>
+      <SidebarPanelHeading
+        title="Brand"
+        hint="Linked to Business Profile (Store → Business). Changes here update your profile and storefront header."
+      />
       <div className="sidebar-field sidebar-field--inline">
         <span className="field-icon" title="Site name">
           <FiType aria-hidden />
@@ -98,10 +102,10 @@ export default function HeaderSettingsEditor({
       {variant === 'orderform' ? (
         <>
           <div className="sidebar-panel-divider" />
-          <div className="sidebar-panel-header">
-            <h3>Store hero text</h3>
-          </div>
-          <p className="panel-hint">Same as Business Profile → Short about / tagline and Full description.</p>
+          <SidebarPanelHeading
+            title="Store hero text"
+            hint="Same as Business Profile → Short about / tagline and Full description. Open/closed badge uses footer settings (Site → Footer). Menu links are hidden with this layout."
+          />
           <div className="sidebar-field">
             <label className="panel-label">Tagline</label>
             <textarea
@@ -122,31 +126,35 @@ export default function HeaderSettingsEditor({
               onChange={(e) => patch({ headerAbout: e.target.value })}
             />
           </div>
-          <p className="panel-hint">
-            Open/closed badge uses the same settings as the footer (Site → Footer). Menu links are hidden with this layout.
-          </p>
         </>
       ) : null}
 
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Menu links</h3>
-        <button
-          type="button"
-          className="btn-text"
-          onClick={() =>
-            patch({
-              navItems: [...navItems, { id: uuid(), label: 'Link', href: '/' }],
-            })
-          }
-        >
-          + Link
-        </button>
-      </div>
-      {variant === 'orderform' ? (
-        <p className="panel-hint">Not shown with the OrderForm store hero layout.</p>
-      ) : navItems.length === 0 ? (
-        <p className="panel-hint">No links yet — add Home, Shop, or custom pages.</p>
+      <SidebarPanelHeading
+        title="Menu links"
+        hint={
+          variant === 'orderform'
+            ? 'Not shown with the OrderForm store hero layout.'
+            : 'Add Home, Shop, or custom pages. Use + on a link to add dropdown options.'
+        }
+        actions={
+          variant === 'orderform' ? null : (
+            <button
+              type="button"
+              className="btn-text"
+              onClick={() =>
+                patch({
+                  navItems: [...navItems, { id: uuid(), label: 'Link', href: '/' }],
+                })
+              }
+            >
+              + Link
+            </button>
+          )
+        }
+      />
+      {variant === 'orderform' ? null : navItems.length === 0 ? (
+        <p className="sidebar-empty-hint">No links yet.</p>
       ) : (
         <div className="nav-items-list">
           {navItems.map((item, index) => (
@@ -251,12 +259,15 @@ export default function HeaderSettingsEditor({
       )}
 
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Colors</h3>
-        <button type="button" className="btn-text" onClick={() => patch(headerColorPresetForVariant(variant))}>
-          Reset to style defaults
-        </button>
-      </div>
+      <SidebarPanelHeading
+        title="Colors"
+        hint="Background and text colors for the header bar."
+        actions={
+          <button type="button" className="btn-text" onClick={() => patch(headerColorPresetForVariant(variant))}>
+            Reset to style defaults
+          </button>
+        }
+      />
       <div className="color-picker-stack">
         <ColorPickerField
           label="Background"
@@ -271,6 +282,172 @@ export default function HeaderSettingsEditor({
       </div>
     </>
   );
+}
+
+function HeaderLayoutOptions({
+  variant,
+  siteSettings,
+  onPatch,
+}: {
+  variant: WebsiteHeaderVariant;
+  siteSettings: WebsiteSiteSettings;
+  onPatch: (patch: Partial<WebsiteSiteSettings>) => void;
+}) {
+  if (variant === 'classic') {
+    return (
+      <>
+        <div className="sidebar-panel-divider" />
+        <SidebarPanelHeading
+          title="Classic bar options"
+          hint="Border is always hidden once the header pins on scroll."
+        />
+        <label className="panel-checkbox">
+          <input
+            type="checkbox"
+            checked={siteSettings.headerClassicBorder !== false}
+            onChange={(e) => onPatch({ headerClassicBorder: e.target.checked })}
+          />
+          <span>Show bottom border</span>
+        </label>
+      </>
+    );
+  }
+
+  if (variant === 'centered') {
+    return (
+      <>
+        <div className="sidebar-panel-divider" />
+        <SidebarPanelHeading title="Centered bar options" />
+        <div className="sidebar-field">
+          <label className="panel-label">Logo / menu spacing</label>
+          <SidebarDropdownField
+            ariaLabel="Centered header spacing"
+            value={siteSettings.headerCenteredGap || 'normal'}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'normal', label: 'Normal' },
+              { value: 'wide', label: 'Wide' },
+            ]}
+            onChange={(headerCenteredGap) => onPatch({ headerCenteredGap })}
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (variant === 'floating') {
+    const opacity = siteSettings.headerFloatingOpacity ?? 0.92;
+    const blur = siteSettings.headerFloatingBlur ?? 12;
+    return (
+      <>
+        <div className="sidebar-panel-divider" />
+        <SidebarPanelHeading
+          title="Floating bar options"
+          hint="Transparency and blur apply to the pill before scroll. Background color comes from Colors below."
+        />
+        <div className="sidebar-field">
+          <label className="panel-label">Bar transparency ({Math.round(opacity * 100)}%)</label>
+          <input
+            type="range"
+            className="panel-input"
+            min={0.2}
+            max={1}
+            step={0.05}
+            value={opacity}
+            onChange={(e) => onPatch({ headerFloatingOpacity: parseFloat(e.target.value) })}
+            aria-label="Floating bar transparency"
+          />
+        </div>
+        <div className="sidebar-field">
+          <label className="panel-label">Backdrop blur ({blur}px)</label>
+          <input
+            type="range"
+            className="panel-input"
+            min={0}
+            max={24}
+            step={2}
+            value={blur}
+            onChange={(e) => onPatch({ headerFloatingBlur: parseInt(e.target.value, 10) })}
+            aria-label="Floating bar backdrop blur"
+          />
+        </div>
+        <div className="sidebar-field">
+          <label className="panel-label">Corner style</label>
+          <SidebarDropdownField
+            ariaLabel="Floating bar corner style"
+            value={siteSettings.headerFloatingRadius || 'round'}
+            options={[
+              { value: 'soft', label: 'Soft (8px)' },
+              { value: 'round', label: 'Round (12px)' },
+              { value: 'pill', label: 'Pill' },
+            ]}
+            onChange={(headerFloatingRadius) => onPatch({ headerFloatingRadius })}
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (variant === 'immersive') {
+    const tint = siteSettings.headerImmersiveOpacity ?? 0;
+    return (
+      <>
+        <div className="sidebar-panel-divider" />
+        <SidebarPanelHeading
+          title="Immersive bar options"
+          hint="Transparent bar overlays only when the first homepage block is a hero image (banner, image, carousel, video, or feature card). Otherwise the bar stays in the normal page flow."
+        />
+        <div className="sidebar-field">
+          <label className="panel-label">Hero tint ({Math.round(tint * 100)}%)</label>
+          <input
+            type="range"
+            className="panel-input"
+            min={0}
+            max={0.85}
+            step={0.05}
+            value={tint}
+            onChange={(e) => onPatch({ headerImmersiveOpacity: parseFloat(e.target.value) })}
+            aria-label="Immersive header hero tint"
+          />
+        </div>
+        <label className="panel-checkbox">
+          <input
+            type="checkbox"
+            checked={siteSettings.headerImmersiveTextShadow !== false}
+            onChange={(e) => onPatch({ headerImmersiveTextShadow: e.target.checked })}
+          />
+          <span>Text shadow on hero</span>
+        </label>
+      </>
+    );
+  }
+
+  if (variant === 'orderform') {
+    return (
+      <>
+        <div className="sidebar-panel-divider" />
+        <SidebarPanelHeading
+          title="Store hero options"
+          hint="Hero compacts to a logo + name bar when you scroll."
+        />
+        <div className="sidebar-field">
+          <label className="panel-label">Hero padding</label>
+          <SidebarDropdownField
+            ariaLabel="Store hero padding"
+            value={siteSettings.headerHeroPadding || 'comfortable'}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'comfortable', label: 'Comfortable' },
+              { value: 'spacious', label: 'Spacious' },
+            ]}
+            onChange={(headerHeroPadding) => onPatch({ headerHeroPadding })}
+          />
+        </div>
+      </>
+    );
+  }
+
+  return null;
 }
 
 function sanitizeHref(value: string) {

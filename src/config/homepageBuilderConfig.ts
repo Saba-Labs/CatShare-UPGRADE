@@ -9,6 +9,7 @@ import {
 import { syncSiteThemeAcrossPages } from '../utils/websiteSiteTheme';
 import { v4 as uuid } from 'uuid';
 import { createDefaultFooterLinkColumns } from './footerVariants';
+import { normalizeHeaderVariant } from './headerVariants';
 import { normalizeStorefrontPath } from '../utils/storefrontHref';
 import { normalizeFreeformElementsList } from '../utils/freeformElements';
 
@@ -193,6 +194,7 @@ export function createDefaultSection(
           gap: 'md',
           titleAlign: 'left',
           labelStyle: 'below',
+          labelAlign: 'left',
           hoverEffect: 'lift',
         },
         content: {
@@ -599,6 +601,7 @@ function normalizeNavItem(item: import('../types/homepage').WebsiteNavItem): imp
 function normalizeSiteSettingsLinks(site: WebsiteSiteSettings): WebsiteSiteSettings {
   return {
     ...site,
+    headerVariant: normalizeHeaderVariant(site.headerVariant),
     navItems: (site.navItems || []).map(normalizeNavItem),
     footerColumns: (site.footerColumns || []).map((column) => ({
       ...column,

@@ -52,7 +52,12 @@ export default function CatalogCollectionPage({
           }}
         >
           {showSiteHeader && siteSettings ? (
-            <StorefrontSiteHeader siteSettings={siteSettings} store={store} basePath={basePath} />
+            <StorefrontSiteHeader
+              siteSettings={siteSettings}
+              store={store}
+              basePath={basePath}
+              pageSurface="inner"
+            />
           ) : onBack ? (
             <div className="sv-catalog-product-top">
               <button

@@ -1,7 +1,12 @@
 import type { WebsiteHeaderVariant, WebsiteSiteSettings } from '../types/homepage';
 
 /** Structural header layout — not colors or fonts. */
-export type HeaderLayoutMode = 'classic' | 'centered' | 'minimal' | 'split' | 'orderform';
+export type HeaderLayoutMode = 'classic' | 'centered' | 'floating' | 'immersive' | 'orderform';
+
+const LEGACY_HEADER_VARIANT_MAP: Record<string, WebsiteHeaderVariant> = {
+  minimal: 'classic',
+  split: 'classic',
+};
 
 export const HEADER_VARIANT_OPTIONS: Array<{ id: WebsiteHeaderVariant; label: string; description: string }> = [
   {
@@ -15,14 +20,14 @@ export const HEADER_VARIANT_OPTIONS: Array<{ id: WebsiteHeaderVariant; label: st
     description: 'Logo centered on top, navigation links in a row below',
   },
   {
-    id: 'minimal',
-    label: 'Minimal bar',
-    description: 'Logo only in the bar — links open from the menu button',
+    id: 'floating',
+    label: 'Floating bar',
+    description: 'Rounded pill bar with inset margins and shadow over the page hero',
   },
   {
-    id: 'split',
-    label: 'Split bar',
-    description: 'Logo left, links centered in the middle, menu button on the right',
+    id: 'immersive',
+    label: 'Immersive bar',
+    description: 'Transparent bar over the hero — solid background after you scroll',
   },
   {
     id: 'orderform',
@@ -31,14 +36,36 @@ export const HEADER_VARIANT_OPTIONS: Array<{ id: WebsiteHeaderVariant; label: st
   },
 ];
 
-export function headerLayoutForVariant(variant: WebsiteHeaderVariant): HeaderLayoutMode {
-  switch (variant) {
+/** Map saved values (including removed minimal/split) to a supported header layout. */
+export function normalizeHeaderVariant(variant: string | undefined): WebsiteHeaderVariant {
+  if (!variant) return 'classic';
+  if (variant in LEGACY_HEADER_VARIANT_MAP) {
+    return LEGACY_HEADER_VARIANT_MAP[variant];
+  }
+  if (
+    variant === 'classic' ||
+    variant === 'centered' ||
+    variant === 'floating' ||
+    variant === 'immersive' ||
+    variant === 'orderform'
+  ) {
+    return variant;
+  }
+  return 'classic';
+}
+
+export function isOverlayHeaderLayout(layout: HeaderLayoutMode): boolean {
+  return layout === 'floating' || layout === 'immersive';
+}
+
+export function headerLayoutForVariant(variant: string | undefined): HeaderLayoutMode {
+  switch (normalizeHeaderVariant(variant)) {
     case 'centered':
       return 'centered';
-    case 'minimal':
-      return 'minimal';
-    case 'split':
-      return 'split';
+    case 'floating':
+      return 'floating';
+    case 'immersive':
+      return 'immersive';
     case 'orderform':
       return 'orderform';
     case 'classic':
@@ -47,9 +74,39 @@ export function headerLayoutForVariant(variant: WebsiteHeaderVariant): HeaderLay
   }
 }
 
+/** Homepage uses the configured layout; inner storefront pages always use the classic top bar. */
+export function headerLayoutForPageSurface(
+  variant: string | undefined,
+  surface: 'homepage' | 'inner' = 'homepage'
+): HeaderLayoutMode {
+  if (surface === 'inner') return 'classic';
+  return headerLayoutForVariant(variant);
+}
+
+/** Layout only — colors stay in the Colors section. */
+export function headerLayoutDefaultsForVariant(variant: WebsiteHeaderVariant): Partial<WebsiteSiteSettings> {
+  switch (variant) {
+    case 'centered':
+      return { headerCenteredGap: 'normal' };
+    case 'floating':
+      return {
+        headerFloatingOpacity: 0.92,
+        headerFloatingBlur: 12,
+        headerFloatingRadius: 'round',
+      };
+    case 'immersive':
+      return { headerImmersiveOpacity: 0, headerImmersiveTextShadow: true };
+    case 'orderform':
+      return { headerHeroPadding: 'comfortable' };
+    case 'classic':
+    default:
+      return { headerClassicBorder: true };
+  }
+}
+
 /** Layout only — colors stay in the Colors section. */
 export function headerPresetForVariant(variant: WebsiteHeaderVariant): Partial<WebsiteSiteSettings> {
-  return { headerVariant: variant };
+  return { headerVariant: variant, ...headerLayoutDefaultsForVariant(variant) };
 }
 
 /** Optional palette when user taps “Reset to style defaults”. */
@@ -60,15 +117,15 @@ export function headerColorPresetForVariant(variant: WebsiteHeaderVariant): Part
         headerBg: '#fdfaf6',
         headerTextColor: '#3b3026',
       };
-    case 'minimal':
+    case 'floating':
       return {
         headerBg: '#ffffff',
         headerTextColor: '#111827',
       };
-    case 'split':
+    case 'immersive':
       return {
-        headerBg: '#0b1120',
-        headerTextColor: '#e2e8f0',
+        headerBg: '#ffffff',
+        headerTextColor: '#111827',
       };
     case 'orderform':
       return {
@@ -86,13 +143,13 @@ export function headerColorPresetForVariant(variant: WebsiteHeaderVariant): Part
 
 export function headerVariantForTemplate(templateId: string): WebsiteHeaderVariant {
   if (templateId === 'aurora-boutique') return 'centered';
-  if (templateId === 'pulse-tech') return 'split';
-  if (templateId === 'clean-market') return 'minimal';
+  if (templateId === 'pulse-tech') return 'floating';
+  if (templateId === 'clean-market') return 'classic';
   if (templateId === 'default-store') return 'orderform';
   if (templateId === 'studio-commerce') return 'classic';
   if (templateId === 'fashion-wardrobe' || templateId === 'fashion-boutique-list') return 'orderform';
-  if (templateId === 'fashion-linen' || templateId === 'jewel-pearl') return 'minimal';
-  if (templateId === 'fashion-runway' || templateId === 'jewel-apex') return 'split';
+  if (templateId === 'fashion-linen' || templateId === 'jewel-pearl') return 'classic';
+  if (templateId === 'fashion-runway' || templateId === 'jewel-apex') return 'floating';
   if (templateId === 'fashion-maharani' || templateId === 'jewel-royal') return 'centered';
   if (templateId === 'jewel-tray' || templateId === 'jewel-counter') return 'orderform';
   return 'classic';
