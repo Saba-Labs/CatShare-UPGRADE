@@ -1,5 +1,6 @@
 import React from 'react';
 import { ImageSection } from '../../../types/homepage';
+import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './ImageSection.css';
 
@@ -7,10 +8,17 @@ interface ImageSectionViewProps {
   section: ImageSection & { id: string };
   storeId?: string;
   editMode?: boolean;
+  builderCanvas?: boolean;
   onUpdateSection?: (updates: Partial<ImageSection>) => void;
 }
 
-export default function ImageSectionView({ section, storeId, editMode, onUpdateSection }: ImageSectionViewProps) {
+export default function ImageSectionView({
+  section,
+  storeId,
+  editMode,
+  builderCanvas = false,
+  onUpdateSection,
+}: ImageSectionViewProps) {
   const { settings, content } = section;
   const media = useBuilderMediaOptional();
 
@@ -51,25 +59,37 @@ export default function ImageSectionView({ section, storeId, editMode, onUpdateS
     });
   };
 
+  const imageStyle = {
+    width: '100%',
+    objectFit: 'cover' as const,
+    objectPosition: imageObjectPosition,
+    borderRadius: settings.rounded ? '8px' : '0',
+    boxShadow: settings.shadow ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
+    cursor: editMode && media ? 'pointer' : undefined,
+  };
+
+  const renderImage = () => (
+    <img
+      src={content.url}
+      alt={content.alt}
+      style={imageStyle}
+      onClick={editMode && media ? openPicker : undefined}
+      title={editMode ? 'Click to change image' : undefined}
+    />
+  );
+
   return (
     <div className={`image-section ${alignClass} ${verticalAlignClass}`}>
       <div className={`image-section__inner ${widthClass}`}>
         {content.url ? (
           <figure className="image-section__figure">
-            <img
-              src={content.url}
-              alt={content.alt}
-              style={{
-                width: '100%',
-                objectFit: 'cover',
-                objectPosition: imageObjectPosition,
-                borderRadius: settings.rounded ? '8px' : '0',
-                boxShadow: settings.shadow ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
-                cursor: editMode && media ? 'pointer' : undefined,
-              }}
-              onClick={editMode && media ? openPicker : undefined}
-              title={editMode ? 'Click to change image' : undefined}
-            />
+            {settings.link ? (
+              <StorefrontLink href={settings.link} preview={builderCanvas}>
+                {renderImage()}
+              </StorefrontLink>
+            ) : (
+              renderImage()
+            )}
             {editMode && onUpdateSection ? (
               <figcaption
                 className="image-section__caption sites-inline-editable"

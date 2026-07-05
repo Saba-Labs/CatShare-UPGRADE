@@ -1,5 +1,6 @@
 import React from 'react';
 import { TextSection } from '../../../types/homepage';
+import BuilderRichTextEditor from '../BuilderRichTextEditor';
 
 interface TextSectionEditorProps {
   section: TextSection & { id: string };
@@ -8,19 +9,10 @@ interface TextSectionEditorProps {
 
 export default function TextSectionEditor({ section, onUpdate }: TextSectionEditorProps) {
   return (
-    <div className="panel-section">
-      <label className="panel-label">Content</label>
-      <textarea
-        className="panel-input"
-        style={{ minHeight: '80px', fontFamily: 'inherit' }}
-        value={section.content.text}
-        onChange={(e) =>
-          onUpdate({
-            content: { ...section.content, text: e.target.value },
-          })
-        }
-        placeholder="Enter your text content..."
-      />
-    </div>
+    <BuilderRichTextEditor
+      label="Content"
+      value={section.content.text}
+      onChange={(text) => onUpdate({ content: { ...section.content, text } })}
+    />
   );
 }

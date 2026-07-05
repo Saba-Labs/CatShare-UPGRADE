@@ -274,6 +274,10 @@ export interface TestimonialsSection {
     columns: 1 | 2 | 3;
     backgroundColor?: string;
     showRating: boolean;
+    /** Card layout: classic quote cards, layered tilted cards, or accent-bordered cards */
+    cardStyle?: 'classic' | 'layered' | 'accent';
+    /** Accent color for accent card style (name, featured top border) */
+    accentColor?: string;
   };
   content: {
     testimonials: Testimonial[];
@@ -453,6 +457,10 @@ export interface FreeformButtonElement {
   content: {
     label: string;
     href: string;
+    buttonStyle?: 'solid' | 'outline' | 'soft';
+    buttonColor?: string;
+    buttonShadow?: 'none' | 'soft' | 'medium' | 'strong';
+    buttonRadius?: 'theme' | 'sharp' | 'round' | 'pill';
   };
 }
 
@@ -589,6 +597,10 @@ export interface WebsiteSiteSettings {
   headerClassicBorder?: boolean;
   /** Centered bar: vertical space between logo and navigation. */
   headerCenteredGap?: 'compact' | 'normal' | 'wide';
+  /** Centered bar: logo display size at rest. */
+  headerCenteredLogoSize?: 'small' | 'medium' | 'large' | 'xl';
+  /** Centered bar: store name beside, below, or hidden (logo only). */
+  headerCenteredBrandLayout?: 'logo-only' | 'logo-beside' | 'logo-below';
   /** Floating bar: pill background opacity (0–1) before scroll. */
   headerFloatingOpacity?: number;
   /** Floating bar: backdrop blur on the pill (px). */

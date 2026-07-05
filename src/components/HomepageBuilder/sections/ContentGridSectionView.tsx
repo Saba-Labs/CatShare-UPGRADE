@@ -1,5 +1,7 @@
 import type { ContentGridSection } from '../../../types/homepage';
 import { commitInlineText } from '../../../utils/builderEditGuards';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './ContentGrid.css';
 interface ContentGridSectionViewProps {
@@ -67,18 +69,19 @@ export default function ContentGridSectionView({
     >
       {settings.title ? (
         editMode && onUpdateSection ? (
-          <h2
-            className="grid-title sites-inline-editable"
-            contentEditable
-            suppressContentEditableWarning
+          <BuilderInlineEditable
+            tag="h2"
+            className="grid-title"
+            value={settings.title}
+            onChange={updateSectionTitle}
             onMouseDown={stopEditPointer}
             onPointerDown={stopEditPointer}
             onClick={stopEditPointer}
-            onBlur={(e) => updateSectionTitle(e.currentTarget.textContent || '')}
-          >            {settings.title}
-          </h2>
+          />
         ) : (
-          <h2 className="grid-title">{settings.title}</h2>
+          <h2 className="grid-title">
+            <BuilderHtmlContent html={settings.title} tag="span" />
+          </h2>
         )
       ) : null}
 
@@ -112,32 +115,31 @@ export default function ContentGridSectionView({
             <div className="grid-item-content">
               {editMode && onUpdateSection ? (
                 <>
-                  <h3
-                    className="sites-inline-editable"
-                    contentEditable
-                    suppressContentEditableWarning
+                  <BuilderInlineEditable
+                    tag="h3"
+                    value={item.title}
+                    onChange={(title) => updateItem(item.id, { title })}
                     onMouseDown={stopEditPointer}
                     onPointerDown={stopEditPointer}
                     onClick={stopEditPointer}
-                    onBlur={(e) => updateItem(item.id, { title: e.currentTarget.textContent || '' })}
-                  >
-                    {item.title}
-                  </h3>
-                  <p
-                    className="sites-inline-editable"
-                    contentEditable
-                    suppressContentEditableWarning
+                  />
+                  <BuilderInlineEditable
+                    tag="p"
+                    value={item.description}
+                    onChange={(description) => updateItem(item.id, { description })}
                     onMouseDown={stopEditPointer}
                     onPointerDown={stopEditPointer}
                     onClick={stopEditPointer}
-                    onBlur={(e) => updateItem(item.id, { description: e.currentTarget.textContent || '' })}
-                  >                    {item.description}
-                  </p>
+                  />
                 </>
               ) : (
                 <>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
+                  <h3>
+                    <BuilderHtmlContent html={item.title} tag="span" />
+                  </h3>
+                  <p>
+                    <BuilderHtmlContent html={item.description} tag="span" />
+                  </p>
                 </>
               )}
             </div>

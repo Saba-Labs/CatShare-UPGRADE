@@ -5,7 +5,7 @@ import { getBlockInnerStyle, getBlockRowStyle } from '../../utils/blockLayout';
 import { preventBuilderLinkNavigation } from '../../utils/builderNavigation';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
-import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
+import { homepageUsesHeroHeaderOverlay } from '../../utils/immersiveHeaderOverlay';
 
 interface PreviewPaneProps {
   layout: HomepageLayout;
@@ -18,13 +18,13 @@ export default function PreviewPane({ layout }: PreviewPaneProps) {
     [layout.sections]
   );
   const siteSettings = layout.websiteConfig?.siteSettings;
-  const immersiveHeroOverlay = homepageUsesImmersiveHeroOverlay(siteSettings?.headerVariant, sections);
+  const heroHeaderOverlay = homepageUsesHeroHeaderOverlay(siteSettings?.headerVariant, sections);
   return (
     <div className="preview-pane">
       <div className="preview-header">Live Preview</div>
       <div
         className={`preview-content preview-content--document${
-          immersiveHeroOverlay ? ' preview-content--immersive-hero' : ''
+          heroHeaderOverlay ? ' preview-content--hero-overlay' : ''
         }`}
         onClickCapture={preventBuilderLinkNavigation}
         style={{
@@ -37,7 +37,7 @@ export default function PreviewPane({ layout }: PreviewPaneProps) {
           <StorefrontSiteHeader
             siteSettings={siteSettings}
             preview
-            immersiveOverHero={immersiveHeroOverlay}
+            heroOverlay={heroHeaderOverlay}
           />
         ) : null}
         {sections.length === 0 ? (

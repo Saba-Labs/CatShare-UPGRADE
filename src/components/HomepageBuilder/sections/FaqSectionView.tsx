@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { FaqSection } from '../../../types/homepage';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
 import './FaqSection.css';
 
 interface FaqSectionViewProps {
@@ -30,18 +32,13 @@ export default function FaqSectionView({ section, editMode, onUpdateSection }: F
       {settings.title && (
         <h2 className="faq-section-title">
           {editMode && onUpdateSection ? (
-            <span
-              className="sites-inline-editable"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) =>
-                onUpdateSection({ settings: { ...settings, title: e.currentTarget.textContent || '' } })
-              }
-            >
-              {settings.title}
-            </span>
+            <BuilderInlineEditable
+              tag="span"
+              value={settings.title}
+              onChange={(title) => onUpdateSection({ settings: { ...settings, title } })}
+            />
           ) : (
-            settings.title
+            <BuilderHtmlContent html={settings.title} tag="span" />
           )}
         </h2>
       )}
@@ -58,17 +55,14 @@ export default function FaqSectionView({ section, editMode, onUpdateSection }: F
                 aria-expanded={isOpen}
               >
                 {editMode && onUpdateSection ? (
-                  <span
-                    className="sites-inline-editable"
-                    contentEditable
-                    suppressContentEditableWarning
+                  <BuilderInlineEditable
+                    tag="span"
+                    value={item.question}
+                    onChange={(question) => updateItem(item.id, { question })}
                     onClick={(e) => e.stopPropagation()}
-                    onBlur={(e) => updateItem(item.id, { question: e.currentTarget.textContent || '' })}
-                  >
-                    {item.question}
-                  </span>
+                  />
                 ) : (
-                  item.question
+                  <BuilderHtmlContent html={item.question} tag="span" />
                 )}
                 <span className="faq-chevron" aria-hidden>
                   {isOpen ? '−' : '+'}
@@ -77,16 +71,15 @@ export default function FaqSectionView({ section, editMode, onUpdateSection }: F
               {(isOpen || editMode) && (
                 <div className="faq-answer">
                   {editMode && onUpdateSection ? (
-                    <p
-                      className="sites-inline-editable"
-                      contentEditable
-                      suppressContentEditableWarning
-                      onBlur={(e) => updateItem(item.id, { answer: e.currentTarget.textContent || '' })}
-                    >
-                      {item.answer}
-                    </p>
+                    <BuilderInlineEditable
+                      tag="p"
+                      value={item.answer}
+                      onChange={(answer) => updateItem(item.id, { answer })}
+                    />
                   ) : (
-                    <p>{item.answer}</p>
+                    <p>
+                      <BuilderHtmlContent html={item.answer} tag="span" />
+                    </p>
                   )}
                 </div>
               )}

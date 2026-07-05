@@ -54,10 +54,7 @@ export default function HeaderSettingsEditor({
   const headerLayoutHint =
     'Changes how your logo and menu are arranged. Use Colors below for background and text. Click the announcement strip in the preview to edit the top banner.' +
     (variant === 'floating' || variant === 'immersive'
-      ? ' For overlay layouts, click the header bar to edit the header, or click the hero below it to edit sections.'
-      : '') +
-    (variant === 'immersive'
-      ? ' Immersive only overlays image hero blocks at the top of the page.'
+      ? ' Floating and Immersive overlay only when the first homepage block is a hero image (banner, carousel, video, image, etc.). Otherwise the bar stays in normal page flow.'
       : '');
 
   return (
@@ -317,7 +314,44 @@ function HeaderLayoutOptions({
     return (
       <>
         <div className="sidebar-panel-divider" />
-        <SidebarPanelHeading title="Centered bar options" />
+        <SidebarPanelHeading
+          title="Centered bar options"
+          hint="Showcase your logo at the center — adjust size and how the store name appears."
+        />
+        <div className="sidebar-field">
+          <label className="panel-label">Logo size</label>
+          <SidebarDropdownField
+            ariaLabel="Centered header logo size"
+            value={siteSettings.headerCenteredLogoSize || 'medium'}
+            options={[
+              { value: 'small', label: 'Small' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'large', label: 'Large' },
+              { value: 'xl', label: 'Extra large' },
+            ]}
+            onChange={(headerCenteredLogoSize) =>
+              onPatch({ headerCenteredLogoSize: headerCenteredLogoSize as WebsiteSiteSettings['headerCenteredLogoSize'] })
+            }
+          />
+        </div>
+        <div className="sidebar-field">
+          <label className="panel-label">Store name</label>
+          <SidebarDropdownField
+            ariaLabel="Centered header store name layout"
+            value={siteSettings.headerCenteredBrandLayout || 'logo-beside'}
+            options={[
+              { value: 'logo-beside', label: 'Beside logo' },
+              { value: 'logo-below', label: 'Below logo' },
+              { value: 'logo-only', label: 'Hidden (logo only)' },
+            ]}
+            onChange={(headerCenteredBrandLayout) =>
+              onPatch({
+                headerCenteredBrandLayout:
+                  headerCenteredBrandLayout as WebsiteSiteSettings['headerCenteredBrandLayout'],
+              })
+            }
+          />
+        </div>
         <div className="sidebar-field">
           <label className="panel-label">Logo / menu spacing</label>
           <SidebarDropdownField
@@ -343,7 +377,7 @@ function HeaderLayoutOptions({
         <div className="sidebar-panel-divider" />
         <SidebarPanelHeading
           title="Floating bar options"
-          hint="Transparency and blur apply to the pill before scroll. Background color comes from Colors below."
+          hint="The pill overlays hero images at the top of the homepage only. Transparency and blur apply before scroll. Background color comes from Colors below."
         />
         <div className="sidebar-field">
           <label className="panel-label">Bar transparency ({Math.round(opacity * 100)}%)</label>
@@ -395,7 +429,7 @@ function HeaderLayoutOptions({
         <div className="sidebar-panel-divider" />
         <SidebarPanelHeading
           title="Immersive bar options"
-          hint="Transparent bar overlays only when the first homepage block is a hero image (banner, image, carousel, video, or feature card). Otherwise the bar stays in the normal page flow."
+          hint="Transparent bar overlays only when the first homepage block is a hero image (banner, carousel, video, image, etc.). Otherwise the bar stays in the normal page flow."
         />
         <div className="sidebar-field">
           <label className="panel-label">Hero tint ({Math.round(tint * 100)}%)</label>

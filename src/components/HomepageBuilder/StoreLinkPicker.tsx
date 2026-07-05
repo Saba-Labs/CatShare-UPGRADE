@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { WebsiteModeConfig } from '../../types/homepage';
 import { buildStoreLinkOptions, groupStoreLinkOptions } from '../../utils/storeLinkOptions';
-import { normalizeStorefrontPath } from '../../utils/storefrontHref';
+import { isExternalHref, sanitizeStoreLinkHref } from '../../utils/storefrontHref';
 import { useBuilderCatalogue } from './catalogue/BuilderCatalogueContext';
 import SidebarDropdownField, { type SidebarDropdownOption } from './SidebarDropdownField';
 
@@ -18,10 +18,13 @@ export default function StoreLinkPicker({
   value,
   onChange,
   websiteConfig,
-  placeholder = 'Or enter a custom path or https://…',
+  placeholder = 'https://example.com or /collections/all',
   allowCustom = true,
 }: StoreLinkPickerProps) {
   const { products, categories, loading } = useBuilderCatalogue();
+  const [linkMode, setLinkMode] = useState<'store' | 'external'>(() =>
+    isExternalHref(value) ? 'external' : 'store'
+  );
 
   const options = useMemo(
     () =>
@@ -34,7 +37,6 @@ export default function StoreLinkPicker({
   );
 
   const grouped = useMemo(() => groupStoreLinkOptions(options), [options]);
-
   const matchedOption = options.find((o) => o.href === value);
   const dropdownOptions = useMemo(
     () =>
@@ -50,26 +52,53 @@ export default function StoreLinkPicker({
     [grouped]
   );
 
+  const effectiveMode = isExternalHref(value) ? 'external' : linkMode;
+
   return (
     <div className="store-link-picker">
       <SidebarDropdownField
-        ariaLabel="Choose a store link"
-        value={matchedOption?.href || ''}
-        options={dropdownOptions}
-        placeholder={loading ? 'Loading store links…' : 'Choose store link…'}
+        ariaLabel="Link destination type"
+        value={effectiveMode}
+        options={[
+          { value: 'store', label: 'Store page' },
+          { value: 'external', label: 'External URL' },
+        ]}
         onChange={(next) => {
-          if (next) onChange(normalizeStorefrontPath(next));
+          const mode = next as 'store' | 'external';
+          setLinkMode(mode);
+          if (mode === 'external' && !isExternalHref(value)) {
+            onChange('https://');
+          } else if (mode === 'store' && isExternalHref(value)) {
+            onChange('/');
+          }
         }}
       />
+
+      {effectiveMode === 'store' ? (
+        <SidebarDropdownField
+          ariaLabel="Choose a store link"
+          value={matchedOption?.href || ''}
+          options={dropdownOptions}
+          placeholder={loading ? 'Loading store links…' : 'Choose store link…'}
+          onChange={(next) => {
+            if (next) onChange(sanitizeStoreLinkHref(next));
+          }}
+        />
+      ) : null}
+
       {allowCustom && (
         <input
           type="text"
           className="panel-input"
           value={value}
-          onChange={(e) => onChange(normalizeStorefrontPath(e.target.value))}
-          placeholder={placeholder}
+          onChange={(e) => onChange(sanitizeStoreLinkHref(e.target.value))}
+          placeholder={effectiveMode === 'external' ? 'https://…, mailto:…, tel:…' : placeholder}
         />
       )}
+
+      {effectiveMode === 'external' ? (
+        <p className="sidebar-field-hint">External links open in a new tab on your live store.</p>
+      ) : null}
     </div>
   );
 }

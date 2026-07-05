@@ -16,18 +16,10 @@ import TemplateGallery from './TemplateGallery';
 import type { WebsiteTemplateId } from '../../config/websiteTemplates';
 import { isCatalogClassicFooter } from '../../config/footerVariants';
 import {
-  SECTION_TYPE_LABELS,
   SITE_ANNOUNCEMENT_SELECTION_ID,
   SITE_FOOTER_SELECTION_ID,
   SITE_HEADER_SELECTION_ID,
 } from '../../config/homepageBuilderConfig';
-import { useBuilderMedia } from './media/BuilderMediaContext';
-import {
-  applyMediaUrlToSection,
-  applyMediaUrlsToSection,
-  sectionSupportsMultiMedia,
-  sectionSupportsQuickMedia,
-} from '../../utils/sectionMedia';
 import {
   getBlockAlign,
   getBlockInnerStyle,
@@ -43,8 +35,9 @@ import {
 } from '../../utils/builderEditGuards';
 import WebsiteFooter from '../WebsiteBuilder/WebsiteFooter';
 import StorefrontSiteHeader from '../Storefront/StorefrontSiteHeader';
-import { headerLayoutForVariant } from '../../config/headerVariants';
-import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
+import { homepageUsesHeroHeaderOverlay } from '../../utils/immersiveHeaderOverlay';
+import { BuilderInlineEditProvider } from './BuilderInlineEditContext';
+import SectionFloatingToolbar from './SectionFloatingToolbar';
 import SectionDropIndicator from './dnd/SectionDropIndicator';
 import { isPaletteDragId } from './dnd/builderDndTypes';
 import './GridCanvas.css';
@@ -76,12 +69,6 @@ interface GridCanvasProps {
   onUpdateSectionPosition?: (id: string, position: unknown) => void;
 }
 
-const ALIGN_OPTIONS: Array<{ value: BlockAlign; label: string }> = [
-  { value: 'left', label: '◧' },
-  { value: 'center', label: '▣' },
-  { value: 'right', label: '◨' },
-];
-
 export default function GridCanvas({
   layout,
   theme,
@@ -106,7 +93,6 @@ export default function GridCanvas({
   onProductPreview,
   onCategoryPreview,
 }: GridCanvasProps) {
-  const { openMediaPicker } = useBuilderMedia();
   const { active } = useDndContext();
   const paletteDragActive = active ? isPaletteDragId(String(active.id)) : false;
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -120,9 +106,8 @@ export default function GridCanvas({
     [layout.sections]
   );
   const siteSettings = layout.websiteConfig?.siteSettings;
-  const headerLayout = headerLayoutForVariant(siteSettings?.headerVariant);
-  const immersiveHeroOverlay = homepageUsesImmersiveHeroOverlay(siteSettings?.headerVariant, sortedSections);
-  const overlayHeaderInEditor = headerLayout === 'floating' || immersiveHeroOverlay;
+  const heroHeaderOverlay = homepageUsesHeroHeaderOverlay(siteSettings?.headerVariant, sortedSections);
+  const overlayHeaderInEditor = heroHeaderOverlay;
   const showTemplatePicker =
     themeHubMode ||
     (sortedSections.length === 0 &&
@@ -243,27 +228,29 @@ export default function GridCanvas({
   };
 
   return (
+    <BuilderInlineEditProvider>
     <div
       className={`grid-canvas-container sites-canvas${
         overlayHeaderInEditor ? ' sites-canvas--overlay-header' : ''
-      }${immersiveHeroOverlay ? ' sites-canvas--immersive-hero' : ''}${
+      }${heroHeaderOverlay ? ' sites-canvas--hero-overlay' : ''}${
         showTemplatePicker ? ' sites-canvas--theme-hub-active' : ''
       }`}
       onPointerDown={handleCanvasPointerDown}
       onClickCapture={preventBuilderLinkNavigation}
       style={{
-        fontFamily: theme.fontFamily || undefined,
-        color: theme.textColor || undefined,
-        backgroundColor: theme.backgroundColor || '#fff',
+        fontFamily: showTemplatePicker ? undefined : theme.fontFamily || undefined,
+        color: showTemplatePicker ? undefined : theme.textColor || undefined,
+        backgroundColor: showTemplatePicker ? undefined : theme.backgroundColor || '#fff',
         ['--site-primary' as string]: theme.primaryColor || '#1a73e8',
       }}
     >
-      <div className={`grid-canvas-chrome${showTemplatePicker ? ' grid-canvas-chrome--hidden' : ''}`}>
+      {!showTemplatePicker && (
+      <div className="grid-canvas-chrome">
       {siteSettings ? (
         <StorefrontSiteHeader
           siteSettings={siteSettings}
           preview
-          immersiveOverHero={immersiveHeroOverlay}
+          heroOverlay={heroHeaderOverlay}
           onSelectAnnouncement={() => onSelectSection(SITE_ANNOUNCEMENT_SELECTION_ID)}
           isAnnouncementSelected={isSiteAnnouncementSelected}
           onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}
@@ -277,6 +264,7 @@ export default function GridCanvas({
         </div>
       )}
       </div>
+      )}
       <div className="grid-canvas-stage">
         <div
           className={`grid-canvas-layer grid-canvas-layer--theme-hub${showTemplatePicker ? ' is-active' : ''}`}
@@ -324,11 +312,23 @@ export default function GridCanvas({
                   heightDragState && heightDragState.id === section.id
                     ? heightDragState.heightPx
                     : section.blockLayout?.heightPx;
-                const innerStyle = {
+                const blockStyle = {
                   ...getBlockInnerStyle(section.blockLayout),
                   width: isFreeform ? '100%' : `${liveWidth}%`,
-                  ...(liveHeight && !isFreeform ? { height: `${liveHeight}px`, overflow: 'hidden' as const } : {}),
                 };
+                const decorativeTestimonialStyle =
+                  section.type === 'testimonials' &&
+                  (section.settings?.cardStyle === 'layered' ||
+                    section.settings?.cardStyle === 'accent');
+                const contentClipStyle =
+                  liveHeight && !isFreeform
+                    ? {
+                        height: `${liveHeight}px`,
+                        overflow: decorativeTestimonialStyle
+                          ? ('visible' as const)
+                          : ('hidden' as const),
+                      }
+                    : undefined;
                 return (
                   <Fragment key={section.id}>
                   <SortableGridSection id={section.id}>
@@ -354,106 +354,30 @@ export default function GridCanvas({
                   className={`sites-document-block${isFreeform ? ' freeform-block-wrap' : ''} ${isSelected ? 'selected' : ''} ${
                     dragState?.id === section.id || heightDragState?.id === section.id ? 'resizing' : ''
                   }${isDragging ? ' dragging' : ''}`}
-                  style={innerStyle}
+                  style={blockStyle}
+                  data-section-id={section.id}
                   ref={(el) => {
                     blockRefs.current[section.id] = el;
                   }}
                   onClick={(e) => handleSectionClick(e, section.id)}
                 >
                   {isSelected && (
-                    <div
-                      className="sites-floating-toolbar"
-                      onClick={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <span className="sites-floating-label">{SECTION_TYPE_LABELS[section.type]}</span>
-                      <span className="sites-floating-hint">
-                        {isFreeform
-                          ? 'Click canvas to edit layers'
-                          : 'Drag block to move'}
-                      </span>
-                      {!isFreeform && (
-                      <div className="sites-align-group">
-                        {ALIGN_OPTIONS.map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            className={`sites-float-btn icon ${align === opt.value ? 'active' : ''}`}
-                            title={`Align ${opt.value}`}
-                            onClick={() => setAlign(section.id, opt.value)}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                      )}
-                      {!isFreeform && (
-                      <div className="sites-width-group">
-                        {[50, 75, 100].map((w) => (
-                          <button
-                            key={w}
-                            type="button"
-                            className={`sites-float-btn icon ${liveWidth === w ? 'active' : ''}`}
-                            title={`${w}% width`}
-                            onClick={() => setWidth(section.id, w)}
-                          >
-                            {w}%
-                          </button>
-                        ))}
-                        {section.blockLayout?.heightPx ? (
-                          <button
-                            type="button"
-                            className="sites-float-btn icon"
-                            title="Reset height to fit content"
-                            onClick={() => resetHeight(section.id)}
-                          >
-                            ↕ Auto
-                          </button>
-                        ) : null}
-                      </div>
-                      )}
-                      {sectionSupportsQuickMedia(section.type) && (
-                        <button
-                          type="button"
-                          className="sites-float-btn"
-                          onClick={() => {
-                            const isMulti = sectionSupportsMultiMedia(section.type);
-                            openMediaPicker({
-                              storeId,
-                              assetKey: `${section.id}-quick`,
-                              title: isMulti ? 'Add carousel images' : 'Choose image',
-                              multiple: isMulti,
-                              onSelect: isMulti
-                                ? undefined
-                                : (url) => {
-                                    const patch = applyMediaUrlToSection(section, url);
-                                    if (patch) onUpdateSection(section.id, patch);
-                                  },
-                              onSelectMultiple: isMulti
-                                ? (urls) => {
-                                    const patch = applyMediaUrlsToSection(section, urls);
-                                    if (patch) onUpdateSection(section.id, patch);
-                                  }
-                                : undefined,
-                            });
-                          }}
-                        >
-                          {sectionSupportsMultiMedia(section.type) ? 'Images' : 'Image'}
-                        </button>
-                      )}
-                      <button type="button" className="sites-float-btn" onClick={() => onDuplicateSection(section.id)}>
-                        Duplicate
-                      </button>
-                      <button
-                        type="button"
-                        className="sites-float-btn danger"
-                        onClick={() => onRemoveSection(section.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <SectionFloatingToolbar
+                      section={section}
+                      isFreeform={isFreeform}
+                      align={align}
+                      liveWidth={liveWidth}
+                      setAlign={setAlign}
+                      setWidth={setWidth}
+                      resetHeight={resetHeight}
+                      storeId={storeId}
+                      onUpdateSection={onUpdateSection}
+                      onDuplicateSection={onDuplicateSection}
+                      onRemoveSection={onRemoveSection}
+                    />
                   )}
 
+                  <div className="sites-document-block__clip" style={contentClipStyle}>
                   <SectionRenderer
                     section={section}
                     theme={theme}
@@ -478,6 +402,7 @@ export default function GridCanvas({
                     }
                     onUpdateSection={(updates) => onUpdateSection(section.id, updates)}
                   />
+                  </div>
 
                   {isSelected && !isFreeform && (
                     <>
@@ -553,5 +478,6 @@ export default function GridCanvas({
         </div>
       </div>
     </div>
+    </BuilderInlineEditProvider>
   );
 }

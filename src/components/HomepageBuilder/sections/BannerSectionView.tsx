@@ -1,5 +1,8 @@
 import type { BannerSection, ThemeSettings } from '../../../types/homepage';
-import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
+import { getBuilderButtonStyles } from '../../../utils/buttonStyleUtils';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
+import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './BannerSection.css';
@@ -25,7 +28,9 @@ export default function BannerSectionView({
 }: BannerSectionViewProps) {
   const { settings, content } = section;
   const media = useBuilderMediaOptional();
+  const buttonStyles = getBuilderButtonStyles(settings as Parameters<typeof getBuilderButtonStyles>[0], theme || {});
   const align = settings.textAlignment || 'center';
+  const canEdit = Boolean(editMode && onUpdateSection);
 
   const updateContent = (patch: Partial<BannerSection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
@@ -44,6 +49,20 @@ export default function BannerSectionView({
     });
   };
 
+  const renderButtonLabel = () => {
+    if (canEdit) {
+      return (
+        <BuilderInlineEditable
+          tag="span"
+          value={content.buttonText || ''}
+          placeholder="Button"
+          onChange={(buttonText) => updateContent({ buttonText })}
+        />
+      );
+    }
+    return <BuilderHtmlContent html={content.buttonText} tag="span" />;
+  };
+
   return (
     <div
       className={`banner-section banner-section--align-${align}`}
@@ -57,7 +76,7 @@ export default function BannerSectionView({
         className="banner-section__overlay"
         style={{ background: `rgba(0,0,0,${settings.overlayOpacity})` }}
       />
-      {editMode && media && storeId && onUpdateSection ? (
+      {canEdit && media && storeId ? (
         <button
           type="button"
           className="section-image-edit-btn"
@@ -70,56 +89,51 @@ export default function BannerSectionView({
         </button>
       ) : null}
       <div className="banner-section__content">
-        {editMode && onUpdateSection ? (
-          <>
-            <h2
-              className="banner-section__title sites-inline-editable sites-inline-heading"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => updateContent({ title: e.currentTarget.textContent || '' })}
-            >
-              {content.title}
-            </h2>
-            <p
-              className="banner-section__subtitle sites-inline-editable"
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => updateContent({ subtitle: e.currentTarget.textContent || '' })}
-            >
-              {content.subtitle || 'Subtitle'}
-            </p>
-            <span
-              className={`banner-section__cta sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
-              style={getThemeButtonStyles(theme || {})}
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
-            >
-              {content.buttonText || 'Button'}
-            </span>
-          </>
-        ) : (
-          <>
-            <h2 className="banner-section__title">{content.title}</h2>
-            {content.subtitle ? <p className="banner-section__subtitle">{content.subtitle}</p> : null}
-            {content.buttonText ? (
-              content.buttonLink ? (
-                <StorefrontLink
-                  href={content.buttonLink}
-                  preview={builderCanvas}
-                  className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`}
-                  style={getThemeButtonStyles(theme || {})}
-                >
-                  {content.buttonText}
-                </StorefrontLink>
-              ) : (
-                <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={getThemeButtonStyles(theme || {})}>
-                  {content.buttonText}
-                </span>
-              )
-            ) : null}
-          </>
+        <h2 className="banner-section__title">
+          {canEdit ? (
+            <BuilderInlineEditable
+              tag="span"
+              value={content.title}
+              placeholder="Title"
+              onChange={(title) => updateContent({ title })}
+            />
+          ) : (
+            <BuilderHtmlContent html={content.title} tag="span" />
+          )}
+        </h2>
+        {(canEdit || content.subtitle) && (
+          <p className="banner-section__subtitle">
+            {canEdit ? (
+              <BuilderInlineEditable
+                tag="span"
+                value={content.subtitle || ''}
+                placeholder="Subtitle"
+                onChange={(subtitle) => updateContent({ subtitle })}
+              />
+            ) : (
+              <BuilderHtmlContent html={content.subtitle} tag="span" />
+            )}
+          </p>
         )}
+        {(canEdit || content.buttonText) &&
+          (canEdit ? (
+            <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={buttonStyles}>
+              {renderButtonLabel()}
+            </span>
+          ) : content.buttonLink ? (
+            <StorefrontLink
+              href={content.buttonLink}
+              preview={builderCanvas}
+              className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`}
+              style={buttonStyles}
+            >
+              {renderButtonLabel()}
+            </StorefrontLink>
+          ) : (
+            <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={buttonStyles}>
+              {renderButtonLabel()}
+            </span>
+          ))}
       </div>
     </div>
   );

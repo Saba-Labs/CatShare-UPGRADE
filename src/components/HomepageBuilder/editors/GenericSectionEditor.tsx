@@ -109,6 +109,17 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
                 <span>Drop Shadow</span>
               </label>
             </div>
+
+            <ButtonLinkField
+              label="Image Link"
+              value={(section as any).settings.link || ''}
+              websiteConfig={websiteConfig}
+              onChange={(link) =>
+                onUpdate({
+                  settings: { ...(section as any).settings, link },
+                })
+              }
+            />
           </>
         );
 
@@ -230,17 +241,6 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
               onChange={(buttonLink) =>
                 onUpdate({
                   content: { ...(section as any).content, buttonLink },
-                })
-              }
-            />
-
-            <ColorPickerField
-              label="Button"
-              value={(section as any).settings.buttonColor || '#2563eb'}
-              defaultValue="#2563eb"
-              onChange={(buttonColor) =>
-                onUpdate({
-                  settings: { ...(section as any).settings, buttonColor },
                 })
               }
             />
@@ -518,7 +518,7 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
         );
 
       case 'testimonials':
-        return <TestimonialsSectionEditor section={section as any} onUpdate={onUpdate} />;
+        return <TestimonialsSectionEditor section={section as any} storeId={storeId} onUpdate={onUpdate} />;
 
       case 'featured-products':
       case 'category-showcase':

@@ -40,22 +40,18 @@
 }
 
 /* Order-form store hero is taller than a nav bar — don't clip it in the builder */
-.grid-canvas-chrome:has(.storefront-site-header--layout-orderform) {
+.grid-canvas-chrome:not(.grid-canvas-chrome--hidden):has(.storefront-site-header--layout-orderform) {
   max-height: none;
   overflow: visible;
 }
 
+.grid-canvas-container.sites-canvas--theme-hub-active .grid-canvas-chrome,
 .grid-canvas-chrome--hidden {
+  display: none;
+  max-height: 0 !important;
+  overflow: hidden !important;
   opacity: 0;
-  transform: translate3d(0, -8px, 0);
-  max-height: 0;
-  filter: blur(4px);
   pointer-events: none;
-  transition:
-    opacity var(--theme-hub-duration-fast, 0.38s) var(--theme-hub-ease, cubic-bezier(0.16, 1, 0.3, 1)),
-    transform var(--theme-hub-duration, 0.52s) var(--theme-hub-ease, cubic-bezier(0.16, 1, 0.3, 1)),
-    max-height var(--theme-hub-duration, 0.52s) var(--theme-hub-ease, cubic-bezier(0.16, 1, 0.3, 1)),
-    filter var(--theme-hub-duration-fast, 0.38s) var(--theme-hub-ease, cubic-bezier(0.16, 1, 0.3, 1));
 }
 
 .grid-canvas-stage {
@@ -165,8 +161,15 @@
 }
 
 .grid-canvas-container.sites-canvas--theme-hub-active {
-  background: transparent;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(26, 115, 232, 0.08), transparent 55%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f3f4 100%);
   min-height: 0;
+  padding: 0;
+}
+
+.grid-canvas-container.sites-canvas--theme-hub-active .grid-canvas-stage {
+  flex: 0 0 auto;
 }
 
 .grid-canvas-container::before {

@@ -1,5 +1,7 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React from 'react';
 import { TwoColumnContentSection } from '../../../types/homepage';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
 import './TwoColumnContent.css';
 
 type ColumnContent = TwoColumnContentSection['content']['leftContent'];
@@ -13,54 +15,6 @@ interface TwoColumnContentSectionViewProps {
 
 function stopEditPointer(e: React.MouseEvent | React.PointerEvent) {
   e.stopPropagation();
-}
-
-interface EditableFieldProps {
-  tag: 'h3' | 'p';
-  value: string;
-  onCommit: (value: string) => void;
-}
-
-function EditableColumnField({ tag: Tag, value, onCommit }: EditableFieldProps) {
-  const ref = useRef<HTMLElement>(null);
-  const isFocusedRef = useRef(false);
-
-  const syncDomFromProp = useCallback(() => {
-    const el = ref.current;
-    if (!el || isFocusedRef.current) return;
-    const next = value || '';
-    if (el.textContent !== next) {
-      el.textContent = next;
-    }
-  }, [value]);
-
-  useEffect(() => {
-    syncDomFromProp();
-  }, [syncDomFromProp]);
-
-  const commit = (next: string) => {
-    if (next === value) return;
-    onCommit(next);
-  };
-
-  return (
-    <Tag
-      ref={ref as never}
-      className="sites-inline-editable"
-      contentEditable
-      suppressContentEditableWarning
-      onPointerDown={stopEditPointer}
-      onMouseDown={stopEditPointer}
-      onClick={stopEditPointer}
-      onFocus={() => {
-        isFocusedRef.current = true;
-      }}
-      onBlur={(e) => {
-        isFocusedRef.current = false;
-        commit(e.currentTarget.textContent || '');
-      }}
-    />
-  );
 }
 
 export default function TwoColumnContentSectionView({
@@ -95,21 +49,31 @@ export default function TwoColumnContentSectionView({
       )}
       {canInlineEdit ? (
         <>
-          <EditableColumnField
+          <BuilderInlineEditable
             tag="h3"
             value={columnContent.title}
-            onCommit={(title) => updateColumn(side, { title })}
+            onChange={(title) => updateColumn(side, { title })}
+            onPointerDown={stopEditPointer}
+            onMouseDown={stopEditPointer}
+            onClick={stopEditPointer}
           />
-          <EditableColumnField
+          <BuilderInlineEditable
             tag="p"
             value={columnContent.description}
-            onCommit={(description) => updateColumn(side, { description })}
+            onChange={(description) => updateColumn(side, { description })}
+            onPointerDown={stopEditPointer}
+            onMouseDown={stopEditPointer}
+            onClick={stopEditPointer}
           />
         </>
       ) : (
         <>
-          <h3>{columnContent.title}</h3>
-          <p>{columnContent.description}</p>
+          <h3>
+            <BuilderHtmlContent html={columnContent.title} tag="span" />
+          </h3>
+          <p>
+            <BuilderHtmlContent html={columnContent.description} tag="span" />
+          </p>
         </>
       )}
     </div>

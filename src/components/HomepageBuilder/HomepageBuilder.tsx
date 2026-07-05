@@ -444,7 +444,7 @@ export default function HomepageBuilder({
 
   const handleApplyTemplate = (templateId: WebsiteTemplateId) => {
     const tpl = getWebsiteTemplate(templateId);
-    if (!tpl) return;
+    if (!tpl || tpl.comingSoon) return;
     const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
     const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
     const homeHasContent = (withSnapshot.pages.home.sections || []).length > 0;
@@ -476,25 +476,33 @@ export default function HomepageBuilder({
     setCookThemeOpen(true);
   };
 
-  const handleCookThemeComplete = (built: WebsiteModeConfig) => {
-    const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
-    const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
+  const handleCookThemeClose = useCallback(() => {
+    setCookThemeOpen(false);
+  }, []);
 
-    capturePreThemeSnapshot();
+  const handleCookThemeComplete = useCallback(
+    (built: WebsiteModeConfig) => {
+      const current = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+      const withSnapshot = snapshotCurrentPageIntoWebsiteConfig(current, state.layout, editingPageId);
 
-    applyBuiltWebsiteConfig(
-      built,
-      withSnapshot,
-      state.layout,
-      editingPageId,
-      actions,
-      { toastMessage: 'Your theme is ready — customize any block on the canvas' },
-      showToast
-    );
-    setBlankStarted(false);
-    setEditingPageId('home');
-    setSidebarTab('insert');
-  };
+      capturePreThemeSnapshot();
+
+      applyBuiltWebsiteConfig(
+        built,
+        withSnapshot,
+        state.layout,
+        editingPageId,
+        actions,
+        { toastMessage: 'Your theme is ready — customize any block on the canvas' },
+        showToast
+      );
+      setBlankStarted(false);
+      setEditingPageId('home');
+      setSidebarTab('insert');
+      setCookThemeOpen(false);
+    },
+    [actions, editingPageId, showToast, state.layout]
+  );
 
   const getRestoreOriginalMessage = useCallback(() => {
     const preTheme = preThemeLayoutRef.current;
@@ -851,7 +859,7 @@ export default function HomepageBuilder({
         open={cookThemeOpen}
         storeName={store?.sellerBusinessName || state.layout.websiteConfig?.siteSettings?.websiteName}
         confirmReplace={homeHasContent}
-        onClose={() => setCookThemeOpen(false)}
+        onClose={handleCookThemeClose}
         onComplete={handleCookThemeComplete}
       />
     </div>
@@ -956,7 +964,8 @@ function applyBuiltWebsiteConfig(
   showToast?: (msg: string, type: 'success' | 'error' | 'warning') => void
 ) {
   const siteTheme = built.pages.home.theme;
-  const customPages = (withSnapshot.pages.custom || []).map((page) => ({
+  const customPagesSource = built.pages.custom?.length ? built.pages.custom : withSnapshot.pages.custom || [];
+  const customPages = customPagesSource.map((page) => ({
     ...page,
     layout: {
       ...page.layout,
@@ -968,21 +977,29 @@ function applyBuiltWebsiteConfig(
     label: page.title,
     href: `/${page.slug}`,
   }));
+  const cookedWithPages = (built.pages.custom?.length ?? 0) > 0;
   const sellerSiteSettings = withSnapshot.siteSettings;
   const mergedSiteSettings = mergeThemeSiteSettingsWithSeller(built.siteSettings, sellerSiteSettings);
   const sellerNav =
-    sellerSiteSettings.navItems?.length > 0 ? sellerSiteSettings.navItems : built.siteSettings.navItems;
+    !cookedWithPages && sellerSiteSettings.navItems?.length > 0
+      ? sellerSiteSettings.navItems
+      : built.siteSettings.navItems;
   const seenNavHrefs = new Set(sellerNav.map((item) => item.href));
+  const navItems = cookedWithPages
+    ? built.siteSettings.navItems
+    : [...sellerNav, ...customNavItems.filter((item) => !seenNavHrefs.has(item.href))];
   const mergedConfig: WebsiteModeConfig = {
     ...built,
     ...(options?.activeTemplateId ? { activeTemplateId: options.activeTemplateId } : {}),
     seo: mergeThemeSeoWithSeller(built.seo, withSnapshot.seo),
     siteSettings: {
       ...mergedSiteSettings,
-      navItems: [
-        ...sellerNav,
-        ...customNavItems.filter((item) => !seenNavHrefs.has(item.href)),
-      ],
+      ...(cookedWithPages
+        ? {
+            navItems: built.siteSettings.navItems,
+            footerColumns: built.siteSettings.footerColumns,
+          }
+        : { navItems }),
     },
     pages: {
       home: built.pages.home,

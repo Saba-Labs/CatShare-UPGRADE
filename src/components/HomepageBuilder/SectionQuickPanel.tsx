@@ -16,6 +16,8 @@ import FreeformSectionEditor from './editors/FreeformSectionEditor';
 import type { FreeformSection } from '../../types/homepage';
 import FooterSettingsEditor from './FooterSettingsEditor';
 import SectionStyleControls, { sectionHasStyleControls } from './SectionStyleControls';
+import ButtonStyleControls from './editors/ButtonStyleControls';
+import { sectionHasButtonStyleControls, type BuilderButtonStyleSettings } from '../../utils/buttonStyleUtils';
 import SidebarSection from './SidebarSection';
 import { FiArrowLeft, FiDroplet, FiSliders, SECTION_ICONS } from './builderSidebarIcons';
 
@@ -74,6 +76,23 @@ export default function SectionQuickPanel({
         </SidebarSection>
       )}
 
+      {sectionHasButtonStyleControls(section.type) && (
+        <SidebarSection title="Button" icon={<FiSliders />} description="Style, color & shadow">
+          <ButtonStyleControls
+            settings={((section as HomepageSection & { settings?: Record<string, unknown> }).settings ||
+              {}) as BuilderButtonStyleSettings}
+            onChange={(patch) =>
+              onUpdate({
+                settings: {
+                  ...((section as HomepageSection & { settings?: Record<string, unknown> }).settings || {}),
+                  ...patch,
+                },
+              } as Partial<HomepageSection>)
+            }
+          />
+        </SidebarSection>
+      )}
+
       <SidebarSection
         title={section.type === 'footer' ? 'Footer' : 'Content'}
         icon={<FiSliders />}
@@ -110,7 +129,7 @@ export default function SectionQuickPanel({
           <FullProductListEditor section={section as any} onUpdate={onUpdate} />
         )}
         {section.type === 'testimonials' && (
-          <TestimonialsSectionEditor section={section as any} onUpdate={onUpdate} />
+          <TestimonialsSectionEditor section={section as any} storeId={storeId} onUpdate={onUpdate} />
         )}
         {section.type === 'content-grid' && (
           <ContentGridSectionEditor section={section as any} storeId={storeId} onUpdate={onUpdate} />

@@ -821,11 +821,11 @@ function OrderRow({
         {/* Row 1: Name + Total */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', lineHeight: 1.2, marginBottom: 2 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ord-text)', lineHeight: 1.2, marginBottom: 2 }}>
               {order.customer_name}
             </div>
             {phone ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748B', fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--ord-text-muted)', fontSize: 12 }}>
                 <IconPhone />
                 {phone}
               </div>
@@ -1592,13 +1592,14 @@ export default function Orders() {
 
   return (
     <div
+      className="orders-page-root"
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
         minHeight: 0,
         overflow: 'hidden',
-        background: '#F8FAFC',
+        background: 'var(--ord-bg)',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         position: 'relative',
@@ -1652,15 +1653,15 @@ export default function Orders() {
         className="orders-page-header"
         style={{
           flexShrink: 0,
-          background: '#fff',
-          borderBottom: '1px solid #E2E8F0',
+          background: 'var(--ord-surface)',
+          borderBottom: '1px solid var(--ord-border)',
           boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
           marginTop: 40,
         }}
       >
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
           <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0F172A', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ord-text)', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
           </div>
 
           {/* Create Order Button */}
@@ -1723,10 +1724,11 @@ export default function Orders() {
                   padding: '0 12px 0 12px',
                   paddingRight: 32,
                   fontSize: 14,
-                  border: '1px solid #D1D5DB',
+                  border: '1px solid var(--ord-input-border)',
                   borderRadius: 6,
                   boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)',
-                  background: 'rgba(255, 255, 255, 0.8)',
+                  background: 'var(--ord-input-bg)',
+                  color: 'var(--ord-text)',
                   backdropFilter: 'blur(4px)',
                   fontFamily: 'inherit',
                   outline: 'none',
@@ -1780,7 +1782,7 @@ export default function Orders() {
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: 18,
-                color: showFilters || hasActiveListFilters ? '#2563EB' : '#4B5563',
+                color: showFilters || hasActiveListFilters ? '#2563EB' : 'var(--ord-icon)',
                 padding: 4,
                 display: 'flex',
                 alignItems: 'center',
@@ -1790,7 +1792,7 @@ export default function Orders() {
               }}
               onMouseEnter={(e) => e.currentTarget.style.color = '#2563EB'}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = showFilters || hasActiveListFilters ? '#2563EB' : '#4B5563';
+                e.currentTarget.style.color = showFilters || hasActiveListFilters ? '#2563EB' : 'var(--ord-icon)';
               }}
               title="Filter"
             >
@@ -1817,15 +1819,15 @@ export default function Orders() {
                 border: 'none',
                 cursor: 'pointer',
                 fontSize: 18,
-                color: '#4B5563',
+                color: 'var(--ord-icon)',
                 padding: 4,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'color 0.15s',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#000'}
-              onMouseLeave={(e) => e.currentTarget.style.color = '#4B5563'}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--ord-text)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--ord-icon)'}
               title="Search"
             >
               <IconSearch />
@@ -1941,8 +1943,8 @@ export default function Orders() {
         {/* Sales Box at Top of Scrollable Content (All tab only) */}
         {tab === 'all' && (
           <div style={{
-            background: '#fff',
-            borderBottom: '1px solid #E2E8F0',
+            background: 'var(--ord-surface)',
+            borderBottom: '1px solid var(--ord-border)',
             padding: '16px 16px 16px',
             display: 'flex',
             flexDirection: 'column',
@@ -2073,7 +2075,7 @@ export default function Orders() {
           ) : filteredOrders.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, padding: 24 }}>
               <div style={{ fontSize: 36, marginBottom: 4 }}>{searchQuery || hasActiveListFilters ? '🔍' : '📦'}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#374151' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ord-text)' }}>
                 {searchQuery || hasActiveListFilters
                   ? 'No matching orders'
                   : `No ${tab !== 'all' && activeTabMeta ? activeTabMeta.label.toLowerCase() : ''} orders yet`}

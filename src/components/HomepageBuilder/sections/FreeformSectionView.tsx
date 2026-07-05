@@ -13,7 +13,10 @@ import {
   patchFreeformElementInList,
   sortFreeformElements,
 } from '../../../utils/freeformElements';
-import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
+import { getBuilderButtonStyles } from '../../../utils/buttonStyleUtils';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
+import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './FreeformSectionView.css';
@@ -340,23 +343,21 @@ export default function FreeformSectionView({
           onClick={(e) => selectElement(e, element.id)}
         >
           {editMode && onUpdateSection ? (
-            <div
-              className="freeform-text-body sites-inline-editable"
+            <BuilderInlineEditable
+              tag="div"
+              className="freeform-text-body"
               style={textStyle}
-              contentEditable
-              suppressContentEditableWarning
-              onPointerDown={(e) => e.stopPropagation()}
-              onBlur={(e) =>
+              value={element.content.text}
+              onChange={(text) =>
                 patchElementContent(element.id, {
-                  content: { ...element.content, text: e.currentTarget.textContent || '' },
+                  content: { ...element.content, text },
                 } as Partial<FreeformElement>)
               }
-            >
-              {element.content.text}
-            </div>
+              onPointerDown={(e) => e.stopPropagation()}
+            />
           ) : (
             <div className="freeform-text-body" style={textStyle}>
-              {element.content.text}
+              <BuilderHtmlContent html={element.content.text} tag="span" />
             </div>
           )}
           {renderLayerHandles(element, isSelected)}
@@ -364,7 +365,7 @@ export default function FreeformSectionView({
       );
     }
 
-    const buttonStyles = getThemeButtonStyles(theme || {});
+    const buttonStyles = getBuilderButtonStyles(element.content, theme || {});
     return (
       <div
         key={element.id}
@@ -373,10 +374,19 @@ export default function FreeformSectionView({
         onClick={(e) => selectElement(e, element.id)}
       >
         <div className="freeform-button-wrap">
-          {editMode ? (
-            <span className={`${SITES_THEME_BUTTON_CLASS} freeform-button-preview`} style={buttonStyles}>
-              {element.content.label}
-            </span>
+          {editMode && onUpdateSection ? (
+            <BuilderInlineEditable
+              tag="span"
+              className={`${SITES_THEME_BUTTON_CLASS} freeform-button-preview`}
+              style={buttonStyles}
+              value={element.content.label}
+              onChange={(label) =>
+                patchElementContent(element.id, {
+                  content: { ...element.content, label },
+                } as Partial<FreeformElement>)
+              }
+              onPointerDown={(e) => e.stopPropagation()}
+            />
           ) : (
             <StorefrontLink
               href={element.content.href}
@@ -384,7 +394,7 @@ export default function FreeformSectionView({
               className={SITES_THEME_BUTTON_CLASS}
               style={buttonStyles}
             >
-              {element.content.label}
+              <BuilderHtmlContent html={element.content.label} tag="span" />
             </StorefrontLink>
           )}
         </div>

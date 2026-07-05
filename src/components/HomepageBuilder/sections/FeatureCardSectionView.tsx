@@ -1,5 +1,8 @@
 import type { FeatureCardSection, ThemeSettings } from '../../../types/homepage';
-import { getThemeButtonStyles, SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
+import { getBuilderButtonStyles } from '../../../utils/buttonStyleUtils';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
+import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useBuilderMediaOptional } from '../media/BuilderMediaContext';
 import './FeatureCard.css';
@@ -21,8 +24,8 @@ export default function FeatureCardSectionView({
   builderCanvas = false,
   onUpdateSection,
 }: FeatureCardSectionViewProps) {
-  const buttonStyles = getThemeButtonStyles(theme || {});
   const { settings, content } = section;
+  const buttonStyles = getBuilderButtonStyles(settings as Parameters<typeof getBuilderButtonStyles>[0], theme || {});
   const isImageLeft = settings.layout === 'image-left';
   const layoutClass = isImageLeft ? 'layout-image-left' : 'layout-image-right';
   const media = useBuilderMediaOptional();
@@ -79,40 +82,36 @@ export default function FeatureCardSectionView({
         <div className="feature-card-text">
           {editMode && onUpdateSection ? (
             <>
-              <h3
-                className="sites-inline-editable"
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => updateContent({ title: e.currentTarget.textContent || '' })}
-              >
-                {content.title}
-              </h3>
-              <p
-                className="sites-inline-editable"
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={(e) => updateContent({ description: e.currentTarget.textContent || '' })}
-              >
-                {content.description}
-              </p>
+              <BuilderInlineEditable
+                tag="h3"
+                value={content.title}
+                onChange={(title) => updateContent({ title })}
+              />
+              <BuilderInlineEditable
+                tag="p"
+                value={content.description}
+                onChange={(description) => updateContent({ description })}
+              />
               {content.buttonText && (
                 <div className="button-group">
-                  <span
-                    className={`sites-inline-editable ${SITES_THEME_BUTTON_CLASS}`}
+                  <BuilderInlineEditable
+                    tag="span"
+                    className={SITES_THEME_BUTTON_CLASS}
                     style={buttonStyles}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onBlur={(e) => updateContent({ buttonText: e.currentTarget.textContent || '' })}
-                  >
-                    {content.buttonText}
-                  </span>
+                    value={content.buttonText}
+                    onChange={(buttonText) => updateContent({ buttonText })}
+                  />
                 </div>
               )}
             </>
           ) : (
             <>
-              <h3>{content.title}</h3>
-              <p>{content.description}</p>
+              <h3>
+                <BuilderHtmlContent html={content.title} tag="span" />
+              </h3>
+              <p>
+                <BuilderHtmlContent html={content.description} tag="span" />
+              </p>
               {content.buttonText && content.buttonLink && (
                 <div className="button-group">
                   <StorefrontLink
@@ -121,7 +120,7 @@ export default function FeatureCardSectionView({
                     className={SITES_THEME_BUTTON_CLASS}
                     style={buttonStyles}
                   >
-                    {content.buttonText}
+                    <BuilderHtmlContent html={content.buttonText} tag="span" />
                   </StorefrontLink>
                 </div>
               )}

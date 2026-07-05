@@ -311,6 +311,7 @@ export function createDefaultSection(
           displayMode: 'carousel',
           columns: 1,
           showRating: true,
+          cardStyle: 'classic',
         },
         content: {
           testimonials: [

@@ -58,7 +58,7 @@ export function isBuilderEditInteractionTarget(target: EventTarget | null): bool
   if (!el) return false;
   return Boolean(
     el.closest(
-      '.sites-inline-editable, [contenteditable="true"], input, textarea, select, button, a, .sidebar-dropdown, .sites-floating-toolbar, .sites-resize-handle, .carousel-section__arrow, .carousel-section__dot, .cat-showcase-scroll__dot, .website-carousel-nav-btn'
+      '.sites-inline-editable, [contenteditable="true"], input, textarea, select, button, a, .sidebar-dropdown, .sites-floating-toolbar, .sites-floating-drag-handle, .builder-inline-format-toolbar, .builder-format-toolbar, .builder-format-select, .builder-format-color, .sites-resize-handle, .carousel-section__arrow, .carousel-section__dot, .cat-showcase-scroll__dot, .website-carousel-nav-btn'
     )
   );
 }

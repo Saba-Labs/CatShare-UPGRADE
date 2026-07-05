@@ -30,30 +30,30 @@ export function rgbaFromHex(hex: string, alpha: number): string {
 
 export function buildHeaderSurfaceStyle(
   siteSettings: WebsiteSiteSettings,
-  options: { scrolled: boolean; layout?: HeaderLayoutMode; immersiveOverHero?: boolean }
+  options: { scrolled: boolean; layout?: HeaderLayoutMode; heroOverlay?: boolean; /** @deprecated */ immersiveOverHero?: boolean }
 ): CSSProperties {
   const layout = options.layout ?? headerLayoutForVariant(siteSettings.headerVariant);
   const headerBg = siteSettings.headerBg || '#ffffff';
-  const isOverlayAtRest = layout === 'floating' || (layout === 'immersive' && options.immersiveOverHero);
+  const heroOverlay = options.heroOverlay ?? options.immersiveOverHero ?? false;
   const floatingOpacity = siteSettings.headerFloatingOpacity ?? 0.92;
   const immersiveOpacity = siteSettings.headerImmersiveOpacity ?? 0;
   const floatingBlur = siteSettings.headerFloatingBlur ?? 12;
 
   let background = headerBg;
-  if (layout === 'immersive' && !options.scrolled) {
-    background = options.immersiveOverHero
+  if (layout === 'floating' && !options.scrolled) {
+    background = 'transparent';
+  } else if (layout === 'immersive' && !options.scrolled) {
+    background = heroOverlay
       ? immersiveOpacity > 0
         ? rgbaFromHex(headerBg, immersiveOpacity)
         : 'transparent'
       : headerBg;
-  } else if (isOverlayAtRest && !options.scrolled) {
-    background = 'transparent';
   }
 
   let barBg = headerBg;
   if (layout === 'floating' && !options.scrolled) {
     barBg = rgbaFromHex(headerBg, floatingOpacity);
-  } else if (layout === 'immersive' && !options.scrolled && options.immersiveOverHero) {
+  } else if (layout === 'immersive' && !options.scrolled && heroOverlay) {
     barBg = 'transparent';
   }
 
@@ -78,6 +78,8 @@ export function headerLayoutDataAttributes(
   }
   if (layout === 'centered') {
     attrs['data-centered-gap'] = siteSettings.headerCenteredGap || 'normal';
+    attrs['data-centered-logo-size'] = siteSettings.headerCenteredLogoSize || 'medium';
+    attrs['data-centered-brand-layout'] = siteSettings.headerCenteredBrandLayout || 'logo-beside';
   }
   if (layout === 'floating') {
     attrs['data-floating-radius'] = siteSettings.headerFloatingRadius || 'round';

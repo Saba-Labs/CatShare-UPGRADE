@@ -2,6 +2,121 @@
 input:focus { outline: none; border-color: #16A34A !important; }
 ::-webkit-scrollbar { width: 0; }
 
+/* ─── Theme tokens (light defaults + dark overrides) ───────────────────────── */
+.orders-page-root {
+  --ord-bg: #f8fafc;
+  --ord-surface: #ffffff;
+  --ord-surface-2: #f8fafc;
+  --ord-border: #e2e8f0;
+  --ord-text: #0f172a;
+  --ord-text-muted: #64748b;
+  --ord-text-faint: #94a3b8;
+  --ord-icon: #4b5563;
+  --ord-input-bg: rgba(255, 255, 255, 0.8);
+  --ord-input-border: #d1d5db;
+}
+
+html.dark .orders-page-root {
+  --ord-bg: #0b1120;
+  --ord-surface: #111827;
+  --ord-surface-2: #1f2937;
+  --ord-border: #1f2937;
+  --ord-text: #f1f5f9;
+  --ord-text-muted: #94a3b8;
+  --ord-text-faint: #94a3b8;
+  --ord-icon: #cbd5e1;
+  --ord-input-bg: rgba(30, 41, 59, 0.8);
+  --ord-input-border: #374151;
+}
+
+/* ─── Dark overrides for class-based surfaces ──────────────────────────────── */
+html.dark .orders-status-tabs {
+  border-top-color: #1f2937;
+}
+html.dark .orders-status-tab__icon {
+  background: #1f2937;
+  color: #94a3b8;
+}
+html.dark .orders-status-tab__count {
+  background: #1f2937;
+  color: #94a3b8;
+}
+
+html.dark .order-row-card {
+  background: #111827;
+  border-color: #1f2937;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+html.dark .order-row-card:hover {
+  border-color: #374151;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+html.dark .order-row-catalogue {
+  border-color: #1f2937;
+  background: #1f2937;
+  color: #94a3b8;
+}
+html.dark .order-row-catalogue:hover {
+  color: #cbd5e1;
+  border-color: #374151;
+  background: #273449;
+}
+html.dark .order-row-meta-popover {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+html.dark .order-row-meta-popover__text {
+  color: #e5e7eb;
+}
+
+/* Filter bottom sheet */
+html.dark .orders-filter-sheet {
+  background: linear-gradient(180deg, #111827 0%, #0b1120 100%);
+  border-top-color: rgba(148, 163, 184, 0.15);
+}
+html.dark .orders-filter-source-chip,
+html.dark .orders-filter-card,
+html.dark .orders-filter-btn-clear {
+  background: #1f2937;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+html.dark .orders-filter-source-chip-icon {
+  background: #111827;
+  color: #94a3b8;
+}
+html.dark .orders-filter-source-chip-label,
+html.dark .orders-filter-catalogue-label {
+  color: #e5e7eb;
+}
+html.dark .orders-filter-catalogue-row {
+  border-bottom-color: #1f2937;
+}
+html.dark .orders-filter-catalogue-row:hover {
+  background: #273449;
+}
+html.dark .orders-filter-footer {
+  background: linear-gradient(180deg, rgba(11, 17, 32, 0) 0%, #0b1120 40%, #111827 100%);
+  border-top-color: rgba(148, 163, 184, 0.15);
+}
+html.dark .orders-filter-header-text h2 {
+  color: #f1f5f9;
+}
+html.dark .orders-filter-close {
+  background: #1f2937;
+  border-color: #374151;
+  color: #cbd5e1;
+}
+html.dark .orders-filter-close:hover {
+  background: #273449;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+html.dark .orders-filter-grabber span {
+  background: #374151;
+}
+
 /* ─── Order status tabs & banner ──────────────────────────────────────────── */
 .orders-status-tabs {
   display: flex;

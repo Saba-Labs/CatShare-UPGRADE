@@ -26,7 +26,9 @@ interface StorefrontSiteHeaderProps {
   isHeaderSelected?: boolean;
   /** Inner pages (product, category, etc.) always render the classic top bar. */
   pageSurface?: 'homepage' | 'inner';
-  /** Immersive layout only overlays when the first homepage block is a hero section. */
+  /** Floating/immersive layouts only overlay when the first homepage block is a hero section. */
+  heroOverlay?: boolean;
+  /** @deprecated Use heroOverlay */
   immersiveOverHero?: boolean;
 }
 
@@ -40,8 +42,10 @@ export default function StorefrontSiteHeader({
   onSelectHeader,
   isHeaderSelected = false,
   pageSurface = 'homepage',
-  immersiveOverHero = false,
+  heroOverlay: heroOverlayProp,
+  immersiveOverHero: immersiveOverHeroProp,
 }: StorefrontSiteHeaderProps) {
+  const heroOverlay = heroOverlayProp ?? immersiveOverHeroProp ?? false;
   const headerRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
@@ -118,8 +122,8 @@ export default function StorefrontSiteHeader({
   }, [layout]);
 
   const headerStyle = useMemo(
-    () => buildHeaderSurfaceStyle(siteSettings, { scrolled: headerScrolled, layout, immersiveOverHero }),
-    [siteSettings, headerScrolled, layout, immersiveOverHero]
+    () => buildHeaderSurfaceStyle(siteSettings, { scrolled: headerScrolled, layout, heroOverlay }),
+    [siteSettings, headerScrolled, layout, heroOverlay]
   );
 
   const layoutDataAttrs = useMemo(
@@ -130,10 +134,13 @@ export default function StorefrontSiteHeader({
   const headerClassName = `storefront-site-header storefront-site-header--layout-${layout}${
     headerScrolled ? ' is-scrolled' : ''
   }${preview ? ' storefront-site-header--preview' : ''}${
-    layout === 'immersive' && immersiveOverHero ? ' storefront-site-header--immersive-over-hero' : ''
+    heroOverlay ? ' storefront-site-header--hero-overlay' : ''
   }`;
 
   const brandName = siteSettings.websiteName || 'My Store';
+  const centeredBrandLayout = siteSettings.headerCenteredBrandLayout || 'logo-beside';
+  const showBrandName =
+    centeredBrandLayout !== 'logo-only' || !siteSettings.logoUrl;
 
   const brandContent = (
     <span className="storefront-site-header__brand-inner">
@@ -144,7 +151,9 @@ export default function StorefrontSiteHeader({
           alt=""
         />
       ) : null}
-      <span className="storefront-site-header__brand-name">{brandName}</span>
+      {showBrandName ? (
+        <span className="storefront-site-header__brand-name">{brandName}</span>
+      ) : null}
     </span>
   );
 

@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { CategoryShowcaseSection } from '../../../types/homepage';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
 import SectionPlaceholder from './SectionPlaceholder';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import { useWebsiteStoreOptional } from '../../WebsiteBuilder/WebsiteStoreContext';
@@ -97,23 +99,19 @@ export default function CategoryShowcaseSectionView({
     <section className={rootClass} style={rootStyle}>
       {resolved.title ? (
         canEditHeading ? (
-          <h2
-            className="cat-showcase__heading sites-inline-editable"
-            contentEditable
-            suppressContentEditableWarning
+          <BuilderInlineEditable
+            tag="h2"
+            className="cat-showcase__heading"
+            value={resolved.title}
+            onChange={(title) => onUpdateSection({ settings: { ...settings, title } })}
             onPointerDown={stopEditPointer}
             onMouseDown={stopEditPointer}
             onClick={stopEditPointer}
-            onBlur={(e) =>
-              onUpdateSection({
-                settings: { ...settings, title: e.currentTarget.textContent || '' },
-              })
-            }
-          >
-            {resolved.title}
-          </h2>
+          />
         ) : (
-          <h2 className="cat-showcase__heading">{resolved.title}</h2>
+          <h2 className="cat-showcase__heading">
+            <BuilderHtmlContent html={resolved.title} tag="span" />
+          </h2>
         )
       ) : null}
       {!hasAnySelection ? (

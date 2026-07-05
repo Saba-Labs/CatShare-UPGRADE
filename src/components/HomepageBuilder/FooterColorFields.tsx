@@ -1,4 +1,5 @@
 import ColorPickerField from './ColorPickerField';
+import PanelFieldLabel from './PanelFieldLabel';
 import { footerColorPresetForVariant } from '../../config/footerVariants';
 import type { WebsiteFooterVariant, WebsiteSiteSettings } from '../../types/homepage';
 
@@ -19,12 +20,14 @@ export default function FooterColorFields({
   return (
     <>
       <div className="sidebar-panel-header footer-colors-header">
-        <span className="panel-label">Footer colors</span>
+        <PanelFieldLabel
+          label="Footer colors"
+          hint="Updates the footer in the preview immediately."
+        />
         <button type="button" className="btn-text" onClick={() => onPatch(footerColorPresetForVariant(variant))}>
           Reset for layout
         </button>
       </div>
-      <p className="panel-hint">Updates the footer in the preview immediately.</p>
       <div className="color-picker-stack">
         <ColorPickerField
           label="Background"

@@ -16,3 +16,6 @@ export type WebsiteTemplateId =
   | 'jewel-royal';
 
 export type TemplateIndustry = 'general' | 'fashion' | 'jewellery';
+
+/** Visual/style bucket used for theme hub filters. */
+export type TemplateStyle = 'catalog' | 'subtle' | 'modern' | 'traditional';

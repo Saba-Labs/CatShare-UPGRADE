@@ -2,8 +2,8 @@ import { v4 as uuid } from 'uuid';
 import { createDefaultFooterLinkColumns, footerPresetForVariant } from './footerVariants';
 import { INDUSTRY_WEBSITE_TEMPLATES } from './industryWebsiteTemplates';
 import { headerVariantForTemplate } from './headerVariants';
-import type { TemplateIndustry, WebsiteTemplateId } from './websiteTemplateIds';
-export type { TemplateIndustry, WebsiteTemplateId } from './websiteTemplateIds';
+import type { TemplateIndustry, WebsiteTemplateId, TemplateStyle } from './websiteTemplateIds';
+export type { TemplateIndustry, WebsiteTemplateId, TemplateStyle } from './websiteTemplateIds';
 import type {
   HomepageLayout,
   HomepageSection,
@@ -21,6 +21,10 @@ export interface WebsiteTemplateMeta {
   /** Swatch colors shown on the gallery card. */
   palette: string[];
   industry?: TemplateIndustry;
+  /** Style bucket for theme hub filters (modern, basics, traditional). */
+  style?: TemplateStyle;
+  /** When true, theme is visible in the hub but cannot be applied yet. */
+  comingSoon?: boolean;
   build: () => WebsiteModeConfig;
 }
 
@@ -661,6 +665,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/studio-commerce/preview.jpg',
     palette: ['#121212', '#f6f6f6', '#ffffff', '#6b7280'],
     industry: 'general',
+    style: 'modern',
     build: buildStudioCommerce,
   },
   {
@@ -671,6 +676,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/aurora-boutique/preview.jpg',
     palette: ['#9c6644', '#ede0d4', '#3b3026', '#fdfaf6'],
     industry: 'general',
+    style: 'traditional',
     build: buildAuroraBoutique,
   },
   {
@@ -681,6 +687,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/pulse-tech/preview.jpg',
     palette: ['#2563eb', '#22d3ee', '#0b1120', '#e2e8f0'],
     industry: 'general',
+    style: 'modern',
     build: buildPulseTech,
   },
   {
@@ -691,6 +698,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/clean-market/preview.jpg',
     palette: ['#111827', '#2563eb', '#f3f4f6', '#ffffff'],
     industry: 'general',
+    style: 'subtle',
     build: buildCleanMarket,
   },
   {
@@ -702,6 +710,7 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: '/templates/default-store/preview.svg',
     palette: ['#1a6b4a', '#f7f7f5', '#1a1a1a', '#ffffff'],
     industry: 'general',
+    style: 'catalog',
     build: buildDefaultStore,
   },
   ...INDUSTRY_WEBSITE_TEMPLATES.map((tpl) => ({
@@ -712,6 +721,8 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateMeta[] = [
     previewImage: tpl.previewImage,
     palette: tpl.palette,
     industry: tpl.industry,
+    style: tpl.style,
+    comingSoon: true,
     build: tpl.build,
   })),
 ];

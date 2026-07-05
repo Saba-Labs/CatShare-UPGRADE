@@ -8,8 +8,10 @@ import {
   removeFreeformElement,
   sortFreeformElements,
 } from '../../../utils/freeformElements';
-import { normalizeStorefrontPath } from '../../../utils/storefrontHref';
+import { sanitizeStoreLinkHref } from '../../../utils/storefrontHref';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
+import BuilderRichTextEditor from '../BuilderRichTextEditor';
+import ButtonStyleControls from './ButtonStyleControls';
 import MediaPickerButton from '../media/MediaPickerButton';
 import StoreLinkPicker from '../StoreLinkPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
@@ -288,19 +290,16 @@ export default function FreeformSectionEditor({
 
           {selected.type === 'text' && (
             <>
-              <div className="sidebar-field">
-                <label className="panel-label">Text</label>
-                <textarea
-                  className="panel-textarea"
-                  rows={3}
-                  value={selected.content.text}
-                  onChange={(e) =>
-                    updateElement(selected.id, {
-                      content: { ...selected.content, text: e.target.value },
-                    } as Partial<FreeformElement>)
-                  }
-                />
-              </div>
+              <BuilderRichTextEditor
+                label="Text"
+                value={selected.content.text}
+                onChange={(text) =>
+                  updateElement(selected.id, {
+                    content: { ...selected.content, text },
+                  } as Partial<FreeformElement>)
+                }
+                minHeight={100}
+              />
               <div className="sidebar-field-row">
                 <div className="sidebar-field">
                   <label className="panel-label">Size (px)</label>
@@ -371,7 +370,15 @@ export default function FreeformSectionEditor({
                 value={selected.content.href}
                 onChange={(href) =>
                   updateElement(selected.id, {
-                    content: { ...selected.content, href: normalizeStorefrontPath(href) },
+                    content: { ...selected.content, href: sanitizeStoreLinkHref(href) },
+                  } as Partial<FreeformElement>)
+                }
+              />
+              <ButtonStyleControls
+                settings={selected.content}
+                onChange={(patch) =>
+                  updateElement(selected.id, {
+                    content: { ...selected.content, ...patch },
                   } as Partial<FreeformElement>)
                 }
               />

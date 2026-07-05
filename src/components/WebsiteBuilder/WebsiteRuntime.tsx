@@ -14,7 +14,7 @@ import WebsiteFooter from './WebsiteFooter';
 import HomePageRuntime from './pages/HomePageRuntime';
 import CollectionPageRuntime from './pages/CollectionPageRuntime';
 import ProductPageRuntime from './pages/ProductPageRuntime';
-import { homepageUsesImmersiveHeroOverlay } from '../../utils/immersiveHeaderOverlay';
+import { homepageUsesHeroHeaderOverlay } from '../../utils/immersiveHeaderOverlay';
 import { resolveCollectionPageSettings } from '../../utils/collectionPageSettings';
 
 interface WebsiteRuntimeProps {
@@ -109,9 +109,9 @@ export default function WebsiteRuntime({
   const innerPage =
     section === 'collections' || section === 'products' || section === 'checkout' || !!customPage;
 
-  const immersiveHeroOverlay =
+  const heroHeaderOverlay =
     pageKind === 'home' &&
-    homepageUsesImmersiveHeroOverlay(websiteConfig.siteSettings.headerVariant, homeLayout.sections);
+    homepageUsesHeroHeaderOverlay(websiteConfig.siteSettings.headerVariant, homeLayout.sections);
 
   return (
     <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
@@ -121,7 +121,7 @@ export default function WebsiteRuntime({
         faviconUrl={websiteConfig.seo?.faviconUrl}
       />
       <div
-        className={`website-runtime-root${immersiveHeroOverlay ? ' website-runtime-root--immersive-hero' : ''}`}
+        className={`website-runtime-root${heroHeaderOverlay ? ' website-runtime-root--hero-overlay' : ''}`}
         style={{ minHeight: '100vh', background: homeLayout.theme?.backgroundColor || '#fff', color: homeLayout.theme?.textColor, fontFamily: homeLayout.theme?.fontFamily, ...themeVars }}
       >
         <WebsiteHeader
@@ -129,7 +129,7 @@ export default function WebsiteRuntime({
           siteSettings={{ ...websiteConfig.siteSettings, websiteName: storeDisplayName }}
           onSubdomain={onSubdomain}
           pageSurface={innerPage ? 'inner' : 'homepage'}
-          immersiveOverHero={immersiveHeroOverlay}
+          heroOverlay={heroHeaderOverlay}
         />
         {section === 'collections' ? (
           <CollectionPageRuntime

@@ -1,5 +1,7 @@
 import React from 'react';
 import { AnnouncementSection } from '../../../types/homepage';
+import BuilderInlineEditable from '../BuilderInlineEditable';
+import BuilderHtmlContent from '../BuilderHtmlContent';
 import { announcementIcon, IconX } from '../../Storefront/StorefrontIcons';
 import './AnnouncementSection.css';
 
@@ -73,17 +75,17 @@ export default function AnnouncementSectionView({
           </div>
         </div>
       ) : canInlineEdit ? (
-        <p
-          className="announcement-bar-section__message sites-inline-editable"
+        <BuilderInlineEditable
+          tag="p"
+          className="announcement-bar-section__message"
           style={{ textAlign: alignment, fontSize: messageFontSize }}
-          contentEditable
-          suppressContentEditableWarning
-          onBlur={(e) => onUpdateSection({ content: { message: e.currentTarget.textContent || '' } })}
-        >
-          {content.message}
-        </p>
+          value={content.message}
+          onChange={(message) => onUpdateSection({ content: { message } })}
+        />
       ) : (
-        <p className="announcement-bar-section__message">{content.message}</p>
+        <p className="announcement-bar-section__message">
+          <BuilderHtmlContent html={content.message} tag="span" />
+        </p>
       )}
       {settings.dismissible && (
         <button

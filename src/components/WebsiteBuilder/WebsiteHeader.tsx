@@ -7,6 +7,8 @@ interface WebsiteHeaderProps {
   siteSettings: WebsiteSiteSettings;
   onSubdomain?: boolean;
   pageSurface?: 'homepage' | 'inner';
+  heroOverlay?: boolean;
+  /** @deprecated Use heroOverlay */
   immersiveOverHero?: boolean;
 }
 
@@ -15,7 +17,8 @@ export default function WebsiteHeader({
   siteSettings,
   onSubdomain,
   pageSurface = 'homepage',
-  immersiveOverHero = false,
+  heroOverlay,
+  immersiveOverHero,
 }: WebsiteHeaderProps) {
   const basePath = storeBasePath(slug, onSubdomain);
   return (
@@ -23,7 +26,7 @@ export default function WebsiteHeader({
       siteSettings={siteSettings}
       basePath={basePath}
       pageSurface={pageSurface}
-      immersiveOverHero={immersiveOverHero}
+      heroOverlay={heroOverlay ?? immersiveOverHero}
     />
   );
 }

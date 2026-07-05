@@ -22,12 +22,12 @@ export const HEADER_VARIANT_OPTIONS: Array<{ id: WebsiteHeaderVariant; label: st
   {
     id: 'floating',
     label: 'Floating bar',
-    description: 'Rounded pill bar with inset margins and shadow over the page hero',
+    description: 'Rounded pill bar with inset margins — overlays hero images at the top of the homepage',
   },
   {
     id: 'immersive',
     label: 'Immersive bar',
-    description: 'Transparent bar over the hero — solid background after you scroll',
+    description: 'Transparent bar over hero images at the top of the homepage — solid background after you scroll',
   },
   {
     id: 'orderform',
@@ -87,7 +87,11 @@ export function headerLayoutForPageSurface(
 export function headerLayoutDefaultsForVariant(variant: WebsiteHeaderVariant): Partial<WebsiteSiteSettings> {
   switch (variant) {
     case 'centered':
-      return { headerCenteredGap: 'normal' };
+      return {
+        headerCenteredGap: 'normal',
+        headerCenteredLogoSize: 'medium',
+        headerCenteredBrandLayout: 'logo-beside',
+      };
     case 'floating':
       return {
         headerFloatingOpacity: 0.92,

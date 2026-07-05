@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import StoreLinkPicker from './StoreLinkPicker';
 import FooterColorFields from './FooterColorFields';
 import SidebarDropdownField from './SidebarDropdownField';
+import PanelFieldLabel, { SidebarPanelHeading } from './PanelFieldLabel';
 import {
   FOOTER_COLUMN_PRESETS,
   FOOTER_VARIANT_OPTIONS,
@@ -68,20 +69,23 @@ export default function FooterSettingsEditor({
   return (
     <>
       <div className="sidebar-field">
-        <label className="panel-label">Footer layout</label>
+        <PanelFieldLabel
+          label="Footer layout"
+          hint="Changes the structure of your footer (columns, cards, centered, or split row)."
+        />
         <SidebarDropdownField
           ariaLabel="Footer layout"
           value={variant}
           options={FOOTER_VARIANT_OPTIONS.map((opt) => ({ value: opt.id, label: opt.label }))}
           onChange={applyVariant}
         />
-        <p className="panel-hint">
-          Changes the structure of your footer (columns, cards, centered, or split row).
-        </p>
       </div>
 
       <div className="sidebar-field">
-        <label className="panel-label">Footer width</label>
+        <PanelFieldLabel
+          label="Footer width"
+          hint="Boxed matches the OrderForm card look; full width spans the entire page."
+        />
         <SidebarDropdownField
           ariaLabel="Footer width"
           value={siteSettings.footerWidth === 'full' ? 'full' : 'boxed'}
@@ -91,7 +95,6 @@ export default function FooterSettingsEditor({
           ]}
           onChange={(next) => patch({ footerWidth: next })}
         />
-        <p className="panel-hint">Boxed matches the OrderForm card look; full width spans the entire page.</p>
       </div>
 
       {!hideColors ? (
@@ -102,8 +105,10 @@ export default function FooterSettingsEditor({
       ) : null}
 
       <div className="sidebar-field">
-        <label className="panel-label">Tagline</label>
-        <p className="panel-hint">Same as Business Profile → Short about / tagline (and header hero tagline).</p>
+        <PanelFieldLabel
+          label="Tagline"
+          hint="Same as Business Profile → Short about / tagline (and header hero tagline)."
+        />
         <textarea
           className="panel-input"
           rows={2}
@@ -132,17 +137,10 @@ export default function FooterSettingsEditor({
       </label>
 
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Contact overrides</h3>
-      </div>
-      <p className="panel-hint">Leave blank to use your business profile. These appear in the footer cards.</p>
-      <p className="panel-hint">
-        Edit all contact details in{' '}
-        <a href="/store/business" className="panel-hint-link">
-          Business Profile
-        </a>
-        .
-      </p>
+      <SidebarPanelHeading
+        title="Contact overrides"
+        hint="Leave blank to use your business profile. These appear in the footer cards. Edit all contact details in Business Profile (Store → Business)."
+      />
       <div className="sidebar-panel-section">
         <label className="panel-label">Address</label>
         <textarea
@@ -173,12 +171,10 @@ export default function FooterSettingsEditor({
       </div>
 
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Social links</h3>
-      </div>
-      <p className="panel-hint">
-        Linked to Business Profile → Social Links. Updates the Follow section in the preview.
-      </p>
+      <SidebarPanelHeading
+        title="Social links"
+        hint="Linked to Business Profile → Social Links. Updates the Follow section in the preview."
+      />
       <div className="sidebar-panel-section">
         <label className="panel-label">Instagram</label>
         <input
@@ -217,9 +213,14 @@ export default function FooterSettingsEditor({
       </div>
 
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Sections</h3>
-      </div>
+      <SidebarPanelHeading
+        title="Sections"
+        hint={
+          footerShowsLinkColumns(variant)
+            ? 'Toggle which info cards appear in the footer.'
+            : 'Toggle which info cards appear. Classic bar shows Location, Contact, Store info, and Follow — not Shop/Legal link columns. Switch to Link columns, Centered, or Split to add menu links.'
+        }
+      />
       {(
         [
           ['footerShowLocation', 'Location', siteSettings.footerShowLocation !== false],
@@ -242,26 +243,26 @@ export default function FooterSettingsEditor({
       {footerShowsLinkColumns(variant) ? (
         <>
       <div className="sidebar-panel-divider" />
-      <div className="sidebar-panel-header">
-        <h3>Link columns</h3>
-        <button
-          type="button"
-          className="btn-text"
-          onClick={() =>
-            patch({
-              footerColumns: [
-                ...columns,
-                { title: 'New column', links: [{ id: uuid(), label: 'Link', href: '/' }] },
-              ],
-            })
-          }
-        >
-          + Column
-        </button>
-      </div>
-      <p className="panel-hint">
-        Add groups like Shop, Customer care, or Legal — each column shows a title and a vertical list of links in your footer.
-      </p>
+      <SidebarPanelHeading
+        title="Link columns"
+        hint="Add groups like Shop, Customer care, or Legal — each column shows a title and a vertical list of links in your footer."
+        actions={
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() =>
+              patch({
+                footerColumns: [
+                  ...columns,
+                  { title: 'New column', links: [{ id: uuid(), label: 'Link', href: '/' }] },
+                ],
+              })
+            }
+          >
+            + Column
+          </button>
+        }
+      />
       <div className="footer-column-presets">
         {FOOTER_COLUMN_PRESETS.map((preset) => {
           const exists = columns.some(
@@ -371,11 +372,7 @@ export default function FooterSettingsEditor({
       ))}
 
         </>
-      ) : (
-        <p className="panel-hint panel-hint--static">
-          Classic bar shows Location, Contact, Store info, and Follow cards — not Shop/Legal link columns. Switch to Link columns, Centered, or Split to add menu links.
-        </p>
-      )}
+      ) : null}
 
       <p className="panel-hint panel-hint--static">
         “Powered by CatShare” always appears at the bottom of your site footer and links to catshare.app. It cannot be removed or edited.

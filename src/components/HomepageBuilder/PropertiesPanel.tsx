@@ -291,6 +291,7 @@ export default function PropertiesPanel({
         {selectedSection.type === 'testimonials' && (
           <TestimonialsSectionEditor
             section={selectedSection as any}
+            storeId={storeId}
             onUpdate={(updates) => onUpdateSection(selectedSectionId, updates)}
           />
         )}

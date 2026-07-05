@@ -1,19 +1,34 @@
 import { v4 as uuid } from 'uuid';
 import type { TestimonialsSection } from '../../../types/homepage';
+import {
+  normalizeTestimonialCardStyle,
+  resolveTestimonialSectionSettings,
+  TESTIMONIAL_CARD_STYLE_OPTIONS,
+} from '../../../utils/testimonialCardStyles';
 import TestimonialStarRating from '../sections/TestimonialStarRating';
 import SidebarDropdownField from '../SidebarDropdownField';
+import ColorPickerField from '../ColorPickerField';
+import MediaPickerButton from '../media/MediaPickerButton';
 import '../sections/testimonials-section.css';
 
 interface TestimonialsSectionEditorProps {
   section: TestimonialsSection & { id: string };
+  storeId?: string;
   onUpdate: (updates: Partial<TestimonialsSection>) => void;
 }
 
-export default function TestimonialsSectionEditor({ section, onUpdate }: TestimonialsSectionEditorProps) {
-  const { settings, content } = section;
+export default function TestimonialsSectionEditor({
+  section,
+  storeId,
+  onUpdate,
+}: TestimonialsSectionEditorProps) {
+  const resolved = resolveTestimonialSectionSettings(section.settings);
+  const { content } = section;
+  const cardStyle = resolved.cardStyle;
+  const showAvatarField = cardStyle !== 'classic';
 
   const updateSettings = (patch: Partial<TestimonialsSection['settings']>) => {
-    onUpdate({ settings: { ...settings, ...patch } });
+    onUpdate({ settings: { ...section.settings, ...patch } });
   };
 
   const updateTestimonials = (testimonials: TestimonialsSection['content']['testimonials']) => {
@@ -59,16 +74,45 @@ export default function TestimonialsSectionEditor({ section, onUpdate }: Testimo
         <input
           type="text"
           className="panel-input"
-          value={settings.title || ''}
+          value={resolved.title || ''}
           onChange={(e) => updateSettings({ title: e.target.value })}
         />
+        {cardStyle === 'accent' ? (
+          <p className="catalogue-picker-hint" style={{ margin: '6px 0 0' }}>
+            Wrap a word in <strong>&lt;strong&gt;</strong> to highlight it in the accent color.
+          </p>
+        ) : null}
       </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Card style</label>
+        <SidebarDropdownField
+          ariaLabel="Testimonial card style"
+          value={cardStyle}
+          options={TESTIMONIAL_CARD_STYLE_OPTIONS.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
+          onChange={(next) =>
+            updateSettings({ cardStyle: normalizeTestimonialCardStyle(next as TestimonialsSection['settings']['cardStyle']) })
+          }
+        />
+      </div>
+
+      {cardStyle === 'accent' ? (
+        <ColorPickerField
+          label="Accent color"
+          value={resolved.accentColor}
+          defaultValue="#dc2626"
+          onChange={(accentColor) => updateSettings({ accentColor })}
+        />
+      ) : null}
 
       <div className="panel-section">
         <label className="panel-label">Layout</label>
         <SidebarDropdownField
           ariaLabel="Testimonials layout"
-          value={settings.displayMode}
+          value={resolved.displayMode}
           options={[
             { value: 'grid', label: 'Grid' },
             { value: 'carousel', label: 'Carousel (single row)' },
@@ -81,7 +125,7 @@ export default function TestimonialsSectionEditor({ section, onUpdate }: Testimo
         <label className="panel-label">Columns (grid)</label>
         <SidebarDropdownField
           ariaLabel="Testimonials grid columns"
-          value={String(settings.columns)}
+          value={String(resolved.columns)}
           options={[
             { value: '1', label: '1' },
             { value: '2', label: '2' },
@@ -95,7 +139,7 @@ export default function TestimonialsSectionEditor({ section, onUpdate }: Testimo
         <label className="panel-checkbox">
           <input
             type="checkbox"
-            checked={settings.showRating}
+            checked={resolved.showRating}
             onChange={(e) => updateSettings({ showRating: e.target.checked })}
           />
           <span>Show star rating</span>
@@ -119,7 +163,25 @@ export default function TestimonialsSectionEditor({ section, onUpdate }: Testimo
         ) : (
           content.testimonials.map((item, index) => (
             <div key={item.id} className="faq-editor-item testimonial-editor-item">
-              {settings.showRating && (
+              {showAvatarField && storeId ? (
+                <MediaPickerButton
+                  storeId={storeId}
+                  assetKey={`testimonial-${item.id}`}
+                  label={item.image ? 'Change photo' : 'Add photo'}
+                  currentUrl={item.image}
+                  onUrl={(image) => patchTestimonial(index, { image })}
+                />
+              ) : null}
+              {showAvatarField && !storeId ? (
+                <input
+                  type="url"
+                  className="panel-input"
+                  placeholder="Photo URL (optional)"
+                  value={item.image || ''}
+                  onChange={(e) => patchTestimonial(index, { image: e.target.value || undefined })}
+                />
+              ) : null}
+              {resolved.showRating && (
                 <div className="testimonial-editor-stars">
                   <span className="testimonial-editor-stars-label">Star rating</span>
                   <TestimonialStarRating

@@ -29,6 +29,7 @@ export default function FeaturedProductsSectionView({
     cardStyle: settings.cardStyle,
     displayMode: settings.displayMode,
     cardSize: settings.cardSize,
+    columns: settings.columns,
   });
   const catalogProducts = storeCtx?.products ?? [];
   const resolvedProducts = React.useMemo(() => {
