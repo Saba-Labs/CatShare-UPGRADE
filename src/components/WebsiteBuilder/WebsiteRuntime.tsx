@@ -137,7 +137,6 @@ export default function WebsiteRuntime({
             embedded
             columns={collectionSettings.columns}
             cardsStyle={collectionSettings.cardsStyle}
-            showSearch={collectionSettings.showSearch}
             showCategoryFilters={collectionSettings.showCategoryFilters}
             showSort={collectionSettings.showSort}
             viewMode={collectionSettings.viewMode}

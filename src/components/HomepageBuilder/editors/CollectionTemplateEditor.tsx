@@ -73,17 +73,6 @@ export default function CollectionTemplateEditor({
         <label className="panel-label panel-label--checkbox">
           <input
             type="checkbox"
-            checked={template.showSearch ?? true}
-            onChange={(e) => onUpdate({ showSearch: e.target.checked })}
-          />
-          Show search
-        </label>
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label panel-label--checkbox">
-          <input
-            type="checkbox"
             checked={template.showFilters ?? true}
             onChange={(e) => onUpdate({ showFilters: e.target.checked })}
           />

@@ -84,17 +84,6 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
         <label className="panel-label panel-label--checkbox">
           <input
             type="checkbox"
-            checked={settings.showSearch}
-            onChange={(e) => updateSettings({ showSearch: e.target.checked })}
-          />
-          Show search
-        </label>
-      </div>
-
-      <div className="panel-section">
-        <label className="panel-label panel-label--checkbox">
-          <input
-            type="checkbox"
             checked={settings.showCategoryFilters}
             onChange={(e) => updateSettings({ showCategoryFilters: e.target.checked })}
           />

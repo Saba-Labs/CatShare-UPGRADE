@@ -56,6 +56,7 @@ const FieldsSettings = lazy(() => import("./pages/FieldsSettings"));
 const CurrencySettings = lazy(() => import("./pages/CurrencySettings"));
 const ManageCategories = lazy(() => import("./ManageCategories"));
 const ProInfo = lazy(() => import("./pages/ProInfo"));
+const ProSubscriptionManage = lazy(() => import("./pages/ProSubscriptionManage"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -2611,6 +2612,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
           element={
             <ProtectedRoute>
               <ProInfo />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/pro/manage"
+          element={
+            <ProtectedRoute>
+              <ProSubscriptionManage />
             </ProtectedRoute>
           }
         />

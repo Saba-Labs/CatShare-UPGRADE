@@ -30,6 +30,8 @@ interface BuilderProductPageOverlayProps {
   selectedSectionId: string | null;
   onSelectSection: (id: string | null) => void;
   onClose: () => void;
+  onProductPreview?: (product: ProductWithCatalogueData) => void;
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
 }
 
 /** Product page preview in the same editor frame as the homepage (header, product, footer). */
@@ -44,6 +46,8 @@ export default function BuilderProductPageOverlay({
   selectedSectionId,
   onSelectSection,
   onClose,
+  onProductPreview,
+  onCategoryPreview,
 }: BuilderProductPageOverlayProps) {
   const themeVars = buildWebsiteThemeVars(theme);
   const isSiteFooterSelected = selectedSectionId === SITE_FOOTER_SELECTION_ID;
@@ -88,6 +92,8 @@ export default function BuilderProductPageOverlay({
               isAnnouncementSelected={isSiteAnnouncementSelected}
               onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}
               isHeaderSelected={isSiteHeaderSelected}
+              onProductPreview={onProductPreview}
+              onCategoryPreview={onCategoryPreview}
             />
           ) : null}
 

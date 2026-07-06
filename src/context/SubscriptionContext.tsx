@@ -3,6 +3,7 @@ import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 import { TRIAL_DAYS_UI_FALLBACK } from '../config/freeTierLimits';
 import { useAuth } from './AuthContext';
 import { getPersistedAuthUserId, tryGetSupabaseUserIdFromAuthToken } from '../utils/authUserId';
+import type { UserSubscriptionInfo } from '../utils/subscriptionDisplay';
 
 const LS_TRIAL_ENDS = 'subscription_trialEndsAt';
 const LS_TRIAL_ACTIVE = 'subscription_isTrialActive';
@@ -21,6 +22,8 @@ type SubscriptionContextValue = {
   trialEndsAt: string | null;
   /** Trial length in days from server (`/api/subscription`); use for UI copy. */
   trialDays: number;
+  /** Paid subscription record from server (plan, expiry, status). */
+  subscription: UserSubscriptionInfo | null;
   loading: boolean;
   refresh: () => Promise<void>;
 };
@@ -51,17 +54,18 @@ function readCachedTrialDays(): number {
 
 const EMPTY_CACHED_TRIAL: Pick<
   SubscriptionContextValue,
-  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays'
+  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays' | 'subscription'
 > = {
   trialEndsAt: null,
   isTrialActive: false,
   isPaidPro: false,
   trialDays: TRIAL_DAYS_UI_FALLBACK,
+  subscription: null,
 };
 
 function readCachedTrial(): Pick<
   SubscriptionContextValue,
-  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays'
+  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays' | 'subscription'
 > {
   if (!shouldUseCachedSubscription()) return EMPTY_CACHED_TRIAL;
 
@@ -71,6 +75,7 @@ function readCachedTrial(): Pick<
     isTrialActive: localStorage.getItem(LS_TRIAL_ACTIVE) === 'true',
     isPaidPro: localStorage.getItem(LS_PAID_PRO) === 'true',
     trialDays: readCachedTrialDays(),
+    subscription: null,
   };
 }
 
@@ -84,6 +89,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isTrialActive, setIsTrialActive] = useState<boolean>(() => readCachedTrial().isTrialActive);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(() => readCachedTrial().trialEndsAt);
   const [trialDays, setTrialDays] = useState<number>(() => readCachedTrial().trialDays);
+  const [subscription, setSubscription] = useState<UserSubscriptionInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   const clearSubscriptionCache = useCallback(() => {
@@ -92,6 +98,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setIsTrialActive(false);
     setTrialEndsAt(null);
     setTrialDays(TRIAL_DAYS_UI_FALLBACK);
+    setSubscription(null);
     localStorage.setItem('isPro', 'false');
     localStorage.removeItem(LS_TRIAL_ENDS);
     localStorage.setItem(LS_TRIAL_ACTIVE, 'false');
@@ -173,12 +180,24 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           typeof json?.trialDays === 'number' && Number.isFinite(json.trialDays) && json.trialDays > 0
             ? json.trialDays
             : TRIAL_DAYS_UI_FALLBACK;
+        const nextSubscription =
+          json?.subscription && typeof json.subscription === 'object'
+            ? ({
+                platform: json.subscription.platform,
+                productId: json.subscription.productId,
+                status: json.subscription.status,
+                expiresAt: json.subscription.expiresAt ?? null,
+                createdAt: json.subscription.createdAt ?? json.subscription.updatedAt,
+                updatedAt: json.subscription.updatedAt,
+              } as UserSubscriptionInfo)
+            : null;
 
         setIsPro(next);
         setIsPaidPro(nextPaid);
         setIsTrialActive(nextTrial);
         setTrialEndsAt(nextTrialEnd);
         setTrialDays(nextTrialDays);
+        setSubscription(nextSubscription);
 
         localStorage.setItem('isPro', next ? 'true' : 'false');
         localStorage.setItem(LS_CACHED_UID, session.user.id);
@@ -256,8 +275,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [refresh, clearSubscriptionCache]);
 
   const value = useMemo(
-    () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, loading, refresh }),
-    [isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, loading, refresh]
+    () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, subscription, loading, refresh }),
+    [isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, subscription, loading, refresh]
   );
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;

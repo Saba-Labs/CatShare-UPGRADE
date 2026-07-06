@@ -4619,7 +4619,7 @@
 }
 
 .template-card--coming-soon {
-  opacity: 0.88;
+  cursor: default;
 }
 
 .template-card--coming-soon:hover {
@@ -4628,12 +4628,33 @@
   transform: none;
 }
 
+.template-card--coming-soon .template-card-preview,
+.template-card--coming-soon .template-card-body {
+  opacity: 0.38;
+  filter: grayscale(1);
+}
+
 .template-card--coming-soon .template-card-preview img {
-  filter: saturate(0.85);
+  filter: grayscale(1) brightness(1.08);
 }
 
 .template-card--coming-soon:hover .template-card-preview img {
   transform: none;
+}
+
+.template-card--coming-soon .template-card-preview-shade {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.template-card--coming-soon .template-card-name,
+.template-card--coming-soon .template-card-tag,
+.template-card--coming-soon .template-card-desc,
+.template-card--coming-soon .template-card-chip {
+  color: #9aa0a6;
+}
+
+.template-card--coming-soon .template-swatch {
+  opacity: 0.55;
 }
 
 .template-card-badge--soon {

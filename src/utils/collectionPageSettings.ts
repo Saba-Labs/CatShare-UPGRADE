@@ -4,7 +4,6 @@ import type { FullProductListSection } from '../types/homepage';
 import { normalizeProductCardStyle, coerceProductListViewMode, getProductCardStyleGridColumns } from './productCardStyles';
 
 const DEFAULT_LIST_SETTINGS: FullProductListSection['settings'] = {
-  showSearch: true,
   showCategoryFilters: true,
   showSort: true,
   viewMode: 'list',
@@ -43,7 +42,6 @@ export function resolveCollectionTemplate(
 
 export interface ResolvedCollectionPageSettings {
   columns: 2 | 3 | 4;
-  showSearch: boolean;
   showCategoryFilters: boolean;
   showSort: boolean;
   viewMode: 'list' | 'grid';
@@ -64,7 +62,6 @@ export function resolveCollectionPageSettings(
 
   return {
     columns: getProductCardStyleGridColumns(cardsStyle, template.columns ?? 4),
-    showSearch: template.showSearch ?? true,
     showCategoryFilters: template.showFilters ?? true,
     showSort: template.showSort ?? true,
     viewMode: coerceProductListViewMode(cardsStyle, template.viewMode ?? 'list'),

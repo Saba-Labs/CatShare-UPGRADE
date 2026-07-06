@@ -77,7 +77,6 @@ export default function CatalogCollectionPage({
             products={products}
             embedded
             columns={settings.columns}
-            showSearch={settings.showSearch}
             showCategoryFilters={settings.showCategoryFilters}
             showSort={settings.showSort}
             viewMode={settings.viewMode}

@@ -37,6 +37,7 @@ interface BuilderCategoryPageOverlayProps {
   onSelectSection: (id: string | null) => void;
   onClose: () => void;
   onProductPreview?: (product: ProductWithCatalogueData) => void;
+  onCategoryPreview?: (category: BuilderPreviewCategory) => void;
 }
 
 /** Category / collection page preview in the homepage editor. */
@@ -50,6 +51,7 @@ export default function BuilderCategoryPageOverlay({
   onSelectSection,
   onClose,
   onProductPreview,
+  onCategoryPreview,
 }: BuilderCategoryPageOverlayProps) {
   const { products } = useBuilderCatalogue();
   const themeVars = buildWebsiteThemeVars(theme);
@@ -102,6 +104,8 @@ export default function BuilderCategoryPageOverlay({
               isAnnouncementSelected={isSiteAnnouncementSelected}
               onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}
               isHeaderSelected={isSiteHeaderSelected}
+              onProductPreview={onProductPreview}
+              onCategoryPreview={onCategoryPreview}
             />
           ) : null}
 
@@ -114,7 +118,6 @@ export default function BuilderCategoryPageOverlay({
               embedded
               columns={settings.columns}
               sectionTitle={category.label}
-              showSearch={settings.showSearch}
               showCategoryFilters={settings.showCategoryFilters}
               showSort={settings.showSort}
               viewMode={settings.viewMode}

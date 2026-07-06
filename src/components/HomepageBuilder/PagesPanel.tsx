@@ -117,7 +117,7 @@ export default function PagesPanel({
 
         <p className="panel-hint" style={{ marginTop: 12 }}>
           Home is your custom storefront cover. <strong>Shop catalog</strong> is always underneath — category
-          pages show your full product list with search, filters, and ordering.
+          pages show your full product list with filters and ordering.
         </p>
       </SidebarSection>
     </div>

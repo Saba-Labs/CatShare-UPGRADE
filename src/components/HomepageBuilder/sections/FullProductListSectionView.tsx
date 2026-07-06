@@ -36,8 +36,7 @@ export default function FullProductListSectionView({
             {settings.title?.trim() || 'Full product list'}
           </h2>
           <p style={{ margin: 0, fontSize: 14, color: '#64748b' }}>
-            Complete catalog with search, categories, and quantity controls — same as the classic default
-            store.
+            Complete catalog with categories and quantity controls — same as the classic default store.
           </p>
         </div>
       );
@@ -56,7 +55,6 @@ export default function FullProductListSectionView({
         products={storeCtx.products}
         embedded
         sectionTitle={settings.title}
-        showSearch={settings.showSearch ?? true}
         showCategoryFilters={settings.showCategoryFilters ?? true}
         showSort={settings.showSort ?? true}
         viewMode={coerceProductListViewMode(settings.cardStyle, settings.viewMode ?? 'list')}

@@ -255,6 +255,8 @@ export default function GridCanvas({
           isAnnouncementSelected={isSiteAnnouncementSelected}
           onSelectHeader={() => onSelectSection(SITE_HEADER_SELECTION_ID)}
           isHeaderSelected={isSiteHeaderSelected}
+          onProductPreview={onProductPreview}
+          onCategoryPreview={onCategoryPreview}
         />
       ) : (
         <div className="sites-editor-header-preview">

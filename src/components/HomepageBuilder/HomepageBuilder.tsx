@@ -773,6 +773,8 @@ export default function HomepageBuilder({
                   selectedSectionId={state.selectedSectionId}
                   onSelectSection={handleOverlaySelectSection}
                   onClose={() => setPreviewProduct(null)}
+                  onProductPreview={handleProductPreview}
+                  onCategoryPreview={handleCategoryPreview}
                 />
               ) : previewCategory ? (
                 <BuilderCategoryPageOverlay
@@ -785,6 +787,7 @@ export default function HomepageBuilder({
                   onSelectSection={handleOverlaySelectSection}
                   onClose={() => setPreviewCategory(null)}
                   onProductPreview={handleProductPreview}
+                  onCategoryPreview={handleCategoryPreview}
                 />
               ) : (
                 <div className={`sites-page-frame viewport-${viewport}${showThemeHub ? ' sites-page-frame--theme-hub' : ''}`}>

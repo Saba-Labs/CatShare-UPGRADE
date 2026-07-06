@@ -63,16 +63,6 @@ export default function ProductGridSectionView({
 
   return (
     <div className="website-section-products" style={{ background: settings.backgroundColor || 'transparent' }}>
-      {settings.showSearch && editMode && (
-        <input
-          type="text"
-          placeholder="Search (preview only in live store)"
-          className="panel-input"
-          style={{ marginBottom: 16 }}
-          disabled
-        />
-      )}
-
       <h2>{settings.title}</h2>
 
       {storeCtx && limited.length > 0 ? (

@@ -179,7 +179,6 @@ export interface ProductGridSection {
     sortBy: 'default' | 'alphabetical' | 'price-low' | 'price-high' | 'newest';
     itemsToShow: number;
     showFilters: boolean;
-    showSearch: boolean;
     backgroundColor?: string;
   };
   content: {
@@ -195,7 +194,6 @@ export interface FullProductListSection {
   type: 'full-product-list';
   settings: {
     title?: string;
-    showSearch: boolean;
     showCategoryFilters: boolean;
     showSort: boolean;
     viewMode: 'list' | 'grid';
@@ -650,7 +648,6 @@ export interface WebsiteSiteSettings {
 export interface WebsiteCollectionTemplate {
   showFilters: boolean;
   showSort: boolean;
-  showSearch?: boolean;
   columns: 2 | 3 | 4;
   cardsStyle: ProductCardStyle;
   viewMode?: 'list' | 'grid';

@@ -39,7 +39,6 @@ interface CollectionPageRuntimeProps {
   /** When true, hides breadcrumbs and uses optional section title (homepage block). */
   embedded?: boolean;
   sectionTitle?: string;
-  showSearch?: boolean;
   showCategoryFilters?: boolean;
   showSort?: boolean;
   viewMode?: 'list' | 'grid';
@@ -61,7 +60,6 @@ export default function CollectionPageRuntime({
   cardsStyle = 'boxed',
   embedded = false,
   sectionTitle,
-  showSearch = true,
   showCategoryFilters = true,
   showSort = true,
   viewMode,
@@ -89,13 +87,11 @@ export default function CollectionPageRuntime({
   const imageAspect = productImageAspectRatio(productImageRatio);
   const gridColumnCount = getProductCardStyleGridColumns(resolvedCardsStyle, columns);
   const catalogProductLayout = resolvedCardsStyle === 'catalog';
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
 
   const categoryParam =
     previewCategoryId ??
     new URLSearchParams(location.search).get('category');
-  const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const availableCategories = useMemo(() => {
     const all = products.flatMap((product) =>
@@ -139,19 +135,9 @@ export default function CollectionPageRuntime({
   };
 
   const filteredProducts = useMemo(() => {
-    const byCategory =
-      selectedCategory === 'all'
-        ? products
-        : productsInCategory(products, selectedCategory);
-    if (!normalizedQuery) return byCategory;
-    return byCategory.filter((product) =>
-      [product.name, product.subtitle, ...(Array.isArray(product.category) ? product.category : [])]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery)
-    );
-  }, [products, selectedCategory, normalizedQuery]);
+    if (selectedCategory === 'all') return products;
+    return productsInCategory(products, selectedCategory);
+  }, [products, selectedCategory]);
 
   const sortedProducts = useMemo(() => {
     if (sortBy === 'default') {
@@ -222,34 +208,7 @@ export default function CollectionPageRuntime({
           <div className="website-of-count">
             {sortedProducts.length} item{sortedProducts.length === 1 ? '' : 's'}
           </div>
-          {showSearch || showSort ? (
-          <div className="website-of-search-row">
-            {showSearch ? (
-            <div className="website-of-search">
-              <span className="website-of-search-icon" aria-hidden>
-                ⌕
-              </span>
-              <input
-                type="text"
-                className="website-of-search-input"
-                placeholder="Search items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Search products"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  className="website-of-search-clear"
-                  onClick={() => setSearchQuery('')}
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
-              ) : null}
-            </div>
-            ) : null}
-            {showSort ? (
+          {showSort ? (
             <select
               className="website-of-sort"
               value={sortBy}
@@ -262,8 +221,6 @@ export default function CollectionPageRuntime({
               <option value="name-asc">Name: A to Z</option>
               <option value="name-desc">Name: Z to A</option>
             </select>
-            ) : null}
-          </div>
           ) : null}
           {showCategoryFilters && availableCategories.length > 0 ? (
             <div className="website-of-category-filters" role="tablist" aria-label="Filter by category">

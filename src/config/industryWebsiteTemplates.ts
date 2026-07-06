@@ -53,7 +53,6 @@ function buildFashionWardrobe(): WebsiteModeConfig {
       type: 'full-product-list',
       settings: {
         title: '',
-        showSearch: true,
         showCategoryFilters: true,
         showSort: true,
         viewMode: 'list',
@@ -99,7 +98,6 @@ function buildFashionWardrobe(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'boxed',
         viewMode: 'list',
@@ -146,7 +144,6 @@ function buildFashionBoutiqueList(): WebsiteModeConfig {
       type: 'full-product-list',
       settings: {
         title: 'Shop dresses',
-        showSearch: true,
         showCategoryFilters: true,
         showSort: true,
         viewMode: 'grid',
@@ -189,7 +186,6 @@ function buildFashionBoutiqueList(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'boutique',
         viewMode: 'grid',
@@ -340,7 +336,6 @@ function buildFashionLinen(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'minimal',
         viewMode: 'grid',
@@ -430,7 +425,6 @@ function buildFashionRunway(): WebsiteModeConfig {
         sortBy: 'newest',
         itemsToShow: 12,
         showFilters: false,
-        showSearch: false,
         backgroundColor: '#ffffff',
       },
       content: { productSource: 'all', productIds: [] },
@@ -538,7 +532,6 @@ function buildFashionRunway(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 4,
         cardsStyle: 'elevated',
         viewMode: 'grid',
@@ -728,7 +721,6 @@ function buildFashionMaharani(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: false,
         columns: 3,
         cardsStyle: 'boutique',
         viewMode: 'list',
@@ -780,7 +772,6 @@ function buildJewelTray(): WebsiteModeConfig {
       type: 'full-product-list',
       settings: {
         title: '',
-        showSearch: true,
         showCategoryFilters: true,
         showSort: true,
         viewMode: 'grid',
@@ -826,7 +817,6 @@ function buildJewelTray(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 2,
         cardsStyle: 'overlay',
         viewMode: 'grid',
@@ -873,7 +863,6 @@ function buildJewelCounter(): WebsiteModeConfig {
       type: 'full-product-list',
       settings: {
         title: 'Today’s counter',
-        showSearch: true,
         showCategoryFilters: true,
         showSort: true,
         viewMode: 'list',
@@ -916,7 +905,6 @@ function buildJewelCounter(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'quick-shop',
         viewMode: 'list',
@@ -1066,7 +1054,6 @@ function buildJewelPearl(): WebsiteModeConfig {
       collection: {
         showFilters: false,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'minimal',
         viewMode: 'grid',
@@ -1147,7 +1134,6 @@ function buildJewelApex(): WebsiteModeConfig {
         sortBy: 'price-high',
         itemsToShow: 9,
         showFilters: true,
-        showSearch: true,
         backgroundColor: '#060912',
       },
       content: { productSource: 'all', productIds: [] },
@@ -1237,7 +1223,6 @@ function buildJewelApex(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 3,
         cardsStyle: 'elevated',
         viewMode: 'grid',
@@ -1424,7 +1409,6 @@ function buildJewelRoyal(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: false,
         columns: 3,
         cardsStyle: 'boutique',
         viewMode: 'list',

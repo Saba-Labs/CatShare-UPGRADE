@@ -62,7 +62,7 @@ export const SECTION_TYPE_DESCRIPTIONS: Record<HomepageSectionType, string> = {
   banner: 'Full-width banner with overlay text and CTA',
   'featured-products': 'Showcase selected products in grid or slider',
   'category-showcase': 'Display store categories as cards',
-  'product-grid': 'Product grid with search and filters',
+  'product-grid': 'Product grid with filters',
   'full-product-list': 'Complete store catalog with order-form list and quantity controls',
   announcement: 'Important announcements or alerts',
   cta: 'Call-to-action section with button',
@@ -216,7 +216,6 @@ export function createDefaultSection(
           sortBy: 'default',
           itemsToShow: 10,
           showFilters: true,
-          showSearch: true,
         },
         content: {
           productSource: 'all',
@@ -232,7 +231,6 @@ export function createDefaultSection(
         order,
         settings: {
           title: '',
-          showSearch: true,
           showCategoryFilters: true,
           showSort: true,
           viewMode: 'list',
@@ -563,7 +561,6 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       collection: {
         showFilters: true,
         showSort: true,
-        showSearch: true,
         columns: 4,
         cardsStyle: 'boxed',
         viewMode: 'list',

@@ -206,6 +206,7 @@ useEffect(() => {
   };
 
   const planLabel = isPaidPro ? "Pro" : isTrialActive ? "Pro Trial" : isPro ? "Pro" : "Free";
+  const handleManageAccount = () => navigate(`/settings/pro/manage?from=${referrer}`);
 
   const freePlanLimits = {
     products: FREE_MAX_PRODUCTS,
@@ -458,6 +459,12 @@ useEffect(() => {
             )}
           </div>
 
+          {error && (
+            <div className="p-4 bg-red-100 border border-red-300 rounded-lg mb-6">
+              <p className="text-sm text-red-700 font-medium">{error}</p>
+            </div>
+          )}
+
           {/* BILLING FREQUENCY SELECTOR — show until user has a paid subscription (trial users can still buy) — desktop only */}
           {!isPaidPro && isAndroid && (
             <div className="hidden md:flex gap-3 justify-center mb-8">
@@ -522,12 +529,20 @@ useEffect(() => {
                   >
                     Current Plan
                   </button>
-                ) : (
+                ) : isPaidPro ? (
                   <button
-                    onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
-                    className="w-full py-2 sm:py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold text-sm sm:text-base rounded-lg hover:bg-gray-50 transition mb-6"
+                    type="button"
+                    onClick={handleManageAccount}
+                    className="w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base rounded-lg mb-6 shadow-lg hover:shadow-xl transition"
                   >
                     Manage Account
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full py-2 sm:py-3 px-4 bg-gray-100 text-gray-500 font-semibold text-sm sm:text-base rounded-lg mb-6 cursor-not-allowed"
+                  >
+                    Pro Trial Active
                   </button>
                 )}
 
@@ -686,8 +701,9 @@ useEffect(() => {
                   )
                 ) : (
                   <button
-                    onClick={() => navigate(referrer === 'account' ? '/account' : '/settings')}
-                    className="relative z-10 w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm sm:text-base rounded-lg mb-6 shadow-lg hover:shadow-xl"
+                    type="button"
+                    onClick={handleManageAccount}
+                    className="relative z-10 w-full py-2 sm:py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base rounded-lg transition mb-6 shadow-lg hover:shadow-xl"
                   >
                     Manage Account
                   </button>

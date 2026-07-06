@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import { headerLayoutForPageSurface } from '../../config/headerVariants';
 import type { WebsiteNavItem, WebsiteSiteSettings } from '../../types/homepage';
 import { isExternalHref, normalizeStorefrontPath, resolveStorefrontHref } from '../../utils/storefrontHref';
 import type { StorePublic } from '../../services/storeService';
 import StorefrontOrderformHeader from './StorefrontOrderformHeader';
+import StorefrontHeaderSearch from './StorefrontHeaderSearch';
 import { buildHeaderSurfaceStyle, headerLayoutDataAttributes } from '../../utils/headerSurfaceStyle';
 import './storefront-site-header.css';
 
@@ -30,6 +32,10 @@ interface StorefrontSiteHeaderProps {
   heroOverlay?: boolean;
   /** @deprecated Use heroOverlay */
   immersiveOverHero?: boolean;
+  /** Builder preview: open product page overlay from header search */
+  onProductPreview?: (product: ProductWithCatalogueData) => void;
+  /** Builder preview: open category page overlay from header search */
+  onCategoryPreview?: (category: { id: string; label: string }) => void;
 }
 
 export default function StorefrontSiteHeader({
@@ -44,6 +50,8 @@ export default function StorefrontSiteHeader({
   pageSurface = 'homepage',
   heroOverlay: heroOverlayProp,
   immersiveOverHero: immersiveOverHeroProp,
+  onProductPreview,
+  onCategoryPreview,
 }: StorefrontSiteHeaderProps) {
   const heroOverlay = heroOverlayProp ?? immersiveOverHeroProp ?? false;
   const headerRef = useRef<HTMLElement>(null);
@@ -297,20 +305,14 @@ export default function StorefrontSiteHeader({
   );
 
   function renderBarInner() {
+    const searchProps = {
+      preview,
+      onProductPreview,
+      onCategoryPreview,
+    };
+
     return (
       <>
-        {preview ? (
-          <span className="storefront-site-header__brand">{brandContent}</span>
-        ) : (
-          <Link to={basePath || '/'} className="storefront-site-header__brand" onClick={closeMenu}>
-            {brandContent}
-          </Link>
-        )}
-
-        <nav className="storefront-site-header__nav-desktop" aria-label="Main">
-          {navItems.map(renderDesktopNavItem)}
-        </nav>
-
         <button
           type="button"
           className="storefront-site-header__menu-btn"
@@ -329,6 +331,27 @@ export default function StorefrontSiteHeader({
             )}
           </svg>
         </button>
+
+        {preview ? (
+          <span className="storefront-site-header__brand">{brandContent}</span>
+        ) : (
+          <Link to={basePath || '/'} className="storefront-site-header__brand" onClick={closeMenu}>
+            {brandContent}
+          </Link>
+        )}
+
+        <nav className="storefront-site-header__nav-desktop" aria-label="Main">
+          {navItems.map(renderDesktopNavItem)}
+          <StorefrontHeaderSearch
+            {...searchProps}
+            className="storefront-header-search--nav-inline"
+          />
+        </nav>
+
+        <StorefrontHeaderSearch
+          {...searchProps}
+          className="storefront-header-search--bar-end"
+        />
       </>
     );
   }
@@ -345,7 +368,6 @@ export default function StorefrontSiteHeader({
       />
       <aside
         className="storefront-nav-drawer"
-        style={headerStyle}
         role="dialog"
         aria-modal="true"
         aria-label="Site menu"

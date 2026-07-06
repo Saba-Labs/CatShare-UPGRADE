@@ -44,12 +44,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isPro = computeHasProAccess({ paidPro, trialEndsAtIso: trialEndsAt });
     const isTrialActive = !paidPro && isTrialPeriodActive(trialEndsAt);
 
+    const subscription = subRow
+      ? {
+          platform: subRow.platform,
+          productId: subRow.product_id,
+          status: subRow.status,
+          expiresAt: subRow.expires_at,
+          createdAt: subRow.created_at ?? subRow.updated_at,
+          updatedAt: subRow.updated_at,
+        }
+      : null;
+
     return res.status(200).json({
       isPro,
       isPaidPro: paidPro,
       isTrialActive,
       trialEndsAt,
       trialDays: TRIAL_DAYS,
+      subscription,
     });
   } catch (e) {
     console.error(e);

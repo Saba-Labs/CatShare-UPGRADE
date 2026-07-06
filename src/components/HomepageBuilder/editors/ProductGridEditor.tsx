@@ -168,17 +168,6 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
           onChange={(next) => updateSettings({ sortBy: next as ProductGridSection['settings']['sortBy'] })}
         />
       </div>
-
-      <div className="panel-section">
-        <label className="panel-checkbox">
-          <input
-            type="checkbox"
-            checked={settings.showSearch}
-            onChange={(e) => updateSettings({ showSearch: e.target.checked })}
-          />
-          <span>Show search bar</span>
-        </label>
-      </div>
     </>
   );
 }
