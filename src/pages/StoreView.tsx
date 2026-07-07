@@ -174,7 +174,7 @@ const CSS = `
 .sv { font-family: var(--f-body); background: var(--c-bg); min-height: 100vh; color: var(--c-text); -webkit-font-smoothing: antialiased; position: relative; }
 .sv.sv-checkout-open { overflow: hidden; height: 100dvh; max-height: 100dvh; }
 .sv-page { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; overflow-x: hidden; }
-.sv-page.website-mode-full { max-width: none; width: 100%; margin: 0; padding: 0; min-height: 0; }
+.sv-page.website-mode-full { max-width: none; width: 100%; margin: 0; padding: 0; min-height: 0; overflow-x: clip; overflow-y: visible; }
 
 .sv-page.sv-page--has-cart .catalog-layout-runtime {
   padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
@@ -567,6 +567,8 @@ body { background: var(--c-bg); }
     margin: 0;
     padding: 0;
     min-height: 0;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .sv-hero {

@@ -120,6 +120,44 @@ export default function GridCanvas({
   const isSiteAnnouncementSelected = selectedSectionId === SITE_ANNOUNCEMENT_SELECTION_ID;
   const isSiteHeaderSelected = selectedSectionId === SITE_HEADER_SELECTION_ID;
 
+  const siteFooterPreview =
+    showSiteFooter && siteSettings ? (
+      <div className="sites-block-row sites-block-row--site-footer">
+        <div className="sites-section-drag-grip sites-section-drag-grip--placeholder" aria-hidden="true" />
+        <div className="sites-block-row-body">
+          <div
+            className={`sites-editor-footer-preview${
+              catalogClassicFooter ? ' sites-editor-footer-preview--catalog' : ''
+            }${
+              siteSettings.footerWidth === 'full' ? ' sites-editor-footer-preview--full' : ''
+            }${isSiteFooterSelected ? ' selected' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-label="Edit site footer"
+            aria-pressed={isSiteFooterSelected}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectSection(SITE_FOOTER_SELECTION_ID);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                onSelectSection(SITE_FOOTER_SELECTION_ID);
+              }
+            }}
+          >
+            {isSiteFooterSelected && (
+              <div className="sites-footer-selection-label" onClick={(e) => e.stopPropagation()}>
+                Footer
+              </div>
+            )}
+            <WebsiteFooter siteSettings={siteSettings} previewMode />
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   const handleSectionClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     onSelectSection(id);
@@ -441,41 +479,8 @@ export default function GridCanvas({
                   </Fragment>
                 );
               })}
+              {siteFooterPreview}
             </div>
-      )}
-      {showSiteFooter && (
-        <div
-          className={`sites-editor-footer-preview${
-            catalogClassicFooter ? ' sites-editor-footer-preview--catalog' : ''
-          }${
-            siteSettings.footerWidth === 'full' ? ' sites-editor-footer-preview--full' : ''
-          }${isSiteFooterSelected ? ' selected' : ''}`}
-          role="button"
-          tabIndex={0}
-          aria-label="Edit site footer"
-          aria-pressed={isSiteFooterSelected}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectSection(SITE_FOOTER_SELECTION_ID);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              e.stopPropagation();
-              onSelectSection(SITE_FOOTER_SELECTION_ID);
-            }
-          }}
-        >
-          {isSiteFooterSelected && (
-            <div className="sites-footer-selection-label" onClick={(e) => e.stopPropagation()}>
-              Footer
-            </div>
-          )}
-          <WebsiteFooter
-            siteSettings={siteSettings}
-            previewMode
-          />
-        </div>
       )}
         </div>
       </div>

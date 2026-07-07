@@ -101,7 +101,7 @@ export default function HeaderSettingsEditor({
           <div className="sidebar-panel-divider" />
           <SidebarPanelHeading
             title="Store hero text"
-            hint="Same as Business Profile → Short about / tagline and Full description. Open/closed badge uses footer settings (Site → Footer). Menu links are hidden with this layout."
+            hint="Same as Business Profile → Short about / tagline and Full description. Open/closed badge uses footer settings (Site → Footer). Menu links and search appear in the bar above the hero."
           />
           <div className="sidebar-field">
             <label className="panel-label">Tagline</label>
@@ -131,26 +131,24 @@ export default function HeaderSettingsEditor({
         title="Menu links"
         hint={
           variant === 'orderform'
-            ? 'Not shown with the OrderForm store hero layout.'
+            ? 'Shown in the navigation bar above the store hero (and in the compact bar after scroll).'
             : 'Add Home, Shop, or custom pages. Use + on a link to add dropdown options.'
         }
         actions={
-          variant === 'orderform' ? null : (
-            <button
-              type="button"
-              className="btn-text"
-              onClick={() =>
-                patch({
-                  navItems: [...navItems, { id: uuid(), label: 'Link', href: '/' }],
-                })
-              }
-            >
-              + Link
-            </button>
-          )
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() =>
+              patch({
+                navItems: [...navItems, { id: uuid(), label: 'Link', href: '/' }],
+              })
+            }
+          >
+            + Link
+          </button>
         }
       />
-      {variant === 'orderform' ? null : navItems.length === 0 ? (
+      {navItems.length === 0 ? (
         <p className="sidebar-empty-hint">No links yet.</p>
       ) : (
         <div className="nav-items-list">

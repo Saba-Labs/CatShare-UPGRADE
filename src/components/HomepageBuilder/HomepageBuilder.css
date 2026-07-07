@@ -2542,10 +2542,9 @@
 
 .sites-editor-footer-preview {
   width: 100%;
-  border-top: 1px solid #e5e7eb;
-  margin-top: 8px;
-  padding: 12px;
-  background: #f7f7f5;
+  margin: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
   position: relative;
   border: 2px solid transparent;
@@ -2553,14 +2552,31 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.sites-block-row--site-footer {
+  align-items: stretch;
+}
+
+.sites-block-row--site-footer .sites-block-row-body {
+  width: 100%;
+}
+
+.sites-block-row--site-footer .sites-editor-footer-preview {
+  flex: 1;
+  min-width: 0;
+}
+
+.sites-section-drag-grip--placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Classic catalog footer — boxed on mobile matches order-link width; desktop uses full boxed width */
 .sites-editor-footer-preview--catalog {
   width: 100%;
-  margin: 8px auto 0;
+  margin: 0 auto;
   padding: 0 12px 28px;
   background: transparent;
   border: none;
-  border-top: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -2615,7 +2631,7 @@
 
 .sites-page-frame.viewport-desktop .sites-editor-footer-preview--catalog .sf-footer--width-boxed,
 .builder-product-page-root.viewport-desktop .sites-editor-footer-preview--catalog .sf-footer--width-boxed {
-  margin: 18px auto 24px;
+  margin: 0 auto;
   padding: 16px 18px;
 }
 
@@ -2648,9 +2664,8 @@
 }
 
 .sites-editor-footer-preview--full {
-  padding-left: 0;
-  padding-right: 0;
-  padding-bottom: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .sites-editor-footer-preview--full .sf-footer--width-full {
@@ -2718,10 +2733,11 @@
   box-sizing: border-box;
 }
 
-/* Drag-and-drop: palette → canvas drop slots */
+/* Drag-and-drop: palette → canvas drop slots (collapsed until dragging) */
 .sites-drop-slot {
-  height: 4px;
+  height: 0;
   margin: 0;
+  overflow: hidden;
   border-radius: 4px;
   transition:
     height 0.15s ease,

@@ -1258,6 +1258,19 @@ button.website-product-card-cta--boutique:hover {
   --catalog-side-inset: 16px;
 }
 
+/* Published website: allow sticky/fixed headers (overflow-x: hidden on .sv-page breaks sticky) */
+.sv-page.website-mode-full {
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.website-runtime-root > .storefront-site-header--layout-centered,
+.website-runtime-root > .storefront-site-header--layout-classic {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
 .website-catalog-collection-shell .sf-of-header,
 .website-catalog-product-shell .sf-of-header,
 .sv-page.website-mode-full .sf-of-header,

@@ -40,7 +40,8 @@
 }
 
 /* Order-form store hero is taller than a nav bar — don't clip it in the builder */
-.grid-canvas-chrome:not(.grid-canvas-chrome--hidden):has(.storefront-site-header--layout-orderform) {
+.grid-canvas-chrome:not(.grid-canvas-chrome--hidden):has(.storefront-site-header--layout-orderform),
+.grid-canvas-chrome:not(.grid-canvas-chrome--hidden):has(.storefront-site-header--layout-centered) {
   max-height: none;
   overflow: visible;
 }

@@ -1,6 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { WebsiteSiteSettings } from '../types/homepage';
-import { headerLayoutForVariant, type HeaderLayoutMode } from '../config/headerVariants';
+import {
+  headerColorPresetForVariant,
+  headerLayoutForVariant,
+  normalizeHeaderVariant,
+  type HeaderLayoutMode,
+} from '../config/headerVariants';
 
 function parseHexColor(hex: string): { r: number; g: number; b: number } | null {
   const raw = hex.trim().replace(/^#/, '');
@@ -33,7 +38,8 @@ export function buildHeaderSurfaceStyle(
   options: { scrolled: boolean; layout?: HeaderLayoutMode; heroOverlay?: boolean; /** @deprecated */ immersiveOverHero?: boolean }
 ): CSSProperties {
   const layout = options.layout ?? headerLayoutForVariant(siteSettings.headerVariant);
-  const headerBg = siteSettings.headerBg || '#ffffff';
+  const headerPreset = headerColorPresetForVariant(normalizeHeaderVariant(siteSettings.headerVariant));
+  const headerBg = siteSettings.headerBg || headerPreset.headerBg || '#ffffff';
   const heroOverlay = options.heroOverlay ?? options.immersiveOverHero ?? false;
   const floatingOpacity = siteSettings.headerFloatingOpacity ?? 0.92;
   const immersiveOpacity = siteSettings.headerImmersiveOpacity ?? 0;
@@ -57,12 +63,23 @@ export function buildHeaderSurfaceStyle(
     barBg = 'transparent';
   }
 
+  const searchSurface = barBg === 'transparent' ? headerBg : barBg;
+
+  const surfaceVars: CSSProperties =
+    layout === 'orderform'
+      ? {
+          ['--sf-of-surface' as string]: headerBg,
+        }
+      : {};
+
   return {
     background,
-    color: siteSettings.headerTextColor || '#111827',
+    color: siteSettings.headerTextColor || headerPreset.headerTextColor || '#111827',
     ['--header-bg' as string]: headerBg,
     ['--header-bar-bg' as string]: barBg,
+    ['--sf-search-surface' as string]: searchSurface,
     ['--header-floating-blur' as string]: `${floatingBlur}px`,
+    ...surfaceVars,
   };
 }
 
