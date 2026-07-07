@@ -8,7 +8,14 @@ import { isExternalHref, normalizeStorefrontPath, resolveStorefrontHref } from '
 import type { StorePublic } from '../../services/storeService';
 import StorefrontOrderformHeader from './StorefrontOrderformHeader';
 import StorefrontHeaderSearch from './StorefrontHeaderSearch';
+import SiteAnnouncementRotator from './SiteAnnouncementRotator';
 import { buildHeaderSurfaceStyle, headerLayoutDataAttributes } from '../../utils/headerSurfaceStyle';
+import {
+  getActiveSiteAnnouncementMessages,
+  hasVisibleSiteAnnouncement,
+  resolveSiteAnnouncementRotation,
+  resolveSiteAnnouncementRotationInterval,
+} from '../../utils/siteAnnouncementMessages';
 import './storefront-site-header.css';
 
 const DEFAULT_NAV: WebsiteNavItem[] = [{ id: 'home', label: 'Home', href: '/' }];
@@ -211,6 +218,9 @@ export default function StorefrontSiteHeader({
     heroOverlay,
     siteSettings.showAnnouncement,
     siteSettings.announcementText,
+    siteSettings.announcementMessages,
+    siteSettings.announcementRotation,
+    siteSettings.announcementRotationInterval,
     siteSettings.headerCenteredLogoSize,
     siteSettings.headerCenteredBrandLayout,
     siteSettings.logoUrl,
@@ -233,6 +243,9 @@ export default function StorefrontSiteHeader({
     layout,
     siteSettings.showAnnouncement,
     siteSettings.announcementText,
+    siteSettings.announcementMessages,
+    siteSettings.announcementRotation,
+    siteSettings.announcementRotationInterval,
     siteSettings.headerCenteredLogoSize,
     siteSettings.headerCenteredBrandLayout,
     siteSettings.logoUrl,
@@ -356,8 +369,13 @@ export default function StorefrontSiteHeader({
     );
   };
 
+  const announcementMessages = useMemo(
+    () => getActiveSiteAnnouncementMessages(siteSettings),
+    [siteSettings.announcementMessages, siteSettings.announcementText]
+  );
+
   const announcementBlock =
-    siteSettings.showAnnouncement && siteSettings.announcementText ? (
+    hasVisibleSiteAnnouncement(siteSettings) ? (
       preview && onSelectAnnouncement ? (
         <button
           type="button"
@@ -378,7 +396,11 @@ export default function StorefrontSiteHeader({
           {isAnnouncementSelected ? (
             <span className="storefront-site-header__announcement-badge">Announcement</span>
           ) : null}
-          {siteSettings.announcementText}
+          <SiteAnnouncementRotator
+            messages={announcementMessages}
+            animation={resolveSiteAnnouncementRotation(siteSettings)}
+            intervalMs={resolveSiteAnnouncementRotationInterval(siteSettings)}
+          />
         </button>
       ) : (
         <div
@@ -388,7 +410,11 @@ export default function StorefrontSiteHeader({
             color: siteSettings.announcementTextColor || '#fff',
           }}
         >
-          {siteSettings.announcementText}
+          <SiteAnnouncementRotator
+            messages={announcementMessages}
+            animation={resolveSiteAnnouncementRotation(siteSettings)}
+            intervalMs={resolveSiteAnnouncementRotationInterval(siteSettings)}
+          />
         </div>
       )
     ) : null;

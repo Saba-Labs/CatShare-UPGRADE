@@ -22,7 +22,12 @@ import {
   createEmptyHomepageLayout,
   createDefaultWebsiteModeConfig,
   normalizeHomepageLayoutForWebsiteMode,
+  SITE_ANNOUNCEMENT_SELECTION_ID,
 } from '../../config/homepageBuilderConfig';
+import {
+  getActiveSiteAnnouncementMessages,
+  normalizeSiteAnnouncementSlots,
+} from '../../utils/siteAnnouncementMessages';
 import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StorePublic } from '../../services/storeService';
 import { HomepageConfig, HomepageLayout, ThemeSettings, WebsiteModeConfig } from '../../types/homepage';
@@ -606,6 +611,35 @@ export default function HomepageBuilder({
     setPreviewCategory(null);
   };
 
+  const handleAddSiteAnnouncement = useCallback(() => {
+    const websiteConfig = state.layout.websiteConfig || createDefaultWebsiteModeConfig();
+    const siteSettings = websiteConfig.siteSettings;
+    const defaultMessage =
+      siteSettings.announcementText?.trim() ||
+      getActiveSiteAnnouncementMessages(siteSettings)[0] ||
+      'Free shipping on orders above your store minimum';
+    const slots = normalizeSiteAnnouncementSlots(siteSettings);
+    if (!slots[0]?.trim()) {
+      slots[0] = defaultMessage;
+    }
+    updateWebsiteConfig({
+      siteSettings: {
+        ...siteSettings,
+        showAnnouncement: true,
+        announcementMessages: slots,
+        announcementText: slots.map((message) => message.trim()).filter(Boolean)[0] || defaultMessage,
+        announcementRotation: siteSettings.announcementRotation || 'fade',
+        announcementRotationInterval: siteSettings.announcementRotationInterval || 5,
+        announcementBg: siteSettings.announcementBg || state.layout.theme?.primaryColor || '#111827',
+        announcementTextColor: siteSettings.announcementTextColor || '#ffffff',
+      },
+    });
+    actions.selectSection(SITE_ANNOUNCEMENT_SELECTION_ID);
+    setSelectedFreeformElementId(null);
+    setPreviewProduct(null);
+    setPreviewCategory(null);
+  }, [actions, state.layout.websiteConfig, state.layout.theme?.primaryColor, updateWebsiteConfig]);
+
   const handleOverlaySelectSection = useCallback((id: string | null) => {
     // Keep product preview open while selecting header/footer/announcement in overlay.
     actions.selectSection(id);
@@ -848,6 +882,7 @@ export default function HomepageBuilder({
               onAddPage={handleAddPage}
               onRemovePage={handleRemovePage}
               onClearSectionSelection={() => actions.selectSection(null)}
+              onAddSiteAnnouncement={handleAddSiteAnnouncement}
               onApplyTemplate={handleApplyTemplate}
               onCookTheme={handleCookThemeOpen}
               onStartBlank={editingPageId === 'home' ? handleStartBlank : undefined}

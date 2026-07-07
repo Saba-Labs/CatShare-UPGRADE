@@ -2248,6 +2248,15 @@
   border-color: #1a73e8;
 }
 
+.insert-block--active {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.insert-block--active .insert-block__icon {
+  color: #1a73e8;
+}
+
 .insert-block__icon,
 .insert-block-icon {
   width: 18px;

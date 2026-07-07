@@ -54,6 +54,7 @@ interface BuilderSidebarProps {
   onAddPage: () => void;
   onRemovePage: (pageId: string) => void;
   onClearSectionSelection: () => void;
+  onAddSiteAnnouncement?: () => void;
   onApplyTemplate?: (id: WebsiteTemplateId) => void;
   onCookTheme?: () => void;
   onStartBlank?: () => void;
@@ -91,6 +92,7 @@ export default function BuilderSidebar({
   onAddPage,
   onRemovePage,
   onClearSectionSelection,
+  onAddSiteAnnouncement,
   onApplyTemplate,
   onCookTheme,
   onStartBlank,
@@ -235,6 +237,8 @@ export default function BuilderSidebar({
                 onAddSection={onAddSection}
                 onAddFreeformElement={onAddFreeformElement}
                 onAddPreset={onAddPreset}
+                siteAnnouncementEnabled={!!websiteConfig.siteSettings.showAnnouncement}
+                onAddSiteAnnouncement={onAddSiteAnnouncement}
               />
             )}
             {activeTab === 'templates' && onApplyTemplate && (

@@ -6,7 +6,18 @@ import {
 } from '../../config/homepageBuilderConfig';
 import { BLOCK_PRESETS, BlockPresetId } from '../../config/blockPresets';
 import SidebarSection from './SidebarSection';
-import { FiLayers, FiGrid, FiShoppingBag, FiMousePointer, FiType, FiImage, PRESET_ICONS, SECTION_ICONS } from './builderSidebarIcons';
+import {
+  FiLayers,
+  FiGrid,
+  FiShoppingBag,
+  FiMousePointer,
+  FiType,
+  FiImage,
+  FiBell,
+  FiGlobe,
+  PRESET_ICONS,
+  SECTION_ICONS,
+} from './builderSidebarIcons';
 import { FiSquare } from 'react-icons/fi';
 import PaletteInsertItem from './dnd/PaletteInsertItem';
 import PalettePresetItem from './dnd/PalettePresetItem';
@@ -15,11 +26,39 @@ interface ComponentPaletteProps {
   onAddSection: (type: HomepageSectionType) => void;
   onAddFreeformElement?: (type: FreeformElementType) => void;
   onAddPreset: (presetId: BlockPresetId) => void;
+  siteAnnouncementEnabled?: boolean;
+  onAddSiteAnnouncement?: () => void;
 }
 
-export default function ComponentPalette({ onAddSection, onAddFreeformElement, onAddPreset }: ComponentPaletteProps) {
+export default function ComponentPalette({
+  onAddSection,
+  onAddFreeformElement,
+  onAddPreset,
+  siteAnnouncementEnabled = false,
+  onAddSiteAnnouncement,
+}: ComponentPaletteProps) {
   return (
     <div className="sidebar-panel insert-panel">
+      {onAddSiteAnnouncement ? (
+        <SidebarSection
+          title="Site chrome"
+          icon={<FiGlobe />}
+          description="Global elements shown at the top of every page"
+        >
+          <div className="insert-grid insert-grid--labeled">
+            <button
+              type="button"
+              className={`insert-block${siteAnnouncementEnabled ? ' insert-block--active' : ''}`}
+              title="Top strip for promos and shipping offers"
+              onClick={onAddSiteAnnouncement}
+            >
+              <FiBell className="insert-block__icon" aria-hidden />
+              <span className="insert-block__label">Announcement</span>
+            </button>
+          </div>
+        </SidebarSection>
+      ) : null}
+
       <SidebarSection title="Layouts" icon={<FiLayers />} description="Drag onto page or tap to add at end">
         <div className="preset-grid">
           {BLOCK_PRESETS.map((preset) => {

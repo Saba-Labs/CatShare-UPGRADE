@@ -90,25 +90,25 @@ const navigate = useNavigate();
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
 
   const accountPlanLine = (() => {
+    if (subscriptionLoading) {
+      return { text: 'Checking plan…', className: 'text-xs text-gray-500 mt-1' };
+    }
     if (isPaidPro) {
-      return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
+      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700 mt-1' };
     }
     if (isTrialActive && trialEndsAt) {
       const end = new Date(trialEndsAt).getTime();
       const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
-      const dayWord = daysLeft === 1 ? "day" : "days";
+      const dayWord = daysLeft === 1 ? 'day' : 'days';
       return {
         text: `Trial · ${daysLeft} ${dayWord} left`,
-        className: "text-xs font-medium text-amber-800 mt-1",
+        className: 'text-xs font-medium text-amber-800 mt-1',
       };
     }
     if (isPro) {
-      return { text: "Pro", className: "text-xs font-semibold text-emerald-700 mt-1" };
+      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700 mt-1' };
     }
-    if (subscriptionLoading) {
-      return { text: "Checking plan…", className: "text-xs text-gray-500 mt-1" };
-    }
-    return { text: "Free", className: "text-xs text-gray-600 mt-1" };
+    return { text: 'Free', className: 'text-xs text-gray-600 mt-1' };
   })();
 
   const totalProducts = products.length;

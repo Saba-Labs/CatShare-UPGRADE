@@ -807,6 +807,11 @@ export function buildCookedWebsiteConfig(input: CookThemeInput): WebsiteModeConf
       websiteName: storeName,
       showAnnouncement,
       announcementText: showAnnouncement ? 'Free shipping on orders above your store minimum' : '',
+      announcementMessages: showAnnouncement
+        ? ['Free shipping on orders above your store minimum', '', '']
+        : ['', '', ''],
+      announcementRotation: 'fade',
+      announcementRotationInterval: 5,
       announcementBg: theme.primaryColor,
       announcementTextColor: '#ffffff',
       ...(showHeader ? headerPreset : { headerVariant: storefront.headerVariant }),

@@ -579,10 +579,19 @@ export type WebsiteFooterWidth = 'boxed' | 'full';
 /** Header layout on the storefront (classic bar, centered, floating, immersive, orderform hero). */
 export type WebsiteHeaderVariant = 'classic' | 'centered' | 'floating' | 'immersive' | 'orderform';
 
+export type SiteAnnouncementRotation = 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'none';
+
 export interface WebsiteSiteSettings {
   websiteName: string;
   logoUrl?: string;
+  /** @deprecated Use announcementMessages — kept for legacy layouts */
   announcementText?: string;
+  /** Up to three rotating announcement messages shown in the site header bar. */
+  announcementMessages?: string[];
+  /** Transition style when cycling multiple announcement messages. */
+  announcementRotation?: SiteAnnouncementRotation;
+  /** Seconds between announcement message changes (minimum 2). */
+  announcementRotationInterval?: number;
   showAnnouncement?: boolean;
   announcementBg?: string;
   announcementTextColor?: string;

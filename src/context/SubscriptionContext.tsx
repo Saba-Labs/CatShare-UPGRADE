@@ -1,15 +1,15 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 import { TRIAL_DAYS_UI_FALLBACK } from '../config/freeTierLimits';
 import { useAuth } from './AuthContext';
-import { getPersistedAuthUserId, tryGetSupabaseUserIdFromAuthToken } from '../utils/authUserId';
+import { getPersistedAuthUserId } from '../utils/authUserId';
 import type { UserSubscriptionInfo } from '../utils/subscriptionDisplay';
-
-const LS_TRIAL_ENDS = 'subscription_trialEndsAt';
-const LS_TRIAL_ACTIVE = 'subscription_isTrialActive';
-const LS_PAID_PRO = 'subscription_isPaidPro';
-const LS_TRIAL_DAYS = 'subscription_trialDays';
-const LS_CACHED_UID = 'subscription_cachedUid';
+import {
+  clearCachedEntitlement,
+  readCachedEntitlement,
+  writeCachedEntitlement,
+  type CachedEntitlement,
+} from '../utils/subscriptionCache';
 
 type SubscriptionContextValue = {
   /** Full Pro access (paid subscription or active free trial). */
@@ -24,195 +24,169 @@ type SubscriptionContextValue = {
   trialDays: number;
   /** Paid subscription record from server (plan, expiry, status). */
   subscription: UserSubscriptionInfo | null;
+  /** True while entitlement for the current user is still being resolved. */
   loading: boolean;
   refresh: () => Promise<void>;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
-function getCurrentAuthUserId(): string | null {
-  return getPersistedAuthUserId() || tryGetSupabaseUserIdFromAuthToken();
-}
-
-function shouldUseCachedSubscription(): boolean {
-  const cachedUid = localStorage.getItem(LS_CACHED_UID);
-  const currentUid = getCurrentAuthUserId();
-  if (cachedUid && currentUid) return cachedUid === currentUid;
-  // Legacy cache (before per-user key): trust when signed-in and subscription keys exist.
-  if (!cachedUid && currentUid) {
-    return localStorage.getItem('isPro') !== null;
-  }
-  return false;
-}
-
-function readCachedTrialDays(): number {
-  const raw = localStorage.getItem(LS_TRIAL_DAYS);
-  if (raw == null || raw === '') return TRIAL_DAYS_UI_FALLBACK;
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : TRIAL_DAYS_UI_FALLBACK;
-}
-
-const EMPTY_CACHED_TRIAL: Pick<
-  SubscriptionContextValue,
-  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays' | 'subscription'
-> = {
-  trialEndsAt: null,
-  isTrialActive: false,
+const EMPTY_ENTITLEMENT: CachedEntitlement = {
+  isPro: false,
   isPaidPro: false,
+  isTrialActive: false,
+  trialEndsAt: null,
   trialDays: TRIAL_DAYS_UI_FALLBACK,
   subscription: null,
 };
 
-function readCachedTrial(): Pick<
-  SubscriptionContextValue,
-  'trialEndsAt' | 'isTrialActive' | 'isPaidPro' | 'trialDays' | 'subscription'
-> {
-  if (!shouldUseCachedSubscription()) return EMPTY_CACHED_TRIAL;
+function parseSubscriptionResponse(json: unknown): CachedEntitlement | null {
+  if (!json || typeof json !== 'object') return null;
+  const payload = json as Record<string, unknown>;
+  const nextTrialDays =
+    typeof payload.trialDays === 'number' && Number.isFinite(payload.trialDays) && payload.trialDays > 0
+      ? payload.trialDays
+      : TRIAL_DAYS_UI_FALLBACK;
+  const nextTrialEnd =
+    typeof payload.trialEndsAt === 'string' && payload.trialEndsAt.length > 0
+      ? payload.trialEndsAt
+      : null;
+  const nextSubscription =
+    payload.subscription && typeof payload.subscription === 'object'
+      ? ({
+          platform: (payload.subscription as UserSubscriptionInfo).platform,
+          productId: (payload.subscription as UserSubscriptionInfo).productId,
+          status: (payload.subscription as UserSubscriptionInfo).status,
+          expiresAt: (payload.subscription as UserSubscriptionInfo).expiresAt ?? null,
+          createdAt:
+            (payload.subscription as UserSubscriptionInfo).createdAt ??
+            (payload.subscription as UserSubscriptionInfo).updatedAt,
+          updatedAt: (payload.subscription as UserSubscriptionInfo).updatedAt,
+        } as UserSubscriptionInfo)
+      : null;
 
-  const trialEndsAt = localStorage.getItem(LS_TRIAL_ENDS);
   return {
-    trialEndsAt: trialEndsAt && trialEndsAt.length > 0 ? trialEndsAt : null,
-    isTrialActive: localStorage.getItem(LS_TRIAL_ACTIVE) === 'true',
-    isPaidPro: localStorage.getItem(LS_PAID_PRO) === 'true',
-    trialDays: readCachedTrialDays(),
-    subscription: null,
+    isPro: !!payload.isPro,
+    isPaidPro: !!payload.isPaidPro,
+    isTrialActive: !!payload.isTrialActive,
+    trialEndsAt: nextTrialEnd,
+    trialDays: nextTrialDays,
+    subscription: nextSubscription,
   };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading: authLoading } = useAuth();
-  const [isPro, setIsPro] = useState<boolean>(() => {
-    if (!shouldUseCachedSubscription()) return false;
-    return localStorage.getItem('isPro') === 'true';
-  });
-  const [isPaidPro, setIsPaidPro] = useState<boolean>(() => readCachedTrial().isPaidPro);
-  const [isTrialActive, setIsTrialActive] = useState<boolean>(() => readCachedTrial().isTrialActive);
-  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(() => readCachedTrial().trialEndsAt);
-  const [trialDays, setTrialDays] = useState<number>(() => readCachedTrial().trialDays);
-  const [subscription, setSubscription] = useState<UserSubscriptionInfo | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const initialEntitlement = useMemo(
+    () => readCachedEntitlement(getPersistedAuthUserId()) ?? EMPTY_ENTITLEMENT,
+    []
+  );
+  const [isPro, setIsPro] = useState(initialEntitlement.isPro);
+  const [isPaidPro, setIsPaidPro] = useState(initialEntitlement.isPaidPro);
+  const [isTrialActive, setIsTrialActive] = useState(initialEntitlement.isTrialActive);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(initialEntitlement.trialEndsAt);
+  const [trialDays, setTrialDays] = useState<number>(initialEntitlement.trialDays);
+  const [subscription, setSubscription] = useState<UserSubscriptionInfo | null>(
+    initialEntitlement.subscription
+  );
+  const [loading, setLoading] = useState(true);
+  const activeUserIdRef = useRef<string | null>(getPersistedAuthUserId());
 
-  const clearSubscriptionCache = useCallback(() => {
-    setIsPro(false);
-    setIsPaidPro(false);
-    setIsTrialActive(false);
-    setTrialEndsAt(null);
-    setTrialDays(TRIAL_DAYS_UI_FALLBACK);
-    setSubscription(null);
-    localStorage.setItem('isPro', 'false');
-    localStorage.removeItem(LS_TRIAL_ENDS);
-    localStorage.setItem(LS_TRIAL_ACTIVE, 'false');
-    localStorage.setItem(LS_PAID_PRO, 'false');
-    localStorage.removeItem(LS_TRIAL_DAYS);
-    localStorage.removeItem(LS_CACHED_UID);
+  const setEntitlementState = useCallback((entitlement: CachedEntitlement) => {
+    setIsPro(entitlement.isPro);
+    setIsPaidPro(entitlement.isPaidPro);
+    setIsTrialActive(entitlement.isTrialActive);
+    setTrialEndsAt(entitlement.trialEndsAt);
+    setTrialDays(entitlement.trialDays);
+    setSubscription(entitlement.subscription);
   }, []);
 
-  const refresh = useCallback(async () => {
-    try {
-      setLoading(true);
+  const hydrateFromCache = useCallback(
+    (userId: string | null | undefined): CachedEntitlement | null => {
+      const cached = readCachedEntitlement(userId);
+      if (!cached) return null;
+      setEntitlementState(cached);
+      return cached;
+    },
+    [setEntitlementState]
+  );
 
+  const clearSubscriptionCache = useCallback(() => {
+    setEntitlementState(EMPTY_ENTITLEMENT);
+    clearCachedEntitlement();
+  }, [setEntitlementState]);
+
+  const refresh = useCallback(async () => {
+    const userId = activeUserIdRef.current;
+    if (!userId) return;
+
+    setLoading(true);
+
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        // Session may still be hydrating on cold start — keep cached entitlement.
+        hydrateFromCache(userId);
         return;
       }
 
       const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
-      // Skip subscription check if backend URL is not configured
       if (!baseUrl) {
-        setLoading(false);
+        hydrateFromCache(userId);
         return;
       }
 
       let accessToken: string | null = null;
-      try {
-        accessToken = await getSupabaseAccessToken();
-      } catch (err) {
-        console.debug('Failed to get access token:', err instanceof Error ? err.message : String(err));
-        setLoading(false);
-        return;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          accessToken = await getSupabaseAccessToken();
+        } catch (err) {
+          console.debug(
+            'Failed to get access token:',
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+        if (accessToken) break;
+        await sleep(250 * (attempt + 1));
       }
 
       if (!accessToken) {
-        setLoading(false);
+        hydrateFromCache(userId);
         return;
       }
 
-      // Create an AbortController with 5 second timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort('timeout'), 5000);
+      const timeoutId = window.setTimeout(() => controller.abort('timeout'), 8000);
 
       try {
-        let resp: Response;
-        try {
-          resp = await fetch(`${baseUrl}/api/subscription`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-            signal: controller.signal,
-          });
-        } catch (fetchErr) {
-          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-          if (msg.includes('abort') || msg.includes('signal')) {
-            console.debug('Subscription fetch timed out or was aborted');
-          } else {
-            console.debug('Subscription fetch failed:', msg);
-          }
-          clearTimeout(timeoutId);
-          return;
-        }
+        const resp = await fetch(`${baseUrl}/api/subscription`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
 
         if (!resp.ok) {
           console.debug(`Subscription API returned status ${resp.status}`);
-          clearTimeout(timeoutId);
+          hydrateFromCache(userId);
           return;
         }
 
         const json = await resp.json();
-        const next = !!json?.isPro;
-        const nextPaid = !!json?.isPaidPro;
-        const nextTrial = !!json?.isTrialActive;
-        const nextTrialEnd =
-          typeof json?.trialEndsAt === 'string' && json.trialEndsAt.length > 0 ? json.trialEndsAt : null;
-        const nextTrialDays =
-          typeof json?.trialDays === 'number' && Number.isFinite(json.trialDays) && json.trialDays > 0
-            ? json.trialDays
-            : TRIAL_DAYS_UI_FALLBACK;
-        const nextSubscription =
-          json?.subscription && typeof json.subscription === 'object'
-            ? ({
-                platform: json.subscription.platform,
-                productId: json.subscription.productId,
-                status: json.subscription.status,
-                expiresAt: json.subscription.expiresAt ?? null,
-                createdAt: json.subscription.createdAt ?? json.subscription.updatedAt,
-                updatedAt: json.subscription.updatedAt,
-              } as UserSubscriptionInfo)
-            : null;
-
-        setIsPro(next);
-        setIsPaidPro(nextPaid);
-        setIsTrialActive(nextTrial);
-        setTrialEndsAt(nextTrialEnd);
-        setTrialDays(nextTrialDays);
-        setSubscription(nextSubscription);
-
-        localStorage.setItem('isPro', next ? 'true' : 'false');
-        localStorage.setItem(LS_CACHED_UID, session.user.id);
-        localStorage.setItem(LS_TRIAL_DAYS, String(nextTrialDays));
-        localStorage.setItem(LS_PAID_PRO, nextPaid ? 'true' : 'false');
-        localStorage.setItem(LS_TRIAL_ACTIVE, nextTrial ? 'true' : 'false');
-        if (nextTrialEnd) {
-          localStorage.setItem(LS_TRIAL_ENDS, nextTrialEnd);
-        } else {
-          localStorage.removeItem(LS_TRIAL_ENDS);
+        const parsed = parseSubscriptionResponse(json);
+        if (!parsed) {
+          hydrateFromCache(userId);
+          return;
         }
-        clearTimeout(timeoutId);
+
+        setEntitlementState(parsed);
+        writeCachedEntitlement(session.user.id, parsed);
       } catch (fetchError) {
-        clearTimeout(timeoutId);
-        // Silently fail and keep cached values - this handles network errors, CORS issues, timeouts, etc.
         if (fetchError instanceof Error) {
           if (fetchError.name === 'AbortError') {
             console.debug('Subscription fetch timeout');
@@ -220,20 +194,25 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
             console.debug('Subscription fetch error (using cache):', fetchError.message);
           }
         }
+        hydrateFromCache(userId);
       } finally {
-        clearTimeout(timeoutId);
+        window.clearTimeout(timeoutId);
       }
     } catch (error) {
-      // Catch any unexpected errors
-      console.debug('Subscription refresh error:', error instanceof Error ? error.message : String(error));
+      console.debug(
+        'Subscription refresh error:',
+        error instanceof Error ? error.message : String(error)
+      );
+      hydrateFromCache(userId);
     } finally {
       setLoading(false);
     }
-  }, [clearSubscriptionCache]);
+  }, [hydrateFromCache, setEntitlementState]);
 
   useEffect(() => {
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) {
+      activeUserIdRef.current = null;
       clearSubscriptionCache();
       setLoading(false);
       return;
@@ -242,22 +221,26 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (authLoading) return;
 
     if (!user?.uid) {
+      activeUserIdRef.current = null;
       clearSubscriptionCache();
       setLoading(false);
       return;
     }
 
+    activeUserIdRef.current = user.uid;
+    hydrateFromCache(user.uid);
     refresh().catch(() => setLoading(false));
-  }, [user?.uid, authLoading, refresh, clearSubscriptionCache]);
+  }, [user?.uid, authLoading, refresh, clearSubscriptionCache, hydrateFromCache]);
 
   useEffect(() => {
     const isGuestUser = localStorage.getItem('isOfflineGuest') === 'true';
     if (isGuestUser) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED') return;
 
       if (event === 'SIGNED_OUT') {
+        activeUserIdRef.current = null;
         clearSubscriptionCache();
         setLoading(false);
         return;
@@ -267,12 +250,14 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         session?.user &&
         (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')
       ) {
+        activeUserIdRef.current = session.user.id;
+        hydrateFromCache(session.user.id);
         refresh().catch(() => setLoading(false));
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [refresh, clearSubscriptionCache]);
+    return () => authSubscription.unsubscribe();
+  }, [refresh, clearSubscriptionCache, hydrateFromCache]);
 
   const value = useMemo(
     () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, subscription, loading, refresh }),
