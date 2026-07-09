@@ -618,9 +618,29 @@ export default function TrackOrder() {
               )}
             </section>
 
+            {order?.checkout_adjustments?.customerNotes?.orderNote || order?.checkout_adjustments?.customerNotes?.giftMessage ? (
+              <section className="trk-card trk-card-pad">
+                <h2 className="trk-card-label">Order notes</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {order.checkout_adjustments?.customerNotes?.orderNote ? (
+                    <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                      <span style={{ fontWeight: 600, color: '#1e293b' }}>Special instructions: </span>
+                      {order.checkout_adjustments.customerNotes.orderNote}
+                    </div>
+                  ) : null}
+                  {order.checkout_adjustments?.customerNotes?.giftMessage ? (
+                    <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                      <span style={{ fontWeight: 600, color: '#1e293b' }}>Gift message: </span>
+                      {order.checkout_adjustments.customerNotes.giftMessage}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
             {canEdit && order?.status === 'pending' ? (
               <section className="trk-card trk-card-pad">
-                <h2 className="trk-card-label">Notes for seller</h2>
+                <h2 className="trk-card-label">Add notes for seller</h2>
                 <div className="trk-field">
                   <label htmlFor="trk-notes">Add any special instructions or notes for your order</label>
                   <textarea
