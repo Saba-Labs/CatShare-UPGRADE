@@ -43,7 +43,7 @@ function getLikelyRootDomain(host: string): string {
 function looksLikeHostingPreviewHostname(host: string): boolean {
   const h = normalizeHost(host);
   if (!h) return false;
-  return /\.(vercel\.app|netlify\.app|pages\.dev|pages\.github\.io|cloudflarepages\.net)$/i.test(h);
+  return /\.(vercel\.app|netlify\.app|pages\.dev|pages\.github\.io|cloudflarepages\.net|builderio\.dev)$/i.test(h);
 }
 
 export function getStorefrontRootHost(): string {

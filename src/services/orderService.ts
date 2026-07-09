@@ -248,6 +248,7 @@ export interface Order {
   seller_user_id: string;
   customer_name: string;
   customer_whatsapp?: string;
+  customer_notes?: string;
   items: OrderItem[];
   total_amount?: number;
   currency_code: string;

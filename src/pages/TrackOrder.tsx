@@ -379,6 +379,7 @@ export default function TrackOrder() {
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [customerNotes, setCustomerNotes] = useState('');
   const [claimingUpi, setClaimingUpi] = useState(false);
 
   const canEdit = canCustomerEditOrder(order?.status);
@@ -415,6 +416,8 @@ export default function TrackOrder() {
     setEditLines(linesFromOrder(data.items || []));
     setCustomerName(data.customer_name || '');
     setCustomerWhatsapp(data.customer_whatsapp || '');
+    const existingNotes = data.customer_notes || data.checkout_adjustments?.customerNotes?.orderNote || '';
+    setCustomerNotes(existingNotes);
     setLoading(false);
   }, [trackingToken]);
 
@@ -463,6 +466,7 @@ export default function TrackOrder() {
       trackingToken,
       customerName: customerName.trim(),
       customerWhatsapp: customerWhatsapp.trim() || undefined,
+      customerNotes: customerNotes.trim() || undefined,
       items: status === 'cancelled' ? (order.items || []) : itemsToSave,
       totalAmount: status === 'cancelled' ? order.total_amount : total,
       status,
@@ -614,6 +618,28 @@ export default function TrackOrder() {
                 </>
               )}
             </section>
+
+            {customerNotes || canEdit ? (
+              <section className="trk-card trk-card-pad">
+                <h2 className="trk-card-label">Notes</h2>
+                {canEdit ? (
+                  <div className="trk-field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="trk-notes">Add or edit notes for your order</label>
+                    <textarea
+                      id="trk-notes"
+                      value={customerNotes}
+                      onChange={(e) => setCustomerNotes(e.target.value)}
+                      placeholder="e.g., special packaging, delivery instructions, custom requests..."
+                      rows={4}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                    {customerNotes}
+                  </div>
+                )}
+              </section>
+            ) : null}
 
             <section className="trk-card trk-card-pad">
               <h2 className="trk-card-label">
