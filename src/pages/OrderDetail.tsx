@@ -2886,14 +2886,21 @@ useEffect(() => {
             </div>
           ) : (
             <>
-              {(order.checkout_adjustments?.customerNotes?.orderNote ||
+              {(order.customer_notes ||
+                order.checkout_adjustments?.customerNotes?.orderNote ||
                 order.checkout_adjustments?.customerNotes?.giftMessage) ? (
                 <div style={{ padding: '0 6px' }}>
                   <SectionLabel>Notes</SectionLabel>
                   <Card>
                     <div style={{ padding: '12px 16px' }}>
-                      {order.checkout_adjustments?.customerNotes?.orderNote ? (
+                      {order.customer_notes ? (
                         <div style={{ fontSize: 12.5, color: COLORS.muted, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 600, color: COLORS.text }}>Order note: </span>
+                          {order.customer_notes}
+                        </div>
+                      ) : null}
+                      {order.checkout_adjustments?.customerNotes?.orderNote ? (
+                        <div style={{ fontSize: 12.5, color: COLORS.muted, whiteSpace: 'pre-wrap', marginTop: order.customer_notes ? 10 : 0 }}>
                           <span style={{ fontWeight: 600, color: COLORS.text }}>Order note: </span>
                           {order.checkout_adjustments.customerNotes.orderNote}
                         </div>
@@ -2903,7 +2910,7 @@ useEffect(() => {
                           style={{
                             fontSize: 12.5,
                             color: COLORS.muted,
-                            marginTop: order.checkout_adjustments?.customerNotes?.orderNote ? 10 : 0,
+                            marginTop: (order.customer_notes || order.checkout_adjustments?.customerNotes?.orderNote) ? 10 : 0,
                             whiteSpace: 'pre-wrap',
                           }}
                         >
