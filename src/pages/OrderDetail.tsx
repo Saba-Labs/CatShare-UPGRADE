@@ -2754,18 +2754,6 @@ useEffect(() => {
                       ) : (
                         <div style={{ fontSize: 12, color: COLORS.subtle, marginTop: 1 }}>No phone saved</div>
                       )}
-                      {order.checkout_adjustments?.customerNotes?.orderNote ? (
-                        <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 8, whiteSpace: 'pre-wrap' }}>
-                          <span style={{ fontWeight: 600, color: COLORS.text }}>Order note: </span>
-                          {order.checkout_adjustments.customerNotes.orderNote}
-                        </div>
-                      ) : null}
-                      {order.checkout_adjustments?.customerNotes?.giftMessage ? (
-                        <div style={{ fontSize: 12, color: COLORS.muted, marginTop: 6, whiteSpace: 'pre-wrap' }}>
-                          <span style={{ fontWeight: 600, color: COLORS.text }}>Gift message: </span>
-                          {order.checkout_adjustments.customerNotes.giftMessage}
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -2898,6 +2886,36 @@ useEffect(() => {
             </div>
           ) : (
             <>
+              {(order.checkout_adjustments?.customerNotes?.orderNote ||
+                order.checkout_adjustments?.customerNotes?.giftMessage) ? (
+                <div style={{ padding: '0 6px' }}>
+                  <SectionLabel>Notes</SectionLabel>
+                  <Card>
+                    <div style={{ padding: '12px 16px' }}>
+                      {order.checkout_adjustments?.customerNotes?.orderNote ? (
+                        <div style={{ fontSize: 12.5, color: COLORS.muted, whiteSpace: 'pre-wrap' }}>
+                          <span style={{ fontWeight: 600, color: COLORS.text }}>Order note: </span>
+                          {order.checkout_adjustments.customerNotes.orderNote}
+                        </div>
+                      ) : null}
+                      {order.checkout_adjustments?.customerNotes?.giftMessage ? (
+                        <div
+                          style={{
+                            fontSize: 12.5,
+                            color: COLORS.muted,
+                            marginTop: order.checkout_adjustments?.customerNotes?.orderNote ? 10 : 0,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: COLORS.text }}>Gift message: </span>
+                          {order.checkout_adjustments.customerNotes.giftMessage}
+                        </div>
+                      ) : null}
+                    </div>
+                  </Card>
+                </div>
+              ) : null}
+
               <div style={{ padding: '0 6px' }}>
                 <SectionLabel>Quick Actions</SectionLabel>
                 <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>

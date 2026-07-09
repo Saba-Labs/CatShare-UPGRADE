@@ -468,6 +468,7 @@ export async function fetchSellerOrders(
   sellerUserId: string,
   options?: FetchSellerOrdersOptions
 ): Promise<{ data: Order[] | null; error: any }> {
+  let cachedForFallback: Order[] = [];
   try {
     // Validate seller user ID is provided and not empty
     if (!sellerUserId || sellerUserId.trim() === '') {
@@ -488,23 +489,29 @@ export async function fetchSellerOrders(
 
     const trimmed = sellerUserId.trim();
 
-    if (!isBrowserOnline()) {
+    // Always compute a cached fallback so the UI can render quickly.
+    // If `navigator.onLine` is inaccurate, we still attempt the server request below.
+    {
       const cacheKey = getStorageKey('sellerOrders', trimmed);
       let cached = safeGetFromStorage<Order[]>(cacheKey, []);
+
       if (options?.status) {
         cached = cached.filter((o) => o.status === options.status);
       }
+
       if (options?.createdAfter?.trim()) {
         const after = options.createdAfter.trim();
         cached = cached.filter((o) => (o.created_at || '') > after);
       }
+
       const incremental = Boolean(options?.createdAfter?.trim());
       cached = [...cached].sort((a, b) => {
         const ta = new Date(a.created_at).getTime();
         const tb = new Date(b.created_at).getTime();
         return incremental ? ta - tb : tb - ta;
       });
-      return { data: cached, error: null };
+
+      cachedForFallback = cached;
     }
 
     // RLS matches seller_user_id to x-user-id; customer flows clear the header after insert — restore for seller reads.
@@ -531,7 +538,7 @@ export async function fetchSellerOrders(
 
     return { data, error };
   } catch (err) {
-    return { data: null, error: err };
+    return { data: cachedForFallback, error: err };
   }
 }
 

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { FiPackage, FiGrid, FiShoppingCart, FiShoppingBag } from 'react-icons/fi';
@@ -23,6 +24,57 @@ const pathForTab = (tab: MainAppTab): string => {
 export default function MainAppBottomNav({ active, sideDrawerOpen = false, modalOpen = false }: { active: MainAppTab; sideDrawerOpen?: boolean; modalOpen?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [unreadOrders, setUnreadOrders] = useState<number>(0);
+
+  // Hydrate unread count from storage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('catshare_unread_orders');
+      const n = raw != null ? Number.parseInt(raw, 10) : 0;
+      if (Number.isFinite(n) && n > 0) {
+        setUnreadOrders(n);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Reset unread count when Orders tab is active / route is open
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isOnOrders =
+      active === 'orders' || location.pathname === '/orders' || location.pathname.startsWith('/orders/');
+    if (!isOnOrders) return;
+    setUnreadOrders(0);
+    try {
+      window.localStorage.removeItem('catshare_unread_orders');
+    } catch {
+      /* ignore */
+    }
+  }, [active, location.pathname]);
+
+  // Listen for new-order events emitted by `orderNotifications.ts`
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handler = () => {
+      setUnreadOrders((prev) => {
+        const next = (prev || 0) + 1;
+        try {
+          window.localStorage.setItem('catshare_unread_orders', String(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    };
+
+    window.addEventListener('catshareNewOrder', handler as EventListener);
+    return () => {
+      window.removeEventListener('catshareNewOrder', handler as EventListener);
+    };
+  }, []);
 
   const go = async (tab: MainAppTab) => {
     try {
@@ -71,7 +123,14 @@ export default function MainAppBottomNav({ active, sideDrawerOpen = false, modal
             active === id ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
           }`}
         >
-          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="relative inline-flex">
+            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+            {id === 'orders' && unreadOrders > 0 && (
+              <span className="absolute -top-1.5 -right-2 min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-tight flex items-center justify-center border border-white shadow-sm">
+                {unreadOrders > 9 ? '9+' : unreadOrders}
+              </span>
+            )}
+          </span>
           <span className="text-xs sm:text-sm font-medium">{label}</span>
         </button>
       ))}

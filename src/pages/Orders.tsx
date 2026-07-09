@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { fetchSellerOrders, updateOrderStatus, type Order } from '../services/orderService';
@@ -26,6 +27,10 @@ import MainAppBottomNav from '../components/MainAppBottomNav';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
+const ORDERS_SCREEN_FRESH_MS = 15000;
+const ORDERS_ACTIVE_MOBILE_POLL_MS = 5000;
+
+const runtimeOrdersMemory = new Map<string, { updatedAt: number; orders: Order[] }>();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = OrderTabFilter;
@@ -79,6 +84,17 @@ function formatDate(dateStr: string) {
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function maxCreatedAtIso(orders: Array<Pick<Order, 'created_at'>>): string | null {
+  let best: string | null = null;
+  for (const o of orders) {
+    const t = (o as { created_at?: string | null }).created_at;
+    if (!t) continue;
+    const s = String(t);
+    if (!best || s > best) best = s;
+  }
+  return best;
 }
 
 function getStatusConfig(status: string) {
@@ -1202,6 +1218,7 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const ordersFetchSeqRef = useRef(0);
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -1222,29 +1239,58 @@ export default function Orders() {
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
+    const mem = runtimeOrdersMemory.get(user.uid);
     const cached = readCachedSellerOrders(user.uid);
-    setOrders(cached);
-    setLoading(cached.length === 0);
+    const seed = mem?.orders?.length ? mem.orders : cached;
+    setOrders(seed);
+    setLoading(seed.length === 0);
     setError(null);
   }, [user?.uid, user?.isAnonymous]);
 
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '') return;
-    loadOrders();
+    void loadOrders({ silent: true });
   }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || user.isAnonymous) return;
-    const handler = () => {
-      void fetchSellerOrders(user.uid).then(({ data, error }) => {
+    runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders });
+  }, [orders, user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
+    if (!user?.uid || user.isAnonymous) return;
+    const handler = (evt: Event) => {
+      // Prefer the emitted payload (faster, avoids full refetch + stale race).
+      const custom = evt as CustomEvent<{ orderId: string; order: Order }>;
+      const orderFromEvent = custom?.detail?.order;
+      const sellerUid = user.uid;
+
+      if (orderFromEvent?.id) {
+        setOrders((prev) => {
+          const next = [...prev];
+          const idx = next.findIndex((o) => o.id === orderFromEvent.id);
+          if (idx >= 0) next[idx] = orderFromEvent;
+          else next.unshift(orderFromEvent);
+          next.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
+          writeCachedSellerOrders(sellerUid, next);
+          return next;
+        });
+        return;
+      }
+
+      // Fallback: refetch (guarded by fetch sequence to prevent stale overwrite).
+      const fetchSeq = ++ordersFetchSeqRef.current;
+      void fetchSellerOrders(sellerUid).then(({ data, error }) => {
+        if (fetchSeq !== ordersFetchSeqRef.current) return;
         if (!error && data) {
           setOrders(data);
-          writeCachedSellerOrders(user.uid, data);
+          writeCachedSellerOrders(sellerUid, data);
         }
       });
     };
-    window.addEventListener('catshareNewOrder', handler);
-    return () => window.removeEventListener('catshareNewOrder', handler);
+
+    window.addEventListener('catshareNewOrder', handler as EventListener);
+    return () => window.removeEventListener('catshareNewOrder', handler as EventListener);
   }, [user?.uid, user?.isAnonymous]);
 
   useEffect(() => {
@@ -1418,7 +1464,7 @@ export default function Orders() {
     setTabSwipeShift(0);
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (opts?: { force?: boolean; silent?: boolean }) => {
     if (!user?.uid || user.uid.trim() === '') {
       setError('User authentication required');
       setLoading(false);
@@ -1433,33 +1479,95 @@ export default function Orders() {
       return;
     }
 
+    const mem = runtimeOrdersMemory.get(user.uid);
     const cached = readCachedSellerOrders(user.uid);
-    if (cached.length === 0) {
-      setLoading(true);
+    const base = mem?.orders?.length ? mem.orders : cached;
+    const cachedNewest = base.length ? maxCreatedAtIso(base) : null;
+
+    if (!opts?.force && base.length > 0 && mem && Date.now() - mem.updatedAt <= ORDERS_SCREEN_FRESH_MS) {
+      setOrders(base);
+      setLoading(false);
+      setError(null);
+      return;
     }
+
+    if (base.length === 0) setLoading(true);
     setError(null);
-    const { data, error } = await fetchSellerOrders(user.uid);
+
+    const fetchSeq = ++ordersFetchSeqRef.current;
+
+    // If we have cached data, fetch only orders created after our newest cached row.
+    // This reduces payload and usually makes "new orders" appear much faster.
+    const { data, error } = await fetchSellerOrders(user.uid, cachedNewest ? { createdAfter: cachedNewest } : undefined);
+
+    if (fetchSeq !== ordersFetchSeqRef.current) return; // A newer fetch has started; ignore this result.
+
     if (error) {
       console.error('Failed to load orders:', error);
-      const fallback = cached.length > 0 ? cached : readCachedSellerOrders(user.uid);
+      const fallback = base.length > 0 ? base : readCachedSellerOrders(user.uid);
       if (fallback.length > 0) {
         setOrders(fallback);
         setError(null);
-        showToast(
-          isBrowserOnline() ? 'Could not refresh orders. Showing saved list.' : 'Showing saved orders',
-          'info'
-        );
+        if (!opts?.silent) {
+          showToast(
+            isBrowserOnline() ? 'Could not refresh orders. Showing saved list.' : 'Showing saved orders',
+            'info'
+          );
+        }
       } else {
         setError('Failed to load orders. Please try again.');
-        showToast('Error loading orders', 'error');
+        if (!opts?.silent) showToast('Error loading orders', 'error');
       }
     } else {
+      const incremental = Boolean(cachedNewest);
       const list = data || [];
-      setOrders(list);
-      writeCachedSellerOrders(user.uid, list);
+
+      if (incremental && base.length > 0) {
+        const map = new Map<string, Order>();
+        for (const o of base) map.set(o.id, o);
+        for (const o of list) map.set(o.id, o);
+        const merged = Array.from(map.values());
+        merged.sort(
+          (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+        );
+        setOrders(merged);
+        writeCachedSellerOrders(user.uid, merged);
+        runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders: merged });
+      } else {
+        setOrders(list);
+        writeCachedSellerOrders(user.uid, list);
+        runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders: list });
+      }
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (!user?.uid || user.isAnonymous) return;
+    if (Capacitor.getPlatform() === 'web') return;
+
+    const refreshNow = () => {
+      void loadOrders({ force: true, silent: true });
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshNow();
+    };
+
+    let resumeListener: { remove: () => Promise<void> } | null = null;
+    void App.addListener('resume', refreshNow).then((listener) => {
+      resumeListener = listener;
+    });
+
+    document.addEventListener('visibilitychange', onVisibility);
+    const intervalId = window.setInterval(refreshNow, ORDERS_ACTIVE_MOBILE_POLL_MS);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(intervalId);
+      void resumeListener?.remove();
+    };
+  }, [user?.uid, user?.isAnonymous]);
 
   const handleNavigate = async (path: string) => {
     await Haptics.impact({ style: ImpactStyle.Light });
@@ -2066,7 +2174,7 @@ export default function Orders() {
                   background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 }}>Sign In</button>
               ) : (
-                <button onClick={loadOrders} style={{
+                <button onClick={() => void loadOrders({ force: true })} style={{
                   padding: '10px 20px', borderRadius: 100, border: 'none',
                   background: '#3B82F6', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                 }}>Retry</button>
