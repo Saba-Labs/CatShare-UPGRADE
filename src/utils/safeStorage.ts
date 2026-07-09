@@ -4,13 +4,17 @@
  */
 
 import { getPersistedAuthUserId } from './authUserId';
+import { normalizeProductFontColor, withNormalizedProductFontColor } from '../colorUtils';
 import { normalizeProductImageFields } from './productImages';
 
 function normalizeProductsList(products: any[]): any[] {
   if (!Array.isArray(products)) return [];
-  return products.map((p) =>
-    p && typeof p === 'object' ? normalizeProductImageFields(p as Record<string, unknown>) : p
-  );
+  return products.map((p) => {
+    if (!p || typeof p !== 'object') return p;
+    return withNormalizedProductFontColor(
+      normalizeProductImageFields(p as Record<string, unknown>)
+    );
+  });
 }
 
 /**

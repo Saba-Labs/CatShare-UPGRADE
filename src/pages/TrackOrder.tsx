@@ -4,12 +4,16 @@ import { useParams } from 'react-router-dom';
 import {
   claimUpiPaymentByTrackingToken,
   fetchOrderByTrackingToken,
+  fetchSellerCheckoutExperience,
   getCustomerPaymentStatusView,
+  getTrackedOrderCustomerNotes,
   isTrackOrderUpiPending,
   updateOrderByTrackingToken,
   type TrackedOrder,
 } from '../services/orderTrackingService';
 import type { Order, OrderItem } from '../services/orderService';
+import type { CheckoutExperienceSettings } from '../types/checkoutSettings';
+import { DEFAULT_CHECKOUT_EXPERIENCE } from '../types/checkoutSettings';
 import { buildUpiPaymentUrl } from '../utils/upiPayment';
 import UpiQrCode from '../components/UpiQrCode';
 import { canCustomerEditOrder, normalizeOrderStatus } from '../types/orderStatus';
@@ -379,7 +383,11 @@ export default function TrackOrder() {
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
-  const [customerNotes, setCustomerNotes] = useState('');
+  const [orderNote, setOrderNote] = useState('');
+  const [giftMessage, setGiftMessage] = useState('');
+  const [checkoutExperience, setCheckoutExperience] = useState<CheckoutExperienceSettings>(
+    DEFAULT_CHECKOUT_EXPERIENCE
+  );
   const [claimingUpi, setClaimingUpi] = useState(false);
 
   const canEdit = canCustomerEditOrder(order?.status);
@@ -416,8 +424,11 @@ export default function TrackOrder() {
     setEditLines(linesFromOrder(data.items || []));
     setCustomerName(data.customer_name || '');
     setCustomerWhatsapp(data.customer_whatsapp || '');
-    const existingNotes = data.customer_notes || data.checkout_adjustments?.customerNotes?.orderNote || '';
-    setCustomerNotes(existingNotes);
+    const notes = getTrackedOrderCustomerNotes(data);
+    setOrderNote(notes.orderNote);
+    setGiftMessage(notes.giftMessage);
+    const experience = await fetchSellerCheckoutExperience(data.seller_user_id);
+    setCheckoutExperience(experience);
     setLoading(false);
   }, [trackingToken]);
 
@@ -462,11 +473,19 @@ export default function TrackOrder() {
     }));
     const total = itemsToSave.reduce((s, it) => s + (it.unitPrice || 0) * it.quantity, 0);
 
+    const notePayload: { orderNote?: string; giftMessage?: string } = {};
+    if (checkoutExperience.enableOrderNotes) {
+      notePayload.orderNote = orderNote.trim();
+    }
+    if (checkoutExperience.enableGiftNotes) {
+      notePayload.giftMessage = giftMessage.trim();
+    }
+
     const { data, error: saveErr } = await updateOrderByTrackingToken({
       trackingToken,
       customerName: customerName.trim(),
       customerWhatsapp: customerWhatsapp.trim() || undefined,
-      customerNotes: customerNotes.trim() || undefined,
+      ...notePayload,
       items: status === 'cancelled' ? (order.items || []) : itemsToSave,
       totalAmount: status === 'cancelled' ? order.total_amount : total,
       status,
@@ -511,6 +530,11 @@ export default function TrackOrder() {
   const statusCfg = STATUS[statusKey];
   const paymentStatusView = getCustomerPaymentStatusView(order.paymentSummary, order.payment_method);
   const showUpiPay = isTrackOrderUpiPending(order) && Boolean(order.upiCheckout);
+  const showOrderNoteField = checkoutExperience.enableOrderNotes;
+  const showGiftMessageField = checkoutExperience.enableGiftNotes;
+  const hasVisibleNotes =
+    (showOrderNoteField && (orderNote || canEdit)) ||
+    (showGiftMessageField && (giftMessage || canEdit));
 
   return (
     <div className="trk-root">
@@ -619,25 +643,56 @@ export default function TrackOrder() {
               )}
             </section>
 
-            {customerNotes || canEdit ? (
+            {hasVisibleNotes ? (
               <section className="trk-card trk-card-pad">
-                <h2 className="trk-card-label">Notes</h2>
-                {canEdit ? (
+                {showOrderNoteField ? (
+                  <div className="trk-field" style={{ marginBottom: showGiftMessageField ? 16 : 0 }}>
+                    <h2 className="trk-card-label" style={{ marginBottom: 10 }}>
+                      Order note
+                    </h2>
+                    {canEdit ? (
+                      <>
+                        <label htmlFor="trk-order-note" className="trk-sr-only">
+                          Order note
+                        </label>
+                        <textarea
+                          id="trk-order-note"
+                          value={orderNote}
+                          onChange={(e) => setOrderNote(e.target.value)}
+                          placeholder={checkoutExperience.orderNotesPlaceholder}
+                          rows={3}
+                          maxLength={500}
+                        />
+                      </>
+                    ) : orderNote ? (
+                      <div className="trk-readonly-note">{orderNote}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {showGiftMessageField ? (
                   <div className="trk-field" style={{ marginBottom: 0 }}>
-                    <label htmlFor="trk-notes">Add or edit notes for your order</label>
-                    <textarea
-                      id="trk-notes"
-                      value={customerNotes}
-                      onChange={(e) => setCustomerNotes(e.target.value)}
-                      placeholder="e.g., special packaging, delivery instructions, custom requests..."
-                      rows={4}
-                    />
+                    <h2 className="trk-card-label" style={{ marginBottom: 10 }}>
+                      Gift message
+                    </h2>
+                    {canEdit ? (
+                      <>
+                        <label htmlFor="trk-gift-message" className="trk-sr-only">
+                          Gift message
+                        </label>
+                        <textarea
+                          id="trk-gift-message"
+                          value={giftMessage}
+                          onChange={(e) => setGiftMessage(e.target.value)}
+                          placeholder={checkoutExperience.giftNotesPlaceholder}
+                          rows={3}
+                          maxLength={500}
+                        />
+                      </>
+                    ) : giftMessage ? (
+                      <div className="trk-readonly-note">{giftMessage}</div>
+                    ) : null}
                   </div>
-                ) : (
-                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                    {customerNotes}
-                  </div>
-                )}
+                ) : null}
               </section>
             ) : null}
 

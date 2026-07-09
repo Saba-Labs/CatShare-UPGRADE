@@ -1,4 +1,5 @@
 import { getAllCatalogues } from "../config/catalogueConfig";
+import { normalizeProductFontColor } from "../colorUtils";
 import {
   getCatalogueData,
   initializeCatalogueData,
@@ -46,7 +47,7 @@ export function buildBulkImportedProduct(options: {
       options.suggestedColors && options.suggestedColors.length > 0
         ? options.suggestedColors
         : undefined,
-    fontColor: options.fontColor || "white",
+    fontColor: normalizeProductFontColor(options.fontColor),
     imageBgColor: options.imageBgColor || "white",
     bgColor: options.bgColor || "#add8e6",
     cropAspectRatio: options.cropAspectRatio,

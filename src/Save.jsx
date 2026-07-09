@@ -8,6 +8,7 @@ import { getAllFields, isFieldVisibleOnSurface } from "./config/fieldConfig";
 import { getProductVariantGroups } from "./utils/productVariants";
 import { getCurrentCurrencySymbol } from "./utils/currencyUtils";
 import { getThemeById } from "./config/themeConfig";
+import { normalizeProductFontColor } from "./colorUtils";
 import { uploadImageToR2, stripDataUriPrefix } from "./services/cloudflareService";
 import { uploadProductImageToR2 } from "./services/r2Upload";
 import { fetchUrlAsDataUrl } from "./utils/fetchImageCrossPlatform";
@@ -255,7 +256,7 @@ export async function deleteRenderedImagesFromFolder(folderName) {
 
 export async function saveRenderedImage(product, type, units = {}) {
   const id = product.id || "temp-id";
-  const fontColor = product.fontColor || "white";
+  const fontColor = normalizeProductFontColor(product.fontColor);
   const bgColor = product.bgColor || "#add8e6";
   const imageBg = product.imageBgColor || "white";
   const badgeBg = imageBg.toLowerCase() === "white" ? "#fff" : "#000";

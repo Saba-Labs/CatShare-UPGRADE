@@ -8,6 +8,7 @@ import { getPersistedAuthUserId } from "./authUserId";
 import { safeGetFromStorage } from "./safeStorage";
 import { getAllFields, isFieldVisibleOnSurface } from "../config/fieldConfig";
 import { getThemeById } from "../config/themeConfig";
+import { normalizeProductFontColor } from "../colorUtils";
 import { offerPriceFieldFor } from "./offerPriceUtils";
 
 export interface RenderedImageCatalogueRef {
@@ -173,7 +174,7 @@ export async function renderProductImageOnTheFly(
     const baseWidth = theme.rendering.cardWidth;
 
     // Get styling settings - use product colors if set, otherwise use theme defaults
-    const fontColor = product.fontColor || theme.styles.fontColor;
+    const fontColor = normalizeProductFontColor(product.fontColor || theme.styles.fontColor);
     const bgColor = product.bgColor || theme.styles.bgColor;
     const imageBg = product.imageBgColor || theme.styles.imageBgColor;
 
@@ -265,7 +266,7 @@ export async function renderProductImageOnTheFly(
         scale: 3,
         bgColor: product.bgColor || "#add8e6",
         imageBgColor: product.imageBgColor || "white",
-        fontColor: product.fontColor || "white",
+        fontColor: normalizeProductFontColor(product.fontColor),
         backgroundColor: "#ffffff",
       };
       const fallbackWatermarkOptions = {

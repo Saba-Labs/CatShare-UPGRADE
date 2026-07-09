@@ -1,3 +1,23 @@
+export type ProductFontColor = "black" | "white";
+
+/** Product card text is always black or white — never theme hex or palette colors. */
+export function normalizeProductFontColor(
+  value: string | null | undefined,
+  fallback: ProductFontColor = "white"
+): ProductFontColor {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "white" || v === "#fff" || v === "#ffffff") return "white";
+  if (v === "black" || v === "#000" || v === "#000000") return "black";
+  return fallback;
+}
+
+export function withNormalizedProductFontColor<T extends Record<string, unknown>>(product: T): T {
+  if (typeof product.fontColor === "string" && product.fontColor.trim() !== "") {
+    return { ...product, fontColor: normalizeProductFontColor(product.fontColor) };
+  }
+  return product;
+}
+
 // ✅ First: Convert RGB to HSL — must be on top
 export function rgbToHsl(
   r: number,

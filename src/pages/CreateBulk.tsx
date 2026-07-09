@@ -4,7 +4,7 @@ import { Filesystem, Directory } from "@capacitor/filesystem";
 import Cropper from "react-easy-crop";
 import { FiArrowLeft, FiImage, FiEdit2, FiChevronLeft, FiChevronRight, FiDroplet } from "react-icons/fi";
 import { getCroppedImg, getCenterCroppedImg, getScaledFullImageDataUrl } from "../cropUtils";
-import { getPalette } from "../colorUtils";
+import { getPalette, normalizeProductFontColor } from "../colorUtils";
 import { saveRenderedImage } from "../Save";
 import { uploadProductImageToR2 } from "../services/r2Upload";
 import { useToast } from "../context/ToastContext";
@@ -572,7 +572,7 @@ export default function CreateBulk() {
             imageVersion: uploaded.imageVersion ?? Date.now(),
             cropAspectRatio: prep.cropAspectRatio,
             suggestedColors: prep.suggestedColors.length > 0 ? prep.suggestedColors : undefined,
-            fontColor: currentTheme.styles.fontColor,
+            fontColor: normalizeProductFontColor(currentTheme.styles.fontColor),
             bgColor: pc.bgColor,
             imageBgColor: currentTheme.styles.imageBgColor,
             renderingType,

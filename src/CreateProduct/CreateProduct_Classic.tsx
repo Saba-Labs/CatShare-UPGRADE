@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Cropper from "react-easy-crop";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { getCroppedImg } from "../cropUtils";
-import { getPalette } from "../colorUtils";
+import { getPalette, normalizeProductFontColor } from "../colorUtils";
 import { saveRenderedImage } from "../Save";
 import { uploadProductImageToR2 } from "../services/r2Upload";
 import { useToast } from "../context/ToastContext";
@@ -543,12 +543,11 @@ export default function CreateProduct() {
   const [, setFieldDefinitionsUpdated] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Update preview colors when theme changes (unless user has customized them)
+  // Sync theme defaults for new products (font color is always black or white).
   useEffect(() => {
-    // Only update if user hasn't explicitly set a color (i.e., still using theme default)
     if (!editingId) {
       setOverrideColor(currentTheme.styles.bgColor);
-      setFontColor(currentTheme.styles.fontColor);
+      setFontColor(normalizeProductFontColor(currentTheme.styles.fontColor));
       setImageBgOverride(currentTheme.styles.imageBgColor);
       console.log(`🎨 Updated preview colors for theme: ${currentTheme.id}`);
     }
@@ -730,7 +729,7 @@ export default function CreateProduct() {
         });
 
         setOverrideColor(migratedProduct.bgColor || "#d1b3c4");
-        setFontColor(migratedProduct.fontColor || "white");
+        setFontColor(normalizeProductFontColor(migratedProduct.fontColor));
         setImageBgOverride(migratedProduct.imageBgColor || "white");
         setAppliedAspectRatio(migratedProduct.cropAspectRatio || 1);
         const groups = getProductVariantGroups(migratedProduct);
@@ -1369,7 +1368,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       ...(typeof imageVersion === "number" && Number.isFinite(imageVersion) ? { imageVersion } : {}),
       updatedAt: new Date().toISOString(),
       suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
-      fontColor: fontColor || "white",
+      fontColor: normalizeProductFontColor(fontColor),
       imageBgColor: imageBgOverride || "white",
       bgColor: overrideColor || "#add8e6",
       cropAspectRatio: appliedAspectRatio,
@@ -1763,7 +1762,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                   <div
                     style={{
                       backgroundColor: getLighterColor(overrideColor),
-                      color: fontColor || "white",
+                      color: normalizeProductFontColor(fontColor),
                       padding: "10px",
                     }}
                   >
@@ -1807,7 +1806,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                     <div
                       style={{
                         backgroundColor: overrideColor,
-                        color: fontColor === "white" ? "white" : "black",
+                        color: normalizeProductFontColor(fontColor),
                         padding: "8px 6px",
                         textAlign: "center",
                         fontWeight: "600",
@@ -2164,7 +2163,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
                           width: 20,
                           height: 20,
                           backgroundColor: color,
-                          border: fontColor === color ? "2px solid blue" : "1px solid #ccc",
+                          border: normalizeProductFontColor(fontColor) === color ? "2px solid blue" : "1px solid #ccc",
                           borderRadius: "50%",
                           cursor: "pointer",
                         }}

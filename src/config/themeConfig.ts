@@ -66,7 +66,7 @@ export const THEMES: { [key: string]: ThemeConfig } = {
       layout: "glass",
       bgColor: "#0f8577",
       lightBgColor: "#7fdcc7",
-      fontColor: "#0f8577",
+      fontColor: "white",
       imageBgColor: "white",
       priceBoxBg: "#dc2626",
       gradientStart: "#dc2626",

@@ -1,6 +1,11 @@
 import { supabase } from '../supabaseClient';
 import { getPublicWebBaseUrl } from '../utils/publicWebBaseUrl';
 import type { Order, OrderItem } from './orderService';
+import {
+  DEFAULT_CHECKOUT_EXPERIENCE,
+  normalizeCheckoutSettings,
+  type CheckoutExperienceSettings,
+} from '../types/checkoutSettings';
 
 export type TrackOrderPaymentSummary = {
   status: string;
@@ -22,6 +27,34 @@ export type TrackedOrder = Order & {
   paymentSummary?: TrackOrderPaymentSummary | null;
   upiCheckout?: TrackOrderUpiCheckout | null;
 };
+
+export function getTrackedOrderCustomerNotes(order: Pick<Order, 'customer_notes' | 'checkout_adjustments'>): {
+  orderNote: string;
+  giftMessage: string;
+} {
+  const cn = order.checkout_adjustments?.customerNotes;
+  const orderNote = String(cn?.orderNote ?? order.customer_notes ?? '').trim();
+  const giftMessage = String(cn?.giftMessage ?? '').trim();
+  return { orderNote, giftMessage };
+}
+
+export async function fetchSellerCheckoutExperience(
+  sellerUserId: string
+): Promise<CheckoutExperienceSettings> {
+  if (!sellerUserId?.trim()) return { ...DEFAULT_CHECKOUT_EXPERIENCE };
+  try {
+    const { data, error } = await supabase.rpc('get_seller_checkout_features', {
+      p_seller_user_id: sellerUserId.trim(),
+    });
+    if (error || !data || typeof data !== 'object') {
+      return { ...DEFAULT_CHECKOUT_EXPERIENCE };
+    }
+    const checkoutSettings = (data as Record<string, unknown>).checkoutSettings;
+    return normalizeCheckoutSettings(checkoutSettings).experience;
+  } catch {
+    return { ...DEFAULT_CHECKOUT_EXPERIENCE };
+  }
+}
 
 export type CustomerPaymentStatusView = {
   label: string;
@@ -271,6 +304,7 @@ function normalizeOrderRow(row: Record<string, unknown>): TrackedOrder {
     seller_user_id: String(row.seller_user_id ?? ''),
     customer_name: String(row.customer_name ?? ''),
     customer_whatsapp: row.customer_whatsapp != null ? String(row.customer_whatsapp) : undefined,
+    customer_notes: row.customer_notes != null ? String(row.customer_notes) : undefined,
     items: Array.isArray(row.items) ? (row.items as OrderItem[]) : [],
     total_amount: row.total_amount != null ? Number(row.total_amount) : undefined,
     currency_code: String(row.currency_code ?? 'INR'),
@@ -360,7 +394,8 @@ export type UpdateOrderByTrackingTokenInput = {
   trackingToken: string;
   customerName: string;
   customerWhatsapp?: string;
-  customerNotes?: string;
+  orderNote?: string;
+  giftMessage?: string;
   items: OrderItem[];
   totalAmount?: number;
   status?: 'pending' | 'cancelled';
@@ -373,15 +408,22 @@ export async function updateOrderByTrackingToken(
     const token = input.trackingToken.trim();
     if (!token) return { data: null, error: 'Invalid tracking link' };
 
-    const { data, error } = await supabase.rpc('update_order_by_tracking_token', {
+    const rpcParams: Record<string, unknown> = {
       p_token: token,
       p_customer_name: input.customerName.trim(),
       p_customer_whatsapp: input.customerWhatsapp?.trim() || null,
-      p_customer_notes: input.customerNotes?.trim() || null,
       p_items: input.items,
       p_total_amount: input.totalAmount ?? null,
       p_status: input.status ?? null,
-    });
+    };
+    if (input.orderNote !== undefined) {
+      rpcParams.p_order_note = input.orderNote;
+    }
+    if (input.giftMessage !== undefined) {
+      rpcParams.p_gift_message = input.giftMessage;
+    }
+
+    const { data, error } = await supabase.rpc('update_order_by_tracking_token', rpcParams);
 
     if (error) {
       const code = error.message || '';

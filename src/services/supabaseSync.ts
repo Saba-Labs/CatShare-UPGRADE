@@ -6,6 +6,7 @@
 import { getSupabaseClient, CATSHARE_CLOUD_FETCH_OK_EVENT } from '../supabaseClient';
 import { assertProductsHaveCloudImageUrlForSync } from '../utils/syncImageValidation';
 import { getAllProductImageUrlsForDeletion, normalizeProductImageFields } from '../utils/productImages';
+import { withNormalizedProductFontColor } from '../colorUtils';
 import { mapWithConcurrencyLimit } from '../utils/concurrencyPool';
 import { deleteImageFromR2, deleteAllProductImagesFromR2 } from './cloudflareService';
 import { syncTopLevelFieldsIntoCatalogueData, type ProductWithCatalogueData } from '../config/catalogueProductUtils';
@@ -646,7 +647,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       if (p.data != null && typeof p.data === 'object' && !Array.isArray(p.data)) {
         const row = { ...p.data };
         if (row.id == null && p.product_id != null) row.id = p.product_id;
-        return row.id != null ? normalizeProductImageFields(row) : null;
+        return row.id != null ? withNormalizedProductFontColor(normalizeProductImageFields(row)) : null;
       }
       if (p.product_id != null) {
         return {
@@ -663,7 +664,7 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       if (!dp) return null;
       if (dp.data != null && typeof dp.data === 'object' && !Array.isArray(dp.data)) {
         const row = { ...dp.data, id: dp.product_id ?? dp.data?.id };
-        return row.id != null ? normalizeProductImageFields(row) : null;
+        return row.id != null ? withNormalizedProductFontColor(normalizeProductImageFields(row)) : null;
       }
       if (dp.product_id != null) {
         return { id: dp.product_id, name: dp.name ?? '', sku: dp.sku ?? null };

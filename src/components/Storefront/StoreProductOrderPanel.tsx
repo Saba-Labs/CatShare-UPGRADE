@@ -312,10 +312,6 @@ export default function StoreProductOrderPanel({
       {fieldsAfterOrder && fieldsTable ? (
         <div className="sv-detail-table-after-order">{fieldsTable}</div>
       ) : null}
-
-      {fieldsAfterOrder && descriptionEl ? (
-        <div className="sv-product-description-row sv-product-description-row--span">{descriptionEl}</div>
-      ) : null}
     </div>
   );
 
@@ -332,6 +328,9 @@ export default function StoreProductOrderPanel({
     <article className={rootClass}>
       <div className="website-product-gallery sv-product-order-media">{imageBlock}</div>
       <div className="website-product-info sv-product-order-details">{detailsBlock}</div>
+      {descriptionEl ? (
+        <div className="sv-product-description-row sv-product-description-row--below-grid">{descriptionEl}</div>
+      ) : null}
     </article>
   );
 }

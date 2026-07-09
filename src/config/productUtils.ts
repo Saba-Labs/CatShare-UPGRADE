@@ -22,6 +22,7 @@ import {
   type ProductWithCatalogueData,
 } from './catalogueProductUtils';
 import { getAllCatalogues } from './catalogueConfig';
+import { normalizeProductFontColor } from '../colorUtils';
 import { normalizeProductImageFields } from '../utils/productImages';
 
 /**
@@ -225,6 +226,9 @@ export function getCustomFields(): FieldConfig[] {
 export function normalizeProduct(product: Product): Product {
   const migrated = migrateProductToNewFormat(product);
   const synced = syncProductFieldNames(migrated);
+  if (synced.fontColor != null && String(synced.fontColor).trim() !== "") {
+    synced.fontColor = normalizeProductFontColor(synced.fontColor);
+  }
   return synced as Product;
 }
 
