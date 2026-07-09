@@ -416,7 +416,8 @@ export default function TrackOrder() {
     setEditLines(linesFromOrder(data.items || []));
     setCustomerName(data.customer_name || '');
     setCustomerWhatsapp(data.customer_whatsapp || '');
-    setCustomerNotes(data.customer_notes || '');
+    const existingNotes = data.customer_notes || data.checkout_adjustments?.customerNotes?.orderNote || '';
+    setCustomerNotes(existingNotes);
     setLoading(false);
   }, [trackingToken]);
 
@@ -618,35 +619,25 @@ export default function TrackOrder() {
               )}
             </section>
 
-            {(order?.checkout_adjustments?.customerNotes?.orderNote || order?.checkout_adjustments?.customerNotes?.giftMessage || canEdit) ? (
+            {customerNotes || canEdit ? (
               <section className="trk-card trk-card-pad">
                 <h2 className="trk-card-label">Notes</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {order.checkout_adjustments?.customerNotes?.orderNote ? (
-                    <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                      <span style={{ fontWeight: 600, color: '#1e293b' }}>Special instructions: </span>
-                      {order.checkout_adjustments.customerNotes.orderNote}
-                    </div>
-                  ) : null}
-                  {order.checkout_adjustments?.customerNotes?.giftMessage ? (
-                    <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                      <span style={{ fontWeight: 600, color: '#1e293b' }}>Gift message: </span>
-                      {order.checkout_adjustments.customerNotes.giftMessage}
-                    </div>
-                  ) : null}
-                  {canEdit && order?.status === 'pending' ? (
-                    <div className="trk-field" style={{ marginBottom: 0 }}>
-                      <label htmlFor="trk-notes">Add any special instructions or notes for your order</label>
-                      <textarea
-                        id="trk-notes"
-                        value={customerNotes}
-                        onChange={(e) => setCustomerNotes(e.target.value)}
-                        placeholder="e.g., special packaging, delivery instructions, custom requests..."
-                        rows={4}
-                      />
-                    </div>
-                  ) : null}
-                </div>
+                {canEdit ? (
+                  <div className="trk-field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="trk-notes">Add or edit notes for your order</label>
+                    <textarea
+                      id="trk-notes"
+                      value={customerNotes}
+                      onChange={(e) => setCustomerNotes(e.target.value)}
+                      placeholder="e.g., special packaging, delivery instructions, custom requests..."
+                      rows={4}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                    {customerNotes}
+                  </div>
+                )}
               </section>
             ) : null}
 
