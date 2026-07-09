@@ -532,6 +532,32 @@
   cursor: not-allowed;
 }
 
+.trk-field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--trk-radius-sm);
+  border: 1.5px solid var(--trk-border);
+  background: #f8fafc;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--trk-text);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  resize: vertical;
+}
+
+.trk-field textarea:focus {
+  outline: none;
+  border-color: var(--trk-green);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.trk-field textarea:disabled {
+  background: #f1f5f9;
+  color: var(--trk-muted);
+  cursor: not-allowed;
+}
+
 .trk-readonly-name {
   font-size: 1.125rem;
   font-weight: 700;

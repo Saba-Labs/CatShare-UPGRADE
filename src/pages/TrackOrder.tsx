@@ -379,6 +379,7 @@ export default function TrackOrder() {
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
+  const [customerNotes, setCustomerNotes] = useState('');
   const [claimingUpi, setClaimingUpi] = useState(false);
 
   const canEdit = canCustomerEditOrder(order?.status);
@@ -415,6 +416,7 @@ export default function TrackOrder() {
     setEditLines(linesFromOrder(data.items || []));
     setCustomerName(data.customer_name || '');
     setCustomerWhatsapp(data.customer_whatsapp || '');
+    setCustomerNotes(data.customer_notes || '');
     setLoading(false);
   }, [trackingToken]);
 
@@ -463,6 +465,7 @@ export default function TrackOrder() {
       trackingToken,
       customerName: customerName.trim(),
       customerWhatsapp: customerWhatsapp.trim() || undefined,
+      customerNotes: customerNotes.trim() || undefined,
       items: status === 'cancelled' ? (order.items || []) : itemsToSave,
       totalAmount: status === 'cancelled' ? order.total_amount : total,
       status,
@@ -614,6 +617,22 @@ export default function TrackOrder() {
                 </>
               )}
             </section>
+
+            {canEdit && order?.status === 'pending' ? (
+              <section className="trk-card trk-card-pad">
+                <h2 className="trk-card-label">Notes for seller</h2>
+                <div className="trk-field">
+                  <label htmlFor="trk-notes">Add any special instructions or notes for your order</label>
+                  <textarea
+                    id="trk-notes"
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    placeholder="e.g., special packaging, delivery instructions, custom requests..."
+                    rows={4}
+                  />
+                </div>
+              </section>
+            ) : null}
 
             <section className="trk-card trk-card-pad">
               <h2 className="trk-card-label">

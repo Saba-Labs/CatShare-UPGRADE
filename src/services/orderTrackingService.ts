@@ -360,6 +360,7 @@ export type UpdateOrderByTrackingTokenInput = {
   trackingToken: string;
   customerName: string;
   customerWhatsapp?: string;
+  customerNotes?: string;
   items: OrderItem[];
   totalAmount?: number;
   status?: 'pending' | 'cancelled';
@@ -376,6 +377,7 @@ export async function updateOrderByTrackingToken(
       p_token: token,
       p_customer_name: input.customerName.trim(),
       p_customer_whatsapp: input.customerWhatsapp?.trim() || null,
+      p_customer_notes: input.customerNotes?.trim() || null,
       p_items: input.items,
       p_total_amount: input.totalAmount ?? null,
       p_status: input.status ?? null,
