@@ -618,9 +618,9 @@ export default function TrackOrder() {
               )}
             </section>
 
-            {order?.checkout_adjustments?.customerNotes?.orderNote || order?.checkout_adjustments?.customerNotes?.giftMessage ? (
+            {(order?.checkout_adjustments?.customerNotes?.orderNote || order?.checkout_adjustments?.customerNotes?.giftMessage || canEdit) ? (
               <section className="trk-card trk-card-pad">
-                <h2 className="trk-card-label">Order notes</h2>
+                <h2 className="trk-card-label">Notes</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {order.checkout_adjustments?.customerNotes?.orderNote ? (
                     <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
@@ -634,22 +634,18 @@ export default function TrackOrder() {
                       {order.checkout_adjustments.customerNotes.giftMessage}
                     </div>
                   ) : null}
-                </div>
-              </section>
-            ) : null}
-
-            {canEdit && order?.status === 'pending' ? (
-              <section className="trk-card trk-card-pad">
-                <h2 className="trk-card-label">Add notes for seller</h2>
-                <div className="trk-field">
-                  <label htmlFor="trk-notes">Add any special instructions or notes for your order</label>
-                  <textarea
-                    id="trk-notes"
-                    value={customerNotes}
-                    onChange={(e) => setCustomerNotes(e.target.value)}
-                    placeholder="e.g., special packaging, delivery instructions, custom requests..."
-                    rows={4}
-                  />
+                  {canEdit && order?.status === 'pending' ? (
+                    <div className="trk-field" style={{ marginBottom: 0 }}>
+                      <label htmlFor="trk-notes">Add any special instructions or notes for your order</label>
+                      <textarea
+                        id="trk-notes"
+                        value={customerNotes}
+                        onChange={(e) => setCustomerNotes(e.target.value)}
+                        placeholder="e.g., special packaging, delivery instructions, custom requests..."
+                        rows={4}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </section>
             ) : null}
