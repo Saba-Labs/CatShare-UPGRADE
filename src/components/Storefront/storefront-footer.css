@@ -25,7 +25,8 @@
 }
 
 .sf-footer--width-boxed {
-  width: auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sf-footer--preview {
