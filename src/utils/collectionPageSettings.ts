@@ -6,7 +6,7 @@ import { normalizeProductCardStyle, coerceProductListViewMode, getProductCardSty
 const DEFAULT_LIST_SETTINGS: FullProductListSection['settings'] = {
   showCategoryFilters: true,
   showSort: true,
-  viewMode: 'list',
+  viewMode: 'grid',
   productImageRatio: 'square',
   showPrice: true,
   showAvailability: true,
