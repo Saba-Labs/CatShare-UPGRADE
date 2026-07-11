@@ -1589,7 +1589,7 @@ export default function CreateOrder() {
                             {!hasVariants && (
                               <>
                                 <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
-                                  {quantity} {getOrderUnitLabel(priceUnit)} ({Math.round(quantity / quantityStep)}) × ₹{price.toLocaleString('en-IN')}
+                                  {quantity} {getOrderUnitLabel(priceUnit)}{quantityStep > 1 ? ` (${Math.round(quantity / quantityStep)})` : ''} × ₹{price.toLocaleString('en-IN')}
                                 </span>
                                 <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
                               </>
