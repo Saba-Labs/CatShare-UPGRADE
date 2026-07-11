@@ -591,7 +591,7 @@ function buildDefaultStore(): WebsiteModeConfig {
         title: '',
         showCategoryFilters: true,
         showSort: true,
-        viewMode: 'list',
+        viewMode: 'grid',
         productImageRatio: 'square',
         showPrice: true,
         showAvailability: true,

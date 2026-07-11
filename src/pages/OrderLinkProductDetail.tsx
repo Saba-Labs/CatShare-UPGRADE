@@ -62,7 +62,9 @@ function formatLineCalculationDetail(
   if (!Number.isFinite(unit)) return null;
   const label = getOrderUnitLabel(item.priceUnit);
   const priceStr = `${currencySymbol}${unit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-  return `${q} ${label} × ${priceStr}`;
+  const qstep = getQuantityStep(item);
+  const setCount = Math.floor(q / qstep);
+  return `${q} ${label} (${setCount}) × ${priceStr}`;
 }
 
 function getFieldLabelAndUnitSuffix(
