@@ -313,7 +313,7 @@ function OrderTotalsPanel({
             checked={roundOffEnabled}
             onChange={(e) => onRoundOffChange(e.target.checked)}
           />
-          Round off total to nearest rupee
+          Round off total
         </label>
       ) : null}
       <div style={{

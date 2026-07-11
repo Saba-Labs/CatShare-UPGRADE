@@ -9,6 +9,7 @@ export interface ManualOrderAdjustment {
   label: string;
   amount: number;
   amountKind: ManualOrderAdjustmentAmountKind;
+  amountSign?: 1 | -1;
 }
 
 function roundMoney(value: number): number {
@@ -63,7 +64,9 @@ export function computeManualCheckoutTotals(
     const label = adjustment.label.trim();
     if (amount <= 0 || !label) continue;
 
-    if (adjustment.kind === 'discount' || adjustment.kind === 'round_off') {
+    const isRoundOff = adjustment.kind === 'round_off';
+    const subtract = adjustment.kind === 'discount' || (isRoundOff && adjustment.amountSign !== 1);
+    if (subtract) {
       discountTotal += amount;
       lines.push({
         ruleId: adjustment.id,
@@ -115,6 +118,7 @@ export function buildRoundOffAdjustment(
     label: 'Round off',
     amount: Math.abs(diff),
     amountKind: 'flat',
+    amountSign: diff >= 0 ? 1 : -1,
   };
 }
 
