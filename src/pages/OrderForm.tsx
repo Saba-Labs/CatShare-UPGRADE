@@ -241,6 +241,7 @@ export default function OrderForm() {
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [draftVariantSelections, setDraftVariantSelections] = useState<VariantSelectionMap>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -282,6 +283,8 @@ export default function OrderForm() {
       try {
         setLoading(true);
         setError(null);
+        setCartHydrated(false);
+        setCartLines([]);
         if (!token) { setError('Invalid link'); return; }
         const data = await fetchShareLinkForCustomer(token);
         if (cancelled) return;
@@ -308,6 +311,7 @@ export default function OrderForm() {
             setCartLines(migrateLegacyCartToLines(legacyQty, {}));
           }
         }
+        setCartHydrated(true);
 
         // Fetch seller_user_id using public RPC function
         if (token) {
@@ -366,10 +370,10 @@ export default function OrderForm() {
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && cartHydrated) {
       saveCartLinesToSession(token, cartLines);
     }
-  }, [cartLines, token]);
+  }, [cartHydrated, cartLines, token]);
 
   const selectedProductCount = useMemo(() => totalCartLineCount(cartLines), [cartLines]);
 

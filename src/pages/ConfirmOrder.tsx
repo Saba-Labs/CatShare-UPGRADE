@@ -397,7 +397,9 @@ export default function ConfirmOrder() {
           if (createdOrder?.tracking_token) {
             trackingUrl = buildOrderTrackingUrl(createdOrder.tracking_token);
           }
-          // Clear the saved order quantities from sessionStorage on successful order creation
+          // Clear the saved order quantities on successful order creation
+          localStorage.removeItem(`catshare_order_cart_${token}`);
+          localStorage.removeItem(`catshare_order_qty_${token}`);
           sessionStorage.removeItem(`catshare_order_cart_${token}`);
           sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }

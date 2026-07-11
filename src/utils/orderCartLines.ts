@@ -126,7 +126,9 @@ const LEGACY_QTY_STORAGE_PREFIX = 'catshare_order_qty_';
 
 export function loadCartLinesFromSession(token: string): OrderCartLine[] | null {
   try {
-    const raw = sessionStorage.getItem(`${CART_STORAGE_PREFIX}${token}`);
+    const raw =
+      localStorage.getItem(`${CART_STORAGE_PREFIX}${token}`) ??
+      sessionStorage.getItem(`${CART_STORAGE_PREFIX}${token}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
@@ -137,13 +139,15 @@ export function loadCartLinesFromSession(token: string): OrderCartLine[] | null 
 }
 
 export function saveCartLinesToSession(token: string, lines: OrderCartLine[]): void {
-  sessionStorage.setItem(`${CART_STORAGE_PREFIX}${token}`, JSON.stringify(activeCartLines(lines)));
+  localStorage.setItem(`${CART_STORAGE_PREFIX}${token}`, JSON.stringify(activeCartLines(lines)));
 }
 
 /** Migrate legacy per-product qty + variant map from share-link session storage */
 export function loadLegacyQtyMapFromSession(token: string): Record<string, number> | null {
   try {
-    const raw = sessionStorage.getItem(`${LEGACY_QTY_STORAGE_PREFIX}${token}`);
+    const raw =
+      localStorage.getItem(`${LEGACY_QTY_STORAGE_PREFIX}${token}`) ??
+      sessionStorage.getItem(`${LEGACY_QTY_STORAGE_PREFIX}${token}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
