@@ -22,6 +22,7 @@ import {
   openStoreRazorpayCheckout,
 } from '../services/storePaymentApi';
 import '../components/Storefront/storefront-checkout.css';
+import './OrderForm.css';
 
 type QtyMap = Record<string, number>;
 
