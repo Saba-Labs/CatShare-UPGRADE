@@ -39,6 +39,7 @@
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
+  appearance: auto;
 }
 
 .moa-add--discount.is-active,

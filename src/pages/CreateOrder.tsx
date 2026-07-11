@@ -45,6 +45,7 @@ import {
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { productMatchesSearchQuery } from '../utils/productSearchUtils';
 import {
+  buildRoundOffAdjustment,
   computeManualCheckoutTotals,
   hasManualAdjustments,
   type ManualOrderAdjustment,
@@ -256,8 +257,19 @@ function formatOrderMoney(amount: number): string {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
+function OrderTotalsPanel({
+  totals,
+  adjustments = [],
+  roundOffEnabled = false,
+  onRoundOffChange,
+}: {
+  totals: CheckoutTotals;
+  adjustments?: ManualOrderAdjustment[];
+  roundOffEnabled?: boolean;
+  onRoundOffChange?: (enabled: boolean) => void;
+}) {
   const hasAdjustments = totals.lines.length > 0;
+  const roundOffAvailable = roundOffEnabled || Math.abs(totals.grandTotal - Math.round(totals.grandTotal)) > 0.005;
 
   return (
     <div style={{
@@ -280,7 +292,12 @@ function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
               key={`${line.ruleId}-${line.label}`}
               style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#166534' }}
             >
-              <span>{line.label}</span>
+              <span>
+                {line.label}
+                {adjustments.find((adjustment) => adjustment.id === line.ruleId)?.amountKind === 'percent'
+                  ? ` (${adjustments.find((adjustment) => adjustment.id === line.ruleId)?.amount ?? 0}%)`
+                  : ''}
+              </span>
               <span>
                 {line.amount < 0 ? '−' : '+'}
                 {formatOrderMoney(Math.abs(line.amount))}
@@ -288,6 +305,16 @@ function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
             </div>
           ))}
         </>
+      ) : null}
+      {roundOffAvailable && onRoundOffChange ? (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#166534', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={roundOffEnabled}
+            onChange={(e) => onRoundOffChange(e.target.checked)}
+          />
+          Round off total
+        </label>
       ) : null}
       <div style={{
         display: 'flex',
@@ -360,6 +387,7 @@ export default function CreateOrder() {
   const [customerName, setCustomerName] = useState('');
   const [customerWhatsapp, setCustomerWhatsapp] = useState('');
   const [orderAdjustments, setOrderAdjustments] = useState<ManualOrderAdjustment[]>([]);
+  const [roundOffEnabled, setRoundOffEnabled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -754,16 +782,21 @@ export default function CreateOrder() {
   const reviewSummary = useMemo(() => {
     const items = orderSummary.items.filter((item) => item.quantity > 0);
     const subtotal = items.reduce((sum, item) => sum + item.rowTotal, 0);
-    const checkoutTotals = computeManualCheckoutTotals(subtotal, orderAdjustments);
+    const roundOff = roundOffEnabled
+      ? buildRoundOffAdjustment(subtotal, orderAdjustments)
+      : null;
+    const effectiveAdjustments = roundOff ? [...orderAdjustments, roundOff] : orderAdjustments;
+    const checkoutTotals = computeManualCheckoutTotals(subtotal, effectiveAdjustments);
 
     return {
       items,
       subtotal,
       total: checkoutTotals.grandTotal,
       checkoutTotals,
+      adjustments: effectiveAdjustments,
       count: items.reduce((sum, item) => sum + item.quantity, 0),
     };
-  }, [orderSummary, orderAdjustments]);
+  }, [orderSummary, orderAdjustments, roundOffEnabled]);
 
   React.useEffect(() => {
     return () => {
@@ -1804,7 +1837,12 @@ export default function CreateOrder() {
                 })}
 
                 {/* Total row */}
-                <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
+                <OrderTotalsPanel
+                  totals={reviewSummary.checkoutTotals}
+                  adjustments={reviewSummary.adjustments}
+                  roundOffEnabled={roundOffEnabled}
+                  onRoundOffChange={setRoundOffEnabled}
+                />
               </div>
             </div>
           </div>
@@ -1869,7 +1907,12 @@ export default function CreateOrder() {
               </div>
             </div>
 
-            <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
+            <OrderTotalsPanel
+                  totals={reviewSummary.checkoutTotals}
+                  adjustments={reviewSummary.adjustments}
+                  roundOffEnabled={roundOffEnabled}
+                  onRoundOffChange={setRoundOffEnabled}
+                />
           </div>
         )}
       </div>

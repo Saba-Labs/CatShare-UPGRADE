@@ -148,6 +148,19 @@ function getOrderUnitLabel(priceUnit: string | undefined): string {
   return cleaned;
 }
 
+function formatLineCalculationDetail(
+  quantity: number,
+  item: ShareLinkItem,
+  currencySymbol: string
+): string | null {
+  const unitPrice = getShareLinkItemUnitPrice(item, quantity);
+  if (!Number.isFinite(unitPrice)) return null;
+  const step = Math.max(1, Math.floor(item.quantityStep ?? 1));
+  const setCount = Math.floor(quantity / step);
+  const price = unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return `${quantity} ${getOrderUnitLabel(item.priceUnit)} (${setCount}) × ${currencySymbol}${price}`;
+}
+
 function getItemCategories(item: ShareLinkItem): string[] {
   if (Array.isArray(item.category)) {
     return item.category.filter((c) => c && String(c).trim() !== '');
@@ -727,7 +740,7 @@ export default function ConfirmOrder() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && Number.isFinite(unitPrice) && (
                             <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                              {currencySymbol}{unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              {formatLineCalculationDetail(q, item, currencySymbol)}
                             </div>
                           )}
                           {(!hasCost || !Number.isFinite(unitPrice)) && (
