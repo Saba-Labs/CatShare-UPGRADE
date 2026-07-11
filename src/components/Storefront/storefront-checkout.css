@@ -414,10 +414,25 @@
 }
 
 .of-page .sv-checkout-breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   min-height: 28px;
   padding: 5px 0;
   font-size: 13px;
   color: #7b7b82;
+}
+
+.of-page .sv-checkout-breakdown-row > span:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.of-page .sv-checkout-breakdown-row > span:last-child {
+  flex: 0 0 auto;
+  margin-left: 24px;
+  text-align: right;
 }
 
 .of-page .sv-checkout-breakdown-row > span:last-child {
