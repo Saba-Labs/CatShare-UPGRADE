@@ -272,7 +272,7 @@ export default function OrderLinkProductDetail({
             ) : null}
           </div>
 
-          {drawerCommittedLines.length > 0 ? (
+          {drawerVariantGroups.length > 0 && drawerCommittedLines.length > 0 ? (
             <div className="of-product-variant-lines">
               {drawerCommittedLines.map((line) => {
                 const lineSummary = formatVariantSelectionSummary(
