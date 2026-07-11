@@ -256,7 +256,13 @@ function formatOrderMoney(amount: number): string {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
+function OrderTotalsPanel({
+  totals,
+  adjustments = [],
+}: {
+  totals: CheckoutTotals;
+  adjustments?: ManualOrderAdjustment[];
+}) {
   const hasAdjustments = totals.lines.length > 0;
 
   return (
@@ -280,7 +286,12 @@ function OrderTotalsPanel({ totals }: { totals: CheckoutTotals }) {
               key={`${line.ruleId}-${line.label}`}
               style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#166534' }}
             >
-              <span>{line.label}</span>
+              <span>
+                {line.label}
+                {adjustments.find((adjustment) => adjustment.id === line.ruleId)?.amountKind === 'percent'
+                  ? ` (${adjustments.find((adjustment) => adjustment.id === line.ruleId)?.amount ?? 0}%)`
+                  : ''}
+              </span>
               <span>
                 {line.amount < 0 ? '−' : '+'}
                 {formatOrderMoney(Math.abs(line.amount))}
@@ -1804,7 +1815,7 @@ export default function CreateOrder() {
                 })}
 
                 {/* Total row */}
-                <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
+                <OrderTotalsPanel totals={reviewSummary.checkoutTotals} adjustments={orderAdjustments} />
               </div>
             </div>
           </div>
@@ -1869,7 +1880,7 @@ export default function CreateOrder() {
               </div>
             </div>
 
-            <OrderTotalsPanel totals={reviewSummary.checkoutTotals} />
+            <OrderTotalsPanel totals={reviewSummary.checkoutTotals} adjustments={orderAdjustments} />
           </div>
         )}
       </div>
