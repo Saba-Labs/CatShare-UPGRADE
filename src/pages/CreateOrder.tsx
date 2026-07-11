@@ -1739,7 +1739,7 @@ export default function CreateOrder() {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                             {hasCost && (
                               <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} ({Math.floor(item.quantity / (item.quantityStep ?? 1))}) × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)}{(item.quantityStep ?? 1) > 1 ? ` (${Math.floor(item.quantity / (item.quantityStep ?? 1))})` : ''} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                               </div>
                             )}
                             {hasCost && lineTotal > 0 && (
@@ -1857,7 +1857,7 @@ export default function CreateOrder() {
                         {item.name}
                       </div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                        {item.quantity} {getOrderUnitLabel(item.priceUnit)} ({Math.floor(item.quantity / (item.quantityStep ?? 1))}) × ₹{item.unitPrice.toLocaleString('en-IN')}
+                        {item.quantity} {getOrderUnitLabel(item.priceUnit)}{(item.quantityStep ?? 1) > 1 ? ` (${Math.floor(item.quantity / (item.quantityStep ?? 1))})` : ''} × ₹{item.unitPrice.toLocaleString('en-IN')}
                         {item.variantSummary ? ` · ${item.variantSummary}` : ''}
                       </div>
                     </div>
