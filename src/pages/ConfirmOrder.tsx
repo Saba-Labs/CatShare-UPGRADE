@@ -7,6 +7,7 @@ import { type ShareLinkItem, getShareLinkItemUnitPrice } from '../services/share
 import { formatVariantSelectionSummary, generateVariantCombinationId } from '../utils/productVariants';
 import {
   activeCartLines,
+  saveCartLinesToSession,
   setCartLineQtyById,
   type OrderCartLine,
 } from '../utils/orderCartLines';
@@ -229,6 +230,12 @@ export default function ConfirmOrder() {
     if (showPrepaidOption && !showCodOption) setPaymentMethod('prepaid');
     if (!showPrepaidOption && showCodOption) setPaymentMethod('cod');
   }, [showPrepaidOption, showCodOption]);
+
+  useEffect(() => {
+    if (token && state?.cartLines) {
+      saveCartLinesToSession(token, localCartLines);
+    }
+  }, [localCartLines, state?.cartLines, token]);
 
   const { updatedTotal } = useMemo(() => {
     let total = 0;
