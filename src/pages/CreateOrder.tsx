@@ -1971,7 +1971,7 @@ export default function CreateOrder() {
           ) : (
             <>
               {step === 'products' && 'Continue'}
-              {step === 'customer' && 'Review'}
+              {step === 'customer' && 'Continue'}
               {step === 'review' && 'Create Order'}
             </>
           )}
