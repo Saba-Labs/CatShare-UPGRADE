@@ -758,7 +758,7 @@ export default function ConfirmOrder() {
                 })}
 
                 {/* Total row */}
-                <div style={{ padding: '12px 0 4px', marginTop: 4, borderTop: `2px solid ${COLORS.border}` }}>
+                <div className="of-order-summary-total" style={{ padding: '12px 0 4px', marginTop: 4 }}>
                   <CheckoutBreakdown
                     totals={checkoutTotals}
                     currencySymbol={currencySymbol}
