@@ -774,10 +774,10 @@ body { font-family: var(--font); background: var(--bg); }
 .of-product-back {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: #0f172a;
+  border-radius: 10px;
+  border: 1px solid #e8e8ed;
+  background: #f5f5f7;
+  color: #1c1c1e;
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -785,6 +785,12 @@ body { font-family: var(--font); background: var(--bg); }
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.of-product-back:hover {
+  background: #ebebf0;
+  transform: scale(1.03);
 }
 
 .of-product-top-meta {
