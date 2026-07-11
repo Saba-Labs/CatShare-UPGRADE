@@ -94,7 +94,8 @@ function formatLineCalculationDetail(
   const label = getOrderUnitLabel(item.priceUnit);
   const priceStr = `${currencySymbol}${unit.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   const qstep = normalizeOrderQuantityStep(item.quantityStep);
-  return `${q} ${label} × ${priceStr}`;
+  const setCount = Math.floor(q / qstep);
+  return `${q} ${label} (${setCount}) × ${priceStr}`;
 }
 
 function isPublicHttpUrl(url: string): boolean {

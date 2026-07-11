@@ -1589,7 +1589,7 @@ export default function CreateOrder() {
                             {!hasVariants && (
                               <>
                                 <span style={{ fontSize: 11, fontWeight: 500, color: '#94A3B8' }}>
-                                  {quantity} {getOrderUnitLabel(priceUnit)} ({Math.round(quantity / quantityStep)}) × ₹{price.toLocaleString('en-IN')}
+                                  {quantity} {getOrderUnitLabel(priceUnit)}{quantityStep > 1 ? ` (${Math.round(quantity / quantityStep)})` : ''} × ₹{price.toLocaleString('en-IN')}
                                 </span>
                                 <span style={{ color: '#CBD5E1', fontSize: 11 }}>·</span>
                               </>
@@ -1739,7 +1739,7 @@ export default function CreateOrder() {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                             {hasCost && (
                               <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)}{(item.quantityStep ?? 1) > 1 ? ` (${Math.floor(item.quantity / (item.quantityStep ?? 1))})` : ''} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                               </div>
                             )}
                             {hasCost && lineTotal > 0 && (
@@ -1857,7 +1857,7 @@ export default function CreateOrder() {
                         {item.name}
                       </div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                        {item.quantity} × ₹{item.unitPrice.toLocaleString('en-IN')}
+                        {item.quantity} {getOrderUnitLabel(item.priceUnit)}{(item.quantityStep ?? 1) > 1 ? ` (${Math.floor(item.quantity / (item.quantityStep ?? 1))})` : ''} × ₹{item.unitPrice.toLocaleString('en-IN')}
                         {item.variantSummary ? ` · ${item.variantSummary}` : ''}
                       </div>
                     </div>
@@ -1971,7 +1971,7 @@ export default function CreateOrder() {
           ) : (
             <>
               {step === 'products' && 'Continue'}
-              {step === 'customer' && 'Review'}
+              {step === 'customer' && 'Continue'}
               {step === 'review' && 'Create Order'}
             </>
           )}
