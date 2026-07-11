@@ -7,6 +7,7 @@ import { type ShareLinkItem, getShareLinkItemUnitPrice } from '../services/share
 import { formatVariantSelectionSummary, generateVariantCombinationId } from '../utils/productVariants';
 import {
   activeCartLines,
+  saveCartLinesToSession,
   setCartLineQtyById,
   type OrderCartLine,
 } from '../utils/orderCartLines';
@@ -230,6 +231,12 @@ export default function ConfirmOrder() {
     if (!showPrepaidOption && showCodOption) setPaymentMethod('cod');
   }, [showPrepaidOption, showCodOption]);
 
+  useEffect(() => {
+    if (token && state?.cartLines) {
+      saveCartLinesToSession(token, localCartLines);
+    }
+  }, [localCartLines, state?.cartLines, token]);
+
   const { updatedTotal } = useMemo(() => {
     let total = 0;
     activeCartLines(localCartLines).forEach((line) => {
@@ -397,7 +404,9 @@ export default function ConfirmOrder() {
           if (createdOrder?.tracking_token) {
             trackingUrl = buildOrderTrackingUrl(createdOrder.tracking_token);
           }
-          // Clear the saved order quantities from sessionStorage on successful order creation
+          // Clear the saved order quantities on successful order creation
+          localStorage.removeItem(`catshare_order_cart_${token}`);
+          localStorage.removeItem(`catshare_order_qty_${token}`);
           sessionStorage.removeItem(`catshare_order_cart_${token}`);
           sessionStorage.removeItem(`catshare_order_qty_${token}`);
         }

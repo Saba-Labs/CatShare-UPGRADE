@@ -272,7 +272,7 @@ export default function OrderLinkProductDetail({
             ) : null}
           </div>
 
-          {drawerCommittedLines.length > 0 ? (
+          {drawerVariantGroups.length > 0 && drawerCommittedLines.length > 0 ? (
             <div className="of-product-variant-lines">
               {drawerCommittedLines.map((line) => {
                 const lineSummary = formatVariantSelectionSummary(
@@ -306,7 +306,7 @@ export default function OrderLinkProductDetail({
         </div>
 
         <button type="button" className="of-drawer-done" onClick={onDone}>
-          {dQ > 0 ? `Continue — ${dQ} added` : 'Back to shop'}
+          {dQ > 0 ? 'Add to cart' : 'Back to items'}
         </button>
       </div>
     </article>

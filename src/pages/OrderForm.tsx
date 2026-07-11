@@ -241,6 +241,7 @@ export default function OrderForm() {
   const [currencyCode, setCurrencyCode] = useState('INR');
   const [items, setItems] = useState<ShareLinkItem[]>([]);
   const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [draftVariantSelections, setDraftVariantSelections] = useState<VariantSelectionMap>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -282,6 +283,8 @@ export default function OrderForm() {
       try {
         setLoading(true);
         setError(null);
+        setCartHydrated(false);
+        setCartLines([]);
         if (!token) { setError('Invalid link'); return; }
         const data = await fetchShareLinkForCustomer(token);
         if (cancelled) return;
@@ -308,6 +311,7 @@ export default function OrderForm() {
             setCartLines(migrateLegacyCartToLines(legacyQty, {}));
           }
         }
+        setCartHydrated(true);
 
         // Fetch seller_user_id using public RPC function
         if (token) {
@@ -366,10 +370,10 @@ export default function OrderForm() {
   };
 
   useEffect(() => {
-    if (token) {
+    if (token && cartHydrated) {
       saveCartLinesToSession(token, cartLines);
     }
-  }, [cartLines, token]);
+  }, [cartHydrated, cartLines, token]);
 
   const selectedProductCount = useMemo(() => totalCartLineCount(cartLines), [cartLines]);
 
@@ -673,7 +677,9 @@ export default function OrderForm() {
         <div className="of-product-page">
           <div className="of-product-page-top">
             <button type="button" className="of-product-back" onClick={closeProductPage} aria-label="Back to items">
-              ←
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
             <div className="of-product-top-meta">
               <div className="of-store-name">{sellerBusinessName || 'Order Form'}</div>
@@ -735,7 +741,7 @@ export default function OrderForm() {
               disabled={selectedProductCount === 0}
             >
               <WhatsAppIcon size={14} />
-              <span className="btn-label">Order on WhatsApp</span>
+              <span className="btn-label">Place Order</span>
             </button>
           </div>
         </div>
