@@ -62,7 +62,7 @@
 
 .moa-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px 104px 28px;
+  grid-template-columns: minmax(0, 1fr) 104px 28px;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
@@ -84,7 +84,6 @@
 }
 
 .moa-input,
-.moa-type-select,
 .moa-amount-input {
   width: 100%;
   height: 34px;
@@ -171,7 +170,7 @@
   }
 
   .moa-row {
-    grid-template-columns: minmax(0, 1fr) 70px 96px 28px;
+    grid-template-columns: minmax(0, 1fr) 96px 28px;
     gap: 6px;
     padding: 8px 10px;
   }

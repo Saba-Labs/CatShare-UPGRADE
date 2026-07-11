@@ -87,22 +87,6 @@ export default function ManualOrderAdjustmentsEditor({
                   aria-label={isCharge ? 'Charge label' : 'Discount label'}
                 />
 
-                <select
-                  className="moa-type-select"
-                  value={row.amountKind}
-                  onChange={(e) =>
-                    onChange(
-                      updateAdjustment(adjustments, row.id, {
-                        amountKind: e.target.value as ManualOrderAdjustmentAmountKind,
-                      })
-                    )
-                  }
-                  aria-label="Adjustment type"
-                >
-                  <option value="flat">Fixed</option>
-                  <option value="percent">Percent</option>
-                </select>
-
                 <div className="moa-amount-wrap">
                   <span className="moa-amount-sign" aria-hidden>
                     {isCharge ? '+' : '−'}
