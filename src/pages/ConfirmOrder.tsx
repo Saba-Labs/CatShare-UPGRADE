@@ -78,14 +78,12 @@ const Divider = () => (
 );
 
 // Quantity Control
-function QtyControl({ value, step, onChange }: { value: number; step: number; onChange: (delta: number) => void }) {
-  const s = Math.max(1, Math.floor(step) || 1);
-  const inc = s > 1 ? s : 1;
+function QtyControl({ value, onChange }: { value: number; onChange: (delta: number) => void }) {
   return (
     <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: '#F5F5F7', borderRadius: 6, padding: '3px 6px', width: 'fit-content' }}>
-      <button type="button" onClick={() => onChange(-inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+      <button type="button" onClick={() => onChange(-1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
       <span style={{ width: 24, textAlign: 'center', fontSize: 12, fontWeight: 600, color: COLORS.text }}>{value}</span>
-      <button type="button" onClick={() => onChange(inc)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+      <button type="button" onClick={() => onChange(1)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: COLORS.muted, padding: 0, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
     </div>
   );
 }
@@ -735,7 +733,7 @@ export default function ConfirmOrder() {
                               {variantSummary}
                             </div>
                           )}
-                          <QtyControl value={q} step={item.quantityStep || 1} onChange={(delta) => handleQtyChange(line.lineId, delta)} />
+                          <QtyControl value={q} onChange={(delta) => handleQtyChange(line.lineId, delta)} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                           {hasCost && Number.isFinite(unitPrice) && (
