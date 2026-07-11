@@ -741,7 +741,7 @@ export default function OrderForm() {
               disabled={selectedProductCount === 0}
             >
               <WhatsAppIcon size={14} />
-              <span className="btn-label">Order on WhatsApp</span>
+              <span className="btn-label">Place Order</span>
             </button>
           </div>
         </div>
