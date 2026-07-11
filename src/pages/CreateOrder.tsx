@@ -1857,7 +1857,7 @@ export default function CreateOrder() {
                         {item.name}
                       </div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                        {item.quantity} × ₹{item.unitPrice.toLocaleString('en-IN')}
+                        {item.quantity} {getOrderUnitLabel(item.priceUnit)} ({Math.floor(item.quantity / (item.quantityStep ?? 1))}) × ₹{item.unitPrice.toLocaleString('en-IN')}
                         {item.variantSummary ? ` · ${item.variantSummary}` : ''}
                       </div>
                     </div>
