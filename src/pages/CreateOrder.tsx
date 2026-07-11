@@ -1739,7 +1739,7 @@ export default function CreateOrder() {
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                             {hasCost && (
                               <div style={{ fontSize: 12, color: COLORS.muted, fontFamily: FONT }}>
-                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                {item.quantity} {getOrderUnitLabel(item.priceUnit)} ({Math.floor(item.quantity / (item.quantityStep ?? 1))}) × ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                               </div>
                             )}
                             {hasCost && lineTotal > 0 && (
