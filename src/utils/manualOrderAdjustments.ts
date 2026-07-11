@@ -1,12 +1,14 @@
 import type { CheckoutLineItem, CheckoutTotals } from '../types/checkoutSettings';
 
 export type ManualOrderAdjustmentKind = 'discount' | 'charge' | 'round_off';
+export type ManualOrderAdjustmentAmountKind = 'flat' | 'percent';
 
 export interface ManualOrderAdjustment {
   id: string;
   kind: ManualOrderAdjustmentKind;
   label: string;
   amount: number;
+  amountKind: ManualOrderAdjustmentAmountKind;
 }
 
 function roundMoney(value: number): number {
@@ -19,7 +21,8 @@ export function newManualAdjustmentId(): string {
 
 export function createManualAdjustment(
   kind: ManualOrderAdjustmentKind,
-  amount = 0
+  amount = 0,
+  amountKind: ManualOrderAdjustmentAmountKind = 'flat'
 ): ManualOrderAdjustment {
   const labels: Record<ManualOrderAdjustmentKind, string> = {
     discount: 'Discount',
@@ -31,6 +34,7 @@ export function createManualAdjustment(
     kind,
     label: labels[kind],
     amount,
+    amountKind: kind === 'round_off' ? 'flat' : amountKind,
   };
 }
 
@@ -51,7 +55,11 @@ export function computeManualCheckoutTotals(
   let shippingTotal = 0;
 
   for (const adjustment of adjustments) {
-    const amount = roundMoney(Math.abs(adjustment.amount));
+    const value = roundMoney(Math.abs(adjustment.amount));
+    const amount =
+      adjustment.amountKind === 'percent'
+        ? roundMoney((sub * Math.min(value, 100)) / 100)
+        : value;
     const label = adjustment.label.trim();
     if (amount <= 0 || !label) continue;
 
@@ -106,6 +114,7 @@ export function buildRoundOffAdjustment(
     kind: 'round_off',
     label: 'Round off',
     amount: Math.abs(diff),
+    amountKind: 'flat',
   };
 }
 
@@ -134,6 +143,7 @@ export function manualAdjustmentsFromCheckoutTotals(
       kind,
       label: label || (kind === 'charge' ? 'Extra charge' : 'Discount'),
       amount,
+      amountKind: 'flat',
     };
   });
 }
