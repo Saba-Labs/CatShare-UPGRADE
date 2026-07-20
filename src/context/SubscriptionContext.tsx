@@ -3,11 +3,13 @@ import { supabase, getSupabaseAccessToken } from '../supabaseClient';
 import { TRIAL_DAYS_UI_FALLBACK } from '../config/freeTierLimits';
 import { useAuth } from './AuthContext';
 import { getPersistedAuthUserId } from '../utils/authUserId';
+import { resolveApiBaseUrl } from '../utils/apiBaseUrl';
 import type { UserSubscriptionInfo } from '../utils/subscriptionDisplay';
 import {
   clearCachedEntitlement,
   readCachedEntitlement,
   writeCachedEntitlement,
+  normalizeCachedEntitlement,
   type CachedEntitlement,
 } from '../utils/subscriptionCache';
 
@@ -65,26 +67,64 @@ function parseSubscriptionResponse(json: unknown): CachedEntitlement | null {
         } as UserSubscriptionInfo)
       : null;
 
-  return {
+  return normalizeCachedEntitlement({
     isPro: !!payload.isPro,
     isPaidPro: !!payload.isPaidPro,
     isTrialActive: !!payload.isTrialActive,
     trialEndsAt: nextTrialEnd,
     trialDays: nextTrialDays,
     subscription: nextSubscription,
-  };
+  });
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+async function fetchSubscriptionFromServer(accessToken: string): Promise<CachedEntitlement | null> {
+  const baseUrl = resolveApiBaseUrl();
+  if (!baseUrl) return null;
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort('timeout'), 12000);
+
+  try {
+    const resp = await fetch(`${baseUrl}/api/subscription`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!resp.ok) {
+      console.debug(`Subscription API returned status ${resp.status}`);
+      return null;
+    }
+
+    const json = await resp.json();
+    return parseSubscriptionResponse(json);
+  } catch (fetchError) {
+    if (fetchError instanceof Error) {
+      if (fetchError.name === 'AbortError') {
+        console.debug('Subscription fetch timeout');
+      } else {
+        console.debug('Subscription fetch error:', fetchError.message);
+      }
+    }
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading: authLoading } = useAuth();
-  const initialEntitlement = useMemo(
-    () => readCachedEntitlement(getPersistedAuthUserId()) ?? EMPTY_ENTITLEMENT,
-    []
-  );
+  const initialEntitlement = useMemo(() => {
+    const cached = readCachedEntitlement(getPersistedAuthUserId());
+    return cached ?? EMPTY_ENTITLEMENT;
+  }, []);
   const [isPro, setIsPro] = useState(initialEntitlement.isPro);
   const [isPaidPro, setIsPaidPro] = useState(initialEntitlement.isPaidPro);
   const [isTrialActive, setIsTrialActive] = useState(initialEntitlement.isTrialActive);
@@ -95,14 +135,16 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   );
   const [loading, setLoading] = useState(true);
   const activeUserIdRef = useRef<string | null>(getPersistedAuthUserId());
+  const refreshInFlightRef = useRef(false);
 
   const setEntitlementState = useCallback((entitlement: CachedEntitlement) => {
-    setIsPro(entitlement.isPro);
-    setIsPaidPro(entitlement.isPaidPro);
-    setIsTrialActive(entitlement.isTrialActive);
-    setTrialEndsAt(entitlement.trialEndsAt);
-    setTrialDays(entitlement.trialDays);
-    setSubscription(entitlement.subscription);
+    const normalized = normalizeCachedEntitlement(entitlement);
+    setIsPro(normalized.isPro);
+    setIsPaidPro(normalized.isPaidPro);
+    setIsTrialActive(normalized.isTrialActive);
+    setTrialEndsAt(normalized.trialEndsAt);
+    setTrialDays(normalized.trialDays);
+    setSubscription(normalized.subscription);
   }, []);
 
   const hydrateFromCache = useCallback(
@@ -124,6 +166,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const userId = activeUserIdRef.current;
     if (!userId) return;
 
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     setLoading(true);
 
     try {
@@ -133,14 +177,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
-      if (!baseUrl) {
-        hydrateFromCache(userId);
-        return;
-      }
-
       let accessToken: string | null = null;
-      for (let attempt = 0; attempt < 4; attempt += 1) {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
           accessToken = await getSupabaseAccessToken();
         } catch (err) {
@@ -150,7 +188,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           );
         }
         if (accessToken) break;
-        await sleep(250 * (attempt + 1));
+        await sleep(300 * (attempt + 1));
       }
 
       if (!accessToken) {
@@ -158,46 +196,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort('timeout'), 8000);
+      let parsed: CachedEntitlement | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        parsed = await fetchSubscriptionFromServer(accessToken);
+        if (parsed) break;
+        if (attempt < 2) await sleep(400 * (attempt + 1));
+      }
 
-      try {
-        const resp = await fetch(`${baseUrl}/api/subscription`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: controller.signal,
-        });
-
-        if (!resp.ok) {
-          console.debug(`Subscription API returned status ${resp.status}`);
-          hydrateFromCache(userId);
-          return;
-        }
-
-        const json = await resp.json();
-        const parsed = parseSubscriptionResponse(json);
-        if (!parsed) {
-          hydrateFromCache(userId);
-          return;
-        }
-
+      if (parsed) {
         setEntitlementState(parsed);
         writeCachedEntitlement(session.user.id, parsed);
-      } catch (fetchError) {
-        if (fetchError instanceof Error) {
-          if (fetchError.name === 'AbortError') {
-            console.debug('Subscription fetch timeout');
-          } else {
-            console.debug('Subscription fetch error (using cache):', fetchError.message);
-          }
-        }
-        hydrateFromCache(userId);
-      } finally {
-        window.clearTimeout(timeoutId);
+        return;
       }
+
+      hydrateFromCache(userId);
     } catch (error) {
       console.debug(
         'Subscription refresh error:',
@@ -206,6 +218,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       hydrateFromCache(userId);
     } finally {
       setLoading(false);
+      refreshInFlightRef.current = false;
     }
   }, [hydrateFromCache, setEntitlementState]);
 
@@ -258,6 +271,30 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     return () => authSubscription.unsubscribe();
   }, [refresh, clearSubscriptionCache, hydrateFromCache]);
+
+  // Re-check plan when app/tab becomes visible (e.g. after purchase on another device).
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refresh().catch(() => undefined);
+      }, 800);
+    };
+
+    document.addEventListener('visibilitychange', scheduleRefresh);
+    window.addEventListener('pageshow', scheduleRefresh);
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', scheduleRefresh);
+      window.removeEventListener('pageshow', scheduleRefresh);
+    };
+  }, [user?.uid, refresh]);
 
   const value = useMemo(
     () => ({ isPro, isPaidPro, isTrialActive, trialEndsAt, trialDays, subscription, loading, refresh }),

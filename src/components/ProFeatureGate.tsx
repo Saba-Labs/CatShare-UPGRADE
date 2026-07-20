@@ -14,9 +14,10 @@ interface ProFeatureGateProps {
  * Wraps a feature and shows a modern lock overlay if user is not Pro
  */
 export function ProFeatureGate({ children, featureName, locked = false }: ProFeatureGateProps) {
-  const { isPro } = useSubscription();
+  const { isPro, loading } = useSubscription();
   const navigate = useNavigate();
 
+  if (loading) return <>{children}</>;
   if (isPro) return <>{children}</>;
 
   return (

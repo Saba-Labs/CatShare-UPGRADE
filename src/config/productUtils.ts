@@ -306,12 +306,21 @@ export function saveProduct(product: Product, userId?: string): void {
   }
 }
 
+export type SaveProductsOptions = {
+  /** When true, only write local cache; caller runs syncProductsToCloud. */
+  skipBackgroundSync?: boolean;
+};
+
 /**
  * Save multiple products to localStorage
  * @param products - Products to save
  * @param userId - Optional user ID for keyed storage
  */
-export function saveProducts(products: Product[], userId?: string): void {
+export function saveProducts(
+  products: Product[],
+  userId?: string,
+  options?: SaveProductsOptions
+): void {
   try {
     const normalized = products.map((p) => {
       // Snapshot catalogueData BEFORE normalizeProduct can touch it
@@ -335,8 +344,9 @@ export function saveProducts(products: Product[], userId?: string): void {
     const effectiveUserId = userId || getPersistedAuthUserId() || '';
     const storageKey = effectiveUserId ? getStorageKey('products', effectiveUserId) : 'products';
     localStorage.setItem(storageKey, JSON.stringify(normalized));
-    // Trigger Supabase sync
-    triggerSupabaseSync(normalized, effectiveUserId);
+    if (!options?.skipBackgroundSync) {
+      triggerSupabaseSync(normalized, effectiveUserId);
+    }
   } catch (err) {
     console.error('Failed to save products:', err);
   }

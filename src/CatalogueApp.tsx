@@ -661,7 +661,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   
     window.addEventListener("product-added", handleNewProduct);
     return () => window.removeEventListener("product-added", handleNewProduct);
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     sessionStorage.removeItem("bypassStockWarningUntil");

@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { useToast } from "./context/ToastContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
+import { useAuth } from "./context/AuthContext";
+import { useSync } from "./context/SyncContext";
+import { readDeletedProductsWithLegacyFallback } from "./utils/safeStorage";
 import { getCatalogueData, setCatalogueData, isProductEnabledForCatalogue, normalizeOrderQuantityStep } from "./config/catalogueProductUtils";
 import { normalizeMinimumOrderQuantity } from "./utils/quantityPricingUtils";
 import { offerPriceFieldFor } from "./utils/offerPriceUtils";
@@ -79,8 +82,11 @@ export default function BulkEdit({
   const [confirmDialog, setConfirmDialog] = useState({ show: false, fieldKey: null }); // Confirmation dialog
   const [hasConfirmedFill, setHasConfirmedFill] = useState(false); // Track if user confirmed fill dialog once
   const [dataLoaded, setDataLoaded] = useState(false); // Track if data has been loaded
+  const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
   const { guardCloudWrite } = useCloudWriteGate();
+  const { user } = useAuth();
+  const { syncProductsToCloud } = useSync();
 
   // Use initial values or selected values
   const catalogueId = selectedCatalogueId || initialCatalogueId;
@@ -429,7 +435,7 @@ useEffect(() => {
     );
   };
 
-   const handleSave = () => {
+   const handleSave = async () => {
   try {
     if (!guardCloudWrite()) return;
     if (isCatalogueLinkedToWarehouse(selectedCatalogueConfig) && selectedFields.includes("stock")) {
@@ -542,14 +548,39 @@ useEffect(() => {
       throw new Error(`Data validation failed: ${jsonErr.message}`);
     }
 
-    saveProducts(mergedData);
+    const userId = user?.uid;
+    saveProducts(mergedData, userId, { skipBackgroundSync: true });
     setProducts(mergedData);
+
+    const editedProductIds = cleanData.map((p) => String(p.id));
+    const deletedProducts = userId ? readDeletedProductsWithLegacyFallback(userId) : [];
+
+    setSaving(true);
+    try {
+      if (userId) {
+        await syncProductsToCloud(mergedData, deletedProducts, {
+          onlyProductIds: editedProductIds,
+          skipFullCloudRefresh: true,
+          skipImageUrlAssertion: true,
+          maxSyncUiMs: 15000,
+        });
+        showToast("Changes saved and synced to cloud.", "success");
+      }
+    } catch (syncErr) {
+      console.error("Bulk edit cloud sync failed:", syncErr);
+      showToast(
+        syncErr?.message ||
+          "Saved on this device but cloud sync failed. Check your connection and try again.",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
 
     window.dispatchEvent(
       new CustomEvent("product-added", {
         detail: {
-          onlyProductIds: cleanData.map((p) => String(p.id)),
-          forceCloudSync: true,
+          skipCloudSync: true,
         },
       })
     );
@@ -1168,9 +1199,10 @@ useEffect(() => {
        <button
           type="button"
           onClick={handleSave}
-          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition shadow-md shadow-blue-600/20"
+          disabled={saving}
+          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition shadow-md shadow-blue-600/20 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          Save changes
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
       {showRenderPopup && (

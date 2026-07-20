@@ -647,6 +647,13 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       if (p.data != null && typeof p.data === 'object' && !Array.isArray(p.data)) {
         const row = { ...p.data };
         if (row.id == null && p.product_id != null) row.id = p.product_id;
+        if (typeof p.updated_at === 'string' && p.updated_at.length > 0) {
+          const dbMs = new Date(p.updated_at).getTime();
+          const dataMs = row.updatedAt ? new Date(String(row.updatedAt)).getTime() : 0;
+          if (Number.isFinite(dbMs) && (!Number.isFinite(dataMs) || dbMs >= dataMs)) {
+            row.updatedAt = p.updated_at;
+          }
+        }
         return row.id != null ? withNormalizedProductFontColor(normalizeProductImageFields(row)) : null;
       }
       if (p.product_id != null) {
@@ -664,6 +671,13 @@ export async function fetchAllUserData(userId: string): Promise<SyncResult> {
       if (!dp) return null;
       if (dp.data != null && typeof dp.data === 'object' && !Array.isArray(dp.data)) {
         const row = { ...dp.data, id: dp.product_id ?? dp.data?.id };
+        if (typeof dp.updated_at === 'string' && dp.updated_at.length > 0) {
+          const dbMs = new Date(dp.updated_at).getTime();
+          const dataMs = row.updatedAt ? new Date(String(row.updatedAt)).getTime() : 0;
+          if (Number.isFinite(dbMs) && (!Number.isFinite(dataMs) || dbMs >= dataMs)) {
+            row.updatedAt = dp.updated_at;
+          }
+        }
         return row.id != null ? withNormalizedProductFontColor(normalizeProductImageFields(row)) : null;
       }
       if (dp.product_id != null) {

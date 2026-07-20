@@ -11,7 +11,7 @@ import ReactDOM from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { MdInventory2, MdBackup, MdCategory, MdBook, MdImage, MdSettings, MdPublic, MdSupportAgent, MdDomain } from "react-icons/md";
 import { RiEdit2Line } from "react-icons/ri";
-import { FiCheckCircle, FiAlertCircle } from "react-icons/fi";
+import { FiCheckCircle, FiAlertCircle, FiRefreshCw } from "react-icons/fi";
 import { APP_VERSION } from "./config/version";
 import { useToast } from "./context/ToastContext";
 import { useTheme } from "./context/ThemeContext";
@@ -85,16 +85,32 @@ const navigate = useNavigate();
   const { user } = useAuth();
   const { syncProductsToCloud } = useSync();
   const { guardCloudWrite } = useCloudWriteGate();
-  const { isPro, isPaidPro, isTrialActive, trialEndsAt, loading: subscriptionLoading } =
+  const { isPro, isPaidPro, isTrialActive, trialEndsAt, loading: subscriptionLoading, refresh: refreshSubscription } =
     useSubscription();
+  const [planRefreshing, setPlanRefreshing] = useState(false);
   const isGlassTheme = currentTheme?.styles?.layout === "glass";
 
+  const handleRefreshPlan = async (e) => {
+    e.stopPropagation();
+    if (planRefreshing || subscriptionLoading) return;
+    setPlanRefreshing(true);
+    try {
+      await refreshSubscription();
+    } catch (err) {
+      console.debug('Plan refresh failed:', err);
+    } finally {
+      setPlanRefreshing(false);
+    }
+  };
+
+  const planStatusBusy = subscriptionLoading || planRefreshing;
+
   const accountPlanLine = (() => {
-    if (subscriptionLoading) {
-      return { text: 'Checking plan…', className: 'text-xs text-gray-500 mt-1' };
+    if (planStatusBusy) {
+      return { text: 'Checking plan…', className: 'text-xs text-gray-500' };
     }
     if (isPaidPro) {
-      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700 mt-1' };
+      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700' };
     }
     if (isTrialActive && trialEndsAt) {
       const end = new Date(trialEndsAt).getTime();
@@ -102,13 +118,13 @@ const navigate = useNavigate();
       const dayWord = daysLeft === 1 ? 'day' : 'days';
       return {
         text: `Trial · ${daysLeft} ${dayWord} left`,
-        className: 'text-xs font-medium text-amber-800 mt-1',
+        className: 'text-xs font-medium text-amber-800',
       };
     }
     if (isPro) {
-      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700 mt-1' };
+      return { text: 'Pro', className: 'text-xs font-semibold text-emerald-700' };
     }
-    return { text: 'Free', className: 'text-xs text-gray-600 mt-1' };
+    return { text: 'Free', className: 'text-xs text-gray-600' };
   })();
 
   const totalProducts = products.length;
@@ -1735,7 +1751,21 @@ setShowBrowseForBackup(false);
                     {user.displayName || user.email}
                   </p>
                   <p className="text-xs text-gray-600 truncate">{user.email}</p>
-                  <p className={accountPlanLine.className}>{accountPlanLine.text}</p>
+                  <div className="flex items-center gap-1 mt-1 min-w-0">
+                    <p className={`${accountPlanLine.className} truncate`}>{accountPlanLine.text}</p>
+                    <button
+                      type="button"
+                      onClick={handleRefreshPlan}
+                      disabled={planStatusBusy}
+                      title="Refresh plan status"
+                      aria-label="Refresh plan status"
+                      className="shrink-0 p-0.5 rounded text-gray-500 hover:text-blue-600 hover:bg-gray-200/80 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      <FiRefreshCw
+                        className={`w-3.5 h-3.5 ${planStatusBusy ? 'animate-spin' : ''}`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
               <button

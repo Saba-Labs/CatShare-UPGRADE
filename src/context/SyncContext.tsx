@@ -42,6 +42,16 @@ export type SyncProductsToCloudOptions = {
   skipFullCloudRefresh?: boolean;
   fullListForPosition?: any[];
   /**
+   * Skip R2 image URL checks (bulk field edits, partial row sync).
+   * Local cache is still written; only cloud image validation is relaxed.
+   */
+  skipImageUrlAssertion?: boolean;
+  /**
+   * When another sync holds the lock, wait instead of returning without uploading.
+   * @default true
+   */
+  waitForLock?: boolean;
+  /**
    * Hide the global sync overlay after this many ms while work continues (non-detailed sync only).
    * Use with shelf / restore so users are not blocked by a long spinner.
    */
@@ -238,11 +248,15 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
     if (localP.length > 0) {
       const { mergeProductsData } = await import('../utils/productMerge');
-      filteredProducts = mergeProductsData(localP, filteredProducts, deletedIds);
+      filteredProducts = mergeProductsData(localP, filteredProducts, deletedIds, {
+        preferRemoteOnTie: true,
+      });
     }
     if (localD.length > 0 && nextDeleted.length > 0) {
       const { mergeProductsData } = await import('../utils/productMerge');
-      nextDeleted = mergeProductsData(localD, nextDeleted);
+      nextDeleted = mergeProductsData(localD, nextDeleted, new Set(), {
+        preferRemoteOnTie: true,
+      });
     } else if (localD.length > 0 && nextDeleted.length === 0) {
       nextDeleted = localD;
     }
@@ -361,9 +375,19 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return { products, deletedProducts };
     }
 
-    if (syncLockRef.current) {
-      return { products, deletedProducts };
+    const waitForLock = options?.waitForLock !== false;
+    if (syncLockRef.current && waitForLock) {
+      for (let attempt = 0; attempt < 120 && syncLockRef.current; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
     }
+    if (syncLockRef.current) {
+      throw new Error('Sync is busy. Please wait a moment and try again.');
+    }
+
+    const skipImageAssertion =
+      options?.skipImageUrlAssertion === true ||
+      (Array.isArray(options?.onlyProductIds) && options.onlyProductIds.length > 0);
 
     const detailedStatus = options?.detailedStatus === true;
     const showSyncUi = options?.background !== true;
@@ -419,6 +443,9 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { uploadProductImageToR2 } = await import('../services/r2Upload');
 
         if (!Capacitor.isNativePlatform()) {
+          if (skipImageAssertion) {
+            return items;
+          }
           assertProductsHaveCloudImageUrlForSync(items, phaseLabel);
           return items;
         }
@@ -505,6 +532,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const productsForSync = await uploadMissingImages(subset, 'Uploading image');
         const res = await syncProducts(userId, productsForSync, {
           fullListForPosition: Array.isArray(products) ? products : [],
+          skipImageUrlAssertion: skipImageAssertion,
         });
         if (!res.success) throw new Error(res.error || 'Products sync failed');
         return { products, deletedProducts };
@@ -530,6 +558,7 @@ export const SyncProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setDetail('Saving products to cloud…');
         const res = await syncProducts(userId, productsForSync, {
           fullListForPosition: options?.fullListForPosition ?? productsForSync,
+          skipImageUrlAssertion: skipImageAssertion,
         });
         if (!res.success) throw new Error(res.error || 'Products sync failed');
       }

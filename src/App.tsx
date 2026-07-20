@@ -1493,6 +1493,46 @@ function AppWithBackHandler() {
     return () => window.removeEventListener(CATALOGUE_LOCAL_IMAGES_READY_EVENT, onLocalImagesReady);
   }, [user?.uid]);
 
+  // Pull latest catalogue from cloud when the app/tab becomes visible (cross-device sync on reload/focus).
+  useEffect(() => {
+    if (!user?.uid || isPublicStoreOrOrderRoute) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let refreshInFlight = false;
+
+    const pullFromCloud = () => {
+      if (!isBrowserOnline() || refreshInFlight || shouldDeferCloudSyncNow()) return;
+      refreshInFlight = true;
+      void refreshFromCloud()
+        .then((cloudData) => {
+          if (!cloudData) return;
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        })
+        .catch((err) => {
+          console.debug('Visibility cloud refresh failed (using cache):', err?.message || err);
+        })
+        .finally(() => {
+          refreshInFlight = false;
+        });
+    };
+
+    const schedulePull = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(pullFromCloud, 1500);
+    };
+
+    document.addEventListener('visibilitychange', schedulePull);
+    window.addEventListener('pageshow', schedulePull);
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      document.removeEventListener('visibilitychange', schedulePull);
+      window.removeEventListener('pageshow', schedulePull);
+    };
+  }, [user?.uid, refreshFromCloud, isPublicStoreOrOrderRoute, isEditFlowRoute]);
+
   // ──────────────────────────────────────────────────────
   // PRODUCT-ADDED EVENT: reload products from localStorage
   // (fired by CreateProduct after saving)
@@ -1505,6 +1545,9 @@ function AppWithBackHandler() {
       const skipStrictSync = (e as CustomEvent<{ skipStrictSync?: boolean }> | undefined)?.detail
         ?.skipStrictSync;
       if (skipStrictSync) return;
+
+      const skipCloudSync = (e as CustomEvent<{ skipCloudSync?: boolean }> | undefined)?.detail
+        ?.skipCloudSync;
 
       const freshProducts = readProductsWithLegacyFallback(user.uid);
       const freshDeleted = readDeletedProductsWithLegacyFallback(user.uid);
@@ -1523,6 +1566,10 @@ function AppWithBackHandler() {
       setProducts(freshProducts);
       setDeletedProducts(freshDeleted);
 
+      if (skipCloudSync) {
+        return;
+      }
+
       // Saves still run on /create — never skip upload for an explicit save (forceCloudSync).
       if (shouldDeferCloudSyncNow() && !forceCloudSync) {
         return;
@@ -1537,6 +1584,7 @@ function AppWithBackHandler() {
         const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
           ...partialSyncOpts,
           skipFullCloudRefresh: true,
+          skipImageUrlAssertion: Boolean(partialSyncOpts?.onlyProductIds?.length),
           maxSyncUiMs: 12000,
         });
         setProducts(cloudData.products);

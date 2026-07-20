@@ -36,6 +36,39 @@ function readSubscriptionSnapshot(): UserSubscriptionInfo | null {
   }
 }
 
+/** Reconcile flags from snapshot + trial end (fixes stale isPro=false with active subscription in cache). */
+export function normalizeCachedEntitlement(raw: CachedEntitlement): CachedEntitlement {
+  let isPaidPro = raw.isPaidPro;
+  let isPro = raw.isPro;
+  let isTrialActive = raw.isTrialActive;
+
+  const sub = raw.subscription;
+  if (sub?.status === 'active') {
+    const expiresAt = sub.expiresAt;
+    const lifetime = expiresAt == null || expiresAt === '';
+    const notExpired =
+      typeof expiresAt === 'string' && expiresAt.length > 0 && new Date(expiresAt).getTime() > Date.now();
+    if (lifetime || notExpired) {
+      isPaidPro = true;
+      isPro = true;
+      isTrialActive = false;
+    }
+  }
+
+  if (!isPaidPro && raw.trialEndsAt) {
+    const trialStillActive = new Date(raw.trialEndsAt).getTime() > Date.now();
+    if (trialStillActive) {
+      isTrialActive = true;
+      isPro = true;
+    } else {
+      isTrialActive = false;
+      if (!isPaidPro) isPro = false;
+    }
+  }
+
+  return { ...raw, isPro, isPaidPro, isTrialActive };
+}
+
 /** Whether cached entitlement keys belong to this signed-in user. */
 export function cacheMatchesUser(userId: string | null | undefined): boolean {
   if (!userId) return false;
@@ -55,14 +88,14 @@ export function readCachedEntitlement(userId: string | null | undefined): Cached
   if (!userId || !cacheMatchesUser(userId)) return null;
 
   const trialEndsRaw = localStorage.getItem(LS_TRIAL_ENDS);
-  return {
+  return normalizeCachedEntitlement({
     isPro: localStorage.getItem(LS_IS_PRO) === 'true',
     isPaidPro: localStorage.getItem(LS_PAID_PRO) === 'true',
     isTrialActive: localStorage.getItem(LS_TRIAL_ACTIVE) === 'true',
     trialEndsAt: trialEndsRaw && trialEndsRaw.length > 0 ? trialEndsRaw : null,
     trialDays: readTrialDays(),
     subscription: readSubscriptionSnapshot(),
-  };
+  });
 }
 
 export function writeCachedEntitlement(

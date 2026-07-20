@@ -68,11 +68,18 @@ export function reconcileProductImageFields(local: any, remote: any): Record<str
  * Merge local + remote product lists (by id). Uses updatedAt on each product's JSON;
  * when timestamps conflict or are missing, unions imageUrls so extra gallery images are not dropped.
  */
+export type MergeProductsOptions = {
+  /** When updatedAt ties, prefer cloud row (used on refreshFromCloud / reload). */
+  preferRemoteOnTie?: boolean;
+};
+
 export function mergeProductsData(
   local: any[],
   remote: any[],
-  deletedIds: Set<string> = new Set()
+  deletedIds: Set<string> = new Set(),
+  options?: MergeProductsOptions
 ): any[] {
+  const preferRemoteOnTie = options?.preferRemoteOnTie === true;
   const merged = new Map<string, any>();
 
   local.forEach((product) => {
@@ -101,13 +108,15 @@ export function mergeProductsData(
     } else if (localTime > remoteTime) {
       merged.set(id, { ...localProduct, ...imagePatch });
     } else {
-      // Same timestamp (or both missing): prefer local fields, union images.
+      // Same timestamp (or both missing): on cloud refresh prefer remote; otherwise keep local edits.
+      const base = preferRemoteOnTie
+        ? { ...localProduct, ...remoteProduct }
+        : { ...remoteProduct, ...localProduct };
       merged.set(id, {
-        ...remoteProduct,
-        ...localProduct,
+        ...base,
         ...imagePatch,
         updatedAt:
-          localProduct.updatedAt || remoteProduct.updatedAt || new Date().toISOString(),
+          remoteProduct.updatedAt || localProduct.updatedAt || new Date().toISOString(),
       });
     }
   });
