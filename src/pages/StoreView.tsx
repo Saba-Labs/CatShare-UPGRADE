@@ -1040,7 +1040,7 @@ export default function StoreView() {
   }, [store?.sellerUserId]);
 
   const [allProducts, setAllProducts] = useState<ProductWithCatalogueData[]>([]);
-  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsLoading, setProductsLoading] = useState(true);
   const [cartLines, setCartLines] = useState<OrderCartLine[]>([]);
   const [draftVariantSelections, setDraftVariantSelections] = useState<Record<string, Record<string, string>>>({});
   const [customerName, setCustomerName] = useState('');
@@ -2629,6 +2629,7 @@ export default function StoreView() {
                 pathname={location.pathname}
                 homepageLayout={homepageLayout}
                 products={storeProducts}
+                productsLoading={productsLoading}
                 store={store}
                 onSubdomain={dedicatedHost}
               />
@@ -2639,6 +2640,7 @@ export default function StoreView() {
               pathname={location.pathname}
               homepageLayout={homepageLayout}
               products={storeProducts}
+              productsLoading={productsLoading}
               store={store}
               onSubdomain={dedicatedHost}
             />
@@ -2743,6 +2745,7 @@ export default function StoreView() {
               slug={effectiveSlug || slug || ''}
               store={store}
               products={storeProducts}
+              productsLoading={productsLoading}
               layout={homepageLayout}
               orderBridge={websiteOrderBridge}
               onSubdomain={dedicatedHost}
@@ -2754,6 +2757,7 @@ export default function StoreView() {
               slug={effectiveSlug || slug || ''}
               store={store}
               products={storeProducts}
+              productsLoading={productsLoading}
               layout={catalogHomeLayout}
               orderBridge={websiteOrderBridge}
               onSubdomain={dedicatedHost}
