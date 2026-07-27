@@ -2745,6 +2745,7 @@ export default function StoreView() {
               slug={effectiveSlug || slug || ''}
               store={store}
               products={storeProducts}
+              productsLoading={productsLoading}
               layout={homepageLayout}
               orderBridge={websiteOrderBridge}
               onSubdomain={dedicatedHost}
@@ -2756,6 +2757,7 @@ export default function StoreView() {
               slug={effectiveSlug || slug || ''}
               store={store}
               products={storeProducts}
+              productsLoading={productsLoading}
               layout={catalogHomeLayout}
               orderBridge={websiteOrderBridge}
               onSubdomain={dedicatedHost}

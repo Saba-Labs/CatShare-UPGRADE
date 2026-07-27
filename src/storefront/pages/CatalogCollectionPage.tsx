@@ -14,6 +14,7 @@ interface CatalogCollectionPageProps {
   slug: string;
   store: StorePublic;
   products: ProductWithCatalogueData[];
+  productsLoading?: boolean;
   layout: HomepageLayout | null;
   orderBridge: WebsiteOrderBridgeValue;
   onSubdomain?: boolean;
@@ -25,6 +26,7 @@ export default function CatalogCollectionPage({
   slug,
   store,
   products,
+  productsLoading = false,
   layout,
   orderBridge,
   onSubdomain,
@@ -39,7 +41,13 @@ export default function CatalogCollectionPage({
   const storeName = siteSettings?.websiteName || store.sellerBusinessName || store.storeSlug || slug;
 
   return (
-    <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
+    <WebsiteStoreProvider
+      slug={slug}
+      store={store}
+      products={products}
+      productsLoading={productsLoading}
+      onSubdomain={onSubdomain}
+    >
       <WebsiteOrderBridgeProvider value={orderBridge}>
         <div
           className="website-runtime-root website-catalog-collection-shell"
@@ -75,6 +83,7 @@ export default function CatalogCollectionPage({
           ) : null}
           <CollectionPageRuntime
             products={products}
+            productsLoading={productsLoading}
             embedded
             columns={settings.columns}
             showCategoryFilters={settings.showCategoryFilters}

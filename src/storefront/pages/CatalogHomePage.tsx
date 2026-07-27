@@ -26,6 +26,7 @@ interface CatalogHomePageProps {
   store: StorePublic;
 
   products: ProductWithCatalogueData[];
+  productsLoading?: boolean;
 
   layout: HomepageLayout;
 
@@ -47,6 +48,7 @@ export default function CatalogHomePage({
   store,
 
   products,
+  productsLoading = false,
 
   layout,
 
@@ -66,7 +68,13 @@ export default function CatalogHomePage({
 
   return (
 
-    <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
+    <WebsiteStoreProvider
+      slug={slug}
+      store={store}
+      products={products}
+      productsLoading={productsLoading}
+      onSubdomain={onSubdomain}
+    >
 
       <WebsiteOrderBridgeProvider value={orderBridge}>
 
@@ -94,4 +102,3 @@ export default function CatalogHomePage({
   );
 
 }
-
