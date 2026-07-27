@@ -544,6 +544,16 @@
   background: transparent;
 }
 
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:hover,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:focus,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:focus-visible,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable.is-selected {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* —— Layout: orderform (store hero → compact bar on scroll) —— */
 .sf-of-header-layout {
   position: relative;
