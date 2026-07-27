@@ -648,7 +648,19 @@
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected,
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner {
   outline: none !important;
+  outline-style: none !important;
   border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner {
+  outline: none !important;
+  outline-style: none !important;
+  border: none !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
 }
 
