@@ -1535,6 +1535,10 @@ useEffect(() => {
     if (editMode) {
       setEditModeSync(false);
     } else {
+      // Clear the orders cache before navigating back so Orders page fetches fresh data
+      if (user?.uid) {
+        writeCachedSellerOrders(user.uid, []);
+      }
       navigate(-1);
     }
   };
