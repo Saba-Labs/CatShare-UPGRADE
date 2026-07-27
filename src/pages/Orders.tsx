@@ -1496,9 +1496,10 @@ export default function Orders() {
 
     const fetchSeq = ++ordersFetchSeqRef.current;
 
-    // If we have cached data, fetch only orders created after our newest cached row.
-    // This reduces payload and usually makes "new orders" appear much faster.
-    const { data, error } = await fetchSellerOrders(user.uid, cachedNewest ? { createdAfter: cachedNewest } : undefined);
+    // When forcing a full refresh, fetch all orders (not incremental) to catch status updates.
+    // For normal refreshes, use incremental fetch to reduce payload.
+    const useIncremental = !opts?.force && Boolean(cachedNewest);
+    const { data, error } = await fetchSellerOrders(user.uid, useIncremental ? { createdAfter: cachedNewest } : undefined);
 
     if (fetchSeq !== ordersFetchSeqRef.current) return; // A newer fetch has started; ignore this result.
 
