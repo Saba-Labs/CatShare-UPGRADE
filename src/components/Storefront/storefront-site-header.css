@@ -631,6 +631,12 @@
   max-width: 100%;
 }
 
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable:hover,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected {
+  outline: none;
+  box-shadow: none;
+}
+
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__top {
   display: flex;
   align-items: center;
