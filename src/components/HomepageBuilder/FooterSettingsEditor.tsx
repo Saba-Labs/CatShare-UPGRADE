@@ -227,6 +227,7 @@ export default function FooterSettingsEditor({
           ['footerShowContact', 'Contact', siteSettings.footerShowContact !== false],
           ['footerShowStoreInfo', 'Store info', siteSettings.footerShowStoreInfo !== false],
           ['footerShowFollow', 'Follow / social', siteSettings.footerShowFollow !== false],
+          ['footerShowPoweredBy', 'Powered by CatShare', siteSettings.footerShowPoweredBy !== false],
         ] as const
       ).map(([key, label, checked]) => (
         <div key={key} className="sidebar-panel-section panel-checkbox">

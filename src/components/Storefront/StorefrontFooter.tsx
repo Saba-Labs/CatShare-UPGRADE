@@ -155,6 +155,7 @@ export default function StorefrontFooter({
   const showContact = siteSettings.footerShowContact !== false;
   const showStoreInfo = siteSettings.footerShowStoreInfo !== false;
   const showFollow = siteSettings.footerShowFollow !== false;
+  const showPoweredBy = siteSettings.footerShowPoweredBy !== false;
   const linkColumns = siteSettings.footerColumns || [];
   const hasLinkColumns = linkColumns.length > 0;
   const showInfoGrid =
@@ -433,7 +434,7 @@ export default function StorefrontFooter({
       </div>
       ) : null}
 
-      <CatSharePoweredBy previewMode={previewMode} />
+      {showPoweredBy ? <CatSharePoweredBy previewMode={previewMode} /> : null}
     </footer>
   );
 }
