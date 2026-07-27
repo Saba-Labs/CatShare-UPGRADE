@@ -247,7 +247,7 @@ export default function CollectionPageRuntime({
           ) : null}
         </div>
       </div>
-      {productsLoading ? (
+      {productsLoading && sortedProducts.length === 0 ? (
         <p style={{ color: '#5f6368' }} role="status">Loading products…</p>
       ) : sortedProducts.length === 0 ? (
         <p style={{ color: '#5f6368' }}>No products available yet.</p>
