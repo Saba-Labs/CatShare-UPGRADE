@@ -631,9 +631,12 @@
   max-width: 100%;
 }
 
-.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable:hover,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:hover,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:focus,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:focus-visible,
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected,
-.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner[data-fusion-element-id] {
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner {
   outline: none !important;
   border: none !important;
   box-shadow: none !important;
