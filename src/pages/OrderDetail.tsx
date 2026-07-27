@@ -1558,10 +1558,13 @@ useEffect(() => {
       // Revert on error
       setOrder(prev => prev ? { ...prev, status: oldStatus } : null);
     } else {
+      const updatedOrder = { ...order, status };
       if (user?.uid) {
         patchCachedOrder(user.uid, order.id, { status });
       }
       showToast(`Marked as ${getOrderStatusLabel(status)}`, 'success');
+      // Notify Orders page of the update
+      window.dispatchEvent(new CustomEvent('catshareNewOrder', { detail: { orderId: order.id, order: updatedOrder } }));
     }
   };
 
