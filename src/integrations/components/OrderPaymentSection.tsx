@@ -5,6 +5,7 @@ import CheckoutBreakdown from '../../components/Storefront/CheckoutBreakdown';
 import { useOrderPayment } from '../hooks/useOrderPayment';
 import { confirmUpiPaymentReceived, reverseUpiPaymentConfirmation } from '../services/orderPaymentsService';
 import type { OrderPayment } from '../core/types';
+import { resolveOrderPaymentDisplayAmount } from '../../utils/resolveOrderTotals';
 import {
   OdCard,
   OdFooterNote,
@@ -195,9 +196,10 @@ export function OrderPaymentSection({ order }: { order: Order }) {
     paymentConfirmedBy
   );
   const heroTone = paymentHeroTone(paymentStatus, paymentMethod);
-  const amountStr = payment
-    ? formatMoney(payment.amount, payment.currency)
-    : formatMoney(order.checkout_adjustments?.grandTotal ?? order.total_amount ?? null, currency);
+  const amountStr = formatMoney(
+    resolveOrderPaymentDisplayAmount(order, payment),
+    payment?.currency ?? currency
+  );
 
   const isRazorpay = payment?.provider === 'razorpay';
   const isPaid = paymentStatus === 'paid';

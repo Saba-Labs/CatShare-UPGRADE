@@ -1,6 +1,7 @@
 import type { CustomDomainState } from '../services/storeCustomDomainApi';
-import type { Store } from '../services/storeService';
+import type { Store, StorePublic } from '../services/storeService';
 import type { Order } from '../services/orderService';
+import type { ProductWithCatalogueData } from '../config/catalogueProductUtils';
 import type { StoreBehaviorSettings } from '../types/storeBehaviorSettings';
 import type { StoreMarketingSettings } from '../types/storeMarketingSettings';
 import type { StoreSecuritySettings } from '../types/storeSecuritySettings';
@@ -19,6 +20,37 @@ export const storeShippingPreferencesCacheKey = (uid: string) =>
   getStorageKey('storeShippingPreferences', uid);
 export const customDomainStateCacheKey = (uid: string) =>
   getStorageKey('customDomainState', uid);
+export const storefrontStoreBySlugKey = (slug: string) =>
+  getStorageKey('storefrontStoreSlug', slug.trim().toLowerCase());
+export const storefrontProductsKey = (sellerUserId: string) =>
+  getStorageKey('storefrontProducts', sellerUserId);
+
+export function readCachedStorefrontBySlug(slug: string): StorePublic | null {
+  if (!slug.trim()) return null;
+  return safeGetFromStorage<StorePublic | null>(storefrontStoreBySlugKey(slug), null);
+}
+
+export function writeCachedStorefrontBySlug(slug: string, store: StorePublic): void {
+  if (!slug.trim()) return;
+  safeSetInStorage(storefrontStoreBySlugKey(slug), store);
+}
+
+export function readCachedStorefrontProducts(sellerUserId: string): ProductWithCatalogueData[] {
+  if (!sellerUserId.trim()) return [];
+  const parsed = safeGetFromStorage<ProductWithCatalogueData[]>(
+    storefrontProductsKey(sellerUserId),
+    []
+  );
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+export function writeCachedStorefrontProducts(
+  sellerUserId: string,
+  products: ProductWithCatalogueData[]
+): void {
+  if (!sellerUserId.trim()) return;
+  safeSetInStorage(storefrontProductsKey(sellerUserId), products);
+}
 
 export function readCachedSellerStore(uid: string): Store | null {
   return safeGetFromStorage<Store | null>(sellerStoreCacheKey(uid), null);

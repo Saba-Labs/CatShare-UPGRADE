@@ -28,6 +28,15 @@ function parseRowToOrder(row: Record<string, unknown>): Order {
     tracking_token: row.tracking_token != null ? String(row.tracking_token) : undefined,
     store_slug: row.store_slug != null ? String(row.store_slug) : undefined,
     customer_edited_at: row.customer_edited_at != null ? String(row.customer_edited_at) : undefined,
+    payment_method: row.payment_method as Order['payment_method'],
+    checkout_adjustments:
+      row.checkout_adjustments && typeof row.checkout_adjustments === 'object'
+        ? (row.checkout_adjustments as Order['checkout_adjustments'])
+        : undefined,
+    shipping_address:
+      row.shipping_address && typeof row.shipping_address === 'object'
+        ? (row.shipping_address as Order['shipping_address'])
+        : undefined,
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
   };
@@ -150,6 +159,30 @@ function maxCreatedAtIso(orders: Pick<Order, 'created_at'>[]): string | null {
   return best;
 }
 
+function maxUpdatedAtIso(orders: Pick<Order, 'updated_at'>[]): string | null {
+  if (!orders.length) return null;
+  let best = orders[0].updated_at || orders[0].created_at || '';
+  for (let i = 1; i < orders.length; i++) {
+    const t = orders[i].updated_at || orders[i].created_at || '';
+    if (t > best) best = t;
+  }
+  return best || null;
+}
+
+function emitSellerOrderSync(
+  order: Order,
+  options?: { onNewOrder?: (order: Order) => void }
+): void {
+  options?.onNewOrder?.(order);
+  try {
+    window.dispatchEvent(
+      new CustomEvent('catshareNewOrder', { detail: { orderId: order.id, order } })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function emitNewOrderIfEligible(
   order: Order,
   _source: 'realtime' | 'poll',
@@ -175,8 +208,7 @@ function emitNewOrderIfEligible(
 }
 
 /**
- * Poll REST for new orders. Reliable when Realtime/RLS/WebSocket does not deliver postgres_changes.
- * After one full baseline fetch, polls only rows with created_at newer than the last watermark (less disk I/O).
+ * Poll REST for new and updated orders. Reliable when Realtime/RLS/WebSocket does not deliver postgres_changes.
  */
 export function startPollingForNewSellerOrders(
   sellerUserId: string,
@@ -187,6 +219,8 @@ export function startPollingForNewSellerOrders(
   let knownIds = new Set<string>();
   /** Upper bound on created_at we've processed; incremental polls use .gt(this). */
   let createdAtWatermark = '';
+  /** Upper bound on updated_at we've processed for edits to existing orders. */
+  let updatedAtWatermark = '';
 
   const tick = async () => {
     try {
@@ -195,25 +229,49 @@ export function startPollingForNewSellerOrders(
         if (error || !data) return;
         knownIds = new Set(data.map((o) => o.id));
         createdAtWatermark = maxCreatedAtIso(data) ?? '1970-01-01T00:00:00.000Z';
+        updatedAtWatermark = maxUpdatedAtIso(data) ?? createdAtWatermark;
         baselineReady = true;
         return;
       }
 
-      const { data, error } = await fetchSellerOrders(sellerUserId, {
+      const { data: newRows, error: newErr } = await fetchSellerOrders(sellerUserId, {
         createdAfter: createdAtWatermark,
       });
-      if (error || !data?.length) return;
-
-      for (const o of data) {
-        if (!knownIds.has(o.id)) {
-          emitNewOrderIfEligible(o, 'poll', options);
+      if (!newErr && newRows?.length) {
+        for (const o of newRows) {
+          if (!knownIds.has(o.id)) {
+            emitNewOrderIfEligible(o, 'poll', options);
+          }
+          knownIds.add(o.id);
         }
-        knownIds.add(o.id);
+        const newest = maxCreatedAtIso(newRows);
+        if (newest && newest > createdAtWatermark) {
+          createdAtWatermark = newest;
+        }
+        const newestUpdate = maxUpdatedAtIso(newRows);
+        if (newestUpdate && newestUpdate > updatedAtWatermark) {
+          updatedAtWatermark = newestUpdate;
+        }
       }
 
-      const newest = maxCreatedAtIso(data);
-      if (newest && newest > createdAtWatermark) {
-        createdAtWatermark = newest;
+      const { data: updatedRows, error: updErr } = await fetchSellerOrders(sellerUserId, {
+        updatedAfter: updatedAtWatermark,
+      });
+      if (!updErr && updatedRows?.length) {
+        for (const o of updatedRows) {
+          if (knownIds.has(o.id)) {
+            emitSellerOrderSync(o, options);
+          } else if (!newRows?.some((n) => n.id === o.id)) {
+            emitNewOrderIfEligible(o, 'poll', options);
+            knownIds.add(o.id);
+          } else {
+            knownIds.add(o.id);
+          }
+        }
+        const newestUpdate = maxUpdatedAtIso(updatedRows);
+        if (newestUpdate && newestUpdate > updatedAtWatermark) {
+          updatedAtWatermark = newestUpdate;
+        }
       }
     } catch (e) {
       console.warn('[CatShare] order poll failed:', e);
@@ -293,6 +351,21 @@ export async function subscribeToNewSellerOrders(
 
         const order = parseRowToOrder(row);
         emitNewOrderIfEligible(order, 'realtime', options);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+      },
+      (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        if (!sellerIdsMatch(String(row.seller_user_id ?? ''), sellerUserId)) return;
+
+        const order = parseRowToOrder(row);
+        emitSellerOrderSync(order, options);
       }
     )
     .subscribe((status, err) => {

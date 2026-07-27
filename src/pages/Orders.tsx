@@ -20,6 +20,11 @@ import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { readCachedSellerStore } from '../utils/storePageCache';
 import { getOrderCatalogueLabel, getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import { patchCachedOrder, readCachedSellerOrders, writeCachedSellerOrders } from '../utils/storePageCache';
+import {
+  getRuntimeSellerOrders,
+  setRuntimeSellerOrders,
+} from '../utils/sellerOrdersListSync';
+import { resolveOrderGrandTotal } from '../utils/resolveOrderTotals';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
@@ -29,8 +34,6 @@ import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 const ORDERS_SCREEN_FRESH_MS = 15000;
 const ORDERS_ACTIVE_MOBILE_POLL_MS = 5000;
-
-const runtimeOrdersMemory = new Map<string, { updatedAt: number; orders: Order[] }>();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = OrderTabFilter;
@@ -95,6 +98,29 @@ function maxCreatedAtIso(orders: Array<Pick<Order, 'created_at'>>): string | nul
     if (!best || s > best) best = s;
   }
   return best;
+}
+
+function maxUpdatedAtIso(orders: Array<Pick<Order, 'updated_at' | 'created_at'>>): string | null {
+  let best: string | null = null;
+  for (const o of orders) {
+    const t = o.updated_at || o.created_at;
+    if (!t) continue;
+    const s = String(t);
+    if (!best || s > best) best = s;
+  }
+  return best;
+}
+
+function mergeOrdersById(base: Order[], incoming: Order[]): Order[] {
+  if (!incoming.length) return base;
+  const map = new Map<string, Order>();
+  for (const o of base) map.set(o.id, o);
+  for (const o of incoming) map.set(o.id, o);
+  const merged = Array.from(map.values());
+  merged.sort(
+    (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
+  );
+  return merged;
 }
 
 function getStatusConfig(status: string) {
@@ -812,7 +838,11 @@ function OrderRow({
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const [metaInfoOpen, setMetaInfoOpen] = useState<'source' | 'catalogue' | null>(null);
   const statusCfg = getStatusConfig(order.status);
-  const total = order.total_amount != null ? formatMoney(order.total_amount, currencySymbol) : null;
+  const resolvedTotal = resolveOrderGrandTotal(order, order.items || []);
+  const total =
+    Number.isFinite(resolvedTotal) && (resolvedTotal > 0 || order.total_amount != null)
+      ? formatMoney(resolvedTotal, currencySymbol)
+      : null;
   const phone = (order as any).customer_whatsapp || (order as any).customerWhatsapp || '';
 
   const sourceKey =
@@ -1239,7 +1269,7 @@ export default function Orders() {
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
-    const mem = runtimeOrdersMemory.get(user.uid);
+    const mem = getRuntimeSellerOrders(user.uid);
     const cached = readCachedSellerOrders(user.uid);
     const seed = mem?.orders?.length ? mem.orders : cached;
     setOrders(seed);
@@ -1254,7 +1284,7 @@ export default function Orders() {
 
   useEffect(() => {
     if (!user?.uid || user.isAnonymous) return;
-    runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders });
+    setRuntimeSellerOrders(user.uid, orders);
   }, [orders, user?.uid, user?.isAnonymous]);
 
   useEffect(() => {
@@ -1273,6 +1303,7 @@ export default function Orders() {
           else next.unshift(orderFromEvent);
           next.sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
           writeCachedSellerOrders(sellerUid, next);
+          setRuntimeSellerOrders(sellerUid, next);
           return next;
         });
         return;
@@ -1291,6 +1322,24 @@ export default function Orders() {
 
     window.addEventListener('catshareNewOrder', handler as EventListener);
     return () => window.removeEventListener('catshareNewOrder', handler as EventListener);
+  }, [user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
+    if (!user?.uid || user.isAnonymous) return;
+    const handler = (evt: Event) => {
+      const custom = evt as CustomEvent<{ orderId: string }>;
+      const orderId = custom?.detail?.orderId;
+      if (!orderId) return;
+      const sellerUid = user.uid;
+      setOrders((prev) => {
+        const next = prev.filter((o) => o.id !== orderId);
+        writeCachedSellerOrders(sellerUid, next);
+        return next;
+      });
+    };
+
+    window.addEventListener('catshareOrderRemoved', handler as EventListener);
+    return () => window.removeEventListener('catshareOrderRemoved', handler as EventListener);
   }, [user?.uid, user?.isAnonymous]);
 
   useEffect(() => {
@@ -1479,10 +1528,11 @@ export default function Orders() {
       return;
     }
 
-    const mem = runtimeOrdersMemory.get(user.uid);
+    const mem = getRuntimeSellerOrders(user.uid);
     const cached = readCachedSellerOrders(user.uid);
     const base = mem?.orders?.length ? mem.orders : cached;
     const cachedNewest = base.length ? maxCreatedAtIso(base) : null;
+    const cachedLatestUpdate = base.length ? maxUpdatedAtIso(base) : null;
 
     if (!opts?.force && base.length > 0 && mem && Date.now() - mem.updatedAt <= ORDERS_SCREEN_FRESH_MS) {
       setOrders(base);
@@ -1496,9 +1546,22 @@ export default function Orders() {
 
     const fetchSeq = ++ordersFetchSeqRef.current;
 
-    // If we have cached data, fetch only orders created after our newest cached row.
-    // This reduces payload and usually makes "new orders" appear much faster.
-    const { data, error } = await fetchSellerOrders(user.uid, cachedNewest ? { createdAfter: cachedNewest } : undefined);
+    // Incremental: new rows by created_at + edits by updated_at.
+    const incremental = Boolean(cachedNewest);
+    const fetchCreated = fetchSellerOrders(
+      user.uid,
+      incremental ? { createdAfter: cachedNewest! } : undefined
+    );
+    const fetchUpdated =
+      incremental && cachedLatestUpdate
+        ? fetchSellerOrders(user.uid, { updatedAfter: cachedLatestUpdate })
+        : Promise.resolve({ data: [] as Order[], error: null });
+
+    const [{ data: createdData, error }, { data: updatedData }] = await Promise.all([
+      fetchCreated,
+      fetchUpdated,
+    ]);
+    const data = mergeOrdersById(createdData || [], updatedData || []);
 
     if (fetchSeq !== ordersFetchSeqRef.current) return; // A newer fetch has started; ignore this result.
 
@@ -1519,55 +1582,81 @@ export default function Orders() {
         if (!opts?.silent) showToast('Error loading orders', 'error');
       }
     } else {
-      const incremental = Boolean(cachedNewest);
       const list = data || [];
 
       if (incremental && base.length > 0) {
-        const map = new Map<string, Order>();
-        for (const o of base) map.set(o.id, o);
-        for (const o of list) map.set(o.id, o);
-        const merged = Array.from(map.values());
-        merged.sort(
-          (a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()
-        );
+        const merged = mergeOrdersById(base, list);
         setOrders(merged);
         writeCachedSellerOrders(user.uid, merged);
-        runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders: merged });
+        setRuntimeSellerOrders(user.uid, merged);
       } else {
         setOrders(list);
         writeCachedSellerOrders(user.uid, list);
-        runtimeOrdersMemory.set(user.uid, { updatedAt: Date.now(), orders: list });
+        setRuntimeSellerOrders(user.uid, list);
       }
     }
     setLoading(false);
   };
 
+  const refreshOrderChanges = useCallback(async () => {
+    if (!user?.uid || user.isAnonymous) return;
+    const mem = getRuntimeSellerOrders(user.uid);
+    const cached = readCachedSellerOrders(user.uid);
+    const base = mem?.orders?.length ? mem.orders : cached;
+    const updatedAfter = base.length ? maxUpdatedAtIso(base) : null;
+    if (!updatedAfter) return;
+
+    const fetchSeq = ++ordersFetchSeqRef.current;
+    const { data, error } = await fetchSellerOrders(user.uid, { updatedAfter });
+    if (fetchSeq !== ordersFetchSeqRef.current || error || !data?.length) return;
+
+    setOrders((prev) => {
+      const merged = mergeOrdersById(prev.length ? prev : base, data);
+      writeCachedSellerOrders(user.uid, merged);
+      setRuntimeSellerOrders(user.uid, merged);
+      return merged;
+    });
+  }, [user?.uid, user?.isAnonymous]);
+
+  useEffect(() => {
+    if (location.pathname !== '/orders') return;
+    void refreshOrderChanges();
+  }, [location.pathname, location.key, refreshOrderChanges]);
+
   useEffect(() => {
     if (!user?.uid || user.isAnonymous) return;
-    if (Capacitor.getPlatform() === 'web') return;
 
     const refreshNow = () => {
       void loadOrders({ force: true, silent: true });
     };
 
+    const refreshChanges = () => {
+      void refreshOrderChanges();
+    };
+
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshNow();
+      if (document.visibilityState === 'visible') refreshChanges();
     };
 
     let resumeListener: { remove: () => Promise<void> } | null = null;
-    void App.addListener('resume', refreshNow).then((listener) => {
-      resumeListener = listener;
-    });
+    if (Capacitor.getPlatform() !== 'web') {
+      void App.addListener('resume', refreshNow).then((listener) => {
+        resumeListener = listener;
+      });
+    }
 
     document.addEventListener('visibilitychange', onVisibility);
-    const intervalId = window.setInterval(refreshNow, ORDERS_ACTIVE_MOBILE_POLL_MS);
+    const intervalId = window.setInterval(
+      refreshChanges,
+      Capacitor.getPlatform() === 'web' ? ORDERS_ACTIVE_MOBILE_POLL_MS : ORDERS_ACTIVE_MOBILE_POLL_MS
+    );
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       clearInterval(intervalId);
       void resumeListener?.remove();
     };
-  }, [user?.uid, user?.isAnonymous]);
+  }, [user?.uid, user?.isAnonymous, refreshOrderChanges]);
 
   const handleNavigate = async (path: string) => {
     await Haptics.impact({ style: ImpactStyle.Light });

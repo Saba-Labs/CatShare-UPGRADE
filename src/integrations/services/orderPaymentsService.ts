@@ -1,7 +1,5 @@
-/**
- * Order payment records (gateway transactions).
- */
 import { getSupabaseClient, setSupabaseRlsUserId } from '../../supabaseClient';
+import { resolveOrderGrandTotal } from '../../utils/resolveOrderTotals';
 import type { OrderPayment, OrderPaymentStatus } from '../core/types';
 
 function mapPaymentRow(row: Record<string, unknown>): OrderPayment {
@@ -74,6 +72,7 @@ export async function confirmUpiPaymentReceived(
     currency_code?: string;
     total_amount?: number;
     checkout_adjustments?: { grandTotal?: number } | null;
+    items?: Array<{ quantity?: number; unitPrice?: number; rowTotal?: number }>;
   },
   existingPayment?: OrderPayment | null
 ): Promise<{ data: OrderPayment | null; error: unknown }> {
@@ -91,8 +90,7 @@ export async function confirmUpiPaymentReceived(
     status: 'paid',
     paymentMethod: 'upi',
     amount:
-      order.checkout_adjustments?.grandTotal ??
-      order.total_amount ??
+      resolveOrderGrandTotal(order, order.items ?? []) ??
       existingPayment?.amount ??
       null,
     currency: order.currency_code ?? existingPayment?.currency ?? 'INR',
@@ -112,6 +110,7 @@ export async function reverseUpiPaymentConfirmation(
     currency_code?: string;
     total_amount?: number;
     checkout_adjustments?: { grandTotal?: number } | null;
+    items?: Array<{ quantity?: number; unitPrice?: number; rowTotal?: number }>;
   },
   existingPayment: OrderPayment
 ): Promise<{ data: OrderPayment | null; error: unknown }> {
@@ -132,8 +131,7 @@ export async function reverseUpiPaymentConfirmation(
     status: 'pending',
     paymentMethod: 'upi',
     amount:
-      order.checkout_adjustments?.grandTotal ??
-      order.total_amount ??
+      resolveOrderGrandTotal(order, order.items ?? []) ??
       existingPayment.amount ??
       null,
     currency: order.currency_code ?? existingPayment.currency ?? 'INR',

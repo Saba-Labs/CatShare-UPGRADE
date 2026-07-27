@@ -460,6 +460,8 @@ export type FetchSellerOrdersOptions = {
    * Pair with DB index on (seller_user_id, created_at) for best performance.
    */
   createdAfter?: string;
+  /** Only rows with updated_at strictly greater than this ISO timestamp (order edits). */
+  updatedAfter?: string;
 };
 
 /**
@@ -505,7 +507,12 @@ export async function fetchSellerOrders(
         cached = cached.filter((o) => (o.created_at || '') > after);
       }
 
-      const incremental = Boolean(options?.createdAfter?.trim());
+      if (options?.updatedAfter?.trim()) {
+        const after = options.updatedAfter.trim();
+        cached = cached.filter((o) => (o.updated_at || '') > after);
+      }
+
+      const incremental = Boolean(options?.createdAfter?.trim() || options?.updatedAfter?.trim());
       cached = [...cached].sort((a, b) => {
         const ta = new Date(a.created_at).getTime();
         const tb = new Date(b.created_at).getTime();
@@ -519,7 +526,7 @@ export async function fetchSellerOrders(
     setSupabaseRlsUserId(trimmed);
 
     const client = getSupabaseClient();
-    const incremental = Boolean(options?.createdAfter?.trim());
+    const incremental = Boolean(options?.createdAfter?.trim() || options?.updatedAfter?.trim());
 
     let query = client
       .from('orders')
@@ -529,6 +536,10 @@ export async function fetchSellerOrders(
 
     if (options?.createdAfter?.trim()) {
       query = query.gt('created_at', options.createdAfter.trim());
+    }
+
+    if (options?.updatedAfter?.trim()) {
+      query = query.gt('updated_at', options.updatedAfter.trim());
     }
 
     if (options?.status) {

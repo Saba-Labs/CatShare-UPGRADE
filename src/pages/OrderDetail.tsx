@@ -33,12 +33,11 @@ import { SyncBusyOverlay } from '../components/SyncBusyOverlay';
 import { safeGetFromStorage, getStorageKey } from '../utils/safeStorage';
 import { isBrowserOnline } from '../utils/cloudWritePolicy';
 import {
-  patchCachedOrder,
-  readCachedOrderById,
-  removeCachedOrder,
-  upsertCachedOrder,
-  writeCachedSellerOrders,
-} from '../utils/storePageCache';
+  notifySellerOrderPatched,
+  notifySellerOrderRemoved,
+  notifySellerOrderUpdated,
+} from '../utils/sellerOrdersListSync';
+import { readCachedOrderById, writeCachedSellerOrders } from '../utils/storePageCache';
 import { productImageDisplayUrl } from '../utils/imageUrl';
 import { isDeliberateEdgeSwipeBack } from '../utils/swipeBackGesture';
 import { useCatalogueInventoryMap } from '../hooks/useCatalogueInventoryMap';
@@ -63,6 +62,7 @@ import {
 } from '../utils/productVariants';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
 import { resolveListOfferEffective } from '../utils/offerPriceUtils';
+import { resolveOrderCheckoutTotals, resolveOrderGrandTotal } from '../utils/resolveOrderTotals';
 import { getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import {
   ORDER_STATUSES,
@@ -779,12 +779,6 @@ const COLORS = {
   red: '#FF3B30',
 };
 
-function sumOrderItemsSubtotal(items: OrderItem[]): number {
-  return items.reduce((sum, item) => {
-    const lineTotal = item.rowTotal ?? (item.unitPrice ?? 0) * item.quantity;
-    return sum + lineTotal;
-  }, 0);
-}
 
 function OrderItemsTotalsFooter({
   items,
@@ -797,10 +791,14 @@ function OrderItemsTotalsFooter({
   totalAmount?: number | null;
   symbol: string;
 }) {
-  const itemsSubtotal = sumOrderItemsSubtotal(items);
-  const hasLineBreakdown = Boolean(checkoutAdjustments?.lines?.length);
-  const subtotal = checkoutAdjustments?.subtotal ?? itemsSubtotal;
-  const grandTotal = checkoutAdjustments?.grandTotal ?? totalAmount ?? itemsSubtotal;
+  const resolved = resolveOrderCheckoutTotals(
+    { total_amount: totalAmount, checkout_adjustments: checkoutAdjustments },
+    items
+  );
+  const checkoutAdjustmentsForDisplay = resolved.checkoutAdjustments;
+  const hasLineBreakdown = Boolean(checkoutAdjustmentsForDisplay?.lines?.length);
+  const subtotal = resolved.subtotal;
+  const grandTotal = resolved.grandTotal;
 
   return (
     <>
@@ -820,7 +818,7 @@ function OrderItemsTotalsFooter({
             <span>Subtotal</span>
             <span>{formatMoney(subtotal, symbol)}</span>
           </div>
-          {checkoutAdjustments!.lines.map((line) => (
+          {checkoutAdjustmentsForDisplay!.lines.map((line) => (
             <div
               key={`${line.ruleId}-${line.label}`}
               style={{
@@ -1559,7 +1557,7 @@ useEffect(() => {
       setOrder(prev => prev ? { ...prev, status: oldStatus } : null);
     } else {
       if (user?.uid) {
-        patchCachedOrder(user.uid, order.id, { status });
+        notifySellerOrderUpdated(user.uid, { ...order, status });
       }
       showToast(`Marked as ${getOrderStatusLabel(status)}`, 'success');
     }
@@ -1634,7 +1632,7 @@ useEffect(() => {
       } as Order;
       setOrder(updatedOrder);
       if (user?.uid) {
-        upsertCachedOrder(user.uid, updatedOrder);
+        notifySellerOrderUpdated(user.uid, updatedOrder);
       }
       setEditModeSync(false);
       showToast('Order saved', 'success');
@@ -2025,7 +2023,7 @@ useEffect(() => {
         return;
       }
       if (user?.uid) {
-        removeCachedOrder(user.uid, order.id);
+        notifySellerOrderRemoved(user.uid, order.id);
       }
       showToast('Order deleted', 'success');
       navigate('/orders');
@@ -2082,8 +2080,7 @@ useEffect(() => {
 
   const symbol = getSymbolForCurrencyCode(order.currency_code);
   const items: OrderItem[] = order.items || [];
-  const orderDisplayTotal =
-    order.checkout_adjustments?.grandTotal ?? order.total_amount ?? sumOrderItemsSubtotal(items);
+  const orderDisplayTotal = resolveOrderGrandTotal(order, items);
   const phone = (order as any).customer_whatsapp || '';
   const statusCfg = getStatusConfig(order.status);
 
@@ -3006,7 +3003,7 @@ useEffect(() => {
                   onShippingAddressSaved={(address) => {
                     setOrder((prev) => (prev ? { ...prev, shipping_address: address } : prev));
                     if (user?.uid && order) {
-                      patchCachedOrder(user.uid, order.id, { shipping_address: address });
+                      notifySellerOrderPatched(user.uid, order.id, { shipping_address: address });
                     }
                   }}
                 />
@@ -3020,7 +3017,7 @@ useEffect(() => {
                       setOrder((prev) =>
                         prev ? { ...prev, tracking_token: res.token! } : prev
                       );
-                      patchCachedOrder(user.uid, order.id, { tracking_token: res.token });
+                      notifySellerOrderPatched(user.uid, order.id, { tracking_token: res.token });
                     }
                     return res.token;
                   }}
