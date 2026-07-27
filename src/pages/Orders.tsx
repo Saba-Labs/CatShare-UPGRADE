@@ -1544,7 +1544,6 @@ export default function Orders() {
 
   useEffect(() => {
     if (!user?.uid || user.isAnonymous) return;
-    if (Capacitor.getPlatform() === 'web') return;
 
     const refreshNow = () => {
       void loadOrders({ force: true, silent: true });
@@ -1554,17 +1553,24 @@ export default function Orders() {
       if (document.visibilityState === 'visible') refreshNow();
     };
 
+    const isNative = Capacitor.getPlatform() !== 'web';
     let resumeListener: { remove: () => Promise<void> } | null = null;
-    void App.addListener('resume', refreshNow).then((listener) => {
-      resumeListener = listener;
-    });
+    let intervalId: NodeJS.Timeout | null = null;
 
+    // Always set up visibility listener (works on web too)
     document.addEventListener('visibilitychange', onVisibility);
-    const intervalId = window.setInterval(refreshNow, ORDERS_ACTIVE_MOBILE_POLL_MS);
+
+    // Native-only: app resume and polling
+    if (isNative) {
+      void App.addListener('resume', refreshNow).then((listener) => {
+        resumeListener = listener;
+      });
+      intervalId = window.setInterval(refreshNow, ORDERS_ACTIVE_MOBILE_POLL_MS);
+    }
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
-      clearInterval(intervalId);
+      if (intervalId) clearInterval(intervalId);
       void resumeListener?.remove();
     };
   }, [user?.uid, user?.isAnonymous]);
