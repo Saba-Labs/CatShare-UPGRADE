@@ -632,9 +632,11 @@
 }
 
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable:hover,
-.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected {
-  outline: none;
-  box-shadow: none;
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner[data-fusion-element-id] {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__top {
