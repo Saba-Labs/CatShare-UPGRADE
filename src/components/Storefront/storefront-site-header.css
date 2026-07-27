@@ -544,10 +544,22 @@
   background: transparent;
 }
 
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:hover,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:focus,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable:focus-visible,
+.storefront-site-header.is-scrolled .storefront-site-header__bar--editable.is-selected {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* —— Layout: orderform (store hero → compact bar on scroll) —— */
 .sf-of-header-layout {
   position: relative;
   width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .storefront-site-header--layout-orderform:not(.is-scrolled) .sf-of-header-layout {
@@ -561,8 +573,8 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 10px 16px;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   width: 100%;
   box-sizing: border-box;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -578,8 +590,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   width: 100%;
   padding: 0 16px 0 0;
   box-sizing: border-box;
@@ -615,7 +627,9 @@
   gap: 10px;
   padding: 14px 16px;
   min-height: 54px;
-  max-width: 1200px;
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
   transition: padding 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -625,6 +639,29 @@
   justify-content: center;
   width: auto;
   max-width: 100%;
+}
+
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:hover,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:focus,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit:focus-visible,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit--editable.is-selected,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner {
+  outline: none !important;
+  outline-style: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__hit,
+.storefront-site-header--layout-orderform.is-scrolled .sf-of-header__inner {
+  outline: none !important;
+  outline-style: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 .storefront-site-header--layout-orderform.is-scrolled .sf-of-header__top {

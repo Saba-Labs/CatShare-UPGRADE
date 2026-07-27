@@ -541,6 +541,7 @@ export function createDefaultWebsiteModeConfig(): WebsiteModeConfig {
       footerShowContact: true,
       footerShowStoreInfo: true,
       footerShowFollow: true,
+      footerShowPoweredBy: true,
       footerColumns: createDefaultFooterLinkColumns(),
       navItems: [
         { id: uuid(), label: 'Home', href: '/' },

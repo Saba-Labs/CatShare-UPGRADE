@@ -915,7 +915,6 @@ export async function getStoreBySlug(slug: string): Promise<{ success: boolean; 
       sellerPhone: firstNonEmptyString(
         row.sellerPhone,
         row.seller_phone,
-        businessProfile?.phone,
       ) ?? null,
       sellerEmail: firstNonEmptyString(
         row.sellerEmail,

@@ -648,6 +648,7 @@ export interface WebsiteSiteSettings {
   footerShowContact?: boolean;
   footerShowStoreInfo?: boolean;
   footerShowFollow?: boolean;
+  footerShowPoweredBy?: boolean;
   /** Footer link columns (e.g. Shop, Customer care, Legal) — vertical lists under each title. */
   footerColumns?: Array<{ title: string; links: WebsiteNavItem[] }>;
   /** @deprecated */

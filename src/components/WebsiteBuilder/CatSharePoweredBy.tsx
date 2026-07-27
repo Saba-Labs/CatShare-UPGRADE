@@ -5,7 +5,7 @@ interface CatSharePoweredByProps {
   previewMode?: boolean;
 }
 
-/** Fixed site attribution — not configurable in the editor. */
+/** Site attribution displayed when enabled in footer settings. */
 export default function CatSharePoweredBy({ previewMode }: CatSharePoweredByProps) {
   return (
     <div className="sf-footer-powered-by" aria-label="Powered by CatShare">
