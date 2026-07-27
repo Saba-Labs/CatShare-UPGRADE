@@ -22,6 +22,7 @@ interface WebsiteRuntimeProps {
   pathname: string;
   homepageLayout: HomepageLayout | null;
   products: ProductWithCatalogueData[];
+  productsLoading?: boolean;
   store: StorePublic;
   onSubdomain?: boolean;
 }
@@ -31,6 +32,7 @@ export default function WebsiteRuntime({
   pathname,
   homepageLayout,
   products,
+  productsLoading = false,
   store,
   onSubdomain = false,
 }: WebsiteRuntimeProps) {
@@ -114,7 +116,13 @@ export default function WebsiteRuntime({
     homepageUsesHeroHeaderOverlay(websiteConfig.siteSettings.headerVariant, homeLayout.sections);
 
   return (
-    <WebsiteStoreProvider slug={slug} store={store} products={products} onSubdomain={onSubdomain}>
+    <WebsiteStoreProvider
+      slug={slug}
+      store={store}
+      products={products}
+      productsLoading={productsLoading}
+      onSubdomain={onSubdomain}
+    >
       <StorefrontSeo
         seo={seo}
         googleSiteVerification={websiteConfig.seo?.googleSiteVerification}
@@ -134,6 +142,7 @@ export default function WebsiteRuntime({
         {section === 'collections' ? (
           <CollectionPageRuntime
             products={products}
+            productsLoading={productsLoading}
             embedded
             columns={collectionSettings.columns}
             cardsStyle={collectionSettings.cardsStyle}
@@ -159,4 +168,3 @@ export default function WebsiteRuntime({
     </WebsiteStoreProvider>
   );
 }
-

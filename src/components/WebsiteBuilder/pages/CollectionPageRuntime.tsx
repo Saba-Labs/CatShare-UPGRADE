@@ -34,6 +34,7 @@ import '../website-runtime.css';
 
 interface CollectionPageRuntimeProps {
   products: ProductWithCatalogueData[];
+  productsLoading?: boolean;
   columns?: number;
   cardsStyle?: ProductCardStyle | string;
   /** When true, hides breadcrumbs and uses optional section title (homepage block). */
@@ -56,6 +57,7 @@ interface CollectionPageRuntimeProps {
 
 export default function CollectionPageRuntime({
   products,
+  productsLoading = false,
   columns = 4,
   cardsStyle = 'boxed',
   embedded = false,
@@ -245,7 +247,9 @@ export default function CollectionPageRuntime({
           ) : null}
         </div>
       </div>
-      {sortedProducts.length === 0 ? (
+      {productsLoading ? (
+        <p style={{ color: '#5f6368' }} role="status">Loading products…</p>
+      ) : sortedProducts.length === 0 ? (
         <p style={{ color: '#5f6368' }}>No products available yet.</p>
       ) : (
         <div

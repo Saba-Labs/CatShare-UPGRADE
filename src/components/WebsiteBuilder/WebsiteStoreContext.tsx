@@ -12,6 +12,7 @@ export interface WebsiteStoreContextValue {
   slug: string;
   basePath: string;
   products: ProductWithCatalogueData[];
+  productsLoading: boolean;
   store: StorePublic;
   currencySymbol: string;
   productPath: (product: ProductWithCatalogueData) => string;
@@ -24,12 +25,14 @@ export function WebsiteStoreProvider({
   slug,
   store,
   products,
+  productsLoading = false,
   onSubdomain,
   children,
 }: {
   slug: string;
   store: StorePublic;
   products: ProductWithCatalogueData[];
+  productsLoading?: boolean;
   onSubdomain?: boolean;
   children: React.ReactNode;
 }) {
@@ -39,12 +42,13 @@ export function WebsiteStoreProvider({
       slug,
       basePath,
       products,
+      productsLoading,
       store,
       currencySymbol: currencySymbolFor(store.sellerCurrencyCode),
       productPath: (product) => productPagePath(slug, product, onSubdomain),
       collectionPath: collectionPagePath(slug, onSubdomain),
     };
-  }, [slug, store, products, onSubdomain]);
+  }, [slug, store, products, productsLoading, onSubdomain]);
 
   return <WebsiteStoreContext.Provider value={value}>{children}</WebsiteStoreContext.Provider>;
 }

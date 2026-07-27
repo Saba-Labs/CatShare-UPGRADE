@@ -53,6 +53,7 @@ export default function FullProductListSectionView({
     <div style={{ background: settings.backgroundColor || 'transparent' }}>
       <CollectionPageRuntime
         products={storeCtx.products}
+        productsLoading={storeCtx.productsLoading}
         embedded
         sectionTitle={settings.title}
         showCategoryFilters={settings.showCategoryFilters ?? true}
