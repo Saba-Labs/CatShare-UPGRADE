@@ -118,7 +118,6 @@ export default function StorefrontFooter({
     siteSettings.footerPhoneText?.trim() ||
     store?.sellerPhone?.trim() ||
     store?.phone?.trim() ||
-    bp.phone?.trim() ||
     '';
   const displayEmail =
     siteSettings.footerEmailText?.trim() ||
