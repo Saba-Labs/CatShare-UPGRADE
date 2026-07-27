@@ -1562,8 +1562,15 @@ useEffect(() => {
         patchCachedOrder(user.uid, order.id, { status });
       }
       showToast(`Marked as ${getOrderStatusLabel(status)}`, 'success');
-      // Notify Orders page to refetch (without order payload to trigger full refetch)
-      window.dispatchEvent(new CustomEvent('catshareNewOrder', { detail: { orderId: order.id } }));
+
+      // Fetch the updated order from backend and notify Orders page
+      const { data: orders } = await fetchSellerOrders(user?.uid || '');
+      if (orders) {
+        const updatedOrder = orders.find(o => o.id === order.id);
+        if (updatedOrder) {
+          window.dispatchEvent(new CustomEvent('catshareNewOrder', { detail: { orderId: order.id, order: updatedOrder } }));
+        }
+      }
     }
   };
 
