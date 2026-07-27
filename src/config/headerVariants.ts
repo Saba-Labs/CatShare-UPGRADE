@@ -74,12 +74,12 @@ export function headerLayoutForVariant(variant: string | undefined): HeaderLayou
   }
 }
 
-/** Homepage uses the configured layout; inner storefront pages always use the classic top bar. */
+/** Inner storefront pages use the large store hero when that layout is configured; other layouts use the classic top bar. */
 export function headerLayoutForPageSurface(
   variant: string | undefined,
   surface: 'homepage' | 'inner' = 'homepage'
 ): HeaderLayoutMode {
-  if (surface === 'inner') return 'classic';
+  if (surface === 'inner' && normalizeHeaderVariant(variant) !== 'orderform') return 'classic';
   return headerLayoutForVariant(variant);
 }
 
