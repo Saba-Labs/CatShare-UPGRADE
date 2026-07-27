@@ -375,9 +375,7 @@ export default function FooterSettingsEditor({
         </>
       ) : null}
 
-      <p className="panel-hint panel-hint--static">
-        “Powered by CatShare” always appears at the bottom of your site footer and links to catshare.app. It cannot be removed or edited.
-      </p>
+  
     </>
   );
 }
