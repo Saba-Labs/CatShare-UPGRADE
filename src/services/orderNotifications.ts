@@ -159,7 +159,7 @@ function maxCreatedAtIso(orders: Pick<Order, 'created_at'>[]): string | null {
   return best;
 }
 
-function maxUpdatedAtIso(orders: Pick<Order, 'updated_at'>[]): string | null {
+function maxUpdatedAtIso(orders: Pick<Order, 'updated_at' | 'created_at'>[]): string | null {
   if (!orders.length) return null;
   let best = orders[0].updated_at || orders[0].created_at || '';
   for (let i = 1; i < orders.length; i++) {
