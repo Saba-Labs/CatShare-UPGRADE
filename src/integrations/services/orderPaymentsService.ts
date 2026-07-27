@@ -1,6 +1,7 @@
 import { getSupabaseClient, setSupabaseRlsUserId } from '../../supabaseClient';
 import { resolveOrderGrandTotal } from '../../utils/resolveOrderTotals';
 import type { OrderPayment, OrderPaymentStatus } from '../core/types';
+import type { CheckoutTotals } from '../../types/checkoutSettings';
 
 function mapPaymentRow(row: Record<string, unknown>): OrderPayment {
   return {
@@ -71,7 +72,7 @@ export async function confirmUpiPaymentReceived(
     customer_whatsapp?: string;
     currency_code?: string;
     total_amount?: number;
-    checkout_adjustments?: { grandTotal?: number } | null;
+    checkout_adjustments?: CheckoutTotals | null;
     items?: Array<{ quantity?: number; unitPrice?: number; rowTotal?: number }>;
   },
   existingPayment?: OrderPayment | null
@@ -109,7 +110,7 @@ export async function reverseUpiPaymentConfirmation(
     customer_whatsapp?: string;
     currency_code?: string;
     total_amount?: number;
-    checkout_adjustments?: { grandTotal?: number } | null;
+   checkout_adjustments?: CheckoutTotals | null;
     items?: Array<{ quantity?: number; unitPrice?: number; rowTotal?: number }>;
   },
   existingPayment: OrderPayment
