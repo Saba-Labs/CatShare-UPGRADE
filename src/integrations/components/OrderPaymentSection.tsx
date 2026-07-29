@@ -5,7 +5,7 @@ import CheckoutBreakdown from '../../components/Storefront/CheckoutBreakdown';
 import { useOrderPayment } from '../hooks/useOrderPayment';
 import { confirmUpiPaymentReceived, reverseUpiPaymentConfirmation } from '../services/orderPaymentsService';
 import type { OrderPayment } from '../core/types';
-import { resolveOrderPaymentDisplayAmount } from '../../utils/resolveOrderTotals';
+import { resolveOrderPaymentDisplayAmount, resolveOrderCheckoutTotals } from '../../utils/resolveOrderTotals';
 import {
   OdCard,
   OdFooterNote,
@@ -204,6 +204,19 @@ export function OrderPaymentSection({ order }: { order: Order }) {
   const isRazorpay = payment?.provider === 'razorpay';
   const isPaid = paymentStatus === 'paid';
 
+  const resolvedTotals = resolveOrderCheckoutTotals(order, order.items || []);
+  const displayCheckoutTotals = resolvedTotals.checkoutAdjustments || {
+    subtotal: resolvedTotals.subtotal,
+    discountTotal: 0,
+    shippingTotal: 0,
+    taxTotal: 0,
+    codTotal: 0,
+    grandTotal: resolvedTotals.grandTotal,
+    lines: [],
+    freeShippingApplied: false,
+    appliedCouponCode: null,
+  };
+
   let heroTitle = 'Checkout payment';
   let heroSubtitle = 'Payment details from storefront checkout';
 
@@ -275,23 +288,16 @@ export function OrderPaymentSection({ order }: { order: Order }) {
               <span className="od-pay-field-label">Payment method</span>
               <OdMethodChip method={order.payment_method} />
             </div>
-            {order.checkout_adjustments ? (
-              <div className="od-breakdown-wrap od-breakdown-wrap--modern">
-                <CheckoutBreakdown
-                  totals={order.checkout_adjustments}
-                  currencySymbol={getSymbolForCurrencyCode(currency)}
-                  fmt={(amount, sym) =>
-                    `${sym}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-                  }
-                  compact
-                />
-              </div>
-            ) : amountStr !== '—' ? (
-              <div className="od-pay-field od-pay-field--full">
-                <span className="od-pay-field-label">Amount</span>
-                <span className="od-pay-field-value od-pay-field-value--amount">{amountStr}</span>
-              </div>
-            ) : null}
+            <div className="od-breakdown-wrap od-breakdown-wrap--modern">
+              <CheckoutBreakdown
+                totals={displayCheckoutTotals}
+                currencySymbol={getSymbolForCurrencyCode(currency)}
+                fmt={(amount, sym) =>
+                  `${sym}${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+                }
+                compact
+              />
+            </div>
           </div>
         )}
 

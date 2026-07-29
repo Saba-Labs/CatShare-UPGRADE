@@ -1406,7 +1406,8 @@ useEffect(() => {
       if (!isProductEnabledForCatalogue(p, orderCatalogueId)) return false;
       if (q) {
         const name = (p.name || '').toLowerCase();
-        if (!name.includes(q)) return false;
+        const subtitle = (p.subtitle || '').toLowerCase();
+        if (!name.includes(q) && !subtitle.includes(q)) return false;
       }
       return true;
     });
