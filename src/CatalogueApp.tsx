@@ -503,6 +503,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   useEffect(() => {
     setSearch("");
+    setShowSearch(false);
   }, [tab]);
 
   useEffect(() => {
