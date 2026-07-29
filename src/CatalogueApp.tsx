@@ -502,6 +502,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   }, [showSearch]);
 
   useEffect(() => {
+    setSearch("");
+  }, [tab]);
+
+  useEffect(() => {
     const toggleSort = () => setShowSortMenu((prev) => !prev);
     window.addEventListener("toggle-sort", toggleSort);
     return () => window.removeEventListener("toggle-sort", toggleSort);
