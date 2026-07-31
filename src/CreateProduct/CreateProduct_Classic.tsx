@@ -1434,7 +1434,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const isNewProduct = !editingId;
       const updated = editingId
         ? all.map((p) => (p.id === editingId ? newItem : p))
-        : [...all, newItem];
+        : [newItem, ...all];
 
       const ok = safeSetInStorage(productsStorageKeyNow, updated);
       if (!ok) {

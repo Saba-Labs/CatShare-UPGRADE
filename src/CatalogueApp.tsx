@@ -391,7 +391,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   }, [selectedCatalogueInCataloguesTab, tab]);
   const [selected, setSelected] = useState([]);
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
+  const [sortBy, setSortBy] = useState("");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   /** Products tab: speed-dial open state (+ → single vs bulk create) */
@@ -1113,11 +1113,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const visible = useMemo(() => {
     const v = [...filtered];
     if (sortBy === "name") v.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    else if (sortBy === "newest") v.sort((a, b) => {
-      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return bTime - aTime;
-    });
     else if (sortBy.endsWith(":out")) {
       const field = sortBy.replace(":out", "");
       v.sort((a, b) => (a[field] ? 1 : -1));
@@ -1294,7 +1289,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               onClick={(e) => e.stopPropagation()}
             >
               {[
-                { label: "Newest First", value: "newest" },
                 { label: "Original", value: "" },
                 { label: "A - Z", value: "name" },
                 { label: "In Stock", value: catalogues[0]?.stockField || "wholesaleStock" },

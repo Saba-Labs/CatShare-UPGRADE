@@ -602,9 +602,9 @@ export default function CreateBulk() {
 
       const all = safeGetFromStorage(productsStorageKeyNow, []);
       const newIds: string[] = [];
-      const merged = [...all];
+      const newProducts = successful.map(({ product }) => product);
+      const merged = [...newProducts, ...all];
       for (const { product } of successful) {
-        merged.push(product);
         newIds.push(String(product.id));
       }
 
