@@ -41,8 +41,16 @@ export default function HeaderSettingsEditor({
   const patch = (patchSettings: Partial<WebsiteSiteSettings>) => {
     const linked = withLinkedTaglinePatch(patchSettings);
     syncSiteSettingsPatchToBusinessProfile(linked);
+
+    // Auto-set favicon when logo is updated
+    const seoUpdates: any = {};
+    if (linked.logoUrl && !websiteConfig.seo?.faviconUrl) {
+      seoUpdates.seo = { ...(websiteConfig.seo || {}), faviconUrl: linked.logoUrl };
+    }
+
     onUpdateWebsiteConfig({
       siteSettings: { ...websiteConfig.siteSettings, ...linked },
+      ...seoUpdates,
     });
   };
 

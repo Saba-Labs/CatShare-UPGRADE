@@ -91,6 +91,18 @@ export default function SeoSettingsPanel({
         />
       </div>
 
+      <div className="sidebar-field">
+        <label className="panel-label">Favicon</label>
+        <MediaPickerButton
+          storeId={storeId}
+          assetKey="seo-favicon"
+          label="Choose favicon"
+          currentUrl={seo.faviconUrl}
+          onUrl={(url) => patchSeo({ faviconUrl: url })}
+        />
+        <p className="sidebar-field-hint">If not set, the store logo will be used automatically.</p>
+      </div>
+
       <label className="sidebar-toggle">
         <input
           type="checkbox"
