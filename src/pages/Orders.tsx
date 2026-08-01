@@ -1249,6 +1249,7 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const ordersFetchSeqRef = useRef(0);
+  const initialOrdersLoadCompleteRef = useRef(false);
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -1279,7 +1280,10 @@ export default function Orders() {
 
   useEffect(() => {
     if (!user?.uid || user.uid.trim() === '') return;
-    void loadOrders({ silent: true });
+    initialOrdersLoadCompleteRef.current = false;
+    void loadOrders({ silent: true, force: true }).finally(() => {
+      initialOrdersLoadCompleteRef.current = true;
+    });
   }, [user?.uid]);
 
   useEffect(() => {
@@ -1547,7 +1551,7 @@ export default function Orders() {
     const fetchSeq = ++ordersFetchSeqRef.current;
 
     // Incremental: new rows by created_at + edits by updated_at.
-    const incremental = Boolean(cachedNewest);
+    const incremental = !opts?.force && Boolean(cachedNewest);
     const fetchCreated = fetchSellerOrders(
       user.uid,
       incremental ? { createdAfter: cachedNewest! } : undefined
@@ -1599,7 +1603,7 @@ export default function Orders() {
   };
 
   const refreshOrderChanges = useCallback(async () => {
-    if (!user?.uid || user.isAnonymous) return;
+    if (!user?.uid || user.isAnonymous || !initialOrdersLoadCompleteRef.current) return;
     const mem = getRuntimeSellerOrders(user.uid);
     const cached = readCachedSellerOrders(user.uid);
     const base = mem?.orders?.length ? mem.orders : cached;
