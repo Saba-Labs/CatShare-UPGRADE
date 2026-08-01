@@ -101,6 +101,18 @@ export default function HomepageBuilder({
   const baselineLayoutRef = useRef<HomepageLayout | null>(null);
   const preThemeLayoutRef = useRef<HomepageLayout | null>(null);
 
+  useEffect(() => {
+    const faviconUrl =
+      state.layout.websiteConfig?.seo?.faviconUrl || state.layout.websiteConfig?.siteSettings?.logoUrl;
+    const icon = document.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+    if (!icon || !faviconUrl) return;
+    const previousHref = icon.href;
+    icon.href = faviconUrl;
+    return () => {
+      icon.href = previousHref;
+    };
+  }, [state.layout.websiteConfig?.seo?.faviconUrl, state.layout.websiteConfig?.siteSettings?.logoUrl]);
+
   const configPersisted = isPersistedHomepageConfigId(config?.id);
 
   useEffect(() => {
