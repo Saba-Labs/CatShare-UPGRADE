@@ -143,15 +143,12 @@ export default function CollectionPageRuntime({
 
   const sortedProducts = useMemo(() => {
     if (sortBy === 'default') {
-      if (embedded) {
-        return sortStorefrontProducts(
-          filteredProducts,
-          defaultSorting,
-          store.catalogueId,
-          orderBridge?.catalogue ?? null
-        );
-      }
-      return filteredProducts;
+      return sortStorefrontProducts(
+        filteredProducts,
+        defaultSorting,
+        store.catalogueId,
+        orderBridge?.catalogue ?? null
+      );
     }
     const catalogue = orderBridge?.catalogue ?? null;
     const withPrice = (product: ProductWithCatalogueData) =>

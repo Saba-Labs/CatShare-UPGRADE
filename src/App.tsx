@@ -1587,7 +1587,11 @@ function AppWithBackHandler() {
           skipImageUrlAssertion: Boolean(partialSyncOpts?.onlyProductIds?.length),
           maxSyncUiMs: 12000,
         });
-        setProducts(cloudData.products);
+        const syncedProductsById = new Map(cloudData.products.map((product) => [String(product.id), product]));
+        const nextProducts = partialSyncOpts
+          ? freshProducts.map((product) => syncedProductsById.get(String(product.id)) || product)
+          : cloudData.products;
+        setProducts(nextProducts);
         setDeletedProducts(cloudData.deletedProducts);
       } catch (err: any) {
         console.error('❌ Sync after product-added failed:', err?.message);

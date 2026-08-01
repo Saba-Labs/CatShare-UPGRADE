@@ -176,7 +176,7 @@ export interface ProductGridSection {
     cardStyle?: ProductCardStyle;
     /** Responsive card density; layout auto-fits by viewport width. */
     cardSize?: 'sm' | 'md' | 'lg';
-    sortBy: 'default' | 'alphabetical' | 'price-low' | 'price-high' | 'newest';
+    sortBy: 'default' | 'alphabetical' | 'price-low' | 'price-high' | 'newest' | 'shuffled';
     itemsToShow: number;
     showFilters: boolean;
     backgroundColor?: string;

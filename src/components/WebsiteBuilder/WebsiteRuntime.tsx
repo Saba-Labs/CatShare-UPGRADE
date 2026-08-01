@@ -126,7 +126,7 @@ export default function WebsiteRuntime({
       <StorefrontSeo
         seo={seo}
         googleSiteVerification={websiteConfig.seo?.googleSiteVerification}
-        faviconUrl={websiteConfig.seo?.faviconUrl}
+        faviconUrl={websiteConfig.seo?.faviconUrl || websiteConfig.siteSettings.logoUrl}
       />
       <div
         className={`website-runtime-root${heroHeaderOverlay ? ' website-runtime-root--hero-overlay' : ''}`}
