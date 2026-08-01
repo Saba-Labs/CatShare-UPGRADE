@@ -62,6 +62,7 @@ export default function CollectionTemplateEditor({
             { value: 'price-low', label: 'Price: low to high' },
             { value: 'price-high', label: 'Price: high to low' },
             { value: 'alphabetical', label: 'Alphabetical' },
+            { value: 'shuffled', label: 'Shuffled' },
           ]}
           onChange={(next) =>
             onUpdate({ defaultSorting: next as WebsiteCollectionTemplate['defaultSorting'] })

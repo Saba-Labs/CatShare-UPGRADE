@@ -4,7 +4,7 @@
  */
 
 export type ProductsToShow = 'all' | 'wholesale' | 'reseller' | 'featured' | 'category';
-export type DefaultSorting = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical';
+export type DefaultSorting = 'newest' | 'oldest' | 'price-low' | 'price-high' | 'alphabetical' | 'shuffled';
 export type ProductImageRatio = 'square' | 'portrait' | 'landscape';
 
 export interface StoreBehaviorSettings {
@@ -63,7 +63,7 @@ function productsToShow(raw: unknown): ProductsToShow {
 
 function defaultSorting(raw: unknown): DefaultSorting {
   const v = str(raw, 'newest');
-  if (v === 'oldest' || v === 'price-low' || v === 'price-high' || v === 'alphabetical') return v;
+  if (v === 'oldest' || v === 'price-low' || v === 'price-high' || v === 'alphabetical' || v === 'shuffled') return v;
   return 'newest';
 }
 
