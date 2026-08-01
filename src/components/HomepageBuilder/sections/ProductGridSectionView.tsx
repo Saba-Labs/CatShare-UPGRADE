@@ -1,4 +1,5 @@
 import React from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { ProductWithCatalogueData } from '../../../config/catalogueProductUtils';
 import { ProductGridSection } from '../../../types/homepage';
@@ -8,6 +9,7 @@ import WebsiteProductCard from '../../WebsiteBuilder/WebsiteProductCard';
 import { resolveWebsiteSectionProductsLayout } from '../../../utils/websiteSectionProductsLayout';
 import { IconImage } from '../../Storefront/StorefrontIcons';
 import { SITES_THEME_BUTTON_CLASS } from '../../../utils/themeButtonStyles';
+import { sortStorefrontProducts } from '../../../utils/storefrontBehavior';
 
 interface ProductGridSectionViewProps {
   section: ProductGridSection & { id: string };
@@ -34,20 +36,35 @@ export default function ProductGridSectionView({
     content.productSource ||
     (content.productIds?.length ? 'specific' : content.categoryId ? 'category' : 'all');
 
-  let displayProducts = storeCtx?.products || [];
-  if (storeCtx && source === 'category' && content.categoryId) {
-    const catId = String(content.categoryId).toLowerCase();
-    displayProducts = displayProducts.filter((p) => {
-      const cats = Array.isArray(p.category) ? p.category : p.category ? [String(p.category)] : [];
-      return cats.some((c) => String(c).toLowerCase() === catId);
-    });
-  }
-  if (storeCtx && source === 'specific') {
-    displayProducts = (content.productIds || [])
-      .map((id) => storeCtx.products.find((p) => p.id === id))
-      .filter((p): p is NonNullable<typeof p> => !!p);
-  }
-  const limited = displayProducts.slice(0, settings.itemsToShow);
+  const displayProducts = useMemo(() => {
+    if (!storeCtx) return [];
+    if (source === 'category' && content.categoryId) {
+      const catId = String(content.categoryId).toLowerCase();
+      return storeCtx.products.filter((p) => {
+        const cats = Array.isArray(p.category) ? p.category : p.category ? [String(p.category)] : [];
+        return cats.some((c) => String(c).toLowerCase() === catId);
+      });
+    }
+    if (source === 'specific') {
+      return (content.productIds || [])
+        .map((id) => storeCtx.products.find((p) => p.id === id))
+        .filter((p): p is NonNullable<typeof p> => !!p);
+    }
+    return storeCtx.products;
+  }, [storeCtx, source, content.categoryId, content.productIds]);
+  const sortedProducts = useMemo(
+    () =>
+      storeCtx
+        ? sortStorefrontProducts(
+            displayProducts,
+            settings.sortBy === 'default' ? 'newest' : settings.sortBy,
+            storeCtx.store.catalogueId,
+            null
+          )
+        : [],
+    [displayProducts, settings.sortBy, storeCtx]
+  );
+  const limited = sortedProducts.slice(0, settings.itemsToShow);
 
   const renderProductCards = (products: typeof limited) =>
     products.map((product) => (
@@ -82,9 +99,9 @@ export default function ProductGridSectionView({
               {renderProductCards(limited)}
             </div>
           )}
-          {limited.length < displayProducts.length && (
+          {limited.length < sortedProducts.length && (
             <p style={{ marginTop: 12, fontSize: '0.85rem', color: '#5f6368' }}>
-              Showing {limited.length} of {displayProducts.length} products
+              Showing {limited.length} of {sortedProducts.length} products
             </p>
           )}
           <p style={{ marginTop: 16, textAlign: 'center' }}>

@@ -164,6 +164,7 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
             { value: 'price-low', label: 'Price: Low to High' },
             { value: 'price-high', label: 'Price: High to Low' },
             { value: 'newest', label: 'Newest' },
+            { value: 'shuffled', label: 'Shuffled' },
           ]}
           onChange={(next) => updateSettings({ sortBy: next as ProductGridSection['settings']['sortBy'] })}
         />
