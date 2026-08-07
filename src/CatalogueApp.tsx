@@ -1,4 +1,4 @@
-  import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
@@ -1521,27 +1521,36 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
           {/* Fixed Icons Group (Glass + Sort) */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <button
+            <motion.button
               type="button"
-              className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-blue-600 md:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100/80 disabled:opacity-40 disabled:hover:bg-transparent md:flex"
               onClick={() => void refreshProducts()}
               disabled={productPullRefreshing || catalogueLoading}
+              whileHover={productPullRefreshing || catalogueLoading ? undefined : { scale: 1.08 }}
+              whileTap={productPullRefreshing || catalogueLoading ? undefined : { scale: 0.86 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
               title="Refresh products"
               aria-label="Refresh products"
             >
-              <svg
-                className={`h-5 w-5 ${productPullRefreshing ? 'animate-spin' : ''}`}
+              <motion.svg
+                className="h-[18px] w-[18px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
                 viewBox="0 0 24 24"
+                animate={productPullRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={
+                  productPullRefreshing
+                    ? { repeat: Infinity, ease: "linear", duration: 0.85 }
+                    : { duration: 0.2, ease: "easeOut" }
+                }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 4v6h6" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 20v-6h-6" />
-              </svg>
-            </button>
+              </motion.svg>
+            </motion.button>
             <button
               onClick={() => setShowSearch((prev) => !prev)}
               className="text-xl text-gray-600 hover:text-black"
