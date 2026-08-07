@@ -118,23 +118,16 @@ const fabDialItem = {
  * Purely presentational — all pull physics stay in the touch handlers below.
  */
 function PullToRefreshIndicator({
-  progress,
   refreshing,
   armed,
   justUpdated,
 }: {
-  /** 0 → 1 pull progress toward the release threshold. */
-  progress: number;
   refreshing: boolean;
   /** True once progress has crossed the release threshold (pre-refresh). */
   armed: boolean;
   /** True for a brief window right after a refresh lands successfully. */
   justUpdated: boolean;
 }) {
-  const radius = 8;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - Math.min(Math.max(progress, 0), 1));
-
   const label = justUpdated
     ? "Updated"
     : refreshing
@@ -143,84 +136,26 @@ function PullToRefreshIndicator({
         ? "Release to refresh"
         : "Pull to refresh";
 
+  // Slow breathing blink while waiting on the user or the network; holds steady once "Updated" lands.
+  const blinking = !justUpdated;
+
   return (
-    <motion.div
-      layout
-      transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
-      className="flex h-9 items-center gap-2 rounded-full bg-white/95 py-2 pl-2 pr-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 ring-black/[0.04] backdrop-blur-sm"
-    >
-      <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
-        <AnimatePresence mode="wait" initial={false}>
-          {justUpdated ? (
-            <motion.svg
-              key="check"
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
-              animate={{ scale: 1, opacity: 1, rotate: 0 }}
-              exit={{ scale: 0.5, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 480, damping: 22 }}
-            >
-              <motion.path
-                d="M3 8.5l3 3 7-7"
-                fill="none"
-                stroke="#6b7280"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.26, ease: "easeOut", delay: 0.06 }}
-              />
-            </motion.svg>
-          ) : (
-            <motion.svg
-              key="ring"
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              className={refreshing ? "animate-spin" : ""}
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.6, opacity: 0 }}
-              transition={{ duration: 0.14 }}
-            >
-              {!refreshing && (
-                <circle cx="9" cy="9" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="2" />
-              )}
-              <circle
-                cx="9"
-                cy="9"
-                r={radius}
-                fill="none"
-                stroke={armed || refreshing ? "#4b5563" : "#9ca3af"}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={refreshing ? circumference * 0.72 : dashOffset}
-                transform="rotate(-90 9 9)"
-                style={{
-                  transition: refreshing ? "none" : "stroke-dashoffset 60ms linear, stroke 160ms ease-out",
-                }}
-              />
-            </motion.svg>
-          )}
-        </AnimatePresence>
-      </div>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={label}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.16 }}
-          className="whitespace-nowrap text-[12px] font-medium tracking-tight text-gray-500"
-        >
-          {label}
-        </motion.span>
-      </AnimatePresence>
-    </motion.div>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={label}
+        initial={{ opacity: 0 }}
+        animate={blinking ? { opacity: [0.35, 1, 0.35] } : { opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={
+          blinking
+            ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.2, ease: "easeOut" }
+        }
+        className="whitespace-nowrap text-[12px] font-medium tracking-tight text-gray-500"
+      >
+        {label}
+      </motion.span>
+    </AnimatePresence>
   );
 }
 
@@ -1677,7 +1612,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             aria-live="polite"
           >
             <PullToRefreshIndicator
-              progress={productPullProgress}
               refreshing={productPullRefreshing}
               armed={productPullArmed}
               justUpdated={productPullJustUpdated}
