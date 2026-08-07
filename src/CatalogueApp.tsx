@@ -118,25 +118,14 @@ const fabDialItem = {
  * Purely presentational — all pull physics stay in the touch handlers below.
  */
 function PullToRefreshIndicator({
-  refreshing,
-  armed,
   justUpdated,
 }: {
-  refreshing: boolean;
-  /** True once progress has crossed the release threshold (pre-refresh). */
-  armed: boolean;
   /** True for a brief window right after a refresh lands successfully. */
   justUpdated: boolean;
 }) {
-  const label = justUpdated
-    ? "Updated"
-    : refreshing
-      ? "Updating…"
-      : armed
-        ? "Release to refresh"
-        : "Pull to refresh";
+  const label = justUpdated ? "Updated" : "⇊ Refreshing…";
 
-  // Slow breathing blink while waiting on the user or the network; holds steady once "Updated" lands.
+  // Mild breathing blink while waiting on the user or the network; holds steady once "Updated" lands.
   const blinking = !justUpdated;
 
   return (
@@ -144,11 +133,11 @@ function PullToRefreshIndicator({
       <motion.span
         key={label}
         initial={{ opacity: 0 }}
-        animate={blinking ? { opacity: [0.35, 1, 0.35] } : { opacity: 1 }}
+        animate={blinking ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={
           blinking
-            ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
+            ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
             : { duration: 0.2, ease: "easeOut" }
         }
         className="whitespace-nowrap text-[12px] font-medium tracking-tight text-gray-500"
@@ -1601,21 +1590,19 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       >
         {tab === 'products' && (
           <div
-            className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center"
+            className="pointer-events-none fixed inset-x-0 z-[60] flex items-center justify-center overflow-hidden"
             style={{
-              top: `calc(env(safe-area-inset-top, 0px) + ${PRODUCTS_HEADER_CHROME_HEIGHT + 8}px)`,
+              top: `calc(env(safe-area-inset-top, 0px) + ${PRODUCTS_HEADER_CHROME_HEIGHT}px)`,
+              height: `${productPullOffset}px`,
               opacity: productPullHolding ? 1 : Math.min(productPullProgress * 1.4, 1),
-              transform: `translateY(${productPullHolding ? 0 : Math.min(productPullOffset, 16) - 16}px)`,
-              transition: productPullDragging ? "none" : "opacity 160ms ease-out, transform 160ms ease-out",
+              transition: productPullDragging
+                ? "none"
+                : "height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out",
             }}
             role="status"
             aria-live="polite"
           >
-            <PullToRefreshIndicator
-              refreshing={productPullRefreshing}
-              armed={productPullArmed}
-              justUpdated={productPullJustUpdated}
-            />
+            <PullToRefreshIndicator justUpdated={productPullJustUpdated} />
             <span className="sr-only">
               {productPullJustUpdated
                 ? "Products updated"
