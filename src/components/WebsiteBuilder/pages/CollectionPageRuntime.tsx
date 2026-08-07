@@ -78,7 +78,7 @@ export default function CollectionPageRuntime({
   previewCategoryId,
   onPreviewCategoryChange,
 }: CollectionPageRuntimeProps) {
-  const { collectionPath, productPath, store } = useWebsiteStore();
+  const { productPath, store } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const location = useLocation();
   const navigate = useNavigate();
@@ -94,10 +94,15 @@ export default function CollectionPageRuntime({
   const gridColumnCount = getProductCardStyleGridColumns(resolvedCardsStyle, columns);
   const catalogProductLayout = resolvedCardsStyle === 'catalog';
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
-
+  const [embeddedCategory, setEmbeddedCategory] = useState<string | null>(null);
+  const initialCategoryParam = new URLSearchParams(location.search).get('category');
   const categoryParam =
     previewCategoryId ??
-    new URLSearchParams(location.search).get('category');
+    (embedded && embeddedCategory !== null
+      ? embeddedCategory === 'all'
+        ? null
+        : embeddedCategory
+      : initialCategoryParam);
 
   const scopedProducts = useMemo(() => {
     const selectedIds = new Set((categoryIds ?? []).map((id) => id.toLowerCase()));
@@ -124,16 +129,8 @@ export default function CollectionPageRuntime({
       onPreviewCategoryChange(category === 'all' ? '' : category);
       return;
     }
-    const params = new URLSearchParams();
-    if (category !== 'all') {
-      params.set('category', category);
-    }
-    const search = params.toString();
     if (embedded) {
-      navigate({
-        pathname: collectionPath,
-        search: search ? `?${search}` : '',
-      });
+      setEmbeddedCategory(category);
       return;
     }
     const nextParams = new URLSearchParams(location.search);
