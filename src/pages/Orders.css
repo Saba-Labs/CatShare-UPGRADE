@@ -218,6 +218,39 @@ html.dark .orders-filter-grabber span {
   touch-action: pan-y;
 }
 
+.orders-pull-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--ord-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  transition: height 0.18s ease;
+}
+
+.orders-pull-refresh__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #2563eb;
+  font-size: 22px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+
+.orders-pull-refresh__indicator.is-refreshing {
+  animation: ordersPullRefreshSpin 0.8s linear infinite;
+}
+
+@keyframes ordersPullRefreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @keyframes ordersBannerIn {
   from {
     opacity: 0;

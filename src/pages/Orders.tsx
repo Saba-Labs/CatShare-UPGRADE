@@ -1255,6 +1255,8 @@ export default function Orders() {
   const [showSearch, setShowSearch] = useState(false);
   const [swipeProgress, setSwipeProgress] = useState(0);
   const [tabSwipeShift, setTabSwipeShift] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [showDateFilters, setShowDateFilters] = useState(false);
@@ -1267,6 +1269,8 @@ export default function Orders() {
   const swipeBackEligible = useRef(false);
   const swipeBackActive = useRef(false);
   const tabSwipeActive = useRef(false);
+  const pullToRefreshActive = useRef(false);
+  const pullDistanceRef = useRef(0);
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
@@ -1461,18 +1465,39 @@ export default function Orders() {
   const handleMainTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
-    tabSwipeActive.current = true;
+    pullToRefreshActive.current =
+      !pullRefreshing && !loading && (scrollRef.current?.scrollTop ?? 0) <= 0;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+    tabSwipeActive.current = !pullToRefreshActive.current;
     setTabSwipeShift(0);
   };
 
   const handleMainTouchMove = (e: React.TouchEvent) => {
-    if (!tabSwipeActive.current) return;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
     const deltaX = currentX - touchStartX.current;
     const deltaY = currentY - touchStartY.current;
-    const absDeltaY = Math.abs(deltaY);
     const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+
+    if (pullToRefreshActive.current) {
+      if (deltaY <= 0 || absDeltaX > absDeltaY * 1.2 || (scrollRef.current?.scrollTop ?? 0) > 0) {
+        pullToRefreshActive.current = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+        tabSwipeActive.current = absDeltaX > absDeltaY;
+      } else {
+        const distance = Math.min(96, deltaY * 0.55);
+        pullDistanceRef.current = distance;
+        setPullDistance(distance);
+        tabSwipeActive.current = false;
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if (!tabSwipeActive.current) return;
 
     if (absDeltaY > 28 && absDeltaY > absDeltaX * 1.2) {
       tabSwipeActive.current = false;
@@ -1499,6 +1524,27 @@ export default function Orders() {
     const deltaY = currentY - touchStartY.current;
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
+
+    if (pullToRefreshActive.current) {
+      const shouldRefresh =
+        pullDistanceRef.current >= 56 &&
+        deltaY > 0 &&
+        (scrollRef.current?.scrollTop ?? 0) <= 0 &&
+        !pullRefreshing &&
+        !loading;
+      pullToRefreshActive.current = false;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      if (shouldRefresh) {
+        setPullRefreshing(true);
+        try {
+          await loadOrders({ force: true });
+        } finally {
+          setPullRefreshing(false);
+        }
+      }
+      return;
+    }
 
     if (
       tabSwipeActive.current &&
@@ -2134,6 +2180,23 @@ export default function Orders() {
         onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
+        {(pullDistance > 0 || pullRefreshing) && (
+          <div
+            className="orders-pull-refresh"
+            style={{ height: pullRefreshing ? 48 : Math.max(pullDistance, 1) }}
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className={`orders-pull-refresh__indicator${pullRefreshing ? ' is-refreshing' : ''}`}
+              style={!pullRefreshing ? { transform: `rotate(${Math.min(pullDistance / 56, 1) * 180}deg)` } : undefined}
+              aria-hidden
+            >
+              ↓
+            </div>
+            <span>{pullRefreshing ? 'Refreshing orders…' : pullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}</span>
+          </div>
+        )}
         <div
           className="orders-main-shift"
           style={{
