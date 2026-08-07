@@ -107,7 +107,7 @@ export default function ImageSectionView({
           <button
             type="button"
             className="image-section-placeholder"
-            disabled={!editMode || !media}
+            aria-disabled={!editMode || !media}
             onClick={editMode ? openPicker : undefined}
           >
             {editMode ? '+ Add image' : 'Image'}

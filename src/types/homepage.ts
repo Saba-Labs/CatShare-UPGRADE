@@ -195,6 +195,8 @@ export interface FullProductListSection {
   settings: {
     title?: string;
     showCategoryFilters: boolean;
+    /** Empty means all catalogue categories. */
+    categoryIds?: string[];
     showSort: boolean;
     viewMode: 'list' | 'grid';
     cardStyle?: ProductCardStyle;

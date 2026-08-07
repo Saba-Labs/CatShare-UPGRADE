@@ -396,11 +396,17 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [menuOpen, setMenuOpen] = useState(false);
   /** Products tab: speed-dial open state (+ → single vs bulk create) */
   const [productFabExpanded, setProductFabExpanded] = useState(false);
+  const [productPullDistance, setProductPullDistance] = useState(0);
+  const [productPullRefreshing, setProductPullRefreshing] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewList, setPreviewList] = useState([]);
   const [imageMap, setImageMap] = useState({});
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const productPullActive = useRef(false);
+  const productPullStartX = useRef(0);
+  const productPullStartY = useRef(0);
+  const productPullDistanceRef = useRef(0);
   const [showShelfConfirm, setShowShelfConfirm] = useState(false);
   const [shelfTarget, setShelfTarget] = useState(null);
   const [showHiddenDangerShelfActions, setShowHiddenDangerShelfActions] = useState(false);
@@ -1127,6 +1133,90 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     return v;
   }, [filtered, sortBy, catalogues]);
 
+  const refreshProducts = async () => {
+    const uid = user?.uid;
+    if (!uid || uid.trim() === '' || user.isAnonymous || !SELLER_UUID_RE.test(uid)) return;
+
+    setProductPullRefreshing(true);
+    try {
+      type FetchResult = Awaited<ReturnType<typeof fetchSellerCatalogue>>;
+      const raced = await Promise.race<FetchResult>([
+        fetchSellerCatalogue(uid),
+        new Promise<FetchResult>((resolve) =>
+          setTimeout(
+            () => resolve({ data: null, error: new Error('Catalogue fetch timed out') }),
+            CATALOGUE_FETCH_TIMEOUT_MS
+          )
+        ),
+      ]);
+
+      if (raced.error || !raced.data) {
+        const fallback = getCatalogueRowsFromDeviceStorage(uid);
+        if (fallback.products.length > 0 || fallback.deletedProducts.length > 0) {
+          setProducts(fallback.products);
+          setDeletedProducts(fallback.deletedProducts);
+        }
+        showToast(
+          isBrowserOnline() ? 'Could not refresh catalogue. Showing saved list.' : 'Showing saved catalogue',
+          'info'
+        );
+        return;
+      }
+
+      setProducts(raced.data.products);
+      setDeletedProducts(raced.data.deletedProducts);
+      markSellerCatalogueCloudHydrated(uid);
+    } finally {
+      setProductPullRefreshing(false);
+    }
+  };
+
+  const handleProductsTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    if (tab !== 'products') return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-rbd-drag-handle-draggable-id], button, input, textarea, select, a')) {
+      productPullActive.current = false;
+      return;
+    }
+    productPullStartX.current = e.touches[0].clientX;
+    productPullStartY.current = e.touches[0].clientY;
+    productPullActive.current =
+      !productPullRefreshing && !catalogueLoading && (scrollRef.current?.scrollTop ?? 0) <= 0;
+    productPullDistanceRef.current = 0;
+    setProductPullDistance(0);
+  };
+
+  const handleProductsTouchMove = (e: React.TouchEvent<HTMLElement>) => {
+    if (!productPullActive.current) return;
+    const horizontalDistance = e.touches[0].clientX - productPullStartX.current;
+    const verticalDistance = e.touches[0].clientY - productPullStartY.current;
+
+    if (verticalDistance <= 0 || Math.abs(horizontalDistance) > verticalDistance * 1.2 || (scrollRef.current?.scrollTop ?? 0) > 0) {
+      productPullActive.current = false;
+      productPullDistanceRef.current = 0;
+      setProductPullDistance(0);
+      return;
+    }
+
+    const distance = Math.min(96, verticalDistance * 0.55);
+    productPullDistanceRef.current = distance;
+    setProductPullDistance(distance);
+    e.preventDefault();
+  };
+
+  const handleProductsTouchEnd = async () => {
+    if (!productPullActive.current) return;
+    const shouldRefresh =
+      productPullDistanceRef.current >= 56 &&
+      !productPullRefreshing &&
+      !catalogueLoading &&
+      (scrollRef.current?.scrollTop ?? 0) <= 0;
+    productPullActive.current = false;
+    productPullDistanceRef.current = 0;
+    setProductPullDistance(0);
+    if (shouldRefresh) await refreshProducts();
+  };
+
   // After /create: restore exact main.scrollTop. ResizeObserver re-applies as list height grows (images).
   useEffect(() => {
     if (pathname !== "/" || tab !== "products") return;
@@ -1339,6 +1429,27 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           {/* Fixed Icons Group (Glass + Sort) */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
             <button
+              type="button"
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-blue-600 md:flex"
+              onClick={() => void refreshProducts()}
+              disabled={productPullRefreshing || catalogueLoading}
+              title="Refresh products"
+              aria-label="Refresh products"
+            >
+              <svg
+                className={`h-5 w-5 ${productPullRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4v6h6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 20v-6h-6" />
+              </svg>
+            </button>
+            <button
               onClick={() => setShowSearch((prev) => !prev)}
               className="text-xl text-gray-600 hover:text-black"
               title="Search"
@@ -1377,7 +1488,30 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       )}
 
 
-      <main ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}>
+      <main
+        ref={scrollRef}
+        className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
+        onTouchStart={handleProductsTouchStart}
+        onTouchMove={handleProductsTouchMove}
+        onTouchEnd={handleProductsTouchEnd}
+      >
+        {tab === 'products' && (productPullDistance > 0 || productPullRefreshing) && (
+          <div
+            className="flex items-center justify-center gap-2 overflow-hidden text-xs font-semibold text-blue-600 transition-[height] duration-200"
+            style={{ height: productPullRefreshing ? 48 : Math.max(productPullDistance, 1) }}
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className={productPullRefreshing ? 'animate-spin text-xl' : 'text-xl transition-transform'}
+              style={!productPullRefreshing ? { transform: `rotate(${Math.min(productPullDistance / 56, 1) * 180}deg)` } : undefined}
+              aria-hidden
+            >
+              ↓
+            </span>
+            {productPullRefreshing ? 'Refreshing products…' : productPullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}
+          </div>
+        )}
         {tab === "products" &&
           visible.length === 0 &&
           products.length === 0 &&

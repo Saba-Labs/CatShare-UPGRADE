@@ -7,6 +7,7 @@ import {
   type ProductWithCatalogueData,
 } from '../../../config/catalogueProductUtils';
 import type { DefaultSorting, ProductImageRatio } from '../../../types/storeBehaviorSettings';
+import { normalizeProductCategories } from '../../../utils/productCategoryUtils';
 import {
   productsInCategory,
   resolveStoreCategoryParam,
@@ -41,6 +42,8 @@ interface CollectionPageRuntimeProps {
   embedded?: boolean;
   sectionTitle?: string;
   showCategoryFilters?: boolean;
+  /** Limits the category chips shown by embedded product lists. Empty means all categories. */
+  categoryIds?: string[];
   showSort?: boolean;
   viewMode?: 'list' | 'grid';
   productImageRatio?: ProductImageRatio;
@@ -63,6 +66,7 @@ export default function CollectionPageRuntime({
   embedded = false,
   sectionTitle,
   showCategoryFilters = true,
+  categoryIds,
   showSort = true,
   viewMode,
   productImageRatio = 'square',
@@ -74,7 +78,7 @@ export default function CollectionPageRuntime({
   previewCategoryId,
   onPreviewCategoryChange,
 }: CollectionPageRuntimeProps) {
-  const { collectionPath, productPath, store } = useWebsiteStore();
+  const { productPath, store } = useWebsiteStore();
   const orderBridge = useWebsiteOrderBridge();
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,40 +94,49 @@ export default function CollectionPageRuntime({
   const gridColumnCount = getProductCardStyleGridColumns(resolvedCardsStyle, columns);
   const catalogProductLayout = resolvedCardsStyle === 'catalog';
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
-
+  const [embeddedCategory, setEmbeddedCategory] = useState<string | null>(null);
+  const initialCategoryParam = new URLSearchParams(location.search).get('category');
   const categoryParam =
     previewCategoryId ??
-    new URLSearchParams(location.search).get('category');
+    (embedded && embeddedCategory !== null
+      ? embeddedCategory === 'all'
+        ? null
+        : embeddedCategory
+      : initialCategoryParam);
+
+  const selectedCategoryIds = useMemo(
+    () => new Set((categoryIds ?? []).map((id) => id.toLowerCase())),
+    [categoryIds]
+  );
+
+  const scopedProducts = useMemo(() => {
+    if (selectedCategoryIds.size === 0) return products;
+    return products.filter((product) =>
+      normalizeProductCategories(product.category).some((category) => selectedCategoryIds.has(category.toLowerCase()))
+    );
+  }, [products, selectedCategoryIds]);
 
   const availableCategories = useMemo(() => {
-    const all = products.flatMap((product) =>
-      (Array.isArray(product.category) ? product.category : [])
-        .map((category) => String(category).trim())
-        .filter(Boolean)
-    );
-    return Array.from(new Set(all));
-  }, [products]);
+    const all = Array.from(new Set(scopedProducts.flatMap((product) => normalizeProductCategories(product.category))));
+    return selectedCategoryIds.size === 0
+      ? all
+      : all.filter((category) => selectedCategoryIds.has(category.toLowerCase()));
+  }, [scopedProducts, selectedCategoryIds]);
 
-  const selectedCategory = useMemo(
-    () => resolveStoreCategoryParam(categoryParam, availableCategories),
-    [categoryParam, availableCategories]
-  );
+  const selectedCategory = useMemo(() => {
+    const resolved = resolveStoreCategoryParam(categoryParam, availableCategories);
+    return resolved === 'all' || availableCategories.some((category) => storeCategoriesMatch(category, resolved))
+      ? resolved
+      : 'all';
+  }, [categoryParam, availableCategories]);
 
   const setCategoryFilter = (category: string) => {
     if (builderPreview && onPreviewCategoryChange) {
       onPreviewCategoryChange(category === 'all' ? '' : category);
       return;
     }
-    const params = new URLSearchParams();
-    if (category !== 'all') {
-      params.set('category', category);
-    }
-    const search = params.toString();
     if (embedded) {
-      navigate({
-        pathname: collectionPath,
-        search: search ? `?${search}` : '',
-      });
+      setEmbeddedCategory(category);
       return;
     }
     const nextParams = new URLSearchParams(location.search);
@@ -137,9 +150,9 @@ export default function CollectionPageRuntime({
   };
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === 'all') return products;
-    return productsInCategory(products, selectedCategory);
-  }, [products, selectedCategory]);
+    if (selectedCategory === 'all') return scopedProducts;
+    return productsInCategory(scopedProducts, selectedCategory);
+  }, [scopedProducts, selectedCategory]);
 
   const sortedProducts = useMemo(() => {
     if (sortBy === 'default') {
@@ -173,9 +186,9 @@ export default function CollectionPageRuntime({
 
   const categoryLabel = useMemo(() => {
     if (!selectedCategory || selectedCategory === 'all') return null;
-    const match = products.find((p) =>
-      (Array.isArray(p.category) ? p.category : []).some(
-        (c) => String(c).toLowerCase() === selectedCategory.toLowerCase()
+    const match = scopedProducts.find((p) =>
+      normalizeProductCategories(p.category).some(
+        (c) => c.toLowerCase() === selectedCategory.toLowerCase()
       )
     );
     const labels = match?.category;
@@ -183,7 +196,7 @@ export default function CollectionPageRuntime({
       return labels.find((c) => String(c).toLowerCase() === selectedCategory.toLowerCase()) || selectedCategory;
     }
     return selectedCategory;
-  }, [selectedCategory, products]);
+  }, [selectedCategory, scopedProducts]);
 
   const pageTitle = embedded
     ? (sectionTitle?.trim() || categoryLabel || 'Products')

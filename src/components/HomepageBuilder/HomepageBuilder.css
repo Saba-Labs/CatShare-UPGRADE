@@ -2742,6 +2742,10 @@
   box-sizing: border-box;
 }
 
+.sites-document-stack--first-selected > .sites-drop-slot + .sites-block-row {
+  margin-top: 44px;
+}
+
 /* Drag-and-drop: palette → canvas drop slots (collapsed until dragging) */
 .sites-drop-slot {
   height: 0;

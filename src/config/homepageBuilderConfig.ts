@@ -233,7 +233,7 @@ export function createDefaultSection(
           title: '',
           showCategoryFilters: true,
           showSort: true,
-          viewMode: 'list',
+          viewMode: 'grid',
           cardStyle: 'boxed',
           productImageRatio: 'square',
           showPrice: true,
