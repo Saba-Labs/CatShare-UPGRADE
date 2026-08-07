@@ -30,6 +30,7 @@ import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { FiChevronsDown } from 'react-icons/fi';
 
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 const ORDERS_SCREEN_FRESH_MS = 15000;
@@ -1257,6 +1258,8 @@ export default function Orders() {
   const [tabSwipeShift, setTabSwipeShift] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [pullRefreshSuccess, setPullRefreshSuccess] = useState(false);
+  const pullRefreshSuccessTimeoutRef = useRef<number | null>(null);
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [showDateFilters, setShowDateFilters] = useState(false);
@@ -1355,6 +1358,12 @@ export default function Orders() {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (pullRefreshSuccessTimeoutRef.current) window.clearTimeout(pullRefreshSuccessTimeoutRef.current);
+    };
+  }, []);
 
   // Debounce search to reduce filtering work on every keypress.
   useEffect(() => {
@@ -1535,10 +1544,13 @@ export default function Orders() {
       pullToRefreshActive.current = false;
       pullDistanceRef.current = 0;
       setPullDistance(0);
-      if (shouldRefresh) {
+        if (shouldRefresh) {
         setPullRefreshing(true);
         try {
           await loadOrders({ force: true });
+          setPullRefreshSuccess(true);
+          if (pullRefreshSuccessTimeoutRef.current) window.clearTimeout(pullRefreshSuccessTimeoutRef.current);
+          pullRefreshSuccessTimeoutRef.current = window.setTimeout(() => setPullRefreshSuccess(false), 1100);
         } finally {
           setPullRefreshing(false);
         }
@@ -2215,21 +2227,21 @@ export default function Orders() {
         onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
-        {(pullDistance > 0 || pullRefreshing) && (
+        {(pullDistance > 0 || pullRefreshing || pullRefreshSuccess) && (
           <div
             className="orders-pull-refresh"
-            style={{ height: pullRefreshing ? 48 : Math.max(pullDistance, 1) }}
+            style={{ height: pullRefreshing || pullRefreshSuccess ? 48 : Math.max(pullDistance, 1) }}
             role="status"
             aria-live="polite"
           >
             <div
               className={`orders-pull-refresh__indicator${pullRefreshing ? ' is-refreshing' : ''}`}
-              style={!pullRefreshing ? { transform: `rotate(${Math.min(pullDistance / 56, 1) * 180}deg)` } : undefined}
+              style={!pullRefreshing && !pullRefreshSuccess ? { transform: `rotate(${Math.min(pullDistance / 56, 1) * 180}deg)` } : undefined}
               aria-hidden
             >
-              ↓
+              {pullRefreshSuccess ? <IconCheck /> : <FiChevronsDown size={16} />}
             </div>
-            <span>{pullRefreshing ? 'Refreshing orders…' : pullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}</span>
+            <span>{pullRefreshSuccess ? 'Updated' : 'Refreshing…'}</span>
           </div>
         )}
         <div
