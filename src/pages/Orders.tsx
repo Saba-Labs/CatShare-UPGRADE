@@ -2299,29 +2299,7 @@ export default function Orders() {
         onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
-        {pullOffset > 0 && (
-          <div
-            className="orders-pull-refresh"
-            style={{
-              height: pullOffset,
-              opacity: pullHolding ? 1 : Math.min(pullProgress * 1.4, 1),
-              transition: pullDragging ? 'none' : 'height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out',
-            }}
-            role="status"
-            aria-live="polite"
-          >
-            <PullToRefreshIndicator justUpdated={pullJustUpdated} />
-            <span className="sr-only">
-              {pullJustUpdated
-                ? 'Orders updated'
-                : pullRefreshing
-                ? 'Refreshing orders…'
-                : pullDistance >= PULL_REFRESH_THRESHOLD
-                ? 'Release to refresh'
-                : 'Pull to refresh'}
-            </span>
-          </div>
-        )}
+        
         <div
           className="orders-main-shift"
           style={{
@@ -2435,6 +2413,30 @@ export default function Orders() {
                 />
               )}
             </div>
+          </div>
+          )}
+
+        {pullOffset > 0 && (
+          <div
+            className="orders-pull-refresh"
+            style={{
+              height: pullOffset,
+              opacity: pullHolding ? 1 : Math.min(pullProgress * 1.4, 1),
+              transition: pullDragging ? 'none' : 'height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out',
+            }}
+            role="status"
+            aria-live="polite"
+          >
+            <PullToRefreshIndicator justUpdated={pullJustUpdated} />
+            <span className="sr-only">
+              {pullJustUpdated
+                ? 'Orders updated'
+                : pullRefreshing
+                ? 'Refreshing orders…'
+                : pullDistance >= PULL_REFRESH_THRESHOLD
+                ? 'Release to refresh'
+                : 'Pull to refresh'}
+            </span>
           </div>
         )}
 
