@@ -147,7 +147,7 @@ function PullToRefreshIndicator({
     <motion.div
       layout
       transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.7 }}
-      className="flex h-9 items-center gap-2 rounded-full bg-white/95 py-2 pl-2 pr-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.16)] ring-1 ring-black/[0.05] backdrop-blur-sm"
+      className="flex h-9 items-center gap-2 rounded-full bg-white/95 py-2 pl-2 pr-3.5 shadow-[0_2px_10px_rgba(15,23,42,0.10)] ring-1 ring-black/[0.04] backdrop-blur-sm"
     >
       <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
@@ -165,7 +165,7 @@ function PullToRefreshIndicator({
               <motion.path
                 d="M3 8.5l3 3 7-7"
                 fill="none"
-                stroke="#16a34a"
+                stroke="#6b7280"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -194,7 +194,7 @@ function PullToRefreshIndicator({
                 cy="9"
                 r={radius}
                 fill="none"
-                stroke={armed || refreshing ? "#2563eb" : "#93b4fa"}
+                stroke={armed || refreshing ? "#4b5563" : "#9ca3af"}
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
@@ -215,9 +215,7 @@ function PullToRefreshIndicator({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.16 }}
-          className={`whitespace-nowrap text-[12px] font-medium tracking-tight ${
-            justUpdated ? "text-green-600" : "text-gray-600"
-          }`}
+          className="whitespace-nowrap text-[12px] font-medium tracking-tight text-gray-500"
         >
           {label}
         </motion.span>
