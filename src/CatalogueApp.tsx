@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "re
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList, FiImage } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList, FiImage, FiChevronsDown } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -67,6 +67,17 @@ const PRODUCT_SCROLL_KEY = "productScroll";
 const CATALOGUE_FETCH_TIMEOUT_MS = 22_000;
 const SELLER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Pull-to-refresh tuning: distance (px) the user must pull past before release triggers a refresh. */
+const PULL_REFRESH_THRESHOLD = 56;
+/** Pull-to-refresh tuning: hard cap (px) on how far the rubber-band can stretch. */
+const PULL_REFRESH_MAX_DISTANCE = 96;
+/** Resting offset (px) the indicator + content hold at while a refresh is in flight. */
+const PULL_REFRESH_SETTLE_DISTANCE = 56;
+/** How long (ms) the "Updated" success state lingers before the pill collapses back. */
+const PULL_REFRESH_SUCCESS_DISPLAY_MS = 1200;
+/** Combined height (px) of the fixed black status bar (40px) + sticky products header (h-14 = 56px). The pull indicator is pinned below this so it's never covered by the header's stacking context. */
+const PRODUCTS_HEADER_CHROME_HEIGHT = 96;
+
 /** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */
 function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
   return {
@@ -96,6 +107,45 @@ const fabDialItem = {
     transition: { duration: 0.17, ease: [0.4, 0, 1, 1] as const, delay: (1 - i) * 0.052 },
   }),
 };
+
+/**
+ * Modern pull-to-refresh pill.
+ * - While dragging: a thin ring fills clockwise to show progress toward the release threshold,
+ *   and the label crossfades between "Pull to refresh" / "Release to refresh" (mirrors iOS/Android affordance).
+ * - While refreshing: the ring becomes an indeterminate spinner and the label reads "Updating…".
+ * - On success: the ring morphs into a checkmark with a green "Updated" label for a brief moment.
+ * The pill's width springs to fit its content via framer-motion's `layout` animation.
+ * Purely presentational — all pull physics stay in the touch handlers below.
+ */
+function PullToRefreshIndicator({
+  justUpdated,
+}: {
+  /** True for a brief window right after a refresh lands successfully. */
+  justUpdated: boolean;
+}) {
+  // Mild breathing blink while waiting on the user or the network; holds steady once "Updated" lands.
+  const blinking = !justUpdated;
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={justUpdated ? "updated" : "refreshing"}
+        initial={{ opacity: 0 }}
+        animate={blinking ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={
+          blinking
+            ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+            : { duration: 0.2, ease: "easeOut" }
+        }
+        className="flex items-center gap-1.5 whitespace-nowrap text-[13.5px] font-medium tracking-tight text-gray-500"
+      >
+        {!justUpdated && <FiChevronsDown className="h-4 w-4 shrink-0" aria-hidden />}
+        {justUpdated ? "Updated" : "Refreshing…"}
+      </motion.span>
+    </AnimatePresence>
+  );
+}
 
 /** Read exact scroll: prefer main (the real list scroller); fallback to window if needed. */
 function readProductsListScrollY(scrollEl: HTMLElement | null): number {
@@ -398,6 +448,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [productFabExpanded, setProductFabExpanded] = useState(false);
   const [productPullDistance, setProductPullDistance] = useState(0);
   const [productPullRefreshing, setProductPullRefreshing] = useState(false);
+  /** True only while a finger is actively dragging — disables the settle transition so the UI tracks the touch 1:1. */
+  const [productPullDragging, setProductPullDragging] = useState(false);
+  /** True for a brief window right after a refresh lands successfully — drives the "Updated" checkmark state. */
+  const [productPullJustUpdated, setProductPullJustUpdated] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewList, setPreviewList] = useState([]);
@@ -407,9 +461,17 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const productPullStartX = useRef(0);
   const productPullStartY = useRef(0);
   const productPullDistanceRef = useRef(0);
+  const productPullSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showShelfConfirm, setShowShelfConfirm] = useState(false);
   const [shelfTarget, setShelfTarget] = useState(null);
   const [showHiddenDangerShelfActions, setShowHiddenDangerShelfActions] = useState(false);
+
+  // Clear any pending "Updated" collapse timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (productPullSuccessTimer.current) clearTimeout(productPullSuccessTimer.current);
+    };
+  }, []);
 
   const stableImageVersionFromUrl = (url: string) => {
     const s = String(url || "").trim();
@@ -1137,6 +1199,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     const uid = user?.uid;
     if (!uid || uid.trim() === '' || user.isAnonymous || !SELLER_UUID_RE.test(uid)) return;
 
+    if (productPullSuccessTimer.current) {
+      clearTimeout(productPullSuccessTimer.current);
+      productPullSuccessTimer.current = null;
+    }
+    setProductPullJustUpdated(false);
     setProductPullRefreshing(true);
     try {
       type FetchResult = Awaited<ReturnType<typeof fetchSellerCatalogue>>;
@@ -1166,6 +1233,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts(raced.data.products);
       setDeletedProducts(raced.data.deletedProducts);
       markSellerCatalogueCloudHydrated(uid);
+
+      // Brief "Updated" confirmation before the pill collapses back.
+      setProductPullJustUpdated(true);
+      productPullSuccessTimer.current = setTimeout(() => {
+        setProductPullJustUpdated(false);
+        productPullSuccessTimer.current = null;
+      }, PULL_REFRESH_SUCCESS_DISPLAY_MS);
     } finally {
       setProductPullRefreshing(false);
     }
@@ -1184,6 +1258,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       !productPullRefreshing && !catalogueLoading && (scrollRef.current?.scrollTop ?? 0) <= 0;
     productPullDistanceRef.current = 0;
     setProductPullDistance(0);
+    if (productPullActive.current) {
+      setProductPullDragging(true);
+    }
   };
 
   const handleProductsTouchMove = (e: React.TouchEvent<HTMLElement>) => {
@@ -1195,10 +1272,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       productPullActive.current = false;
       productPullDistanceRef.current = 0;
       setProductPullDistance(0);
+      setProductPullDragging(false);
       return;
     }
 
-    const distance = Math.min(96, verticalDistance * 0.55);
+    const distance = Math.min(PULL_REFRESH_MAX_DISTANCE, verticalDistance * 0.55);
     productPullDistanceRef.current = distance;
     setProductPullDistance(distance);
     e.preventDefault();
@@ -1207,15 +1285,29 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleProductsTouchEnd = async () => {
     if (!productPullActive.current) return;
     const shouldRefresh =
-      productPullDistanceRef.current >= 56 &&
+      productPullDistanceRef.current >= PULL_REFRESH_THRESHOLD &&
       !productPullRefreshing &&
       !catalogueLoading &&
       (scrollRef.current?.scrollTop ?? 0) <= 0;
     productPullActive.current = false;
     productPullDistanceRef.current = 0;
     setProductPullDistance(0);
-    if (shouldRefresh) await refreshProducts();
+    // Dropping the drag flag re-enables the settle transition so release/refresh/reset all glide smoothly.
+    setProductPullDragging(false);
+    if (shouldRefresh) {
+      await Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+      await refreshProducts();
+    }
   };
+
+  // True while the pill should hold its resting position: during the in-flight fetch and through
+  // the brief "Updated" confirmation that follows it.
+  const productPullHolding = productPullRefreshing || productPullJustUpdated;
+  // Effective offset the indicator + content hold at: follows the finger while dragging,
+  // parks at the settle distance while holding (refresh in flight or showing "Updated"), and eases to 0 otherwise.
+  const productPullOffset = productPullHolding ? PULL_REFRESH_SETTLE_DISTANCE : productPullDistance;
+  const productPullProgress = Math.min(productPullOffset / PULL_REFRESH_THRESHOLD, 1);
+  const productPullArmed = productPullDistance >= PULL_REFRESH_THRESHOLD;
 
   // After /create: restore exact main.scrollTop. ResizeObserver re-applies as list height grows (images).
   useEffect(() => {
@@ -1428,27 +1520,36 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
           {/* Fixed Icons Group (Glass + Sort) */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
-            <button
+            <motion.button
               type="button"
-              className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-blue-600 md:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100/80 disabled:opacity-40 disabled:hover:bg-transparent md:flex"
               onClick={() => void refreshProducts()}
               disabled={productPullRefreshing || catalogueLoading}
+              whileHover={productPullRefreshing || catalogueLoading ? undefined : { scale: 1.08 }}
+              whileTap={productPullRefreshing || catalogueLoading ? undefined : { scale: 0.86 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
               title="Refresh products"
               aria-label="Refresh products"
             >
-              <svg
-                className={`h-5 w-5 ${productPullRefreshing ? 'animate-spin' : ''}`}
+              <motion.svg
+                className="h-[18px] w-[18px]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
                 viewBox="0 0 24 24"
+                animate={productPullRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={
+                  productPullRefreshing
+                    ? { repeat: Infinity, ease: "linear", duration: 0.85 }
+                    : { duration: 0.2, ease: "easeOut" }
+                }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 4v6h6" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 20v-6h-6" />
-              </svg>
-            </button>
+              </motion.svg>
+            </motion.button>
             <button
               onClick={() => setShowSearch((prev) => !prev)}
               className="text-xl text-gray-600 hover:text-black"
@@ -1490,28 +1591,48 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
       <main
         ref={scrollRef}
-        className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
+        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
         onTouchStart={handleProductsTouchStart}
         onTouchMove={handleProductsTouchMove}
         onTouchEnd={handleProductsTouchEnd}
       >
-        {tab === 'products' && (productPullDistance > 0 || productPullRefreshing) && (
+        {tab === 'products' && (
           <div
-            className="flex items-center justify-center gap-2 overflow-hidden text-xs font-semibold text-blue-600 transition-[height] duration-200"
-            style={{ height: productPullRefreshing ? 48 : Math.max(productPullDistance, 1) }}
+            className="pointer-events-none fixed inset-x-0 z-[60] flex items-center justify-center overflow-hidden"
+            style={{
+              top: `calc(env(safe-area-inset-top, 0px) + ${PRODUCTS_HEADER_CHROME_HEIGHT}px)`,
+              height: `${productPullOffset}px`,
+              opacity: productPullHolding ? 1 : Math.min(productPullProgress * 1.4, 1),
+              transition: productPullDragging
+                ? "none"
+                : "height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out",
+            }}
             role="status"
             aria-live="polite"
           >
-            <span
-              className={productPullRefreshing ? 'animate-spin text-xl' : 'text-xl transition-transform'}
-              style={!productPullRefreshing ? { transform: `rotate(${Math.min(productPullDistance / 56, 1) * 180}deg)` } : undefined}
-              aria-hidden
-            >
-              ↓
+            <PullToRefreshIndicator justUpdated={productPullJustUpdated} />
+            <span className="sr-only">
+              {productPullJustUpdated
+                ? "Products updated"
+                : productPullRefreshing
+                  ? "Refreshing products…"
+                  : productPullArmed
+                    ? "Release to refresh"
+                    : "Pull to refresh"}
             </span>
-            {productPullRefreshing ? 'Refreshing products…' : productPullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}
           </div>
         )}
+
+        <div
+          style={
+            tab === 'products'
+              ? {
+                  transform: `translateY(${productPullOffset}px)`,
+                  transition: productPullDragging ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }
+              : undefined
+          }
+        >
         {tab === "products" &&
           visible.length === 0 &&
           products.length === 0 &&
@@ -1687,206 +1808,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           </DragDropContext>
         )}
 
-        {showShelfConfirm && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-            onClick={() => {
-              setShowShelfConfirm(false);
-              setShelfTarget(null);
-            }}
-          >
-            <div
-              className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center border border-gray-100"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">
-                Shelf this item now?
-              </h2>
-              <p className="text-sm text-gray-600 mb-5">
-                It stays safe and can be restored or deleted later.
-              </p>
-              <div className="flex justify-center gap-2 flex-wrap">
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-800 transition"
-                  onClick={async () => {
-                    if (shelfTarget) {
-                      if (!guardCloudWrite()) return;
-                      console.log('🗑️ Shelf button clicked for product:', shelfTarget.id);
-                      await Haptics.impact({ style: ImpactStyle.Heavy });
-                      // ✅ CRITICAL: Get the complete product object from the products array, not from stale shelfTarget
-                      // This ensures all product data (including catalogueData, fields, etc.) is preserved
-                      const completeProduct = products.find(p => p.id === shelfTarget.id);
-                      if (!completeProduct) {
-                        console.warn("Product not found in products array, using shelfTarget as fallback");
-                      }
-                      const productToShelf = completeProduct || shelfTarget;
-
-                      const freshProducts = products.filter((x) => x.id !== productToShelf.id);
-                      const freshDeleted = [productToShelf, ...deletedProducts];
-                      console.log('📦 Shelf state updated:', {
-                        productName: productToShelf.name,
-                        productsCount: freshProducts.length,
-                        deletedCount: freshDeleted.length
-                      });
-                      setProducts(freshProducts);
-                      setDeletedProducts(freshDeleted);
-
-                      // Direct sync like updateProduct for faster response
-                      if (isStrictMode() && user?.uid) {
-                        console.log('📤 Direct sync for shelved product');
-                        syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
-                          setProducts(cloudData.products);
-                          setDeletedProducts(cloudData.deletedProducts);
-                        }).catch(err => console.error('Shelf sync failed:', err));
-                      }
-
-                      // If currently previewing this item, move to next
-                      if (previewProduct && previewProduct.id === productToShelf.id) {
-                        const idx = previewList.findIndex(p => p.id === productToShelf.id);
-                        if (idx !== -1) {
-                          const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
-                          setPreviewList(newPreviewList);
-                          if (newPreviewList.length > 0) {
-                            const nextIdx = idx < newPreviewList.length ? idx : newPreviewList.length - 1;
-                            setPreviewProduct(newPreviewList[nextIdx]);
-                          } else {
-                            setPreviewProduct(null);
-                          }
-                        } else {
-                          setPreviewProduct(null);
-                        }
-                      } else {
-                        // Even if not previewing it, update the list in background
-                        setPreviewList(prev => prev.filter(p => p.id !== productToShelf.id));
-                      }
-                    }
-                    setShowShelfConfirm(false);
-                    setShelfTarget(null);
-                  }}
-                >
-                  Shelf
-                </button>
-                {showHiddenDangerShelfActions && (
-                <button
-                  className="px-4 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-800 transition"
-                  onClick={async () => {
-                    if (!guardCloudWrite()) return;
-                    await Haptics.impact({ style: ImpactStyle.Heavy });
-                    // Move all products to shelf
-                    const freshDeleted = [...deletedProducts, ...products];
-                    setDeletedProducts(freshDeleted);
-                    setProducts([]);
-                    setPreviewProduct(null);
-                    setPreviewList([]);
-
-                    // Direct sync like updateProduct for faster response
-                    if (isStrictMode() && user?.uid) {
-                      console.log('📤 Direct sync for shelf all');
-                      syncProductsToCloud([], freshDeleted, shelfMoveCloudSyncOptions([])).then(cloudData => {
-                        setProducts(cloudData.products);
-                        setDeletedProducts(cloudData.deletedProducts);
-                      }).catch(err => console.error('Shelf all sync failed:', err));
-                    }
-
-                    setShowShelfConfirm(false);
-                    setShelfTarget(null);
-                  }}
-                >
-                  Shelf All
-                </button>
-                )}
-                <button
-                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"
-                  onClick={() => {
-                    setShowShelfConfirm(false);
-                    setShelfTarget(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {confirmToggleStock && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 max-w-sm w-full text-center">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">Heads up!</h2>
-              <p className="text-sm text-gray-600 mb-2">
-                You're about to change stock status{confirmToggleStock.field === "MASTER" ? " for all catalogues" : ""}. Are you sure?
-              </p>
-
-              <label className="flex items-center justify-center gap-2 mt-2 text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={bypassChecked}
-                  onChange={(e) => setBypassChecked(e.target.checked)}
-                />
-                Don't show this again for 5 minutes
-              </label>
-
-              <div className="flex justify-center gap-4 mt-5">
-                <button
-                  className="px-4 py-2 rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300 transition"
-                  onClick={() => {
-                    setConfirmToggleStock(null);
-                    setBypassChecked(false);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
-                  onClick={() => {
-                    const { id, field } = confirmToggleStock;
-                    if (!guardCloudWrite()) return;
-
-                    if (bypassChecked) {
-                      sessionStorage.setItem("bypassStockWarningUntil", (Date.now() + 5 * 60 * 1000).toString());
-                    }
-
-                    Haptics.impact({ style: ImpactStyle.Medium });
-
-                    let freshProducts: any[];
-                    if (field === "MASTER") {
-                      freshProducts = products.map((p) => {
-                        if (p.id === id) {
-                          const allInStock = catalogues.every((cat) =>
-                            isProductInStockForCatalogue(p, cat.id, cat)
-                          );
-                          return applyMasterCatalogueStockChange(p, catalogues, !allInStock);
-                        }
-                        return p;
-                      });
-                    } else {
-                      freshProducts = products.map((p) => {
-                        if (p.id !== id) return p;
-                        const cat = catalogues.find((c) => c.stockField === field);
-                        if (!cat) return { ...p, [field]: !p[field] };
-                        return toggleProductStockForCatalogue(p, cat.id, field, cat);
-                      });
-                    }
-                    setProducts(freshProducts);
-
-                    if (isStrictMode() && user?.uid) {
-                      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
-                        setProducts(cloudData.products);
-                        setDeletedProducts(cloudData.deletedProducts);
-                      }).catch(err => console.error('Strict sync failed:', err));
-                    }
-
-                    setConfirmToggleStock(null);
-                    setBypassChecked(false);
-                  }}
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
         <div
           className="relative -mx-4"
@@ -1941,93 +1862,294 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             })()}
           </div>
         )}
+        </div>
+      </main>
 
-        {previewProduct && (
-          <ProductPreviewModal
-            product={previewProduct}
-            tab={tab}
-            catalogueId={selectedCatalogueInCataloguesTab}
-            filteredProducts={previewList}
-            onClose={() => setPreviewProduct(null)}
-            onEdit={() => {
-              if (!guardCloudWrite()) return;
-              persistProductsListScrollForEdit(scrollRef.current);
-              navigate(`/create?id=${previewProduct.id}`);
-            }}
-            onToggleStock={(fieldOrProduct, isMasterToggle) => {
-              let updated;
+      {showShelfConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => {
+            setShowShelfConfirm(false);
+            setShelfTarget(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full text-center border border-gray-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">
+              Shelf this item now?
+            </h2>
+            <p className="text-sm text-gray-600 mb-5">
+              It stays safe and can be restored or deleted later.
+            </p>
+            <div className="flex justify-center gap-2 flex-wrap">
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-800 transition"
+                onClick={async () => {
+                  if (shelfTarget) {
+                    if (!guardCloudWrite()) return;
+                    console.log('🗑️ Shelf button clicked for product:', shelfTarget.id);
+                    await Haptics.impact({ style: ImpactStyle.Heavy });
+                    // ✅ CRITICAL: Get the complete product object from the products array, not from stale shelfTarget
+                    // This ensures all product data (including catalogueData, fields, etc.) is preserved
+                    const completeProduct = products.find(p => p.id === shelfTarget.id);
+                    if (!completeProduct) {
+                      console.warn("Product not found in products array, using shelfTarget as fallback");
+                    }
+                    const productToShelf = completeProduct || shelfTarget;
 
-              if (isMasterToggle && typeof fieldOrProduct === 'object') {
-                const allInStock = catalogues.every((cat) =>
-                  isProductInStockForCatalogue(fieldOrProduct, cat.id, cat)
-                );
-                updated = applyMasterCatalogueStockChange(
-                  previewProduct,
-                  catalogues,
-                  !allInStock
-                );
-              } else {
-                const field = fieldOrProduct;
-                const cat = catalogues.find((c) => c.stockField === field);
-                updated = cat
-                  ? toggleProductStockForCatalogue(previewProduct, cat.id, field, cat)
-                  : { ...previewProduct, [field]: !previewProduct[field] };
-              }
+                    const freshProducts = products.filter((x) => x.id !== productToShelf.id);
+                    const freshDeleted = [productToShelf, ...deletedProducts];
+                    console.log('📦 Shelf state updated:', {
+                      productName: productToShelf.name,
+                      productsCount: freshProducts.length,
+                      deletedCount: freshDeleted.length
+                    });
+                    setProducts(freshProducts);
+                    setDeletedProducts(freshDeleted);
 
-              updateProduct(updated);
-              setPreviewProduct(updated);
-            }}
-            onSwipeLeft={(next) => setPreviewProduct(next)}
-            onSwipeRight={(prev) => setPreviewProduct(prev)}
-            onShelf={(product) => {
-              // Perform shelf action directly since ProductPreviewModal already showed confirmation
-              const toShelf = product || previewProduct;
-              if (!toShelf) return;
-              if (!guardCloudWrite()) return;
+                    // Direct sync like updateProduct for faster response
+                    if (isStrictMode() && user?.uid) {
+                      console.log('📤 Direct sync for shelved product');
+                      syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+                        setProducts(cloudData.products);
+                        setDeletedProducts(cloudData.deletedProducts);
+                      }).catch(err => console.error('Shelf sync failed:', err));
+                    }
 
-              Haptics.impact({ style: ImpactStyle.Heavy });
-
-              // ✅ CRITICAL: Get the complete product object from the products array, not from stale reference
-              // This ensures all product data (including catalogueData, fields, etc.) is preserved
-              const completeProduct = products.find(p => p.id === toShelf.id);
-              if (!completeProduct) {
-                console.warn("Product not found in products array, using toShelf as fallback");
-              }
-              const productToShelf = completeProduct || toShelf;
-
-              const freshProducts = products.filter((p) => p.id !== productToShelf.id);
-              const freshDeleted = [productToShelf, ...deletedProducts];
-              setProducts(freshProducts);
-              setDeletedProducts(freshDeleted);
-
-              // Direct sync like updateProduct for faster response
-              if (isStrictMode() && user?.uid) {
-                console.log('📤 Direct sync for shelved product from preview');
-                syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
-                  setProducts(cloudData.products);
-                  setDeletedProducts(cloudData.deletedProducts);
-                }).catch(err => console.error('Preview shelf sync failed:', err));
-              }
-
-              // Move to next item in preview
-              const idx = previewList.findIndex(p => p.id === productToShelf.id);
-              if (idx !== -1) {
-                const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
-                setPreviewList(newPreviewList);
-
-                if (newPreviewList.length > 0) {
-                  const nextIdx = idx < newPreviewList.length ? idx : newPreviewList.length - 1;
-                  setPreviewProduct(newPreviewList[nextIdx]);
-                } else {
+                    // If currently previewing this item, move to next
+                    if (previewProduct && previewProduct.id === productToShelf.id) {
+                      const idx = previewList.findIndex(p => p.id === productToShelf.id);
+                      if (idx !== -1) {
+                        const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
+                        setPreviewList(newPreviewList);
+                        if (newPreviewList.length > 0) {
+                          const nextIdx = idx < newPreviewList.length ? idx : newPreviewList.length - 1;
+                          setPreviewProduct(newPreviewList[nextIdx]);
+                        } else {
+                          setPreviewProduct(null);
+                        }
+                      } else {
+                        setPreviewProduct(null);
+                      }
+                    } else {
+                      // Even if not previewing it, update the list in background
+                      setPreviewList(prev => prev.filter(p => p.id !== productToShelf.id));
+                    }
+                  }
+                  setShowShelfConfirm(false);
+                  setShelfTarget(null);
+                }}
+              >
+                Shelf
+              </button>
+              {showHiddenDangerShelfActions && (
+              <button
+                className="px-4 py-2 bg-orange-600 text-white rounded-full hover:bg-orange-800 transition"
+                onClick={async () => {
+                  if (!guardCloudWrite()) return;
+                  await Haptics.impact({ style: ImpactStyle.Heavy });
+                  // Move all products to shelf
+                  const freshDeleted = [...deletedProducts, ...products];
+                  setDeletedProducts(freshDeleted);
+                  setProducts([]);
                   setPreviewProduct(null);
-                }
+                  setPreviewList([]);
+
+                  // Direct sync like updateProduct for faster response
+                  if (isStrictMode() && user?.uid) {
+                    console.log('📤 Direct sync for shelf all');
+                    syncProductsToCloud([], freshDeleted, shelfMoveCloudSyncOptions([])).then(cloudData => {
+                      setProducts(cloudData.products);
+                      setDeletedProducts(cloudData.deletedProducts);
+                    }).catch(err => console.error('Shelf all sync failed:', err));
+                  }
+
+                  setShowShelfConfirm(false);
+                  setShelfTarget(null);
+                }}
+              >
+                Shelf All
+              </button>
+              )}
+              <button
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition"
+                onClick={() => {
+                  setShowShelfConfirm(false);
+                  setShelfTarget(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmToggleStock && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 p-6 max-w-sm w-full text-center">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">Heads up!</h2>
+            <p className="text-sm text-gray-600 mb-2">
+              You're about to change stock status{confirmToggleStock.field === "MASTER" ? " for all catalogues" : ""}. Are you sure?
+            </p>
+
+            <label className="flex items-center justify-center gap-2 mt-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={bypassChecked}
+                onChange={(e) => setBypassChecked(e.target.checked)}
+              />
+              Don't show this again for 5 minutes
+            </label>
+
+            <div className="flex justify-center gap-4 mt-5">
+              <button
+                className="px-4 py-2 rounded-full bg-gray-200 text-gray-800 hover:bg-gray-300 transition"
+                onClick={() => {
+                  setConfirmToggleStock(null);
+                  setBypassChecked(false);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition"
+                onClick={() => {
+                  const { id, field } = confirmToggleStock;
+                  if (!guardCloudWrite()) return;
+
+                  if (bypassChecked) {
+                    sessionStorage.setItem("bypassStockWarningUntil", (Date.now() + 5 * 60 * 1000).toString());
+                  }
+
+                  Haptics.impact({ style: ImpactStyle.Medium });
+
+                  let freshProducts: any[];
+                  if (field === "MASTER") {
+                    freshProducts = products.map((p) => {
+                      if (p.id === id) {
+                        const allInStock = catalogues.every((cat) =>
+                          isProductInStockForCatalogue(p, cat.id, cat)
+                        );
+                        return applyMasterCatalogueStockChange(p, catalogues, !allInStock);
+                      }
+                      return p;
+                    });
+                  } else {
+                    freshProducts = products.map((p) => {
+                      if (p.id !== id) return p;
+                      const cat = catalogues.find((c) => c.stockField === field);
+                      if (!cat) return { ...p, [field]: !p[field] };
+                      return toggleProductStockForCatalogue(p, cat.id, field, cat);
+                    });
+                  }
+                  setProducts(freshProducts);
+
+                  if (isStrictMode() && user?.uid) {
+                    syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+                      setProducts(cloudData.products);
+                      setDeletedProducts(cloudData.deletedProducts);
+                    }).catch(err => console.error('Strict sync failed:', err));
+                  }
+
+                  setConfirmToggleStock(null);
+                  setBypassChecked(false);
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewProduct && (
+        <ProductPreviewModal
+          product={previewProduct}
+          tab={tab}
+          catalogueId={selectedCatalogueInCataloguesTab}
+          filteredProducts={previewList}
+          onClose={() => setPreviewProduct(null)}
+          onEdit={() => {
+            if (!guardCloudWrite()) return;
+            persistProductsListScrollForEdit(scrollRef.current);
+            navigate(`/create?id=${previewProduct.id}`);
+          }}
+          onToggleStock={(fieldOrProduct, isMasterToggle) => {
+            let updated;
+
+            if (isMasterToggle && typeof fieldOrProduct === 'object') {
+              const allInStock = catalogues.every((cat) =>
+                isProductInStockForCatalogue(fieldOrProduct, cat.id, cat)
+              );
+              updated = applyMasterCatalogueStockChange(
+                previewProduct,
+                catalogues,
+                !allInStock
+              );
+            } else {
+              const field = fieldOrProduct;
+              const cat = catalogues.find((c) => c.stockField === field);
+              updated = cat
+                ? toggleProductStockForCatalogue(previewProduct, cat.id, field, cat)
+                : { ...previewProduct, [field]: !previewProduct[field] };
+            }
+
+            updateProduct(updated);
+            setPreviewProduct(updated);
+          }}
+          onSwipeLeft={(next) => setPreviewProduct(next)}
+          onSwipeRight={(prev) => setPreviewProduct(prev)}
+          onShelf={(product) => {
+            // Perform shelf action directly since ProductPreviewModal already showed confirmation
+            const toShelf = product || previewProduct;
+            if (!toShelf) return;
+            if (!guardCloudWrite()) return;
+
+            Haptics.impact({ style: ImpactStyle.Heavy });
+
+            // ✅ CRITICAL: Get the complete product object from the products array, not from stale reference
+            // This ensures all product data (including catalogueData, fields, etc.) is preserved
+            const completeProduct = products.find(p => p.id === toShelf.id);
+            if (!completeProduct) {
+              console.warn("Product not found in products array, using toShelf as fallback");
+            }
+            const productToShelf = completeProduct || toShelf;
+
+            const freshProducts = products.filter((p) => p.id !== productToShelf.id);
+            const freshDeleted = [productToShelf, ...deletedProducts];
+            setProducts(freshProducts);
+            setDeletedProducts(freshDeleted);
+
+            // Direct sync like updateProduct for faster response
+            if (isStrictMode() && user?.uid) {
+              console.log('📤 Direct sync for shelved product from preview');
+              syncProductsToCloud(freshProducts, freshDeleted, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+                setProducts(cloudData.products);
+                setDeletedProducts(cloudData.deletedProducts);
+              }).catch(err => console.error('Preview shelf sync failed:', err));
+            }
+
+            // Move to next item in preview
+            const idx = previewList.findIndex(p => p.id === productToShelf.id);
+            if (idx !== -1) {
+              const newPreviewList = previewList.filter(p => p.id !== productToShelf.id);
+              setPreviewList(newPreviewList);
+
+              if (newPreviewList.length > 0) {
+                const nextIdx = idx < newPreviewList.length ? idx : newPreviewList.length - 1;
+                setPreviewProduct(newPreviewList[nextIdx]);
               } else {
                 setPreviewProduct(null);
               }
-            }}
-          />
-        )}
-      </main>
+            } else {
+              setPreviewProduct(null);
+            }
+          }}
+        />
+      )}
 
       <MainAppBottomNav active={pathname === "/catalogues" ? "catalogues" : "products"} sideDrawerOpen={menuOpen} modalOpen={!!previewProduct} />
 

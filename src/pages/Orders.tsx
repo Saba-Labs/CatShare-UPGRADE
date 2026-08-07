@@ -30,10 +30,16 @@ import { productImageDisplayUrl } from '../utils/imageUrl';
 import './Orders.css';
 import MainAppBottomNav from '../components/MainAppBottomNav';
 import { useCloudWriteGate } from '../hooks/useCloudWriteGate';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiChevronsDown } from 'react-icons/fi';
 
 const ORDERS_LIST_SCROLL_KEY = 'ordersListScroll';
 const ORDERS_SCREEN_FRESH_MS = 15000;
 const ORDERS_ACTIVE_MOBILE_POLL_MS = 5000;
+const PULL_REFRESH_THRESHOLD = 56;
+const PULL_REFRESH_MAX_DISTANCE = 96;
+const PULL_REFRESH_SETTLE_DISTANCE = 56;
+const PULL_REFRESH_SUCCESS_DISPLAY_MS = 1200;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TabType = OrderTabFilter;
@@ -749,6 +755,38 @@ function OrderMetaHit({
   );
 }
 
+function PullToRefreshIndicator({ justUpdated }: { justUpdated: boolean }) {
+  const blinking = !justUpdated;
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={justUpdated ? 'updated' : 'refreshing'}
+        initial={{ opacity: 0 }}
+        animate={blinking ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={
+          blinking
+            ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.2, ease: 'easeOut' }
+        }
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          whiteSpace: 'nowrap',
+          fontSize: 13.5,
+          fontWeight: 500,
+          letterSpacing: '-0.01em',
+          color: '#6B7280',
+        }}
+      >
+        {!justUpdated && <FiChevronsDown size={16} style={{ flexShrink: 0 }} aria-hidden />}
+        {justUpdated ? 'Updated' : 'Refreshing…'}
+      </motion.span>
+    </AnimatePresence>
+  );
+}
+
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const cfg = getStatusConfig(status);
@@ -1257,6 +1295,8 @@ export default function Orders() {
   const [tabSwipeShift, setTabSwipeShift] = useState(0);
   const [pullDistance, setPullDistance] = useState(0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [pullDragging, setPullDragging] = useState(false);
+  const [pullJustUpdated, setPullJustUpdated] = useState(false);
   const [dateRangeStart, setDateRangeStart] = useState<string>('');
   const [dateRangeEnd, setDateRangeEnd] = useState<string>('');
   const [showDateFilters, setShowDateFilters] = useState(false);
@@ -1271,6 +1311,7 @@ export default function Orders() {
   const tabSwipeActive = useRef(false);
   const pullToRefreshActive = useRef(false);
   const pullDistanceRef = useRef(0);
+  const pullSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useLayoutEffect(() => {
     if (!user?.uid || user.uid.trim() === '' || user.isAnonymous) return;
@@ -1355,6 +1396,12 @@ export default function Orders() {
       searchInputRef.current.focus();
     }
   }, [showSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (pullSuccessTimer.current) clearTimeout(pullSuccessTimer.current);
+    };
+  }, []);
 
   // Debounce search to reduce filtering work on every keypress.
   useEffect(() => {
@@ -1469,6 +1516,9 @@ export default function Orders() {
       !pullRefreshing && !loading && (scrollRef.current?.scrollTop ?? 0) <= 0;
     pullDistanceRef.current = 0;
     setPullDistance(0);
+    if (pullToRefreshActive.current) {
+      setPullDragging(true);
+    }
     tabSwipeActive.current = !pullToRefreshActive.current;
     setTabSwipeShift(0);
   };
@@ -1486,9 +1536,10 @@ export default function Orders() {
         pullToRefreshActive.current = false;
         pullDistanceRef.current = 0;
         setPullDistance(0);
+        setPullDragging(false);
         tabSwipeActive.current = absDeltaX > absDeltaY;
       } else {
-        const distance = Math.min(96, deltaY * 0.55);
+        const distance = Math.min(PULL_REFRESH_MAX_DISTANCE, deltaY * 0.55);
         pullDistanceRef.current = distance;
         setPullDistance(distance);
         tabSwipeActive.current = false;
@@ -1527,7 +1578,7 @@ export default function Orders() {
 
     if (pullToRefreshActive.current) {
       const shouldRefresh =
-        pullDistanceRef.current >= 56 &&
+        pullDistanceRef.current >= PULL_REFRESH_THRESHOLD &&
         deltaY > 0 &&
         (scrollRef.current?.scrollTop ?? 0) <= 0 &&
         !pullRefreshing &&
@@ -1535,10 +1586,21 @@ export default function Orders() {
       pullToRefreshActive.current = false;
       pullDistanceRef.current = 0;
       setPullDistance(0);
+      setPullDragging(false);
       if (shouldRefresh) {
+        if (pullSuccessTimer.current) {
+          clearTimeout(pullSuccessTimer.current);
+          pullSuccessTimer.current = null;
+        }
+        setPullJustUpdated(false);
         setPullRefreshing(true);
         try {
           await loadOrders({ force: true });
+          setPullJustUpdated(true);
+          pullSuccessTimer.current = setTimeout(() => {
+            setPullJustUpdated(false);
+            pullSuccessTimer.current = null;
+          }, PULL_REFRESH_SUCCESS_DISPLAY_MS);
         } finally {
           setPullRefreshing(false);
         }
@@ -1650,9 +1712,19 @@ export default function Orders() {
 
   const handleDesktopOrderRefresh = async () => {
     if (pullRefreshing || loading) return;
+    if (pullSuccessTimer.current) {
+      clearTimeout(pullSuccessTimer.current);
+      pullSuccessTimer.current = null;
+    }
+    setPullJustUpdated(false);
     setPullRefreshing(true);
     try {
       await loadOrders({ force: true });
+      setPullJustUpdated(true);
+      pullSuccessTimer.current = setTimeout(() => {
+        setPullJustUpdated(false);
+        pullSuccessTimer.current = null;
+      }, PULL_REFRESH_SUCCESS_DISPLAY_MS);
     } finally {
       setPullRefreshing(false);
     }
@@ -1822,6 +1894,10 @@ export default function Orders() {
     [orders]
   );
   const symbol = useMemo(() => (orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹'), [orders]);
+
+  const pullHolding = pullRefreshing || pullJustUpdated;
+  const pullOffset = pullHolding ? PULL_REFRESH_SETTLE_DISTANCE : pullDistance;
+  const pullProgress = Math.min(pullOffset / PULL_REFRESH_THRESHOLD, 1);
 
   // Calculate sales within date range
   const filteredSales = useMemo(
@@ -2032,15 +2108,18 @@ export default function Orders() {
 
           {/* Fixed Icons Group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-            <button
+            <motion.button
               type="button"
               className="orders-desktop-refresh"
               onClick={() => void handleDesktopOrderRefresh()}
               disabled={pullRefreshing || loading}
+              whileHover={pullRefreshing || loading ? undefined : { scale: 1.08 }}
+              whileTap={pullRefreshing || loading ? undefined : { scale: 0.86 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
               title="Refresh orders"
               aria-label="Refresh orders"
             >
-              <svg
+              <motion.svg
                 width="18"
                 height="18"
                 viewBox="0 0 24 24"
@@ -2049,14 +2128,19 @@ export default function Orders() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={pullRefreshing ? 'orders-desktop-refresh__icon--spinning' : undefined}
+                animate={pullRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={
+                  pullRefreshing
+                    ? { repeat: Infinity, ease: 'linear', duration: 0.85 }
+                    : { duration: 0.2, ease: 'easeOut' }
+                }
               >
                 <path d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
                 <path d="M3 4v6h6" />
                 <path d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
                 <path d="M21 20v-6h-6" />
-              </svg>
-            </button>
+              </motion.svg>
+            </motion.button>
             <button
               onClick={() => setShowFilters(true)}
               style={{
@@ -2215,21 +2299,27 @@ export default function Orders() {
         onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
-        {(pullDistance > 0 || pullRefreshing) && (
+        {pullOffset > 0 && (
           <div
             className="orders-pull-refresh"
-            style={{ height: pullRefreshing ? 48 : Math.max(pullDistance, 1) }}
+            style={{
+              height: pullOffset,
+              opacity: pullHolding ? 1 : Math.min(pullProgress * 1.4, 1),
+              transition: pullDragging ? 'none' : 'height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out',
+            }}
             role="status"
             aria-live="polite"
           >
-            <div
-              className={`orders-pull-refresh__indicator${pullRefreshing ? ' is-refreshing' : ''}`}
-              style={!pullRefreshing ? { transform: `rotate(${Math.min(pullDistance / 56, 1) * 180}deg)` } : undefined}
-              aria-hidden
-            >
-              ↓
-            </div>
-            <span>{pullRefreshing ? 'Refreshing orders…' : pullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}</span>
+            <PullToRefreshIndicator justUpdated={pullJustUpdated} />
+            <span className="sr-only">
+              {pullJustUpdated
+                ? 'Orders updated'
+                : pullRefreshing
+                ? 'Refreshing orders…'
+                : pullDistance >= PULL_REFRESH_THRESHOLD
+                ? 'Release to refresh'
+                : 'Pull to refresh'}
+            </span>
           </div>
         )}
         <div

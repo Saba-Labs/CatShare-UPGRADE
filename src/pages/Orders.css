@@ -222,28 +222,25 @@ html.dark .orders-filter-grabber span {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 9999px;
   background: transparent;
-  color: var(--ord-icon);
+  color: #6b7280;
   cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .orders-desktop-refresh:hover:not(:disabled) {
-  background: var(--ord-surface-2);
-  color: #2563eb;
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
 }
 
 .orders-desktop-refresh:disabled {
   cursor: default;
-  opacity: 0.55;
-}
-
-.orders-desktop-refresh__icon--spinning {
-  animation: ordersPullRefreshSpin 0.8s linear infinite;
+  opacity: 0.4;
 }
 
 @media (min-width: 768px) {
@@ -256,34 +253,23 @@ html.dark .orders-filter-grabber span {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   overflow: hidden;
-  color: var(--ord-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-  transition: height 0.18s ease;
+  pointer-events: none;
 }
 
-.orders-pull-refresh__indicator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: #2563eb;
-  font-size: 22px;
-  line-height: 1;
-  transition: transform 0.12s ease;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.orders-pull-refresh__indicator.is-refreshing {
-  animation: ordersPullRefreshSpin 0.8s linear infinite;
-}
 
-@keyframes ordersPullRefreshSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
 
 @keyframes ordersBannerIn {
   from {
