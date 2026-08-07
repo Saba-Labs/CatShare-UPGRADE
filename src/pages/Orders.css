@@ -259,7 +259,7 @@ html.dark .orders-filter-grabber span {
   gap: 8px;
   overflow: hidden;
   color: var(--ord-text-muted);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   transition: height 0.18s ease;
 }
@@ -271,13 +271,18 @@ html.dark .orders-filter-grabber span {
   width: 24px;
   height: 24px;
   color: #2563eb;
-  font-size: 22px;
   line-height: 1;
   transition: transform 0.12s ease;
+  animation: ordersPullRefreshPulse 1.8s ease-in-out infinite;
 }
 
 .orders-pull-refresh__indicator.is-refreshing {
   animation: ordersPullRefreshSpin 0.8s linear infinite;
+}
+
+@keyframes ordersPullRefreshPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 @keyframes ordersPullRefreshSpin {
