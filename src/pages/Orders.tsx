@@ -1895,6 +1895,10 @@ export default function Orders() {
   );
   const symbol = useMemo(() => (orders[0] ? getCurrencySymbol(orders[0].currency_code) : '₹'), [orders]);
 
+  const pullHolding = pullRefreshing || pullJustUpdated;
+  const pullOffset = pullHolding ? PULL_REFRESH_SETTLE_DISTANCE : pullDistance;
+  const pullProgress = Math.min(pullOffset / PULL_REFRESH_THRESHOLD, 1);
+
   // Calculate sales within date range
   const filteredSales = useMemo(
     () =>
@@ -2104,15 +2108,18 @@ export default function Orders() {
 
           {/* Fixed Icons Group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-            <button
+            <motion.button
               type="button"
               className="orders-desktop-refresh"
               onClick={() => void handleDesktopOrderRefresh()}
               disabled={pullRefreshing || loading}
+              whileHover={pullRefreshing || loading ? undefined : { scale: 1.08 }}
+              whileTap={pullRefreshing || loading ? undefined : { scale: 0.86 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
               title="Refresh orders"
               aria-label="Refresh orders"
             >
-              <svg
+              <motion.svg
                 width="18"
                 height="18"
                 viewBox="0 0 24 24"
@@ -2121,14 +2128,19 @@ export default function Orders() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className={pullRefreshing ? 'orders-desktop-refresh__icon--spinning' : undefined}
+                animate={pullRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                transition={
+                  pullRefreshing
+                    ? { repeat: Infinity, ease: 'linear', duration: 0.85 }
+                    : { duration: 0.2, ease: 'easeOut' }
+                }
               >
                 <path d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
                 <path d="M3 4v6h6" />
                 <path d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
                 <path d="M21 20v-6h-6" />
-              </svg>
-            </button>
+              </motion.svg>
+            </motion.button>
             <button
               onClick={() => setShowFilters(true)}
               style={{
@@ -2287,21 +2299,27 @@ export default function Orders() {
         onTouchEnd={handleMainTouchEnd}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 70 }}
       >
-        {(pullDistance > 0 || pullRefreshing || pullRefreshSuccess) && (
+        {pullOffset > 0 && (
           <div
             className="orders-pull-refresh"
-            style={{ height: pullRefreshing || pullRefreshSuccess ? 48 : Math.max(pullDistance, 1) }}
+            style={{
+              height: pullOffset,
+              opacity: pullHolding ? 1 : Math.min(pullProgress * 1.4, 1),
+              transition: pullDragging ? 'none' : 'height 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 160ms ease-out',
+            }}
             role="status"
             aria-live="polite"
           >
-            <div
-              className={`orders-pull-refresh__indicator${pullRefreshing ? ' is-refreshing' : ''}`}
-              style={!pullRefreshing && !pullRefreshSuccess ? { transform: `rotate(${Math.min(pullDistance / 56, 1) * 180}deg)` } : undefined}
-              aria-hidden
-            >
-              {pullRefreshSuccess ? <IconCheck /> : <FiChevronsDown size={16} />}
-            </div>
-            <span>{pullRefreshSuccess ? 'Updated' : 'Refreshing…'}</span>
+            <PullToRefreshIndicator justUpdated={pullJustUpdated} />
+            <span className="sr-only">
+              {pullJustUpdated
+                ? 'Orders updated'
+                : pullRefreshing
+                ? 'Refreshing orders…'
+                : pullDistance >= PULL_REFRESH_THRESHOLD
+                ? 'Release to refresh'
+                : 'Pull to refresh'}
+            </span>
           </div>
         )}
         <div
