@@ -104,18 +104,24 @@ export default function CollectionPageRuntime({
         : embeddedCategory
       : initialCategoryParam);
 
+  const selectedCategoryIds = useMemo(
+    () => new Set((categoryIds ?? []).map((id) => id.toLowerCase())),
+    [categoryIds]
+  );
+
   const scopedProducts = useMemo(() => {
-    const selectedIds = new Set((categoryIds ?? []).map((id) => id.toLowerCase()));
-    if (selectedIds.size === 0) return products;
+    if (selectedCategoryIds.size === 0) return products;
     return products.filter((product) =>
-      normalizeProductCategories(product.category).some((category) => selectedIds.has(category.toLowerCase()))
+      normalizeProductCategories(product.category).some((category) => selectedCategoryIds.has(category.toLowerCase()))
     );
-  }, [products, categoryIds]);
+  }, [products, selectedCategoryIds]);
 
   const availableCategories = useMemo(() => {
-    const all = scopedProducts.flatMap((product) => normalizeProductCategories(product.category));
-    return Array.from(new Set(all));
-  }, [scopedProducts]);
+    const all = Array.from(new Set(scopedProducts.flatMap((product) => normalizeProductCategories(product.category))));
+    return selectedCategoryIds.size === 0
+      ? all
+      : all.filter((category) => selectedCategoryIds.has(category.toLowerCase()));
+  }, [scopedProducts, selectedCategoryIds]);
 
   const selectedCategory = useMemo(() => {
     const resolved = resolveStoreCategoryParam(categoryParam, availableCategories);
