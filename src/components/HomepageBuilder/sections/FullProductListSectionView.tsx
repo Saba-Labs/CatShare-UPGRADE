@@ -59,7 +59,7 @@ export default function FullProductListSectionView({
         showCategoryFilters={settings.showCategoryFilters ?? true}
         categoryIds={settings.categoryIds}
         showSort={settings.showSort ?? true}
-        viewMode={coerceProductListViewMode(settings.cardStyle, settings.viewMode ?? 'list')}
+        viewMode={coerceProductListViewMode(settings.cardStyle, settings.viewMode ?? 'grid')}
         cardsStyle={normalizeProductCardStyle(settings.cardStyle)}
         productImageRatio={settings.productImageRatio ?? 'square'}
         showPrice={settings.showPrice ?? true}
