@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "re
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation, Outlet } from "react-router-dom";
 import { flushSync } from "react-dom";
-import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList, FiImage } from "react-icons/fi";
+import { FiPlus, FiSearch, FiTrash2, FiEdit, FiMenu, FiMessageSquare, FiList, FiImage, FiChevronsDown } from "react-icons/fi";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SideDrawer from "./SideDrawer";
 import CatalogueView from "./CatalogueView";
@@ -123,15 +123,13 @@ function PullToRefreshIndicator({
   /** True for a brief window right after a refresh lands successfully. */
   justUpdated: boolean;
 }) {
-  const label = justUpdated ? "Updated" : "⇊ Refreshing…";
-
   // Mild breathing blink while waiting on the user or the network; holds steady once "Updated" lands.
   const blinking = !justUpdated;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.span
-        key={label}
+        key={justUpdated ? "updated" : "refreshing"}
         initial={{ opacity: 0 }}
         animate={blinking ? { opacity: [0.55, 1, 0.55] } : { opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -140,9 +138,10 @@ function PullToRefreshIndicator({
             ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
             : { duration: 0.2, ease: "easeOut" }
         }
-        className="whitespace-nowrap text-[12px] font-medium tracking-tight text-gray-500"
+        className="flex items-center gap-1.5 whitespace-nowrap text-[15px] font-medium tracking-tight text-gray-500"
       >
-        {label}
+        {!justUpdated && <FiChevronsDown className="h-4 w-4 shrink-0" aria-hidden />}
+        {justUpdated ? "Updated" : "Refreshing…"}
       </motion.span>
     </AnimatePresence>
   );
