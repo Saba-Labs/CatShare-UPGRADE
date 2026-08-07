@@ -1,6 +1,7 @@
 import { HomepageSection, FullProductListSection } from '../../../types/homepage';
 import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
 import SidebarDropdownField from '../SidebarDropdownField';
+import CategoryPicker from './catalogue/CategoryPicker';
 
 interface FullProductListEditorProps {
   section: FullProductListSection & { id: string };
@@ -90,6 +91,15 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
           />
           Show categories
         </label>
+      </div>
+
+      <div className="panel-section">
+        <label className="panel-label">Categories to show</label>
+        <CategoryPicker
+          selectedIds={settings.categoryIds ?? []}
+          onChange={(categoryIds) => updateSettings({ categoryIds })}
+        />
+        <p className="sidebar-field-hint">Leave empty to show all categories.</p>
       </div>
 
       <div className="panel-section">

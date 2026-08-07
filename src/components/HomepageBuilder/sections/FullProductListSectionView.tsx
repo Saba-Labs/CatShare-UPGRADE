@@ -57,6 +57,7 @@ export default function FullProductListSectionView({
         embedded
         sectionTitle={settings.title}
         showCategoryFilters={settings.showCategoryFilters ?? true}
+        categoryIds={settings.categoryIds}
         showSort={settings.showSort ?? true}
         viewMode={coerceProductListViewMode(settings.cardStyle, settings.viewMode ?? 'list')}
         cardsStyle={normalizeProductCardStyle(settings.cardStyle)}

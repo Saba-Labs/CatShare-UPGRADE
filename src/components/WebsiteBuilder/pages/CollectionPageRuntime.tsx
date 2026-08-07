@@ -41,6 +41,8 @@ interface CollectionPageRuntimeProps {
   embedded?: boolean;
   sectionTitle?: string;
   showCategoryFilters?: boolean;
+  /** Limits the category chips shown by embedded product lists. Empty means all categories. */
+  categoryIds?: string[];
   showSort?: boolean;
   viewMode?: 'list' | 'grid';
   productImageRatio?: ProductImageRatio;
@@ -63,6 +65,7 @@ export default function CollectionPageRuntime({
   embedded = false,
   sectionTitle,
   showCategoryFilters = true,
+  categoryIds,
   showSort = true,
   viewMode,
   productImageRatio = 'square',
@@ -101,13 +104,19 @@ export default function CollectionPageRuntime({
         .map((category) => String(category).trim())
         .filter(Boolean)
     );
-    return Array.from(new Set(all));
-  }, [products]);
+    const categories = Array.from(new Set(all));
+    const selectedIds = new Set((categoryIds ?? []).map((id) => id.toLowerCase()));
+    return selectedIds.size === 0
+      ? categories
+      : categories.filter((category) => selectedIds.has(category.toLowerCase()));
+  }, [products, categoryIds]);
 
-  const selectedCategory = useMemo(
-    () => resolveStoreCategoryParam(categoryParam, availableCategories),
-    [categoryParam, availableCategories]
-  );
+  const selectedCategory = useMemo(() => {
+    const resolved = resolveStoreCategoryParam(categoryParam, availableCategories);
+    return resolved === 'all' || availableCategories.some((category) => storeCategoriesMatch(category, resolved))
+      ? resolved
+      : 'all';
+  }, [categoryParam, availableCategories]);
 
   const setCategoryFilter = (category: string) => {
     if (builderPreview && onPreviewCategoryChange) {
