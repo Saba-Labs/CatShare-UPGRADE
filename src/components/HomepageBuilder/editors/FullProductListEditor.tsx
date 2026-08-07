@@ -2,6 +2,7 @@ import { HomepageSection, FullProductListSection } from '../../../types/homepage
 import ProductCardStyleSettingsPanel from './ProductCardStyleSettingsPanel';
 import SidebarDropdownField from '../SidebarDropdownField';
 import CategoryPicker from './catalogue/CategoryPicker';
+import PanelFieldLabel from '../PanelFieldLabel';
 
 interface FullProductListEditorProps {
   section: FullProductListSection & { id: string };
@@ -94,12 +95,14 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
       </div>
 
       <div className="panel-section">
-        <label className="panel-label">Categories to show</label>
+        <PanelFieldLabel
+          label="Categories to show"
+          hint="Leave empty to show all categories. This block is for the homepage; category and shop pages use the built-in catalog. Edit those styles from Pages → Shop catalog or by clicking a category tile."
+        />
         <CategoryPicker
           selectedIds={settings.categoryIds ?? []}
           onChange={(categoryIds) => updateSettings({ categoryIds })}
         />
-        <p className="sidebar-field-hint">Leave empty to show all categories.</p>
       </div>
 
       <div className="panel-section">
@@ -113,10 +116,6 @@ export default function FullProductListEditor({ section, onUpdate }: FullProduct
         </label>
       </div>
 
-      <p className="panel-hint">
-        Optional block for your homepage only. Category and shop pages use the built-in catalog — edit
-        those styles from Pages → Shop catalog or by clicking a category tile.
-      </p>
     </>
   );
 }
