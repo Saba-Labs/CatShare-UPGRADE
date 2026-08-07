@@ -1639,7 +1639,7 @@ const handleTouchEnd = useCallback(() => {
 
      {/* Modern Filter Drawer Slide-In */}
 <div
-  className={`fixed inset-0 z-40 transition duration-300 ${
+  className={`fixed inset-0 z-50 transition duration-300 ${
     showFilters ? "opacity-100" : "opacity-0 pointer-events-none"
   }`}
 >
