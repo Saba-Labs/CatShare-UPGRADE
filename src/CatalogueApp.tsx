@@ -73,6 +73,8 @@ const PULL_REFRESH_THRESHOLD = 56;
 const PULL_REFRESH_MAX_DISTANCE = 96;
 /** Resting offset (px) the indicator + content hold at while a refresh is in flight. */
 const PULL_REFRESH_SETTLE_DISTANCE = 56;
+/** Combined height (px) of the fixed black status bar (40px) + sticky products header (h-14 = 56px). The pull indicator is pinned below this so it's never covered by the header's stacking context. */
+const PRODUCTS_HEADER_CHROME_HEIGHT = 96;
 
 /** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */
 function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
@@ -1580,10 +1582,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       >
         {tab === 'products' && (
           <div
-            className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center"
+            className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center"
             style={{
+              top: `calc(env(safe-area-inset-top, 0px) + ${PRODUCTS_HEADER_CHROME_HEIGHT + 8}px)`,
               opacity: productPullRefreshing ? 1 : Math.min(productPullProgress * 1.4, 1),
-              transition: productPullDragging ? "none" : "opacity 160ms ease-out",
+              transform: `translateY(${productPullRefreshing ? 0 : Math.min(productPullOffset, 16) - 16}px)`,
+              transition: productPullDragging ? "none" : "opacity 160ms ease-out, transform 160ms ease-out",
             }}
             role="status"
             aria-live="polite"
