@@ -138,7 +138,7 @@ function PullToRefreshIndicator({
             ? { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
             : { duration: 0.2, ease: "easeOut" }
         }
-        className="flex items-center gap-1.5 whitespace-nowrap text-[15px] font-medium tracking-tight text-gray-500"
+        className="flex items-center gap-1.5 whitespace-nowrap text-[13.5px] font-medium tracking-tight text-gray-500"
       >
         {!justUpdated && <FiChevronsDown className="h-4 w-4 shrink-0" aria-hidden />}
         {justUpdated ? "Updated" : "Refreshing…"}
