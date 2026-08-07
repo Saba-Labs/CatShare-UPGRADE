@@ -338,7 +338,9 @@ export default function GridCanvas({
           </p>
         </div>
       ) : (
-            <div className="sites-document-stack">
+            <div
+              className={`sites-document-stack${selectedSectionId === sortedSections[0]?.id ? ' sites-document-stack--first-selected' : ''}`}
+            >
               <SectionDropIndicator index={0} expanded={paletteDragActive} />
               {sortedSections.map((section, sectionIndex) => {
                 const isSelected = selectedSectionId === section.id;
