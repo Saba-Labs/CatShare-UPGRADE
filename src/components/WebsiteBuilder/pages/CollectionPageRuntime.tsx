@@ -7,6 +7,7 @@ import {
   type ProductWithCatalogueData,
 } from '../../../config/catalogueProductUtils';
 import type { DefaultSorting, ProductImageRatio } from '../../../types/storeBehaviorSettings';
+import { normalizeProductCategories } from '../../../utils/productCategoryUtils';
 import {
   productsInCategory,
   resolveStoreCategoryParam,
@@ -98,18 +99,18 @@ export default function CollectionPageRuntime({
     previewCategoryId ??
     new URLSearchParams(location.search).get('category');
 
-  const availableCategories = useMemo(() => {
-    const all = products.flatMap((product) =>
-      (Array.isArray(product.category) ? product.category : [])
-        .map((category) => String(category).trim())
-        .filter(Boolean)
-    );
-    const categories = Array.from(new Set(all));
+  const scopedProducts = useMemo(() => {
     const selectedIds = new Set((categoryIds ?? []).map((id) => id.toLowerCase()));
-    return selectedIds.size === 0
-      ? categories
-      : categories.filter((category) => selectedIds.has(category.toLowerCase()));
+    if (selectedIds.size === 0) return products;
+    return products.filter((product) =>
+      normalizeProductCategories(product.category).some((category) => selectedIds.has(category.toLowerCase()))
+    );
   }, [products, categoryIds]);
+
+  const availableCategories = useMemo(() => {
+    const all = scopedProducts.flatMap((product) => normalizeProductCategories(product.category));
+    return Array.from(new Set(all));
+  }, [scopedProducts]);
 
   const selectedCategory = useMemo(() => {
     const resolved = resolveStoreCategoryParam(categoryParam, availableCategories);
@@ -146,9 +147,9 @@ export default function CollectionPageRuntime({
   };
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === 'all') return products;
-    return productsInCategory(products, selectedCategory);
-  }, [products, selectedCategory]);
+    if (selectedCategory === 'all') return scopedProducts;
+    return productsInCategory(scopedProducts, selectedCategory);
+  }, [scopedProducts, selectedCategory]);
 
   const sortedProducts = useMemo(() => {
     if (sortBy === 'default') {
@@ -182,9 +183,9 @@ export default function CollectionPageRuntime({
 
   const categoryLabel = useMemo(() => {
     if (!selectedCategory || selectedCategory === 'all') return null;
-    const match = products.find((p) =>
-      (Array.isArray(p.category) ? p.category : []).some(
-        (c) => String(c).toLowerCase() === selectedCategory.toLowerCase()
+    const match = scopedProducts.find((p) =>
+      normalizeProductCategories(p.category).some(
+        (c) => c.toLowerCase() === selectedCategory.toLowerCase()
       )
     );
     const labels = match?.category;
@@ -192,7 +193,7 @@ export default function CollectionPageRuntime({
       return labels.find((c) => String(c).toLowerCase() === selectedCategory.toLowerCase()) || selectedCategory;
     }
     return selectedCategory;
-  }, [selectedCategory, products]);
+  }, [selectedCategory, scopedProducts]);
 
   const pageTitle = embedded
     ? (sectionTitle?.trim() || categoryLabel || 'Products')
