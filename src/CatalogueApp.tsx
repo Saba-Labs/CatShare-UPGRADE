@@ -67,6 +67,13 @@ const PRODUCT_SCROLL_KEY = "productScroll";
 const CATALOGUE_FETCH_TIMEOUT_MS = 22_000;
 const SELLER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Pull-to-refresh tuning: distance (px) the user must pull past before release triggers a refresh. */
+const PULL_REFRESH_THRESHOLD = 56;
+/** Pull-to-refresh tuning: hard cap (px) on how far the rubber-band can stretch. */
+const PULL_REFRESH_MAX_DISTANCE = 96;
+/** Resting offset (px) the indicator + content hold at while a refresh is in flight. */
+const PULL_REFRESH_SETTLE_DISTANCE = 56;
+
 /** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */
 function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
   return {
@@ -96,6 +103,65 @@ const fabDialItem = {
     transition: { duration: 0.17, ease: [0.4, 0, 1, 1] as const, delay: (1 - i) * 0.052 },
   }),
 };
+
+/**
+ * Modern circular pull-to-refresh indicator.
+ * - While dragging: a thin ring fills clockwise to show progress toward the release threshold,
+ *   and the chevron rotates 180° once the threshold is crossed (mirrors iOS/Android affordance).
+ * - While refreshing: the ring becomes an indeterminate spinner.
+ * Purely presentational — all pull physics stay in the touch handlers below.
+ */
+function PullToRefreshIndicator({
+  progress,
+  refreshing,
+  armed,
+}: {
+  /** 0 → 1 pull progress toward the release threshold. */
+  progress: number;
+  refreshing: boolean;
+  /** True once progress has crossed the release threshold (pre-refresh). */
+  armed: boolean;
+}) {
+  const radius = 9;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - Math.min(Math.max(progress, 0), 1));
+  const scale = refreshing ? 1 : 0.55 + Math.min(Math.max(progress, 0), 1) * 0.45;
+
+  return (
+    <div
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 shadow-[0_2px_10px_rgba(15,23,42,0.14)] ring-1 ring-black/[0.04] backdrop-blur-sm"
+      style={{
+        transform: `scale(${scale})`,
+        transition: refreshing ? "transform 160ms ease-out" : "none",
+      }}
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        className={refreshing ? "animate-spin" : ""}
+        style={{ transitionDuration: refreshing ? undefined : "120ms" }}
+      >
+        {!refreshing && (
+          <circle cx="10" cy="10" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="2" />
+        )}
+        <circle
+          cx="10"
+          cy="10"
+          r={radius}
+          fill="none"
+          stroke={armed || refreshing ? "#2563eb" : "#93b4fa"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={refreshing ? circumference * 0.72 : dashOffset}
+          transform="rotate(-90 10 10)"
+          style={{ transition: refreshing ? "none" : "stroke-dashoffset 60ms linear, stroke 160ms ease-out" }}
+        />
+      </svg>
+    </div>
+  );
+}
 
 /** Read exact scroll: prefer main (the real list scroller); fallback to window if needed. */
 function readProductsListScrollY(scrollEl: HTMLElement | null): number {
@@ -398,6 +464,8 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [productFabExpanded, setProductFabExpanded] = useState(false);
   const [productPullDistance, setProductPullDistance] = useState(0);
   const [productPullRefreshing, setProductPullRefreshing] = useState(false);
+  /** True only while a finger is actively dragging — disables the settle transition so the UI tracks the touch 1:1. */
+  const [productPullDragging, setProductPullDragging] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewList, setPreviewList] = useState([]);
@@ -1184,6 +1252,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       !productPullRefreshing && !catalogueLoading && (scrollRef.current?.scrollTop ?? 0) <= 0;
     productPullDistanceRef.current = 0;
     setProductPullDistance(0);
+    if (productPullActive.current) {
+      setProductPullDragging(true);
+    }
   };
 
   const handleProductsTouchMove = (e: React.TouchEvent<HTMLElement>) => {
@@ -1195,10 +1266,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       productPullActive.current = false;
       productPullDistanceRef.current = 0;
       setProductPullDistance(0);
+      setProductPullDragging(false);
       return;
     }
 
-    const distance = Math.min(96, verticalDistance * 0.55);
+    const distance = Math.min(PULL_REFRESH_MAX_DISTANCE, verticalDistance * 0.55);
     productPullDistanceRef.current = distance;
     setProductPullDistance(distance);
     e.preventDefault();
@@ -1207,15 +1279,26 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleProductsTouchEnd = async () => {
     if (!productPullActive.current) return;
     const shouldRefresh =
-      productPullDistanceRef.current >= 56 &&
+      productPullDistanceRef.current >= PULL_REFRESH_THRESHOLD &&
       !productPullRefreshing &&
       !catalogueLoading &&
       (scrollRef.current?.scrollTop ?? 0) <= 0;
     productPullActive.current = false;
     productPullDistanceRef.current = 0;
     setProductPullDistance(0);
-    if (shouldRefresh) await refreshProducts();
+    // Dropping the drag flag re-enables the settle transition so release/refresh/reset all glide smoothly.
+    setProductPullDragging(false);
+    if (shouldRefresh) {
+      await Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+      await refreshProducts();
+    }
   };
+
+  // Effective offset the indicator + content hold at: follows the finger while dragging,
+  // parks at the settle distance during an in-flight refresh, and eases to 0 otherwise.
+  const productPullOffset = productPullRefreshing ? PULL_REFRESH_SETTLE_DISTANCE : productPullDistance;
+  const productPullProgress = Math.min(productPullOffset / PULL_REFRESH_THRESHOLD, 1);
+  const productPullArmed = productPullDistance >= PULL_REFRESH_THRESHOLD;
 
   // After /create: restore exact main.scrollTop. ResizeObserver re-applies as list height grows (images).
   useEffect(() => {
@@ -1490,28 +1573,46 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
       <main
         ref={scrollRef}
-        className={`flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
+        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
         onTouchStart={handleProductsTouchStart}
         onTouchMove={handleProductsTouchMove}
         onTouchEnd={handleProductsTouchEnd}
       >
-        {tab === 'products' && (productPullDistance > 0 || productPullRefreshing) && (
+        {tab === 'products' && (
           <div
-            className="flex items-center justify-center gap-2 overflow-hidden text-xs font-semibold text-blue-600 transition-[height] duration-200"
-            style={{ height: productPullRefreshing ? 48 : Math.max(productPullDistance, 1) }}
+            className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center"
+            style={{
+              opacity: productPullRefreshing ? 1 : Math.min(productPullProgress * 1.4, 1),
+              transition: productPullDragging ? "none" : "opacity 160ms ease-out",
+            }}
             role="status"
             aria-live="polite"
           >
-            <span
-              className={productPullRefreshing ? 'animate-spin text-xl' : 'text-xl transition-transform'}
-              style={!productPullRefreshing ? { transform: `rotate(${Math.min(productPullDistance / 56, 1) * 180}deg)` } : undefined}
-              aria-hidden
-            >
-              ↓
+            <PullToRefreshIndicator
+              progress={productPullProgress}
+              refreshing={productPullRefreshing}
+              armed={productPullArmed}
+            />
+            <span className="sr-only">
+              {productPullRefreshing
+                ? "Refreshing products…"
+                : productPullArmed
+                  ? "Release to refresh"
+                  : "Pull to refresh"}
             </span>
-            {productPullRefreshing ? 'Refreshing products…' : productPullDistance >= 56 ? 'Release to refresh' : 'Pull to refresh'}
           </div>
         )}
+
+        <div
+          style={
+            tab === 'products'
+              ? {
+                  transform: `translateY(${productPullOffset}px)`,
+                  transition: productPullDragging ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }
+              : undefined
+          }
+        >
         {tab === "products" &&
           visible.length === 0 &&
           products.length === 0 &&
@@ -1686,6 +1787,62 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             </Droppable>
           </DragDropContext>
         )}
+
+        {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
+        <div
+          className="relative -mx-4"
+          hidden={tab !== "catalogues" || selectedCatalogueInCataloguesTab != null}
+        >
+          <CataloguesList
+            catalogues={catalogues}
+            onSelectCatalogue={(catalogueId) => {
+              setSelectedCatalogueInCataloguesTab(catalogueId);
+              navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueId)}`);
+            }}
+            imageMap={imageMap}
+            products={products}
+            onManageCatalogues={() => setShowManageCatalogues(true)}
+            renamingCatalogueIds={renamingCatalogueIds}
+          />
+        </div>
+
+        {tab === "catalogues" && selectedCatalogueInCataloguesTab && (
+          <div className="relative -mx-4">
+            {/* Black bar for catalogues */}
+            <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50"></div>
+            {/* Render the selected catalogue */}
+            {(() => {
+              const selectedCat = catalogues.find((c) => c.id === selectedCatalogueInCataloguesTab);
+              if (!selectedCat) return null;
+
+              return (
+                <div key={selectedCat.id}>
+                  <CatalogueView
+                    filtered={visible}
+                    allProducts={products}
+                    setProducts={setProducts}
+                    selected={selected}
+                    setSelected={setSelected}
+                    getLighterColor={getLighterColor}
+                    imageMap={imageMap}
+                    catalogueId={selectedCat.id}
+                    catalogueLabel={selectedCat.label}
+                    priceField={selectedCat.priceField}
+                    priceUnitField={selectedCat.priceUnitField}
+                    stockField={selectedCat.stockField}
+                    deletedProducts={deletedProducts}
+                    onBack={() => {
+                      setSelected([]);
+                      setSelectedCatalogueInCataloguesTab(null);
+                      navigate('/catalogues', { replace: true });
+                    }}
+                  />
+                </div>
+              );
+            })()}
+          </div>
+        )}
+        </div>
 
         {showShelfConfirm && (
           <div
@@ -1884,61 +2041,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
-        <div
-          className="relative -mx-4"
-          hidden={tab !== "catalogues" || selectedCatalogueInCataloguesTab != null}
-        >
-          <CataloguesList
-            catalogues={catalogues}
-            onSelectCatalogue={(catalogueId) => {
-              setSelectedCatalogueInCataloguesTab(catalogueId);
-              navigate(`/catalogues?catalogue=${encodeURIComponent(catalogueId)}`);
-            }}
-            imageMap={imageMap}
-            products={products}
-            onManageCatalogues={() => setShowManageCatalogues(true)}
-            renamingCatalogueIds={renamingCatalogueIds}
-          />
-        </div>
-
-        {tab === "catalogues" && selectedCatalogueInCataloguesTab && (
-          <div className="relative -mx-4">
-            {/* Black bar for catalogues */}
-            <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50"></div>
-            {/* Render the selected catalogue */}
-            {(() => {
-              const selectedCat = catalogues.find((c) => c.id === selectedCatalogueInCataloguesTab);
-              if (!selectedCat) return null;
-
-              return (
-                <div key={selectedCat.id}>
-                  <CatalogueView
-                    filtered={visible}
-                    allProducts={products}
-                    setProducts={setProducts}
-                    selected={selected}
-                    setSelected={setSelected}
-                    getLighterColor={getLighterColor}
-                    imageMap={imageMap}
-                    catalogueId={selectedCat.id}
-                    catalogueLabel={selectedCat.label}
-                    priceField={selectedCat.priceField}
-                    priceUnitField={selectedCat.priceUnitField}
-                    stockField={selectedCat.stockField}
-                    deletedProducts={deletedProducts}
-                    onBack={() => {
-                      setSelected([]);
-                      setSelectedCatalogueInCataloguesTab(null);
-                      navigate('/catalogues', { replace: true });
-                    }}
-                  />
-                </div>
-              );
-            })()}
           </div>
         )}
 
