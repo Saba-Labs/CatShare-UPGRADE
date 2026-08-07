@@ -1429,6 +1429,27 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           {/* Fixed Icons Group (Glass + Sort) */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
             <button
+              type="button"
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-gray-100 hover:text-blue-600 md:flex"
+              onClick={() => void refreshProducts()}
+              disabled={productPullRefreshing || catalogueLoading}
+              title="Refresh products"
+              aria-label="Refresh products"
+            >
+              <svg
+                className={`h-5 w-5 ${productPullRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4v6h6" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 20v-6h-6" />
+              </svg>
+            </button>
+            <button
               onClick={() => setShowSearch((prev) => !prev)}
               className="text-xl text-gray-600 hover:text-black"
               title="Search"

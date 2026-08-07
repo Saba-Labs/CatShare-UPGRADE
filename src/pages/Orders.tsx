@@ -1648,6 +1648,16 @@ export default function Orders() {
     setLoading(false);
   };
 
+  const handleDesktopOrderRefresh = async () => {
+    if (pullRefreshing || loading) return;
+    setPullRefreshing(true);
+    try {
+      await loadOrders({ force: true });
+    } finally {
+      setPullRefreshing(false);
+    }
+  };
+
   const refreshOrderChanges = useCallback(async () => {
     if (!user?.uid || user.isAnonymous || !initialOrdersLoadCompleteRef.current) return;
     const mem = getRuntimeSellerOrders(user.uid);
@@ -2022,6 +2032,31 @@ export default function Orders() {
 
           {/* Fixed Icons Group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+            <button
+              type="button"
+              className="orders-desktop-refresh"
+              onClick={() => void handleDesktopOrderRefresh()}
+              disabled={pullRefreshing || loading}
+              title="Refresh orders"
+              aria-label="Refresh orders"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={pullRefreshing ? 'orders-desktop-refresh__icon--spinning' : undefined}
+              >
+                <path d="M20 11a8.1 8.1 0 0 0-14.8-4L3 10" />
+                <path d="M3 4v6h6" />
+                <path d="M4 13a8.1 8.1 0 0 0 14.8 4L21 14" />
+                <path d="M21 20v-6h-6" />
+              </svg>
+            </button>
             <button
               onClick={() => setShowFilters(true)}
               style={{

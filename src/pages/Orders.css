@@ -218,6 +218,40 @@ html.dark .orders-filter-grabber span {
   touch-action: pan-y;
 }
 
+.orders-desktop-refresh {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ord-icon);
+  cursor: pointer;
+}
+
+.orders-desktop-refresh:hover:not(:disabled) {
+  background: var(--ord-surface-2);
+  color: #2563eb;
+}
+
+.orders-desktop-refresh:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.orders-desktop-refresh__icon--spinning {
+  animation: ordersPullRefreshSpin 0.8s linear infinite;
+}
+
+@media (min-width: 768px) {
+  .orders-desktop-refresh {
+    display: inline-flex;
+  }
+}
+
 .orders-pull-refresh {
   display: flex;
   align-items: center;
