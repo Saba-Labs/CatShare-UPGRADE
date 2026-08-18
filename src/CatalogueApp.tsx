@@ -12,6 +12,7 @@ import ProductPreviewModal from "./ProductPreviewModal";
 import EmptyStateIntro from "./EmptyStateIntro";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
+import { v4 as uuidv4 } from "uuid";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { KeepAwake } from "@capacitor-community/keep-awake";
@@ -36,6 +37,7 @@ import { useSync } from "./context/SyncContext";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import {
   safeGetFromStorage,
+  safeSetInStorage,
   getStorageKey,
   readProductsWithLegacyFallback,
   readDeletedProductsWithLegacyFallback,
@@ -939,6 +941,46 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
       }).catch(err => console.error('Strict sync failed:', err));
+    }
+  };
+
+  const duplicateProduct = (productToDuplicate) => {
+    if (!guardCloudWrite()) return;
+    const source = products.find((p) => p.id === productToDuplicate?.id) || productToDuplicate;
+    if (!source) return;
+
+    const duplicate = JSON.parse(JSON.stringify(source));
+    duplicate.id = uuidv4();
+    duplicate.name = `${source.name || 'Untitled product'} (Copy)`;
+    duplicate.updatedAt = new Date().toISOString();
+
+    const sourceIndex = products.findIndex((p) => p.id === source.id);
+    const freshProducts = [...products];
+    freshProducts.splice(sourceIndex + 1, 0, duplicate);
+
+    const storageKey = user?.uid ? getStorageKey('products', user.uid) : 'products';
+    if (!safeSetInStorage(storageKey, freshProducts)) {
+      showToast('Product duplication failed: local storage is full.', 'error');
+      return;
+    }
+
+    setProducts(freshProducts);
+    if (imageMap[source.id]) {
+      setImageMap((prev) => ({ ...prev, [duplicate.id]: imageMap[source.id] }));
+    }
+    setPreviewProduct(null);
+    showToast(`Duplicated ${source.name || 'product'}.`, 'success');
+
+    if (isStrictMode() && user?.uid) {
+      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts))
+        .then((cloudData) => {
+          setProducts(cloudData.products);
+          setDeletedProducts(cloudData.deletedProducts);
+        })
+        .catch((err) => {
+          console.error('Product duplication cloud sync failed:', err);
+          showToast('Product duplicated on this device, but cloud sync failed.', 'warning');
+        });
     }
   };
 
@@ -2077,6 +2119,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             persistProductsListScrollForEdit(scrollRef.current);
             navigate(`/create?id=${previewProduct.id}`);
           }}
+          onDuplicate={duplicateProduct}
           onToggleStock={(fieldOrProduct, isMasterToggle) => {
             let updated;
 

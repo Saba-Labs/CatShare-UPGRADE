@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
-import { FiX, FiShare2, FiCheckCircle, FiAlertCircle, FiEdit3, FiPackage, FiArchive } from "react-icons/fi";
+import { FiX, FiShare2, FiCheckCircle, FiAlertCircle, FiEdit3, FiPackage, FiArchive, FiCopy } from "react-icons/fi";
 import { MdInventory2 } from "react-icons/md";
 import Zoom from 'react-medium-image-zoom';
 import 'react-medium-image-zoom/dist/styles.css';
@@ -402,6 +402,7 @@ export default function ProductPreviewModal_Classic({
   onSwipeLeft,
   onSwipeRight,
   onShelf,
+  onDuplicate,
   filteredProducts = [],
 }) {
   const { showToast } = useToast();
@@ -1109,6 +1110,16 @@ export default function ProductPreviewModal_Classic({
                   >
                     <FiEdit3 size={14} />
                     <span>Edit</span>
+                  </motion.button>
+
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => onDuplicate?.(product)}
+                    className="flex items-center justify-center w-10 shrink-0 py-2.5 rounded-xl bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 active:bg-indigo-600 transition-colors"
+                    title="Duplicate"
+                    aria-label="Duplicate"
+                  >
+                    <FiCopy size={14} />
                   </motion.button>
 
                   <motion.button
