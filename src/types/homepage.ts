@@ -184,6 +184,7 @@ export interface ProductGridSection {
   content: {
     /** How products are chosen for this grid (persisted; do not infer from ids alone). */
     productSource?: 'all' | 'category' | 'specific';
+    categoryIds?: string[];
     categoryId?: string;
     productIds?: string[];
   };

@@ -167,7 +167,7 @@ export default function CategoryPicker({ selectedIds, onChange, single = false }
           title={single ? 'Select category' : 'Select categories'}
           onClose={closeModal}
           onDone={apply}
-          doneLabel={single ? 'Select' : 'Done'}
+          doneLabel="Select"
         >
           <CategoryPickerList
             selectedIds={draftIds}
