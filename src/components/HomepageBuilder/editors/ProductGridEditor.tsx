@@ -67,7 +67,7 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
           value={source}
           options={[
             { value: 'all', label: 'All products' },
-            { value: 'category', label: 'A category' },
+            { value: 'category', label: 'Categories' },
             { value: 'specific', label: 'Specific products' },
           ]}
           onChange={(next) => setSource(next as GridSource)}
