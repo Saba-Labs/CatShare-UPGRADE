@@ -817,16 +817,6 @@ export default function ProductPreviewModal_Glass({
 
                       <motion.button
                         whileTap={{ scale: 0.96 }}
-                        onClick={() => onDuplicate?.(product)}
-                        className="flex items-center justify-center w-10 shrink-0 py-2.5 rounded-xl bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 active:bg-indigo-600 transition-colors"
-                        title="Duplicate"
-                        aria-label="Duplicate"
-                      >
-                        <FiCopy size={14} />
-                      </motion.button>
-
-                      <motion.button
-                        whileTap={{ scale: 0.96 }}
                         onClick={() => onToggleMasterStock()}
                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-xs shadow-lg transition-all border ${
                           getAllStockStatus()
@@ -847,6 +837,16 @@ export default function ProductPreviewModal_Glass({
                       >
                         <FiArchive size={14} />
                         <span>Shelf</span>
+                      </motion.button>
+
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => onDuplicate?.(product)}
+                        className="flex items-center justify-center w-10 shrink-0 py-2.5 rounded-xl bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 active:bg-indigo-600 transition-colors"
+                        title="Duplicate"
+                        aria-label="Duplicate"
+                      >
+                        <FiCopy size={14} />
                       </motion.button>
                     </div>
                   </div>
