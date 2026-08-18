@@ -21,7 +21,7 @@ interface ProductGridEditorProps {
 function currentSource(content: ProductGridSection['content']): GridSource {
   if (content.productSource) return content.productSource;
   if (content.productIds && content.productIds.length > 0) return 'specific';
-  if (content.categoryId) return 'category';
+  if (content.categoryIds?.length || content.categoryId) return 'category';
   return 'all';
 }
 
@@ -40,11 +40,11 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
 
   const setSource = (next: GridSource) => {
     if (next === 'all') {
-      updateContent({ productSource: 'all', categoryId: undefined, productIds: [] });
+      updateContent({ productSource: 'all', categoryIds: [], categoryId: undefined, productIds: [] });
     } else if (next === 'category') {
       updateContent({ productSource: 'category', productIds: [] });
     } else {
-      updateContent({ productSource: 'specific', categoryId: undefined, productIds: content.productIds ?? [] });
+      updateContent({ productSource: 'specific', categoryIds: [], categoryId: undefined, productIds: content.productIds ?? [] });
     }
   };
 
@@ -76,11 +76,10 @@ export default function ProductGridEditor({ section, onUpdate }: ProductGridEdit
 
       {source === 'category' && (
         <div className="panel-section">
-          <label className="panel-label">Category</label>
+          <label className="panel-label">Categories</label>
           <CategoryPicker
-            single
-            selectedIds={content.categoryId ? [content.categoryId] : []}
-            onChange={(ids) => updateContent({ categoryId: ids[0] })}
+            selectedIds={content.categoryIds?.length ? content.categoryIds : content.categoryId ? [content.categoryId] : []}
+            onChange={(categoryIds) => updateContent({ categoryIds, categoryId: undefined })}
           />
         </div>
       )}

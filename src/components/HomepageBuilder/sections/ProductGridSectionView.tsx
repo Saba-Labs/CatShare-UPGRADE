@@ -32,17 +32,22 @@ export default function ProductGridSectionView({
     cardSize: settings.cardSize,
     columns: settings.columns,
   });
+  const selectedCategoryIds = content.categoryIds?.length
+    ? content.categoryIds
+    : content.categoryId
+      ? [content.categoryId]
+      : [];
   const source =
     content.productSource ||
-    (content.productIds?.length ? 'specific' : content.categoryId ? 'category' : 'all');
+    (content.productIds?.length ? 'specific' : selectedCategoryIds.length ? 'category' : 'all');
 
   const displayProducts = useMemo(() => {
     if (!storeCtx) return [];
-    if (source === 'category' && content.categoryId) {
-      const catId = String(content.categoryId).toLowerCase();
+    if (source === 'category' && selectedCategoryIds.length > 0) {
+      const categorySet = new Set(selectedCategoryIds.map((id) => String(id).toLowerCase()));
       return storeCtx.products.filter((p) => {
         const cats = Array.isArray(p.category) ? p.category : p.category ? [String(p.category)] : [];
-        return cats.some((c) => String(c).toLowerCase() === catId);
+        return cats.some((c) => categorySet.has(String(c).toLowerCase()));
       });
     }
     if (source === 'specific') {
@@ -51,7 +56,7 @@ export default function ProductGridSectionView({
         .filter((p): p is NonNullable<typeof p> => !!p);
     }
     return storeCtx.products;
-  }, [storeCtx, source, content.categoryId, content.productIds]);
+  }, [storeCtx, source, selectedCategoryIds, content.productIds]);
   const sortedProducts = useMemo(
     () =>
       storeCtx
