@@ -972,11 +972,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     showToast(`Duplicated ${source.name || 'product'}.`, 'success');
 
     if (isStrictMode() && user?.uid) {
-      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts))
-        .then((cloudData) => {
-          setProducts(cloudData.products);
-          setDeletedProducts(cloudData.deletedProducts);
-        })
+      syncProductsToCloud(freshProducts, deletedProducts, {
+        ...shelfMoveCloudSyncOptions(freshProducts),
+        background: true,
+      })
         .catch((err) => {
           console.error('Product duplication cloud sync failed:', err);
           showToast('Product duplicated on this device, but cloud sync failed.', 'warning');
