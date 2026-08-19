@@ -12,9 +12,9 @@ function productUpdatedTime(product: { updatedAt?: unknown } | null | undefined)
   return Number.isFinite(ms) ? ms : 0;
 }
 
-/** Merge gallery URLs from two product snapshots (deduped, max 5). */
-function mergeImageUrlsFromProducts(local: any, remote: any): string[] {
-  const combined = [...getProductImageUrls(local), ...getProductImageUrls(remote)];
+/** Merge gallery URLs from two product snapshots, keeping the preferred gallery first. */
+function mergeImageUrlsFromProducts(preferred: any, secondary: any): string[] {
+  const combined = [...getProductImageUrls(preferred), ...getProductImageUrls(secondary)];
   const seen = new Set<string>();
   const out: string[] = [];
   for (const u of combined) {
@@ -27,10 +27,7 @@ function mergeImageUrlsFromProducts(local: any, remote: any): string[] {
   return out;
 }
 
-/**
- * When timestamps tie or one side lacks updatedAt, keep the richer gallery and primary index
- * from the newer or more complete snapshot.
- */
+/** Keep the winning snapshot's gallery ordering so its primary-image index stays valid. */
 export function reconcileProductImageFields(local: any, remote: any): Record<string, unknown> {
   const localUrls = getProductImageUrls(local);
   const remoteUrls = getProductImageUrls(remote);
@@ -41,26 +38,16 @@ export function reconcileProductImageFields(local: any, remote: any): Record<str
     return {};
   }
 
-  let urls = mergeImageUrlsFromProducts(local, remote);
+  const preferRemote =
+    remoteTime > localTime || (remoteTime === localTime && remoteUrls.length > localUrls.length);
+  const primaryProduct = preferRemote ? remote : local;
+  const secondaryProduct = preferRemote ? local : remote;
+  const urls = mergeImageUrlsFromProducts(primaryProduct, secondaryProduct);
   if (urls.length === 0) {
     return {};
   }
 
-  let primaryIndex = 0;
-  if (localTime > remoteTime) {
-    primaryIndex = getPrimaryImageIndex(local);
-  } else if (remoteTime > localTime) {
-    primaryIndex = getPrimaryImageIndex(remote);
-  } else if (localUrls.length >= remoteUrls.length) {
-    primaryIndex = getPrimaryImageIndex(local);
-  } else {
-    primaryIndex = getPrimaryImageIndex(remote);
-  }
-
-  if (primaryIndex >= urls.length) {
-    primaryIndex = 0;
-  }
-
+  const primaryIndex = getPrimaryImageIndex(primaryProduct);
   return buildProductImagePersistFields({ imageUrls: urls, primaryImageIndex: primaryIndex });
 }
 

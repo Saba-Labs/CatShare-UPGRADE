@@ -458,6 +458,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewList, setPreviewList] = useState([]);
   const [imageMap, setImageMap] = useState({});
+  const imageLoadGenerationRef = useRef(0);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const productPullActive = useRef(false);
   const productPullStartX = useRef(0);
@@ -598,6 +599,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   }, []);
 
   useEffect(() => {
+    const imageLoadGeneration = imageLoadGenerationRef.current + 1;
+    imageLoadGenerationRef.current = imageLoadGeneration;
+
     const loadImages = async () => {
       const map = {};
       const batchSize = 8; // Load 8 images at a time to avoid memory spikes
@@ -632,6 +636,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         // Wait for batch to complete before loading next batch
         await Promise.all(promises);
+        if (imageLoadGenerationRef.current !== imageLoadGeneration) return;
 
         // Update state incrementally so UI renders as images load
         setImageMap(prev => ({ ...prev, ...map }));
