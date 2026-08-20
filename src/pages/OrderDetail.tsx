@@ -1112,7 +1112,9 @@ function ActionsMenu({
       background: '#FFFFFF', borderRadius: 14,
       border: `1px solid ${COLORS.border}`,
       boxShadow: '0 12px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
-      zIndex: 300, overflow: 'hidden', minWidth: 240,
+      zIndex: 300, minWidth: 240,
+      maxHeight: 'min(360px, calc(100dvh - 96px))',
+      overflowY: 'auto', overscrollBehavior: 'contain',
       animation: 'dropIn 0.15s cubic-bezier(0.34,1.3,0.64,1)',
     }}>
       <style>{`@keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97) } to { opacity: 1; transform: none } }`}</style>
