@@ -1123,7 +1123,7 @@ export default function ProductPreviewModal_Classic({
                     title="Toggle all catalogues"
                   >
                     {getAllStockStatus() ? <FiPackage size={14} /> : <FiX size={14} />}
-                    <span>{getAllStockStatus() ? "In Stock" : "Out of Stock"}</span>
+                    <span>{getAllStockStatus() ? "In Stock" : "Stock-Out"}</span>
                   </motion.button>
 
                   <motion.button

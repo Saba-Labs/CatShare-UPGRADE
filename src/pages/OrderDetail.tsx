@@ -569,6 +569,9 @@ function applySnapshotCloneRootHints(doc: Document) {
     root.style.setProperty('text-rendering', 'geometricPrecision', imp);
     root.style.setProperty('-webkit-font-smoothing', 'antialiased', imp);
     root.style.setProperty('overflow', 'visible', imp);
+    root.style.setProperty('width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
+    root.style.setProperty('min-width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
+    root.style.setProperty('max-width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
     /* Tighter inset in PNG only — live Order Detail keeps padding on the element in JSX */
     root.style.setProperty('padding', '10px', imp);
   }
@@ -680,9 +683,7 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
       // Snapshot-only: number should be gray (not WhatsApp green)
       waLink.style.setProperty('color', COLORS.muted, imp);
       waLink.style.setProperty('text-decoration', 'none', imp);
-      waLink.querySelectorAll('svg').forEach((icon) => {
-        if (icon instanceof SVGElement) icon.style.setProperty('display', 'none', imp);
-      });
+      waLink.querySelectorAll('svg').forEach((icon) => icon.remove());
     }
   }
 
@@ -778,7 +779,7 @@ const COLORS = {
   blue: '#0A84FF',
   red: '#FF3B30',
 };
-
+const ORDER_SNAPSHOT_WIDTH = 480;
 
 function OrderItemsTotalsFooter({
   items,
