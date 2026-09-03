@@ -569,6 +569,9 @@ function applySnapshotCloneRootHints(doc: Document) {
     root.style.setProperty('text-rendering', 'geometricPrecision', imp);
     root.style.setProperty('-webkit-font-smoothing', 'antialiased', imp);
     root.style.setProperty('overflow', 'visible', imp);
+    root.style.setProperty('width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
+    root.style.setProperty('min-width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
+    root.style.setProperty('max-width', `${ORDER_SNAPSHOT_WIDTH}px`, imp);
     /* Tighter inset in PNG only — live Order Detail keeps padding on the element in JSX */
     root.style.setProperty('padding', '10px', imp);
   }
@@ -778,7 +781,7 @@ const COLORS = {
   blue: '#0A84FF',
   red: '#FF3B30',
 };
-
+const ORDER_SNAPSHOT_WIDTH = 480;
 
 function OrderItemsTotalsFooter({
   items,
