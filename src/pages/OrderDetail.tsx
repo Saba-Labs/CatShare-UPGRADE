@@ -683,9 +683,7 @@ function applyOrderSnapshotLayoutForClone(doc: Document) {
       // Snapshot-only: number should be gray (not WhatsApp green)
       waLink.style.setProperty('color', COLORS.muted, imp);
       waLink.style.setProperty('text-decoration', 'none', imp);
-      waLink.querySelectorAll('svg').forEach((icon) => {
-        if (icon instanceof SVGElement) icon.style.setProperty('display', 'none', imp);
-      });
+      waLink.querySelectorAll('svg').forEach((icon) => icon.remove());
     }
   }
 
