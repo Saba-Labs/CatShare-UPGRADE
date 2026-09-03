@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { persistListScroll, useListScrollRestore } from '../hooks/useListScrollRestore';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -804,32 +805,108 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Status Selector Dropdown ─────────────────────────────────────────────────
+const STATUS_MENU_VIEWPORT_MARGIN = 8;
+const STATUS_MENU_BOTTOM_INSET = 72;
+
 function StatusSelector({
   current,
+  anchorRef,
   onChange,
   onClose,
 }: {
   current: string;
+  anchorRef: React.RefObject<HTMLDivElement>;
   onChange: (s: StatusType) => void;
   onClose: () => void;
 }) {
   const statuses: StatusType[] = [...ORDER_STATUSES];
   const ref = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0, visible: false });
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    const menu = ref.current;
+    if (!anchor || !menu) return;
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const viewportBottom = Math.max(
+      STATUS_MENU_VIEWPORT_MARGIN,
+      window.innerHeight - STATUS_MENU_BOTTOM_INSET
+    );
+    if (
+      anchorRect.bottom <= STATUS_MENU_VIEWPORT_MARGIN ||
+      anchorRect.top >= viewportBottom
+    ) {
+      onClose();
+      return;
+    }
+
+    const menuRect = menu.getBoundingClientRect();
+    const opensAbove =
+      viewportBottom - anchorRect.bottom - STATUS_MENU_VIEWPORT_MARGIN < menuRect.height &&
+      anchorRect.top - STATUS_MENU_VIEWPORT_MARGIN >= menuRect.height;
+    const requestedTop = opensAbove
+      ? anchorRect.top - menuRect.height - STATUS_MENU_VIEWPORT_MARGIN
+      : anchorRect.bottom + STATUS_MENU_VIEWPORT_MARGIN;
+    const maxTop = Math.max(
+      STATUS_MENU_VIEWPORT_MARGIN,
+      viewportBottom - menuRect.height
+    );
+    const top = Math.min(
+      Math.max(requestedTop, STATUS_MENU_VIEWPORT_MARGIN),
+      maxTop
+    );
+    const maxLeft = Math.max(
+      STATUS_MENU_VIEWPORT_MARGIN,
+      window.innerWidth - menuRect.width - STATUS_MENU_VIEWPORT_MARGIN
+    );
+    const left = Math.min(
+      Math.max(anchorRect.right - menuRect.width, STATUS_MENU_VIEWPORT_MARGIN),
+      maxLeft
+    );
+
+    setPosition({ top, left, visible: true });
+  }, [anchorRef, onClose]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const target = e.target as Node;
+      if (
+        ref.current &&
+        !ref.current.contains(target) &&
+        !anchorRef.current?.contains(target)
+      ) {
+        onClose();
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  return (
+  useLayoutEffect(() => {
+    updatePosition();
+    const frame = requestAnimationFrame(updatePosition);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [updatePosition]);
+
+  const menu = (
     <div ref={ref} style={{
-      position: 'absolute', top: '110%', right: 0,
+      position: 'fixed',
+      top: position.top,
+      left: position.left,
+      visibility: position.visible ? 'visible' : 'hidden',
       background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 200,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', zIndex: 1000,
+      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
       overflow: 'hidden', minWidth: 160,
+      maxHeight: `calc(100dvh - ${STATUS_MENU_BOTTOM_INSET + STATUS_MENU_VIEWPORT_MARGIN * 2}px)`,
+      overflowY: 'auto',
     }}>
       {statuses.map((s) => {
         const cfg = getStatusConfig(s);
@@ -857,6 +934,8 @@ function StatusSelector({
       })}
     </div>
   );
+
+  return typeof document === 'undefined' ? menu : createPortal(menu, document.body);
 }
 
 // ─── Order Row (List View) ────────────────────────────────────────────────────
@@ -875,6 +954,7 @@ function OrderRow({
 }) {
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const [metaInfoOpen, setMetaInfoOpen] = useState<'source' | 'catalogue' | null>(null);
+  const statusWrapRef = useRef<HTMLDivElement>(null);
   const statusCfg = getStatusConfig(order.status);
   const resolvedTotal = resolveOrderGrandTotal(order, order.items || []);
   const total =
@@ -971,7 +1051,7 @@ function OrderRow({
               />
             ) : null}
 
-            <div className="order-row-status-wrap">
+            <div ref={statusWrapRef} className="order-row-status-wrap">
               <button
                 type="button"
                 className="order-row-status-btn"
@@ -993,6 +1073,7 @@ function OrderRow({
               {showStatusDrop ? (
                 <StatusSelector
                   current={order.status}
+                  anchorRef={statusWrapRef}
                   onChange={(s) => {
                     onStatusChange(order.id, s);
                     setShowStatusDrop(false);
