@@ -7,7 +7,7 @@ buildscript {
     }
     
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.0'
+        classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"  // Add this line
         classpath 'com.google.gms:google-services:4.4.4'
     }
@@ -55,7 +55,6 @@ subprojects {
     tasks.withType(JavaCompile).configureEach {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        options.release = 17
     }
 
     // ✅ Force Kotlin JVM target
@@ -82,7 +81,7 @@ allprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
             force "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
             force "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3"
-            force "com.android.billingclient:billing:7.1.0"
+            force "com.android.billingclient:billing:$billingVersion"
         }
     }
 }
