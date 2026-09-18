@@ -20,7 +20,11 @@ const billingPatchAlreadyApplied =
   fs.readFileSync(billingDefinitionsPath, 'utf8').includes('basePlanId?: string');
 
 if (!billingPatchAlreadyApplied) {
-  execFileSync(process.platform === 'win32' ? 'patch-package.cmd' : 'patch-package', [], {
-    stdio: 'inherit',
-  });
+  try {
+    execFileSync(process.platform === 'win32' ? 'patch-package.cmd' : 'patch-package', [], {
+      stdio: 'inherit',
+    });
+  } catch {
+    console.warn('Skipping the optional capacitor-billing patch because it does not match the installed package.');
+  }
 }
