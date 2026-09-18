@@ -125,6 +125,14 @@ button.website-product-card-details-link {
   font-size: 0.9rem;
 }
 
+.website-product-card-price-list {
+  margin-left: 6px;
+  color: #64748b;
+  font-size: 0.78em;
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
 .website-product-card-minimal {
   border: none;
   background: transparent;

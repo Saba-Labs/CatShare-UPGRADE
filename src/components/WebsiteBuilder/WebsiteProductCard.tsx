@@ -1,12 +1,9 @@
 import { type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { ProductWithCatalogueData } from '../../config/catalogueProductUtils';
+import { getCatalogueData, type ProductWithCatalogueData } from '../../config/catalogueProductUtils';
 import type { StoreProductNavState } from '../../utils/websiteStorefront';
-import {
-  formatStorePrice,
-  getWebsiteProductImageUrl,
-  getWebsiteProductPrice,
-} from '../../utils/websiteStorefront';
+import { formatStorePrice, getWebsiteProductImageUrl } from '../../utils/websiteStorefront';
+import { getStorefrontPriceAndUnit } from '../Storefront/storefrontOrderHelpers';
 import { ProductImagePlaceholder } from '../Storefront/StorefrontIcons';
 import { useWebsiteStore } from './WebsiteStoreContext';
 import ProductCardVariantPicker from './ProductCardVariantPicker';
@@ -35,13 +32,28 @@ export default function WebsiteProductCard({
 }: WebsiteProductCardProps) {
   const { productPath, store } = useWebsiteStore();
   const img = getWebsiteProductImageUrl(product);
-  const price = getWebsiteProductPrice(product, store.catalogueId);
+  const orderBridge = useWebsiteOrderBridge();
+  const catalogue = orderBridge?.catalogue ?? null;
+  const { price, listPrice, showOffer } = getStorefrontPriceAndUnit(
+    getCatalogueData(product, store.catalogueId),
+    catalogue,
+    product
+  );
   const resolvedStyle = normalizeProductCardStyle(cardsStyle);
   const href = productPath(product);
-  const orderBridge = useWebsiteOrderBridge();
   const cartQty = orderBridge?.getProductQty(product.id) ?? 0;
   const brandLabel = product.subtitle?.trim() || store.sellerBusinessName?.trim() || undefined;
-  const priceLabel = showPrice && price != null ? formatStorePrice(price, store.sellerCurrencyCode) : null;
+  const priceLabel =
+    showPrice && Number.isFinite(price) && price > 0 ? (
+      <>
+        {formatStorePrice(price, store.sellerCurrencyCode)}
+        {showOffer && listPrice != null && listPrice > 0 ? (
+          <span className="website-product-card-price-list">
+            {formatStorePrice(listPrice, store.sellerCurrencyCode)}
+          </span>
+        ) : null}
+      </>
+    ) : null;
 
   const className = `website-product-card website-product-card-${resolvedStyle} website-product-card-${viewMode}${
     builderPreview ? ' website-product-card--builder' : ''
