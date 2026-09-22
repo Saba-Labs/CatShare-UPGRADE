@@ -1997,9 +1997,8 @@ if (user?.uid && !authService.isOfflineGuest()) {
     initWebAnalyticsIfNeeded();
   }, [isNative, isPublicStoreOrOrderRoute, loading, user?.uid, user?.isAnonymous]);
 
-  // New orders: Realtime (if enabled) + REST polling (reliable when Realtime/RLS misses events)
+   // New orders: Realtime (if enabled) + REST polling (reliable when Realtime/RLS misses events)
   useEffect(() => {
-    if (loading) return;
     if (!user?.uid) return;
     if (authService.isOfflineGuest()) return;
     if (user.isAnonymous) return;
@@ -2024,15 +2023,14 @@ if (user?.uid && !authService.isOfflineGuest()) {
       removePoll?.();
       removeRealtime?.();
     };
-  }, [loading, user?.uid, user?.isAnonymous]);
+  }, [user?.uid, user?.isAnonymous]);
 
-  useEffect(() => {
-    if (loading) return;
+    useEffect(() => {
     if (!user?.uid) return;
     if (authService.isOfflineGuest()) return;
     if (user.isAnonymous) return;
     return startPollingForLowStock(user.uid);
-  }, [loading, user?.uid, user?.isAnonymous]);
+  }, [user?.uid, user?.isAnonymous]);
 
   // Register FCM token for new-order push as soon as the seller is signed in (native only).
   useEffect(() => {

@@ -70,17 +70,33 @@ export async function pollLowStockForSeller(userId: string): Promise<void> {
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollingUserId: string | null = null;
 
 export function startPollingForLowStock(userId: string): () => void {
+  // Already polling for this exact user — don't restart or double-fire.
+  if (pollTimer && pollingUserId === userId) {
+    return () => {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        pollingUserId = null;
+      }
+    };
+  }
+
+  // Different user or no timer yet — clear any stale one, then start fresh.
   if (pollTimer) clearInterval(pollTimer);
+  pollingUserId = userId;
   void pollLowStockForSeller(userId);
   pollTimer = setInterval(() => {
     void pollLowStockForSeller(userId);
   }, 60_000);
+
   return () => {
     if (pollTimer) {
       clearInterval(pollTimer);
       pollTimer = null;
+      pollingUserId = null;
     }
   };
 }
