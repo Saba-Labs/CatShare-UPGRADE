@@ -1837,39 +1837,34 @@ export default function Orders() {
   }, [location.pathname, location.key, refreshOrderChanges]);
 
   useEffect(() => {
-    if (!user?.uid || user.isAnonymous) return;
+  if (!user?.uid || user.isAnonymous) return;
 
-    const refreshNow = () => {
-      void loadOrders({ force: true, silent: true });
-    };
+  const refreshNow = () => {
+    void loadOrders({ force: true, silent: true });
+  };
 
-    const refreshChanges = () => {
-      void refreshOrderChanges();
-    };
+  const refreshChanges = () => {
+    void refreshOrderChanges();
+  };
 
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refreshChanges();
-    };
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') refreshChanges();
+  };
 
-    let resumeListener: { remove: () => Promise<void> } | null = null;
-    if (Capacitor.getPlatform() !== 'web') {
-      void App.addListener('resume', refreshNow).then((listener) => {
-        resumeListener = listener;
-      });
-    }
+  let resumeListener: { remove: () => Promise<void> } | null = null;
+  if (Capacitor.getPlatform() !== 'web') {
+    void App.addListener('resume', refreshNow).then((listener) => {
+      resumeListener = listener;
+    });
+  }
 
-    document.addEventListener('visibilitychange', onVisibility);
-    const intervalId = window.setInterval(
-      refreshChanges,
-      Capacitor.getPlatform() === 'web' ? ORDERS_ACTIVE_MOBILE_POLL_MS : ORDERS_ACTIVE_MOBILE_POLL_MS
-    );
+  document.addEventListener('visibilitychange', onVisibility);
 
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      clearInterval(intervalId);
-      void resumeListener?.remove();
-    };
-  }, [user?.uid, user?.isAnonymous, refreshOrderChanges]);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibility);
+    void resumeListener?.remove();
+  };
+}, [user?.uid, user?.isAnonymous, refreshOrderChanges]);
 
   const handleNavigate = async (path: string) => {
     await Haptics.impact({ style: ImpactStyle.Light });
