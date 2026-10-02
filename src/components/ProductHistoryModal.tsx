@@ -48,6 +48,44 @@ function entryTitle(entry: ProductHistoryEntry): string {
   return "Product updated";
 }
 
+function isLegacyEntry(entry: ProductHistoryEntry): boolean {
+  return (entry.source === "product" && !entry.exactProductChanges) ||
+    (entry.source === "bulk" && !entry.exactBulkChanges);
+}
+
+function isLegacyDefaultAddition(change: ProductHistoryChange): boolean {
+  const beforeIsEmpty = change.before == null || change.before === "" || (Array.isArray(change.before) && change.before.length === 0);
+  if (!beforeIsEmpty) return false;
+  if (change.after === "None" || change.after === "/ piece" || change.after === true) return true;
+  if (change.after === 1 && /\.(orderQuantityStep|minimumOrderQuantity)$/.test(change.path)) return true;
+  return Array.isArray(change.after) && change.after.length === 0;
+}
+
+function visibleHistoryChanges(entry: ProductHistoryEntry): ProductHistoryChange[] {
+  const changed = entry.changes.filter(
+    (change) => !areProductHistoryValuesEqual(change.before, change.after)
+  );
+  if (!isLegacyEntry(entry)) return changed;
+
+  const canonicalFields = new Set([
+    "name", "subtitle", "description", "privateNotes", "category", "catalogueData", "variants",
+    "imageUrl", "imageUrls", "primaryImageIndex", "videoUrls", "fontColor", "imageBgColor",
+    "bgColor", "cropAspectRatio", "suggestedColors",
+  ]);
+  const productAliases = /^(field\d+(Unit)?|price\d+(Unit)?|wholesale(Unit)?|packageUnit|ageUnit|badge|stock|wholesaleStock)$/;
+  const catalogueChanges = changed.filter((change) => change.path.startsWith("catalogueData."));
+  const canonicalChanges = changed.filter((change) => {
+    const root = change.path.split(/[.\[]/)[0];
+    return canonicalFields.has(root) || (!catalogueChanges.length && productAliases.test(root));
+  });
+
+  return canonicalChanges.filter((change) => {
+    const root = change.path.split(/[.\[]/)[0];
+    if (catalogueChanges.length && productAliases.test(root)) return false;
+    return !isLegacyDefaultAddition(change);
+  });
+}
+
 function ChangeDetails({ changes, omittedChangeCount = 0 }: { changes: ProductHistoryChange[]; omittedChangeCount?: number }) {
   const changedFields = changes.filter((change) => !areProductHistoryValuesEqual(change.before, change.after));
   return (
@@ -138,9 +176,9 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                 const timestamp = Number.isNaN(date.getTime())
                   ? entry.timestamp
                   : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-                const changeCount = entry.changes.filter(
-                  (change) => !areProductHistoryValuesEqual(change.before, change.after)
-                ).length + (entry.omittedChangeCount || 0);
+                const visibleChanges = visibleHistoryChanges(entry);
+                const legacyEntry = isLegacyEntry(entry);
+                const changeCount = visibleChanges.length + (legacyEntry ? 0 : entry.omittedChangeCount || 0);
                 return (
                   <li key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                     <button
@@ -157,31 +195,27 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                       <span className="flex shrink-0 flex-col items-end gap-1">
                         {entry.source !== "created" && (
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                            {entry.source === "bulk" && !entry.exactBulkChanges
-                              ? "Older bulk edit"
-                              : entry.source === "product" && !entry.exactProductChanges
-                                ? "Older save"
-                                : `${changeCount} fields`}
+                            {legacyEntry && visibleChanges.length === 0
+                              ? entry.source === "bulk" ? "Older bulk edit" : "Older save"
+                              : `${changeCount} fields${legacyEntry ? " · recovered" : ""}`}
                           </span>
                         )}
                         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{isExpanded ? "Hide" : "View"}</span>
                       </span>
                     </button>
-                    {isExpanded && entry.source === "bulk" && !entry.exactBulkChanges && (
-                      <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                        Detailed field changes weren’t captured for this older bulk edit.
+                    {isExpanded && legacyEntry && visibleChanges.length > 0 && (
+                      <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
+                        Recovered from an older history entry; unchanged aliases are hidden.
                       </p>
                     )}
-                    {isExpanded && entry.source === "product" && !entry.exactProductChanges && (
+                    {isExpanded && legacyEntry && visibleChanges.length === 0 && (
                       <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                        Exact field changes weren’t captured for this older save.
+                        No reliable field-level changes could be recovered from this older entry.
                       </p>
                     )}
-                    {isExpanded && entry.changes.length > 0 &&
-                      (entry.source !== "bulk" || entry.exactBulkChanges) &&
-                      (entry.source !== "product" || entry.exactProductChanges) && (
-                        <ChangeDetails changes={entry.changes} omittedChangeCount={entry.omittedChangeCount} />
-                      )}
+                    {isExpanded && visibleChanges.length > 0 && (
+                      <ChangeDetails changes={visibleChanges} omittedChangeCount={legacyEntry ? 0 : entry.omittedChangeCount} />
+                    )}
                   </li>
                 );
               })}
