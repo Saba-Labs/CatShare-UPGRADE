@@ -32,7 +32,10 @@ function formatValue(value: unknown): string {
     }
     return `${value.length} item${value.length === 1 ? "" : "s"}`;
   }
-  if (typeof value === "object") return "Details updated";
+  if (typeof value === "object") {
+    const details = JSON.stringify(value);
+    return details.length > 240 ? `${details.slice(0, 237)}…` : details;
+  }
   const text = String(value);
   return /^https?:\/\//i.test(text) ? "Image or link updated" : text;
 }
@@ -41,7 +44,7 @@ function entryTitle(entry: ProductHistoryEntry): string {
   if (entry.source === "created") return "Product created";
   if (entry.source === "variants") return "Variants updated";
   if (entry.source === "bulk") return `Bulk edit · ${entry.affectedProductCount || 1} product${entry.affectedProductCount === 1 ? "" : "s"}`;
-  const labels = [...new Set(entry.changes.map((change) => humanize(change.path.split(/[.[]/)[0])))];
+  const labels = [...new Set(entry.changes.map((change) => humanize(change.path.split(/[.\[]/)[0])))];
   if (labels.length === 0) return "Product updated";
   const visible = labels.slice(0, 2).join(", ");
   return labels.length > 2 ? `${visible} + ${labels.length - 2} more` : visible;
@@ -134,7 +137,7 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                 const isExpanded = expanded === entry.id;
                 const date = new Date(entry.timestamp);
                 return (
-                  <li key={entry.id} className="relative rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-700 dark:bg-gray-850">
+                  <li key={entry.id} className="relative rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-700 dark:bg-gray-800">
                     <button
                       type="button"
                       aria-expanded={isExpanded}

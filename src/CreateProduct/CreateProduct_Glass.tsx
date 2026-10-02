@@ -1565,7 +1565,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
       <div className="fixed top-0 left-0 right-0 h-[40px] bg-black z-50"></div>
 
       {/* Header below status bar */}
-      <div className="fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-end px-4">
+      <div className="fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-between px-4">
+        {editingId ? (
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
+          >
+            History
+          </button>
+        ) : <span />}
         <button
           onClick={() => navigate('/')}
           className="text-white/40 hover:text-white/70 transition-colors flex items-center justify-center w-6 h-6"
@@ -2668,15 +2677,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
           {/* Save/Cancel Buttons */}
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
-            {editingId && (
-              <button
-                type="button"
-                onClick={() => setShowHistory(true)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
-              >
-                History
-              </button>
-            )}
             <button
               onClick={saveAndNavigate}
               disabled={isSaving}
