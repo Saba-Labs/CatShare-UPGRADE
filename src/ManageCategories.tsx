@@ -9,6 +9,7 @@ import { logCategoryManaged } from './config/analyticsEvents';
 import { readProductsWithLegacyFallback, safeSetProductsCache, safeSetInStorage, getStorageKey } from './utils/safeStorage';
 import { readCategoriesList, persistCategoriesList } from './utils/categoriesStorage';
 import { productImageDisplayUrl } from './utils/imageUrl';
+import { recordBulkProductHistory } from './utils/productHistory';
 import {
   normalizeProductCategories,
   productHasCategory,
@@ -35,7 +36,7 @@ export default function ManageCategories() {
     setCategories(readCategoriesList(user?.uid ?? null));
   }, [user?.uid]);
 
-  const persistProducts = async (updatedProducts: any[]) => {
+  const persistProducts = async (updatedProducts: any[], trackHistory = false) => {
     if (!user?.uid) return;
     const normalizedProducts = updatedProducts.map((p) => ({
       ...p,
@@ -43,6 +44,7 @@ export default function ManageCategories() {
     }));
     safeSetProductsCache(user.uid, normalizedProducts);
     safeSetInStorage(getStorageKey('products', user.uid), normalizedProducts);
+    if (trackHistory) recordBulkProductHistory(user.uid, products, normalizedProducts);
     await syncProducts(user.uid, normalizedProducts, { skipImageUrlAssertion: true });
     setProducts(normalizedProducts);
     return normalizedProducts;
@@ -106,7 +108,7 @@ export default function ManageCategories() {
         ...p,
         category: renameProductCategory(p.category, oldName, newName),
       }));
-      persistProducts(updatedProducts).catch((err) => {
+      persistProducts(updatedProducts, true).catch((err) => {
         console.warn('⚠️ Failed to rename category on products:', err);
       });
     }
@@ -126,7 +128,7 @@ export default function ManageCategories() {
         ...p,
         category: removeProductCategory(p.category, removedCat),
       }));
-      persistProducts(updatedProducts).catch((err) => {
+      persistProducts(updatedProducts, true).catch((err) => {
         console.warn('⚠️ Failed to remove category from products:', err);
       });
     }
@@ -159,7 +161,7 @@ export default function ManageCategories() {
 
     setIsSaving(true);
     try {
-      await persistProducts(pendingProducts);
+      await persistProducts(pendingProducts, true);
       setPendingProducts([]);
       setSelectedCategory(null);
     } catch (err) {

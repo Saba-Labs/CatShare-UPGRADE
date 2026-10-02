@@ -10,6 +10,7 @@ import { isProductEnabledForCatalogue, setProductEnabledForCatalogue } from "../
 import { saveProducts } from "../config/productUtils";
 import { productImageDisplayUrl } from "../utils/imageUrl";
 import { useCloudWriteGate } from "../hooks/useCloudWriteGate";
+import { recordBulkProductHistory, recordProductHistory } from "../utils/productHistory";
 
 interface AddProductsModalProps {
   isOpen: boolean;
@@ -104,6 +105,23 @@ useEffect(() => {
   }, [isOpen]);
 
   const persistAndNotifyParent = useCallback((updated: any[]) => {
+  const previous = productsBeforeEditRef.current;
+  const previousById = new Map(previous.map((product) => [String(product.id), product]));
+  const changed = updated.filter((product) => {
+    const oldProduct = previousById.get(String(product.id));
+    return oldProduct && isProductEnabledForCatalogue(oldProduct, catalogueId) !== isProductEnabledForCatalogue(product, catalogueId);
+  });
+  if (changed.length === 1) {
+    const product = changed[0];
+    recordProductHistory({
+      productId: String(product.id),
+      before: previousById.get(String(product.id)),
+      after: product,
+    });
+  } else if (changed.length > 1) {
+    recordBulkProductHistory(undefined, previous, updated);
+  }
+  productsBeforeEditRef.current = updated;
   setProducts(updated);
   saveProducts(updated);
   onProductsUpdate(updated);
@@ -113,7 +131,7 @@ useEffect(() => {
       detail: { forceCloudSync: true },
     })
   );
-}, [onProductsUpdate]);
+}, [onProductsUpdate, catalogueId]);
 
   const handleClose = useCallback(() => {
     onProductsUpdate(products);

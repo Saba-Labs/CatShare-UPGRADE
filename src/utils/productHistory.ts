@@ -17,8 +17,8 @@ export type ProductHistoryEntry = {
   omittedChangeCount?: number;
 };
 
-const MAX_ENTRIES_PER_PRODUCT = 40;
-const MAX_CHANGES_PER_ENTRY = 30;
+const MAX_ENTRIES_PER_PRODUCT = 20;
+const MAX_CHANGES_PER_ENTRY = 20;
 
 function historyKey(userId: string | undefined, productId: string): string {
   const ownerId = userId || getPersistedAuthUserId() || "local";
@@ -142,8 +142,10 @@ export function recordProductHistory({
       : {}),
   };
   const key = historyKey(userId, String(productId));
-  safeSetInStorage(key, [entry, ...readProductHistory(userId, String(productId))].slice(0, MAX_ENTRIES_PER_PRODUCT));
-  window.dispatchEvent(new CustomEvent("product-history-changed", { detail: { productId: String(productId) } }));
+  const saved = safeSetInStorage(key, [entry, ...readProductHistory(userId, String(productId))].slice(0, MAX_ENTRIES_PER_PRODUCT));
+  if (saved) {
+    window.dispatchEvent(new CustomEvent("product-history-changed", { detail: { productId: String(productId) } }));
+  }
 }
 
 export function recordBulkProductHistory(
