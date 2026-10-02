@@ -52,7 +52,9 @@ function historySnapshot(value: unknown): unknown {
 
 export function areProductHistoryValuesEqual(before: unknown, after: unknown): boolean {
   if (Object.is(before, after)) return true;
-  if ((before == null || before === "") && (after == null || after === "")) return true;
+  const isEmpty = (value: unknown) =>
+    value == null || value === "" || (Array.isArray(value) && value.length === 0);
+  if (isEmpty(before) && isEmpty(after)) return true;
   if (
     ["string", "number"].includes(typeof before) &&
     ["string", "number"].includes(typeof after)
