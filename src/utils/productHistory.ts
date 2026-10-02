@@ -49,6 +49,28 @@ function historySnapshot(value: unknown): unknown {
   return value;
 }
 
+export function areProductHistoryValuesEqual(before: unknown, after: unknown): boolean {
+  if (Object.is(before, after)) return true;
+  if ((before == null || before === "") && (after == null || after === "")) return true;
+  if (
+    ["string", "number"].includes(typeof before) &&
+    ["string", "number"].includes(typeof after)
+  ) {
+    return String(before) === String(after);
+  }
+  if (Array.isArray(before) && Array.isArray(after)) {
+    return before.length === after.length && before.every((value, index) => areProductHistoryValuesEqual(value, after[index]));
+  }
+  if (isPlainObject(before) && isPlainObject(after)) {
+    const beforeKeys = Object.keys(before).sort();
+    const afterKeys = Object.keys(after).sort();
+    return beforeKeys.length === afterKeys.length && beforeKeys.every(
+      (key, index) => key === afterKeys[index] && areProductHistoryValuesEqual(before[key], after[key])
+    );
+  }
+  return false;
+}
+
 function arrayItemKey(value: unknown, index: number): string {
   if (isPlainObject(value)) {
     const identity = value.name ?? value.id ?? value.sku ?? value.key;
@@ -59,7 +81,7 @@ function arrayItemKey(value: unknown, index: number): string {
 
 function collectChanges(before: unknown, after: unknown, path = "", changes: ProductHistoryChange[] = []): ProductHistoryChange[] {
   if (changes.length >= MAX_CHANGES_PER_ENTRY + 1) return changes;
-  if (Object.is(before, after)) return changes;
+  if (areProductHistoryValuesEqual(before, after)) return changes;
 
   if (isPlainObject(before) && isPlainObject(after)) {
     const keys = new Set([...Object.keys(before), ...Object.keys(after)]);

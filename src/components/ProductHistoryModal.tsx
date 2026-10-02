@@ -5,6 +5,7 @@ import {
   readProductHistory,
   type ProductHistoryChange,
   type ProductHistoryEntry,
+  areProductHistoryValuesEqual,
 } from "../utils/productHistory";
 
 type ProductHistoryModalProps = {
@@ -48,9 +49,10 @@ function entryTitle(entry: ProductHistoryEntry): string {
 }
 
 function ChangeDetails({ changes, omittedChangeCount = 0 }: { changes: ProductHistoryChange[]; omittedChangeCount?: number }) {
+  const changedFields = changes.filter((change) => !areProductHistoryValuesEqual(change.before, change.after));
   return (
     <div className="mt-3 space-y-2">
-      {changes.map((change, index) => (
+      {changedFields.map((change, index) => (
         <div key={`${change.path}-${index}`} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 p-3">
           <div className="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-200">{humanize(change.path)}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -136,7 +138,9 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                 const timestamp = Number.isNaN(date.getTime())
                   ? entry.timestamp
                   : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-                const changeCount = entry.changes.length + (entry.omittedChangeCount || 0);
+                const changeCount = entry.changes.filter(
+                  (change) => !areProductHistoryValuesEqual(change.before, change.after)
+                ).length + (entry.omittedChangeCount || 0);
                 return (
                   <li key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                     <button
