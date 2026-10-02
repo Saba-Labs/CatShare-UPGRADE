@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiClock, FiX } from "react-icons/fi";
 import { getPersistedAuthUserId } from "../utils/authUserId";
+import { getAllCatalogues } from "../config/catalogueConfig";
+import { getAllFields } from "../config/fieldConfig";
 import {
   readProductHistory,
   type ProductHistoryChange,
@@ -39,6 +41,35 @@ function formatValue(value: unknown): string {
   }
   const text = String(value);
   return /^https?:\/\//i.test(text) ? "Image or link updated" : text;
+}
+
+function historyChangeLabel(
+  path: string,
+  catalogueLabels: Map<string, string>,
+  fields: ReturnType<typeof getAllFields>
+): string {
+  const cataloguePath = /^catalogueData\.([^.]+)\.(.+)$/.exec(path);
+  const root = path.split(/[.\[]/)[0];
+  const field = fields.find((item) => item.key === root || item.unitField === root);
+  const fieldLabel = field
+    ? field.unitField === root && field.key !== root ? `${field.label} Unit` : field.label
+    : humanize(root);
+  if (!cataloguePath) return fieldLabel;
+
+  const [, catalogueId, catalogueFieldPath] = cataloguePath;
+  const pathParts = catalogueFieldPath.split(/[.\[]/);
+  const catalogueField = pathParts.shift() || "";
+  const configuredField = fields.find(
+    (item) => item.key === catalogueField || item.unitField === catalogueField
+  );
+  const label = configuredField
+    ? configuredField.unitField === catalogueField && configuredField.key !== catalogueField
+      ? `${configuredField.label} Unit`
+      : configuredField.label
+    : humanize(catalogueField);
+  const nestedPath = pathParts.filter(Boolean).join(" ");
+  const suffix = nestedPath ? ` · ${humanize(nestedPath)}` : "";
+  return `${catalogueLabels.get(catalogueId) || "Catalogue"} · ${label}${suffix}`;
 }
 
 function entryTitle(entry: ProductHistoryEntry): string {
@@ -86,13 +117,23 @@ function visibleHistoryChanges(entry: ProductHistoryEntry): ProductHistoryChange
   });
 }
 
-function ChangeDetails({ changes, omittedChangeCount = 0 }: { changes: ProductHistoryChange[]; omittedChangeCount?: number }) {
+function ChangeDetails({
+  changes,
+  catalogueLabels,
+  fields,
+  omittedChangeCount = 0,
+}: {
+  changes: ProductHistoryChange[];
+  catalogueLabels: Map<string, string>;
+  fields: ReturnType<typeof getAllFields>;
+  omittedChangeCount?: number;
+}) {
   const changedFields = changes.filter((change) => !areProductHistoryValuesEqual(change.before, change.after));
   return (
     <div className="mt-3 space-y-2">
       {changedFields.map((change, index) => (
         <div key={`${change.path}-${index}`} className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 p-3">
-          <div className="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-200">{humanize(change.path)}</div>
+          <div className="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-200">{historyChangeLabel(change.path, catalogueLabels, fields)}</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <div className="min-w-0 rounded bg-red-50 dark:bg-red-950/30 px-2.5 py-2">
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">Before</div>
@@ -116,6 +157,11 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
   const [entries, setEntries] = useState<ProductHistoryEntry[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const userId = getPersistedAuthUserId() || undefined;
+  const catalogueLabels = useMemo(
+    () => new Map(getAllCatalogues(userId).map((catalogue) => [catalogue.id, catalogue.label])),
+    [userId]
+  );
+  const fields = useMemo(() => getAllFields(), [userId]);
 
   useEffect(() => {
     if (!open) return;
@@ -214,7 +260,12 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                       </p>
                     )}
                     {isExpanded && visibleChanges.length > 0 && (
-                      <ChangeDetails changes={visibleChanges} omittedChangeCount={legacyEntry ? 0 : entry.omittedChangeCount} />
+                      <ChangeDetails
+                        changes={visibleChanges}
+                        catalogueLabels={catalogueLabels}
+                        fields={fields}
+                        omittedChangeCount={legacyEntry ? 0 : entry.omittedChangeCount}
+                      />
                     )}
                   </li>
                 );
