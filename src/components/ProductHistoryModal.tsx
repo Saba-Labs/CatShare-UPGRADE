@@ -43,11 +43,8 @@ function formatValue(value: unknown): string {
 function entryTitle(entry: ProductHistoryEntry): string {
   if (entry.source === "created") return "Product created";
   if (entry.source === "variants") return "Variants updated";
-  if (entry.source === "bulk") return `Bulk edit · ${entry.affectedProductCount || 1} product${entry.affectedProductCount === 1 ? "" : "s"}`;
-  const labels = [...new Set(entry.changes.map((change) => humanize(change.path.split(/[.\[]/)[0])))];
-  if (labels.length === 0) return "Product updated";
-  const visible = labels.slice(0, 2).join(", ");
-  return labels.length > 2 ? `${visible} + ${labels.length - 2} more` : visible;
+  if (entry.source === "bulk") return `Bulk edit · ${entry.affectedProductCount || 1} products`;
+  return "Product updated";
 }
 
 function ChangeDetails({ changes, omittedChangeCount = 0 }: { changes: ProductHistoryChange[]; omittedChangeCount?: number }) {
@@ -136,23 +133,40 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
               {entries.map((entry) => {
                 const isExpanded = expanded === entry.id;
                 const date = new Date(entry.timestamp);
+                const timestamp = Number.isNaN(date.getTime())
+                  ? entry.timestamp
+                  : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+                const changeCount = entry.changes.length + (entry.omittedChangeCount || 0);
                 return (
-                  <li key={entry.id} className="relative rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-700 dark:bg-gray-800">
+                  <li key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
                     <button
                       type="button"
                       aria-expanded={isExpanded}
                       onClick={() => setExpanded(isExpanded ? null : entry.id)}
-                      className="flex w-full items-start justify-between gap-3 text-left"
+                      className="flex w-full items-center justify-between gap-4 text-left"
                     >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">{entryTitle(entry)}</span>
-                        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                          {Number.isNaN(date.getTime()) ? entry.timestamp : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
-                        </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{entryTitle(entry)}</span>
+                        <span className="mt-1 block truncate text-xs text-gray-600 dark:text-gray-300">{entry.productName || productName}</span>
+                        <time dateTime={entry.timestamp} className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{timestamp}</time>
                       </span>
-                      {entry.source !== "created" && <span className="shrink-0 pt-0.5 text-xs font-medium text-blue-600 dark:text-blue-300">{isExpanded ? "Hide" : `${entry.changes.length}${entry.omittedChangeCount ? "+" : ""} changes`}</span>}
+                      <span className="flex shrink-0 flex-col items-end gap-1">
+                        {entry.source !== "created" && (
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                            {entry.source === "bulk" && !entry.exactBulkChanges ? "Older bulk edit" : `${changeCount} fields`}
+                          </span>
+                        )}
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{isExpanded ? "Hide" : "View"}</span>
+                      </span>
                     </button>
-                    {isExpanded && entry.changes.length > 0 && <ChangeDetails changes={entry.changes} omittedChangeCount={entry.omittedChangeCount} />}
+                    {isExpanded && entry.source === "bulk" && !entry.exactBulkChanges && (
+                      <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        Detailed field changes weren’t captured for this older bulk edit.
+                      </p>
+                    )}
+                    {isExpanded && entry.changes.length > 0 && (entry.source !== "bulk" || entry.exactBulkChanges) && (
+                      <ChangeDetails changes={entry.changes} omittedChangeCount={entry.omittedChangeCount} />
+                    )}
                   </li>
                 );
               })}

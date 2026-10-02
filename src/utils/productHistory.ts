@@ -13,12 +13,14 @@ export type ProductHistoryEntry = {
   timestamp: string;
   source: "created" | "product" | "variants" | "bulk";
   affectedProductCount?: number;
+  productName?: string;
+  exactBulkChanges?: boolean;
   changes: ProductHistoryChange[];
   omittedChangeCount?: number;
 };
 
 const MAX_ENTRIES_PER_PRODUCT = 20;
-const MAX_CHANGES_PER_ENTRY = 20;
+const MAX_CHANGES_PER_ENTRY = 50;
 
 function historyKey(userId: string | undefined, productId: string): string {
   const ownerId = userId || getPersistedAuthUserId() || "local";
@@ -114,6 +116,7 @@ export function recordProductHistory({
   after,
   source = "product",
   affectedProductCount,
+  changesOverride,
   timestamp = new Date().toISOString(),
   eventId,
 }: {
@@ -123,11 +126,18 @@ export function recordProductHistory({
   after: unknown;
   source?: ProductHistoryEntry["source"];
   affectedProductCount?: number;
+  changesOverride?: ProductHistoryChange[];
   timestamp?: string;
   eventId?: string;
 }): void {
   if (productId == null || String(productId).length === 0) return;
-  const changes = source === "created" ? [] : collectChanges(before, after);
+  const changes = source === "created"
+    ? []
+    : changesOverride?.map((change) => ({
+        path: change.path,
+        before: historySnapshot(change.before),
+        after: historySnapshot(change.after),
+      })) ?? collectChanges(before, after);
   if (source !== "created" && changes.length === 0) return;
 
   const entry: ProductHistoryEntry = {
@@ -136,6 +146,8 @@ export function recordProductHistory({
     timestamp,
     source,
     ...(source === "bulk" && affectedProductCount ? { affectedProductCount } : {}),
+    ...(isPlainObject(after) && typeof after.name === "string" ? { productName: after.name } : {}),
+    ...(source === "bulk" ? { exactBulkChanges: true } : {}),
     changes: changes.slice(0, MAX_CHANGES_PER_ENTRY),
     ...(changes.length > MAX_CHANGES_PER_ENTRY
       ? { omittedChangeCount: changes.length - MAX_CHANGES_PER_ENTRY }
@@ -151,12 +163,15 @@ export function recordProductHistory({
 export function recordBulkProductHistory(
   userId: string | undefined,
   beforeProducts: unknown[],
-  afterProducts: unknown[]
+  afterProducts: unknown[],
+  changesByProduct?: Map<string, ProductHistoryChange[]>
 ): void {
   const beforeById = new Map(beforeProducts.map((product: any) => [String(product?.id), product]));
   const updated = afterProducts.filter((product: any) => {
-    const before = beforeById.get(String(product?.id));
-    return before !== undefined && collectChanges(before, product).length > 0;
+    const productId = String(product?.id);
+    const before = beforeById.get(productId);
+    const changes = changesByProduct?.get(productId);
+    return before !== undefined && (changesByProduct ? Boolean(changes?.length) : collectChanges(before, product).length > 0);
   });
   const timestamp = new Date().toISOString();
   const eventId = `bulk-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -169,6 +184,7 @@ export function recordBulkProductHistory(
       after,
       source: "bulk",
       affectedProductCount: updated.length,
+      changesOverride: changesByProduct?.get(String(after.id)),
       timestamp,
       eventId,
     });
