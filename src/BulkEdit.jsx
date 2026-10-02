@@ -18,6 +18,7 @@ import {
 } from "./utils/catalogueWarehouseStock";
 import { saveProducts, setFieldValue, setUnitValue } from "./config/productUtils";
 import { descriptionToBulkEditPlainText } from "./utils/productDescriptionHtml";
+import { recordBulkProductHistory } from "./utils/productHistory";
 import BulkDescriptionField from "./components/BulkDescriptionField";
 import OrderQuantityStepInput from "./components/OrderQuantityStepInput";
 import MinimumOrderQuantityInput from "./components/MinimumOrderQuantityInput";
@@ -537,6 +538,7 @@ useEffect(() => {
 
     // Merge edited products back into allProducts to preserve products not in this catalogue
     const editedIds = new Set(cleanData.map(p => p.id));
+    const beforeProducts = allProducts || products;
     const mergedData = allProducts ? allProducts.map(p =>
       editedIds.has(p.id) ? cleanData.find(edited => edited.id === p.id) : p
     ) : cleanData;
@@ -550,6 +552,7 @@ useEffect(() => {
 
     const userId = user?.uid;
     saveProducts(mergedData, userId, { skipBackgroundSync: true });
+    recordBulkProductHistory(userId, beforeProducts, mergedData);
     setProducts(mergedData);
 
     const editedProductIds = cleanData.map((p) => String(p.id));

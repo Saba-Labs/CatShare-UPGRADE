@@ -15,6 +15,8 @@ import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
 import { migrateProductToNewFormat } from "../config/fieldMigration";
 import { getProductFieldValue, getProductUnitValue } from "../config/fieldMigration";
 import { getPersistedAuthUserId } from "../utils/authUserId";
+import { recordProductHistory } from "../utils/productHistory";
+import ProductHistoryModal from "../components/ProductHistoryModal";
 import {
   safeGetFromStorage,
   safeSetInStorage,
@@ -394,6 +396,7 @@ export default function CreateProduct() {
   const y = useMotionValue(DRAG_RANGE * 0.5);
   const [isDragging, setIsDragging] = useState(false);
   const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants'>('basic');
+  const [showHistory, setShowHistory] = useState(false);
   const [showVariantDetailsModal, setShowVariantDetailsModal] = useState(false);
   const [showManageVariants, setShowManageVariants] = useState(false);
   const [variantGroups, setVariantGroups] = useState<ProductVariantGroup[]>([]);
@@ -618,6 +621,16 @@ export default function CreateProduct() {
         // Save to localStorage
         const ok = safeSetInStorage(productsStorageKeyNow, updated);
         if (ok) {
+          const savedProduct = updated.find((p: any) => p.id === editingId);
+          if (savedProduct) {
+            recordProductHistory({
+              userId: authUserIdNow,
+              productId: editingId,
+              before: existing,
+              after: savedProduct,
+              source: "variants",
+            });
+          }
           // Trigger Supabase sync with forceCloudSync flag
           window.dispatchEvent(
             new CustomEvent("product-added", {
@@ -1446,6 +1459,14 @@ if (migratedProduct.suggestedColors?.length > 0) {
         return;
       }
 
+      recordProductHistory({
+        userId: authUserIdNow,
+        productId: String(newItem.id),
+        before: existingProduct,
+        after: newItem,
+        source: isNewProduct ? "created" : "product",
+      });
+
       if (isNewProduct) {
         logProductAdded(updated.length);
       }
@@ -1888,6 +1909,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
         <header className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between select-none">
           <h1 className="text-base font-bold">{editingId ? "Edit Product" : "Create Product"}</h1>
           <div className="flex items-center gap-2">
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => setShowHistory(true)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              >
+                History
+              </button>
+            )}
             <button
               onClick={handleSelectImage}
               className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-3 py-1.5 rounded-lg shadow-md text-xs flex items-center gap-1"
@@ -2762,6 +2792,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
         style={{ display: "none" }}
       />
 
+      {editingId && (
+        <ProductHistoryModal
+          productId={editingId}
+          productName={formData.name || "Product"}
+          open={showHistory}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+
       {showColorPicker && (
         <ColorPickerModal
           value={overrideColor}
@@ -2817,13 +2856,24 @@ if (migratedProduct.suggestedColors?.length > 0) {
     if (!authUserIdNow) return;
     const productsStorageKeyNow = getStorageKey("products", authUserIdNow);
     const all = safeGetFromStorage(productsStorageKeyNow, []);
+    const existingProduct = all.find((p: any) => p.id === editingId);
     const updated = all.map((p: any) => {
       if (p.id !== editingId) return p;
       const savedVariants = pruneVariantGroupsForSave(variantGroups);
       savedVariants.combinations = updatedConfig.combinations ?? [];
       return { ...p, variants: savedVariants, updatedAt: new Date().toISOString() };
     });
-    safeSetInStorage(productsStorageKeyNow, updated);
+    if (!safeSetInStorage(productsStorageKeyNow, updated)) return;
+    const savedProduct = updated.find((p: any) => p.id === editingId);
+    if (existingProduct && savedProduct) {
+      recordProductHistory({
+        userId: authUserIdNow,
+        productId: editingId,
+        before: existingProduct,
+        after: savedProduct,
+        source: "variants",
+      });
+    }
     window.dispatchEvent(
       new CustomEvent("product-added", {
         detail: { onlyProductId: String(editingId), forceCloudSync: true },
