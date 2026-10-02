@@ -15,7 +15,7 @@ import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
 import { migrateProductToNewFormat } from "../config/fieldMigration";
 import { getProductFieldValue, getProductUnitValue } from "../config/fieldMigration";
 import { getPersistedAuthUserId } from "../utils/authUserId";
-import { recordProductHistory } from "../utils/productHistory";
+import { createProductEditHistoryChanges, recordProductHistory } from "../utils/productHistory";
 import ProductHistoryModal from "../components/ProductHistoryModal";
 import {
   safeGetFromStorage,
@@ -484,6 +484,7 @@ export default function CreateProduct() {
     category: [],
     catalogueData: {},
   });
+  const initialHistoryFormRef = useRef<ProductWithCatalogueData | null>(null);
 
   const [selectedCatalogue, setSelectedCatalogue] = useState<string>(catalogueParam || "cat1");
   const [fetchFieldsChecked, setFetchFieldsChecked] = useState(false);
@@ -693,6 +694,7 @@ export default function CreateProduct() {
   };
 
   useEffect(() => {
+    initialHistoryFormRef.current = null;
     if (editingId) {
       const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);
@@ -705,7 +707,7 @@ export default function CreateProduct() {
           migratedProduct.catalogueData = initializeCatalogueData(migratedProduct);
         }
 
-        setFormData({
+        const initialFormData = {
           id: migratedProduct.id || "",
           name: migratedProduct.name || "",
           subtitle: migratedProduct.subtitle || "",
@@ -713,7 +715,9 @@ export default function CreateProduct() {
           privateNotes: migratedProduct.privateNotes || "",
           category: normalizeProductCategories(migratedProduct.category),
           catalogueData: migratedProduct.catalogueData,
-        });
+        };
+        initialHistoryFormRef.current = initialFormData;
+        setFormData(initialFormData);
 
         setOverrideColor(migratedProduct.bgColor || "#d1b3c4");
         setFontColor(normalizeProductFontColor(migratedProduct.fontColor));
@@ -1399,6 +1403,14 @@ if (migratedProduct.suggestedColors?.length > 0) {
         before: existingProduct,
         after: newItem,
         source: isNewProduct ? "created" : "product",
+        changesOverride: isNewProduct
+          ? undefined
+          : createProductEditHistoryChanges(
+              initialHistoryFormRef.current || formData,
+              formData,
+              existingProduct,
+              newItem
+            ),
       });
 
       // Fire custom analytics event when a new product is created

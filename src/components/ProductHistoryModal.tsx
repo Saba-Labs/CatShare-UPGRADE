@@ -157,7 +157,11 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                       <span className="flex shrink-0 flex-col items-end gap-1">
                         {entry.source !== "created" && (
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                            {entry.source === "bulk" && !entry.exactBulkChanges ? "Older bulk edit" : `${changeCount} fields`}
+                            {entry.source === "bulk" && !entry.exactBulkChanges
+                              ? "Older bulk edit"
+                              : entry.source === "product" && !entry.exactProductChanges
+                                ? "Older save"
+                                : `${changeCount} fields`}
                           </span>
                         )}
                         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{isExpanded ? "Hide" : "View"}</span>
@@ -168,9 +172,16 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                         Detailed field changes weren’t captured for this older bulk edit.
                       </p>
                     )}
-                    {isExpanded && entry.changes.length > 0 && (entry.source !== "bulk" || entry.exactBulkChanges) && (
-                      <ChangeDetails changes={entry.changes} omittedChangeCount={entry.omittedChangeCount} />
+                    {isExpanded && entry.source === "product" && !entry.exactProductChanges && (
+                      <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        Exact field changes weren’t captured for this older save.
+                      </p>
                     )}
+                    {isExpanded && entry.changes.length > 0 &&
+                      (entry.source !== "bulk" || entry.exactBulkChanges) &&
+                      (entry.source !== "product" || entry.exactProductChanges) && (
+                        <ChangeDetails changes={entry.changes} omittedChangeCount={entry.omittedChangeCount} />
+                      )}
                   </li>
                 );
               })}

@@ -14,6 +14,7 @@ export type ProductHistoryEntry = {
   source: "created" | "product" | "variants" | "bulk";
   affectedProductCount?: number;
   productName?: string;
+  exactProductChanges?: boolean;
   exactBulkChanges?: boolean;
   changes: ProductHistoryChange[];
   omittedChangeCount?: number;
@@ -69,6 +70,37 @@ export function areProductHistoryValuesEqual(before: unknown, after: unknown): b
     );
   }
   return false;
+}
+
+const PRODUCT_PRESENTATION_HISTORY_FIELDS = [
+  "imageUrl",
+  "imageUrls",
+  "primaryImageIndex",
+  "videoUrls",
+  "variants",
+  "suggestedColors",
+  "fontColor",
+  "imageBgColor",
+  "bgColor",
+  "cropAspectRatio",
+];
+
+export function createProductEditHistoryChanges(
+  beforeForm: unknown,
+  afterForm: unknown,
+  beforeProduct: unknown,
+  afterProduct: unknown
+): ProductHistoryChange[] {
+  const projectPresentation = (product: unknown) => {
+    if (!isPlainObject(product)) return {};
+    return Object.fromEntries(
+      PRODUCT_PRESENTATION_HISTORY_FIELDS.map((field) => [field, product[field]])
+    );
+  };
+  return [
+    ...collectChanges(beforeForm, afterForm),
+    ...collectChanges(projectPresentation(beforeProduct), projectPresentation(afterProduct)),
+  ];
 }
 
 function arrayItemKey(value: unknown, index: number): string {
@@ -169,6 +201,7 @@ export function recordProductHistory({
     source,
     ...(source === "bulk" && affectedProductCount ? { affectedProductCount } : {}),
     ...(isPlainObject(after) && typeof after.name === "string" ? { productName: after.name } : {}),
+    ...(source === "product" ? { exactProductChanges: true } : {}),
     ...(source === "bulk" ? { exactBulkChanges: true } : {}),
     changes: changes.slice(0, MAX_CHANGES_PER_ENTRY),
     ...(changes.length > MAX_CHANGES_PER_ENTRY
