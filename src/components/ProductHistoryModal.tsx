@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiClock, FiX } from "react-icons/fi";
+import { FiChevronDown, FiClock, FiX } from "react-icons/fi";
 import { getPersistedAuthUserId } from "../utils/authUserId";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getAllFields } from "../config/fieldConfig";
@@ -230,23 +230,32 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                     <button
                       type="button"
                       aria-expanded={isExpanded}
+                      aria-label={`${entryTitle(entry)}, ${changeCount} ${changeCount === 1 ? "field" : "fields"}, ${isExpanded ? "collapse" : "expand"}`}
                       onClick={() => setExpanded(isExpanded ? null : entry.id)}
                       className="flex w-full items-center justify-between gap-4 text-left"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{entryTitle(entry)}</span>
-                        <span className="mt-1 block truncate text-xs text-gray-600 dark:text-gray-300">{entry.productName || productName}</span>
                         <time dateTime={entry.timestamp} className="mt-1 block text-xs text-gray-500 dark:text-gray-400">{timestamp}</time>
                       </span>
-                      <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="flex shrink-0 items-center gap-2">
                         {entry.source !== "created" && (
-                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                            {legacyEntry && visibleChanges.length === 0
-                              ? entry.source === "bulk" ? "Older bulk edit" : "Older save"
-                              : `${changeCount} fields${legacyEntry ? " · recovered" : ""}`}
+                          <span className="inline-flex items-baseline gap-1 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-gray-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                            {legacyEntry && visibleChanges.length === 0 ? (
+                              <span className="text-[10px] font-medium">{entry.source === "bulk" ? "Older bulk edit" : "Older save"}</span>
+                            ) : (
+                              <>
+                                <span className="text-sm font-semibold leading-none text-gray-800 dark:text-gray-100">{changeCount}</span>
+                                <span className="text-[10px] font-medium">{changeCount === 1 ? "field" : "fields"}</span>
+                              </>
+                            )}
                           </span>
                         )}
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{isExpanded ? "Hide" : "View"}</span>
+                        <FiChevronDown
+                          aria-hidden="true"
+                          className={`shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          size={16}
+                        />
                       </span>
                     </button>
                     {isExpanded && legacyEntry && visibleChanges.length > 0 && (
