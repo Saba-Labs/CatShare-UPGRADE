@@ -1,4 +1,5 @@
 import { getPersistedAuthUserId } from "./authUserId";
+import { syncQueue } from "../services/syncQueue";
 import { safeGetFromStorage, safeSetInStorage } from "./safeStorage";
 
 export type ProductHistoryChange = {
@@ -22,6 +23,7 @@ export type ProductHistoryEntry = {
 
 const MAX_ENTRIES_PER_PRODUCT = 20;
 const MAX_CHANGES_PER_ENTRY = 50;
+const MAX_HISTORY_SYNC_BATCH_SIZE = 100;
 
 function historyKey(userId: string | undefined, productId: string): string {
   const ownerId = userId || getPersistedAuthUserId() || "local";
@@ -165,6 +167,102 @@ export function readProductHistory(userId: string | undefined, productId: string
   return Array.isArray(entries) ? entries : [];
 }
 
+export function readAllProductHistory(userId: string): ProductHistoryEntry[] {
+  const prefix = `productHistory::${userId}::`;
+  const entries: ProductHistoryEntry[] = [];
+  try {
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const stored = safeGetFromStorage<unknown>(key, []);
+      if (!Array.isArray(stored)) continue;
+      stored.forEach((entry) => {
+        if (
+          isPlainObject(entry) &&
+          typeof entry.id === "string" &&
+          typeof entry.productId === "string" &&
+          typeof entry.timestamp === "string" &&
+          Array.isArray(entry.changes)
+        ) {
+          entries.push(entry as unknown as ProductHistoryEntry);
+        }
+      });
+    }
+  } catch {
+    return entries;
+  }
+  return entries;
+}
+
+export function queueLocalProductHistoryBackfill(userId: string): void {
+  const marker = `productHistoryCloudBackfill::${userId}`;
+  try {
+    const entries = readAllProductHistory(userId);
+    if (localStorage.getItem(marker) === "true") {
+      const failedIds = new Set(
+        syncQueue.getQueue()
+          .filter((item) => item.type === "productHistory" && item.userId === userId && item.status === "failed")
+          .flatMap((item) => Array.isArray(item.data) ? item.data.map((entry: ProductHistoryEntry) => entry.id) : [])
+      );
+      if (failedIds.size > 0) {
+        queueProductHistorySync(userId, entries.filter((entry) => failedIds.has(entry.id)));
+      }
+      return;
+    }
+    queueProductHistorySync(userId, entries);
+    localStorage.setItem(marker, "true");
+  } catch {
+    return;
+  }
+}
+
+export function queueProductHistorySync(
+  userId: string | undefined,
+  entries: ProductHistoryEntry[]
+): void {
+  const ownerId = userId || getPersistedAuthUserId();
+  if (
+    !ownerId ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerId) ||
+    entries.length === 0
+  ) return;
+
+  const queuedIds = new Set(
+    syncQueue.getQueue()
+      .filter((item) => item.type === "productHistory" && item.userId === ownerId && item.status !== "failed")
+      .flatMap((item) => Array.isArray(item.data) ? item.data.map((entry: ProductHistoryEntry) => entry.id) : [])
+  );
+  const pendingEntries = entries.filter((entry) => !queuedIds.has(entry.id));
+  for (let index = 0; index < pendingEntries.length; index += MAX_HISTORY_SYNC_BATCH_SIZE) {
+    syncQueue.addToQueue(
+      "productHistory",
+      ownerId,
+      pendingEntries.slice(index, index + MAX_HISTORY_SYNC_BATCH_SIZE)
+    );
+  }
+}
+
+export function mergeProductHistory(
+  userId: string | undefined,
+  productId: string,
+  incomingEntries: ProductHistoryEntry[]
+): ProductHistoryEntry[] {
+  const entriesById = new Map<string, ProductHistoryEntry>();
+  [...readProductHistory(userId, productId), ...incomingEntries].forEach((entry) => {
+    if (entry.productId === String(productId) && !entriesById.has(entry.id)) {
+      entriesById.set(entry.id, entry);
+    }
+  });
+  const merged = Array.from(entriesById.values())
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp) || b.id.localeCompare(a.id))
+    .slice(0, MAX_ENTRIES_PER_PRODUCT);
+  const saved = safeSetInStorage(historyKey(userId, productId), merged);
+  if (saved) {
+    window.dispatchEvent(new CustomEvent("product-history-changed", { detail: { productId: String(productId) } }));
+  }
+  return merged;
+}
+
 export function recordProductHistory({
   userId,
   productId,
@@ -213,6 +311,7 @@ export function recordProductHistory({
   const key = historyKey(userId, String(productId));
   const saved = safeSetInStorage(key, [entry, ...readProductHistory(userId, String(productId))].slice(0, MAX_ENTRIES_PER_PRODUCT));
   if (saved) {
+    queueProductHistorySync(userId, [entry]);
     window.dispatchEvent(new CustomEvent("product-history-changed", { detail: { productId: String(productId) } }));
   }
 }

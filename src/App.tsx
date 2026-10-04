@@ -24,6 +24,7 @@ import { initPushTokenForLoggedInUser } from "./services/pushTokenService";
 import { readProductSourceBase64ForCloudUpload } from "./utils/productSourceImage";
 import { assertProductsHaveCloudImageUrlForSync } from "./utils/syncImageValidation";
 import { mergeProductsData } from "./utils/productMerge";
+import { queueLocalProductHistoryBackfill } from "./utils/productHistory";
 import {
   safeGetFromStorage,
   safeSetInStorage,
@@ -175,6 +176,12 @@ function AppWithBackHandler() {
     (window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress =
       syncNowLoading;
   }, [syncNowLoading]);
+
+  useEffect(() => {
+    if (user?.uid && !isGuestUser) {
+      queueLocalProductHistoryBackfill(user.uid);
+    }
+  }, [user?.uid, isGuestUser]);
 
   // Startup pipeline state: gates everything until legacy offline data is resolved.
   // 'pending' = haven't checked yet, 'resolving' = popup shown / sync in progress,

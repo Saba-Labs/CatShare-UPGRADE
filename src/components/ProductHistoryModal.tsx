@@ -4,11 +4,14 @@ import { getPersistedAuthUserId } from "../utils/authUserId";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getAllFields } from "../config/fieldConfig";
 import {
+  mergeProductHistory,
+  queueProductHistorySync,
   readProductHistory,
   type ProductHistoryChange,
   type ProductHistoryEntry,
   areProductHistoryValuesEqual,
 } from "../utils/productHistory";
+import { fetchProductHistory } from "../services/productHistoryCloud";
 
 type ProductHistoryModalProps = {
   productId: string;
@@ -165,6 +168,7 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
 
   useEffect(() => {
     if (!open) return;
+    let active = true;
     const refresh = () => setEntries(readProductHistory(userId, productId));
     const handleHistoryChange = (event: Event) => {
       const changedProductId = (event as CustomEvent<{ productId?: string }>).detail?.productId;
@@ -172,7 +176,28 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
     };
     refresh();
     window.addEventListener("product-history-changed", handleHistoryChange);
-    return () => window.removeEventListener("product-history-changed", handleHistoryChange);
+
+    if (userId) {
+      fetchProductHistory(userId, String(productId))
+        .then((cloudEntries) => {
+          if (!active) return;
+          const localEntries = readProductHistory(userId, productId);
+          const cloudIds = new Set(cloudEntries.map((entry) => entry.id));
+          mergeProductHistory(userId, productId, cloudEntries);
+          queueProductHistorySync(
+            userId,
+            localEntries.filter((entry) => !cloudIds.has(entry.id))
+          );
+        })
+        .catch((error) => {
+          console.debug("Product history cloud fetch failed; showing local history:", error);
+        });
+    }
+
+    return () => {
+      active = false;
+      window.removeEventListener("product-history-changed", handleHistoryChange);
+    };
   }, [open, productId, userId]);
 
   useEffect(() => {

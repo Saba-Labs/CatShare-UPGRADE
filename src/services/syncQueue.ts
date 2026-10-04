@@ -11,13 +11,15 @@ import {
   syncFieldsDefinition,
   syncUserSettings,
 } from './supabaseSync';
+import { syncProductHistory } from './productHistoryCloud';
 
 export type SyncQueueItemType =
   | 'products'
   | 'deletedProducts'
   | 'cataloguesDefinition'
   | 'fieldsDefinition'
-  | 'userSettings';
+  | 'userSettings'
+  | 'productHistory';
 
 export interface SyncQueueItem {
   id: string;
@@ -189,6 +191,9 @@ class OfflineSyncQueue {
           break;
         case 'userSettings':
           result = await syncUserSettings(item.userId, item.data);
+          break;
+        case 'productHistory':
+          result = await syncProductHistory(item.userId, item.data);
           break;
         default:
           throw new Error(`Unknown sync type: ${item.type}`);
