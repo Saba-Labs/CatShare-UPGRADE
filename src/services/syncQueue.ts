@@ -120,6 +120,18 @@ class OfflineSyncQueue {
     };
   }
 
+  async retryFailedItems(): Promise<void> {
+    this.queue.forEach((item) => {
+      if (item.status !== 'failed') return;
+      item.status = 'pending';
+      item.retries = 0;
+      item.error = undefined;
+    });
+    this.saveQueueToStorage();
+    this.dispatchQueueChangeEvent();
+    await this.processQueue();
+  }
+
   /**
    * Process all pending items in queue
    */
@@ -253,7 +265,7 @@ class OfflineSyncQueue {
       console.log('🟢 Online detected');
       this.isOnline = true;
       this.dispatchOnlineStatusEvent(true);
-      this.processQueue();
+      this.retryFailedItems();
     });
 
     window.addEventListener('offline', () => {
@@ -359,5 +371,6 @@ export function useSyncQueue() {
     getQueue: () => syncQueue.getQueue(),
     getQueueStats: () => syncQueue.getQueueStats(),
     processQueue: () => syncQueue.processQueue(),
+    retryFailedItems: () => syncQueue.retryFailedItems(),
   };
 }

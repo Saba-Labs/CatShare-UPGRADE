@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { syncQueue } from '../services/syncQueue';
+import { syncQueue, type SyncQueueItem } from '../services/syncQueue';
 
 interface QueueStats {
   total: number;
@@ -24,6 +24,7 @@ export const OfflineStatusIndicator: React.FC = () => {
     failed: 0,
   });
   const [showDetails, setShowDetails] = useState(false);
+  const [failedItems, setFailedItems] = useState<SyncQueueItem[]>([]);
 
   useEffect(() => {
     // Listen for online/offline status changes
@@ -34,6 +35,7 @@ export const OfflineStatusIndicator: React.FC = () => {
     // Listen for queue changes
     const handleQueueChange = (event: any) => {
       setQueueStats(event.detail.stats);
+      setFailedItems(event.detail.queue.filter((item: SyncQueueItem) => item.status === 'failed'));
     };
 
     window.addEventListener('sync-online-status', handleOnlineStatus);
@@ -41,6 +43,7 @@ export const OfflineStatusIndicator: React.FC = () => {
 
     // Update initial queue stats
     setQueueStats(syncQueue.getQueueStats());
+    setFailedItems(syncQueue.getQueue().filter((item) => item.status === 'failed'));
 
     return () => {
       window.removeEventListener('sync-online-status', handleOnlineStatus);
@@ -106,10 +109,15 @@ export const OfflineStatusIndicator: React.FC = () => {
               <div>Syncing: {queueStats.syncing}</div>
               <div>Succeeded: {queueStats.succeeded}</div>
               <div>Failed: {queueStats.failed}</div>
+              {failedItems.slice(-3).map((item) => (
+                <div key={item.id} className="max-w-48 break-words text-[10px] text-white/90">
+                  <span className="font-medium">{item.type}:</span> {item.error || 'Unknown sync error'}
+                </div>
+              ))}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  syncQueue.processQueue();
+                  syncQueue.retryFailedItems();
                 }}
                 className="mt-2 w-full bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs transition"
               >
