@@ -187,6 +187,23 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
                 })
               }
             />
+
+            <div className="panel-section">
+              <label className="panel-label">Clickable area</label>
+              <SidebarDropdownField
+                ariaLabel="Banner clickable area"
+                value={(section as any).settings.clickableArea || 'button'}
+                options={[
+                  { value: 'button', label: 'Button only' },
+                  { value: 'banner', label: 'Entire banner' },
+                ]}
+                onChange={(clickableArea) =>
+                  onUpdate({
+                    settings: { ...(section as any).settings, clickableArea },
+                  })
+                }
+              />
+            </div>
           </>
         );
 

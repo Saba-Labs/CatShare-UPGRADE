@@ -88,6 +88,7 @@ export interface BannerSection {
     backgroundColor?: string;
     overlayOpacity: number;
     textAlignment: 'left' | 'center' | 'right';
+    clickableArea?: 'button' | 'banner';
   };
   content: {
     title: string;
