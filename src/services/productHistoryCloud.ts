@@ -49,6 +49,19 @@ export async function syncProductHistory(
   return error ? { success: false, error: error.message } : { success: true };
 }
 
+export async function deleteProductHistory(
+  userId: string,
+  productId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await getSupabaseClient()
+    .from("product_history")
+    .delete()
+    .eq("user_id", userId)
+    .eq("product_id", String(productId));
+
+  return error ? { success: false, error: error.message } : { success: true };
+}
+
 export async function fetchProductHistory(
   userId: string,
   productId: string

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiChevronDown, FiClock, FiX } from "react-icons/fi";
+import { FiChevronDown, FiClock, FiTrash2, FiX } from "react-icons/fi";
 import { getPersistedAuthUserId } from "../utils/authUserId";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getAllFields } from "../config/fieldConfig";
 import {
+  clearProductHistory,
+  isProductHistoryCloudClearPending,
   mergeProductHistory,
   queueProductHistorySync,
   readProductHistory,
@@ -159,6 +161,7 @@ function ChangeDetails({
 export default function ProductHistoryModal({ productId, productName, open, onClose }: ProductHistoryModalProps) {
   const [entries, setEntries] = useState<ProductHistoryEntry[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const userId = getPersistedAuthUserId() || undefined;
   const catalogueLabels = useMemo(
     () => new Map(getAllCatalogues(userId).map((catalogue) => [catalogue.id, catalogue.label])),
@@ -181,6 +184,10 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
       fetchProductHistory(userId, String(productId))
         .then((cloudEntries) => {
           if (!active) return;
+          if (isProductHistoryCloudClearPending(userId, String(productId))) {
+            refresh();
+            return;
+          }
           const localEntries = readProductHistory(userId, productId);
           const cloudIds = new Set(cloudEntries.map((entry) => entry.id));
           mergeProductHistory(userId, productId, cloudEntries);
@@ -209,6 +216,13 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
+  const handleClearHistory = () => {
+    clearProductHistory(userId, String(productId));
+    setEntries(readProductHistory(userId, productId));
+    setExpanded(null);
+    setShowClearConfirmation(false);
+  };
+
   if (!open) return null;
 
   return (
@@ -229,10 +243,47 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
               <p className="truncate text-xs text-gray-500 dark:text-gray-400">{productName}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close history" className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"><FiX size={18} /></button>
+          <div className="flex shrink-0 items-center gap-1">
+            {entries.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowClearConfirmation(true)}
+                aria-label="Clear product history"
+                title="Clear product history"
+                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+              >
+                <FiTrash2 size={16} />
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close history" className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"><FiX size={18} /></button>
+          </div>
         </header>
 
         <div className="overflow-y-auto p-4 sm:p-5">
+          {showClearConfirmation && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/30">
+              <p id="clear-product-history-confirmation" className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                Clear all history for this product? This can’t be undone.
+              </p>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClearConfirmation(false)}
+                  className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearHistory}
+                  aria-describedby="clear-product-history-confirmation"
+                  className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                >
+                  Clear history
+                </button>
+              </div>
+            </div>
+          )}
           {entries.length === 0 ? (
             <div className="py-12 text-center">
               <FiClock className="mx-auto mb-3 text-gray-400" size={24} />

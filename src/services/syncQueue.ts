@@ -11,7 +11,7 @@ import {
   syncFieldsDefinition,
   syncUserSettings,
 } from './supabaseSync';
-import { syncProductHistory } from './productHistoryCloud';
+import { deleteProductHistory, syncProductHistory } from './productHistoryCloud';
 
 export type SyncQueueItemType =
   | 'products'
@@ -19,7 +19,8 @@ export type SyncQueueItemType =
   | 'cataloguesDefinition'
   | 'fieldsDefinition'
   | 'userSettings'
-  | 'productHistory';
+  | 'productHistory'
+  | 'productHistoryDelete';
 
 export interface SyncQueueItem {
   id: string;
@@ -81,6 +82,16 @@ class OfflineSyncQueue {
     }
 
     return id;
+  }
+
+  removeProductHistoryUploads(userId: string, productId: string): void {
+    this.queue.forEach((item, id) => {
+      if (item.type !== 'productHistory' || item.userId !== userId || !Array.isArray(item.data)) return;
+      item.data = item.data.filter((entry: { productId?: string }) => String(entry.productId) !== String(productId));
+      if (item.data.length === 0) this.queue.delete(id);
+    });
+    this.saveQueueToStorage();
+    this.dispatchQueueChangeEvent();
   }
 
   /**
@@ -207,6 +218,9 @@ class OfflineSyncQueue {
         case 'productHistory':
           result = await syncProductHistory(item.userId, item.data);
           break;
+        case 'productHistoryDelete':
+          result = await deleteProductHistory(item.userId, item.data.productId);
+          break;
         default:
           throw new Error(`Unknown sync type: ${item.type}`);
       }
@@ -214,6 +228,15 @@ class OfflineSyncQueue {
       if (result.success) {
         item.status = 'succeeded';
         item.error = undefined;
+        if (item.type === 'productHistoryDelete') {
+          const { productId, clearId } = item.data as { productId: string; clearId: string };
+          const clearKey = `productHistoryCloudClear::${item.userId}::${encodeURIComponent(productId)}`;
+          try {
+            if (localStorage.getItem(clearKey) === clearId) localStorage.removeItem(clearKey);
+          } catch {
+            // The local clear marker can expire naturally if storage is unavailable.
+          }
+        }
         console.log(`✅ Synced ${item.type} from queue`);
       } else {
         item.status = 'failed';

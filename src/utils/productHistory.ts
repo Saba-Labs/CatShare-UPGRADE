@@ -30,6 +30,23 @@ function historyKey(userId: string | undefined, productId: string): string {
   return `productHistory::${ownerId}::${encodeURIComponent(productId)}`;
 }
 
+function historyCloudClearKey(userId: string, productId: string): string {
+  return `productHistoryCloudClear::${userId}::${encodeURIComponent(productId)}`;
+}
+
+function historyClearedAtKey(userId: string, productId: string): string {
+  return `productHistoryClearedAt::${userId}::${encodeURIComponent(productId)}`;
+}
+
+function isSupabaseUserId(userId: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+}
+
+export function isProductHistoryCloudClearPending(userId: string | undefined, productId: string): boolean {
+  const ownerId = userId || getPersistedAuthUserId();
+  return Boolean(ownerId && localStorage.getItem(historyCloudClearKey(ownerId, String(productId))));
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -167,6 +184,26 @@ export function readProductHistory(userId: string | undefined, productId: string
   return Array.isArray(entries) ? entries : [];
 }
 
+export function clearProductHistory(userId: string | undefined, productId: string): void {
+  const ownerId = userId || getPersistedAuthUserId();
+  const normalizedProductId = String(productId);
+  safeSetInStorage(historyKey(ownerId, normalizedProductId), []);
+
+  if (ownerId && isSupabaseUserId(ownerId)) {
+    const clearId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    try {
+      localStorage.setItem(historyClearedAtKey(ownerId, normalizedProductId), new Date().toISOString());
+      localStorage.setItem(historyCloudClearKey(ownerId, normalizedProductId), clearId);
+      syncQueue.removeProductHistoryUploads(ownerId, normalizedProductId);
+      syncQueue.addToQueue("productHistoryDelete", ownerId, { productId: normalizedProductId, clearId });
+    } catch {
+      return;
+    }
+  }
+
+  window.dispatchEvent(new CustomEvent("product-history-changed", { detail: { productId: normalizedProductId } }));
+}
+
 export function readAllProductHistory(userId: string): ProductHistoryEntry[] {
   const prefix = `productHistory::${userId}::`;
   const entries: ProductHistoryEntry[] = [];
@@ -227,12 +264,22 @@ export function queueProductHistorySync(
     entries.length === 0
   ) return;
 
+  let entriesAllowedToSync = entries;
+  try {
+    entriesAllowedToSync = entries.filter((entry) => {
+      const clearedAt = localStorage.getItem(historyClearedAtKey(ownerId, entry.productId));
+      return !clearedAt || Date.parse(entry.timestamp) >= Date.parse(clearedAt);
+    });
+  } catch {
+    return;
+  }
+
   const queuedIds = new Set(
     syncQueue.getQueue()
       .filter((item) => item.type === "productHistory" && item.userId === ownerId && item.status !== "failed")
       .flatMap((item) => Array.isArray(item.data) ? item.data.map((entry: ProductHistoryEntry) => entry.id) : [])
   );
-  const pendingEntries = entries.filter((entry) => !queuedIds.has(entry.id));
+  const pendingEntries = entriesAllowedToSync.filter((entry) => !queuedIds.has(entry.id));
   for (let index = 0; index < pendingEntries.length; index += MAX_HISTORY_SYNC_BATCH_SIZE) {
     syncQueue.addToQueue(
       "productHistory",
@@ -247,9 +294,19 @@ export function mergeProductHistory(
   productId: string,
   incomingEntries: ProductHistoryEntry[]
 ): ProductHistoryEntry[] {
+  const ownerId = userId || getPersistedAuthUserId();
+  const clearedAt = ownerId
+    ? localStorage.getItem(historyClearedAtKey(ownerId, String(productId)))
+    : null;
+  const clearTimestamp = clearedAt ? Date.parse(clearedAt) : null;
   const entriesById = new Map<string, ProductHistoryEntry>();
   [...readProductHistory(userId, productId), ...incomingEntries].forEach((entry) => {
-    if (entry.productId === String(productId) && !entriesById.has(entry.id)) {
+    const entryTimestamp = Date.parse(entry.timestamp);
+    if (
+      entry.productId === String(productId) &&
+      (clearTimestamp == null || entryTimestamp > clearTimestamp) &&
+      !entriesById.has(entry.id)
+    ) {
       entriesById.set(entry.id, entry);
     }
   });
