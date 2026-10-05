@@ -31,6 +31,8 @@ export default function BannerSectionView({
   const buttonStyles = getBuilderButtonStyles(settings as Parameters<typeof getBuilderButtonStyles>[0], theme || {});
   const align = settings.textAlignment || 'center';
   const canEdit = Boolean(editMode && onUpdateSection);
+  const wholeBannerClickable =
+    !canEdit && settings.clickableArea === 'banner' && Boolean(content.buttonLink);
 
   const updateContent = (patch: Partial<BannerSection['content']>) => {
     onUpdateSection?.({ content: { ...content, ...patch } });
@@ -76,6 +78,15 @@ export default function BannerSectionView({
         className="banner-section__overlay"
         style={{ background: `rgba(0,0,0,${settings.overlayOpacity})` }}
       />
+      {wholeBannerClickable && (
+        <StorefrontLink
+          href={content.buttonLink}
+          preview={builderCanvas}
+          className="banner-section__whole-link"
+        >
+          <span className="sr-only">{content.buttonText || content.title || 'Open banner'}</span>
+        </StorefrontLink>
+      )}
       {canEdit && media && storeId ? (
         <button
           type="button"
@@ -88,7 +99,7 @@ export default function BannerSectionView({
           {settings.backgroundImage ? 'Change background' : '+ Add background image'}
         </button>
       ) : null}
-      <div className="banner-section__content">
+      <div className={`banner-section__content${wholeBannerClickable ? ' banner-section__content--click-through' : ''}`}>
         <h2 className="banner-section__title">
           {canEdit ? (
             <BuilderInlineEditable
@@ -115,12 +126,12 @@ export default function BannerSectionView({
             )}
           </p>
         )}
-        {(canEdit || content.buttonText) &&
+        {settings.clickableArea !== 'banner' && (canEdit || content.buttonText) &&
           (canEdit ? (
             <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={buttonStyles}>
               {renderButtonLabel()}
             </span>
-          ) : content.buttonLink ? (
+          ) : content.buttonLink && !wholeBannerClickable ? (
             <StorefrontLink
               href={content.buttonLink}
               preview={builderCanvas}

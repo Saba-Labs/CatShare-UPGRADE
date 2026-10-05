@@ -11,9 +11,16 @@ interface GenericSectionEditorProps {
   storeId: string;
   websiteConfig?: WebsiteModeConfig;
   onUpdate: (updates: Partial<HomepageSection>) => void;
+  showBannerClickTarget?: boolean;
 }
 
-export default function GenericSectionEditor({ section, storeId, websiteConfig, onUpdate }: GenericSectionEditorProps) {
+export default function GenericSectionEditor({
+  section,
+  storeId,
+  websiteConfig,
+  onUpdate,
+  showBannerClickTarget = true,
+}: GenericSectionEditorProps) {
   const renderImageUploadField = (
     fieldKey: string,
     label: string,
@@ -126,6 +133,23 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
       case 'banner':
         return (
           <>
+            {showBannerClickTarget && (
+              <div className="panel-section">
+                <label className="panel-label">Clickable area</label>
+                <SidebarDropdownField
+                  ariaLabel="Banner clickable area"
+                  value={(section as any).settings.clickableArea || 'button'}
+                  options={[
+                    { value: 'button', label: 'Button' },
+                    { value: 'banner', label: 'Entire banner' },
+                  ]}
+                  onChange={(clickableArea) =>
+                    onUpdate({
+                      settings: { ...(section as any).settings, clickableArea },
+                    })}
+                />
+              </div>
+            )}
             {renderImageUploadField(
               'banner.settings.backgroundImage',
               'Background image',
@@ -164,21 +188,23 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
               />
             </div>
 
-            <div className="panel-section">
-              <label className="panel-label">Button Text</label>
-              <input
-                type="text"
-                className="panel-input"
-                value={(section as any).content.buttonText || ''}
-                onChange={(e) =>
-                  onUpdate({
-                    content: { ...(section as any).content, buttonText: e.target.value },
-                  })
-                }
-              />
-            </div>
+            {(section as any).settings.clickableArea !== 'banner' && (
+              <div className="panel-section">
+                <label className="panel-label">Button Text</label>
+                <input
+                  type="text"
+                  className="panel-input"
+                  value={(section as any).content.buttonText || ''}
+                  onChange={(e) =>
+                    onUpdate({
+                      content: { ...(section as any).content, buttonText: e.target.value },
+                    })}
+                />
+              </div>
+            )}
 
             <ButtonLinkField
+              label={(section as any).settings.clickableArea === 'banner' ? 'Banner Link' : 'Button Link'}
               value={(section as any).content.buttonLink || ''}
               websiteConfig={websiteConfig}
               onChange={(buttonLink) =>
@@ -187,6 +213,7 @@ export default function GenericSectionEditor({ section, storeId, websiteConfig, 
                 })
               }
             />
+
           </>
         );
 

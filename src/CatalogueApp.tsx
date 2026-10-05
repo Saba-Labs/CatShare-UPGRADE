@@ -43,6 +43,7 @@ import {
   readDeletedProductsWithLegacyFallback,
 } from "./utils/safeStorage";
 import { isBrowserOnline } from "./utils/cloudWritePolicy";
+import { recordProductHistory } from "./utils/productHistory";
 import { fetchSellerCatalogue } from "./services/sellerCatalogueService";
 import { getCatalogueRowsFromDeviceStorage } from "./utils/catalogueCachePersist";
 import {
@@ -851,6 +852,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       if (!cat) return { ...p, [field]: !p[field] };
       return toggleProductStockForCatalogue(p, cat.id, field, cat);
     });
+    const beforeProduct = products.find((p) => p.id === id);
+    const afterProduct = freshProducts.find((p) => p.id === id);
+    if (beforeProduct && afterProduct) {
+      recordProductHistory({ userId: user?.uid, productId: String(id), before: beforeProduct, after: afterProduct });
+    }
     setProducts(freshProducts);
 
     if (isStrictMode() && user?.uid) {
@@ -880,6 +886,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       if (!cat) return { ...p, [field]: !p[field] };
       return toggleProductStockForCatalogue(p, cat.id, field, cat);
     });
+      const beforeProduct = products.find((p) => p.id === id);
+      const afterProduct = freshProducts.find((p) => p.id === id);
+      if (beforeProduct && afterProduct) {
+        recordProductHistory({ userId: user?.uid, productId: String(id), before: beforeProduct, after: afterProduct });
+      }
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
@@ -915,6 +926,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         }
         return p;
       });
+      const beforeProduct = products.find((p) => p.id === id);
+      const afterProduct = freshProducts.find((p) => p.id === id);
+      if (beforeProduct && afterProduct) {
+        recordProductHistory({ userId: user?.uid, productId: String(id), before: beforeProduct, after: afterProduct });
+      }
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
@@ -931,6 +947,10 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   const updateProduct = (item) => {
     if (!guardCloudWrite()) return;
+    const beforeProduct = products.find((p) => p.id === item.id);
+    if (beforeProduct) {
+      recordProductHistory({ userId: user?.uid, productId: String(item.id), before: beforeProduct, after: item });
+    }
     const freshProducts = products.map((p) => (p.id === item.id ? item : p));
     setProducts(freshProducts);
 
@@ -969,6 +989,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       return;
     }
 
+    recordProductHistory({ userId: user?.uid, productId: String(duplicate.id), before: undefined, after: duplicate, source: "created" });
     setProducts(freshProducts);
     if (imageMap[source.id]) {
       setImageMap((prev) => ({ ...prev, [duplicate.id]: imageMap[source.id] }));
@@ -2090,6 +2111,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                       if (!cat) return { ...p, [field]: !p[field] };
                       return toggleProductStockForCatalogue(p, cat.id, field, cat);
                     });
+                  }
+                  const beforeProduct = products.find((p) => p.id === id);
+                  const afterProduct = freshProducts.find((p) => p.id === id);
+                  if (beforeProduct && afterProduct) {
+                    recordProductHistory({ userId: user?.uid, productId: String(id), before: beforeProduct, after: afterProduct });
                   }
                   setProducts(freshProducts);
 

@@ -32,6 +32,7 @@ import BulkEdit from "./BulkEdit";
 import { getCurrentCurrencySymbol, getSellerCurrencyForShareLink, onCurrencyChange } from "./utils/currencyUtils";
 import { generateProductPDF, downloadPDF, sharePDF, pdfFilenamePrefix } from "./utils/pdfUtils";
 import { useAuth } from "./context/AuthContext";
+import { recordBulkProductHistory } from "./utils/productHistory";
 import { useCloudWriteGate } from "./hooks/useCloudWriteGate";
 import {
   createShareLink,
@@ -1564,6 +1565,7 @@ const handleTouchEnd = useCallback(() => {
                       : p
                   );
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
+                  recordBulkProductHistory(user?.uid, allProds, updated);
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
                   // Use user-scoped key if logged in, otherwise use default key
@@ -1605,6 +1607,7 @@ const handleTouchEnd = useCallback(() => {
                       : p
                   );
                   console.log('📝 Updated products with stockField:', stockField, '=', updated.filter(p => selected.includes(p.id)).map(p => ({ name: p.name, [stockField]: p[stockField] })));
+                  recordBulkProductHistory(user?.uid, allProds, updated);
                   setProducts(updated);
                   // Save to localStorage before dispatching event to prevent listener from restoring stale data
                   // Use user-scoped key if logged in, otherwise use default key

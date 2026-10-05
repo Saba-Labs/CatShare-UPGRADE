@@ -11,13 +11,16 @@ import {
   syncFieldsDefinition,
   syncUserSettings,
 } from './supabaseSync';
+import { deleteProductHistoryEntry, syncProductHistory } from './productHistoryCloud';
 
 export type SyncQueueItemType =
   | 'products'
   | 'deletedProducts'
   | 'cataloguesDefinition'
   | 'fieldsDefinition'
-  | 'userSettings';
+  | 'userSettings'
+  | 'productHistory'
+  | 'productHistoryEntryDelete';
 
 export interface SyncQueueItem {
   id: string;
@@ -81,6 +84,19 @@ class OfflineSyncQueue {
     return id;
   }
 
+  removeProductHistoryEntryUpload(userId: string, productId: string, entryId: string): void {
+    this.queue.forEach((item, id) => {
+      if (item.type !== 'productHistory' || item.userId !== userId || !Array.isArray(item.data)) return;
+      item.data = item.data.filter(
+        (entry: { productId?: string; id?: string }) =>
+          String(entry.productId) !== String(productId) || entry.id !== entryId
+      );
+      if (item.data.length === 0) this.queue.delete(id);
+    });
+    this.saveQueueToStorage();
+    this.dispatchQueueChangeEvent();
+  }
+
   /**
    * Remove item from queue
    */
@@ -116,6 +132,18 @@ class OfflineSyncQueue {
       succeeded: items.filter(i => i.status === 'succeeded').length,
       failed: items.filter(i => i.status === 'failed').length,
     };
+  }
+
+  async retryFailedItems(): Promise<void> {
+    this.queue.forEach((item) => {
+      if (item.status !== 'failed') return;
+      item.status = 'pending';
+      item.retries = 0;
+      item.error = undefined;
+    });
+    this.saveQueueToStorage();
+    this.dispatchQueueChangeEvent();
+    await this.processQueue();
   }
 
   /**
@@ -190,6 +218,12 @@ class OfflineSyncQueue {
         case 'userSettings':
           result = await syncUserSettings(item.userId, item.data);
           break;
+        case 'productHistory':
+          result = await syncProductHistory(item.userId, item.data);
+          break;
+        case 'productHistoryEntryDelete':
+          result = await deleteProductHistoryEntry(item.userId, item.data.productId, item.data.entryId);
+          break;
         default:
           throw new Error(`Unknown sync type: ${item.type}`);
       }
@@ -248,7 +282,7 @@ class OfflineSyncQueue {
       console.log('🟢 Online detected');
       this.isOnline = true;
       this.dispatchOnlineStatusEvent(true);
-      this.processQueue();
+      this.retryFailedItems();
     });
 
     window.addEventListener('offline', () => {
@@ -354,5 +388,6 @@ export function useSyncQueue() {
     getQueue: () => syncQueue.getQueue(),
     getQueueStats: () => syncQueue.getQueueStats(),
     processQueue: () => syncQueue.processQueue(),
+    retryFailedItems: () => syncQueue.retryFailedItems(),
   };
 }

@@ -986,7 +986,18 @@ export async function deleteUserAccount(userId: string): Promise<SyncResult> {
       }
     }
 
-    // Step 2: Call Supabase SQL function to delete all user data
+    // Step 2: Remove history rows before deleting the remaining user data.
+    const { error: historyError } = await client
+      .from('product_history')
+      .delete()
+      .eq('user_id', userId);
+
+    if (historyError) {
+      console.error('❌ Error deleting product history:', historyError);
+      return { success: false, error: historyError.message };
+    }
+
+    // Step 3: Call Supabase SQL function to delete all user data
     console.log('🗑️ Deleting all user data from Supabase...');
 
     const { data, error } = await client.rpc('delete_user_account', {

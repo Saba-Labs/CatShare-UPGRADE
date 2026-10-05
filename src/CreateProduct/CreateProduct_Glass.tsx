@@ -15,6 +15,8 @@ import { getAllCatalogues, type Catalogue } from "../config/catalogueConfig";
 import { migrateProductToNewFormat } from "../config/fieldMigration";
 import { getProductFieldValue, getProductUnitValue } from "../config/fieldMigration";
 import { getPersistedAuthUserId } from "../utils/authUserId";
+import { createProductEditHistoryChanges, recordProductHistory } from "../utils/productHistory";
+import ProductHistoryModal from "../components/ProductHistoryModal";
 import {
   safeGetFromStorage,
   safeSetInStorage,
@@ -422,6 +424,7 @@ export default function CreateProduct() {
   const y = useMotionValue(DRAG_RANGE);
   const [isDragging, setIsDragging] = useState(false);
   const [formSection, setFormSection] = useState<'basic' | 'catalogue' | 'variants' | 'variantDetails'>('basic');
+  const [showHistory, setShowHistory] = useState(false);
   const [variantGroups, setVariantGroups] = useState<ProductVariantGroup[]>([]);
   const [variantConfig, setVariantConfig] = useState<ProductVariantsConfig>({ groups: [] });
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -481,6 +484,7 @@ export default function CreateProduct() {
     category: [],
     catalogueData: {},
   });
+  const initialHistoryFormRef = useRef<ProductWithCatalogueData | null>(null);
 
   const [selectedCatalogue, setSelectedCatalogue] = useState<string>(catalogueParam || "cat1");
   const [fetchFieldsChecked, setFetchFieldsChecked] = useState(false);
@@ -690,6 +694,7 @@ export default function CreateProduct() {
   };
 
   useEffect(() => {
+    initialHistoryFormRef.current = null;
     if (editingId) {
       const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);
@@ -702,7 +707,7 @@ export default function CreateProduct() {
           migratedProduct.catalogueData = initializeCatalogueData(migratedProduct);
         }
 
-        setFormData({
+        const initialFormData = {
           id: migratedProduct.id || "",
           name: migratedProduct.name || "",
           subtitle: migratedProduct.subtitle || "",
@@ -710,7 +715,9 @@ export default function CreateProduct() {
           privateNotes: migratedProduct.privateNotes || "",
           category: normalizeProductCategories(migratedProduct.category),
           catalogueData: migratedProduct.catalogueData,
-        });
+        };
+        initialHistoryFormRef.current = initialFormData;
+        setFormData(initialFormData);
 
         setOverrideColor(migratedProduct.bgColor || "#d1b3c4");
         setFontColor(normalizeProductFontColor(migratedProduct.fontColor));
@@ -1390,6 +1397,22 @@ if (migratedProduct.suggestedColors?.length > 0) {
         return;
       }
 
+      recordProductHistory({
+        userId: authUserIdNow,
+        productId: String(newItem.id),
+        before: existingProduct,
+        after: newItem,
+        source: isNewProduct ? "created" : "product",
+        changesOverride: isNewProduct
+          ? undefined
+          : createProductEditHistoryChanges(
+              initialHistoryFormRef.current || formData,
+              formData,
+              existingProduct,
+              newItem
+            ),
+      });
+
       // Fire custom analytics event when a new product is created
       if (isNewProduct) {
         logProductAdded(updated.length);
@@ -1554,7 +1577,16 @@ if (migratedProduct.suggestedColors?.length > 0) {
       <div className="fixed top-0 left-0 right-0 h-[40px] bg-black z-50"></div>
 
       {/* Header below status bar */}
-      <div className="fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-end px-4">
+      <div className="fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-between px-4">
+        {editingId ? (
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
+          >
+            History
+          </button>
+        ) : <span />}
         <button
           onClick={() => navigate('/')}
           className="text-white/40 hover:text-white/70 transition-colors flex items-center justify-center w-6 h-6"
@@ -2627,13 +2659,24 @@ if (migratedProduct.suggestedColors?.length > 0) {
     if (!authUserIdNow) return;
     const productsStorageKeyNow = getStorageKey("products", authUserIdNow);
     const all = safeGetFromStorage(productsStorageKeyNow, []);
+    const existingProduct = all.find((p: any) => p.id === editingId);
     const updated = all.map((p: any) => {
       if (p.id !== editingId) return p;
       const savedVariants = pruneVariantGroupsForSave(variantGroups);
       savedVariants.combinations = updatedConfig.combinations ?? [];
       return { ...p, variants: savedVariants, updatedAt: new Date().toISOString() };
     });
-    safeSetInStorage(productsStorageKeyNow, updated);
+    if (!safeSetInStorage(productsStorageKeyNow, updated)) return;
+    const savedProduct = updated.find((p: any) => p.id === editingId);
+    if (existingProduct && savedProduct) {
+      recordProductHistory({
+        userId: authUserIdNow,
+        productId: editingId,
+        before: existingProduct,
+        after: savedProduct,
+        source: "variants",
+      });
+    }
     window.dispatchEvent(
       new CustomEvent("product-added", {
         detail: { onlyProductId: String(editingId), forceCloudSync: true },
@@ -2671,6 +2714,15 @@ if (migratedProduct.suggestedColors?.length > 0) {
         onChange={handleImageUpload}
         style={{ display: "none" }}
       />
+
+      {editingId && (
+        <ProductHistoryModal
+          productId={editingId}
+          productName={formData.name || "Product"}
+          open={showHistory}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
 
       {showColorPicker && (
         <ColorPickerModal

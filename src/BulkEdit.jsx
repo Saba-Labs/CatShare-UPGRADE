@@ -18,6 +18,7 @@ import {
 } from "./utils/catalogueWarehouseStock";
 import { saveProducts, setFieldValue, setUnitValue } from "./config/productUtils";
 import { descriptionToBulkEditPlainText } from "./utils/productDescriptionHtml";
+import { recordBulkProductHistory } from "./utils/productHistory";
 import BulkDescriptionField from "./components/BulkDescriptionField";
 import OrderQuantityStepInput from "./components/OrderQuantityStepInput";
 import MinimumOrderQuantityInput from "./components/MinimumOrderQuantityInput";
@@ -537,6 +538,7 @@ useEffect(() => {
 
     // Merge edited products back into allProducts to preserve products not in this catalogue
     const editedIds = new Set(cleanData.map(p => p.id));
+    const beforeProducts = allProducts || products;
     const mergedData = allProducts ? allProducts.map(p =>
       editedIds.has(p.id) ? cleanData.find(edited => edited.id === p.id) : p
     ) : cleanData;
@@ -549,7 +551,39 @@ useEffect(() => {
     }
 
     const userId = user?.uid;
+    const beforeById = new Map(beforeProducts.map((product) => [String(product.id), product]));
+    const changesByProduct = new Map();
+    const historyLabelByField = new Map(FIELD_OPTIONS.map((field) => [field.key, field.label]));
+    const readHistoryValue = (product, fieldKey) => {
+      if (["name", "subtitle", "privateNotes", "description", "category"].includes(fieldKey)) {
+        return product?.[fieldKey];
+      }
+      const catalogueData = getCatalogueData(product, catalogueId);
+      if (fieldKey === "stock") return catalogueData[stockField] ?? product?.[stockField];
+      return catalogueData[fieldKey] ?? product?.[fieldKey];
+    };
+
+    mergedData.forEach((afterProduct) => {
+      const beforeProduct = beforeById.get(String(afterProduct.id));
+      if (!beforeProduct || !editedIds.has(afterProduct.id)) return;
+      const changes = selectedFields.flatMap((fieldKey) => {
+        const beforeValue = readHistoryValue(beforeProduct, fieldKey);
+        const afterValue = readHistoryValue(afterProduct, fieldKey);
+        const sameJson = JSON.stringify(beforeValue) === JSON.stringify(afterValue);
+        const sameScalar = ![beforeValue, afterValue].some((value) => value != null && typeof value === "object") &&
+          String(beforeValue ?? "") === String(afterValue ?? "");
+        if (sameJson || sameScalar) return [];
+        return [{
+          path: historyLabelByField.get(fieldKey) || fieldKey,
+          before: beforeValue,
+          after: afterValue,
+        }];
+      });
+      if (changes.length > 0) changesByProduct.set(String(afterProduct.id), changes);
+    });
+
     saveProducts(mergedData, userId, { skipBackgroundSync: true });
+    recordBulkProductHistory(userId, beforeProducts, mergedData, changesByProduct);
     setProducts(mergedData);
 
     const editedProductIds = cleanData.map((p) => String(p.id));
