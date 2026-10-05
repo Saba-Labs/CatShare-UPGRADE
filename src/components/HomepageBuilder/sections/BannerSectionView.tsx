@@ -126,7 +126,7 @@ export default function BannerSectionView({
             )}
           </p>
         )}
-        {(canEdit || content.buttonText) &&
+        {settings.clickableArea !== 'banner' && (canEdit || content.buttonText) &&
           (canEdit ? (
             <span className={`banner-section__cta ${SITES_THEME_BUTTON_CLASS}`} style={buttonStyles}>
               {renderButtonLabel()}

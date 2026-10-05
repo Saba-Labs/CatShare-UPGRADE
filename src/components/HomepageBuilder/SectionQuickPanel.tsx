@@ -19,6 +19,7 @@ import SectionStyleControls, { sectionHasStyleControls } from './SectionStyleCon
 import ButtonStyleControls from './editors/ButtonStyleControls';
 import { sectionHasButtonStyleControls, type BuilderButtonStyleSettings } from '../../utils/buttonStyleUtils';
 import SidebarSection from './SidebarSection';
+import SidebarDropdownField from './SidebarDropdownField';
 import { FiArrowLeft, FiDroplet, FiSliders, SECTION_ICONS } from './builderSidebarIcons';
 
 const CATALOGUE_SECTION_TYPES = ['featured-products', 'category-showcase', 'product-grid', 'full-product-list'];
@@ -57,6 +58,8 @@ export default function SectionQuickPanel({
 }: SectionQuickPanelProps) {
   const SectionIcon = SECTION_ICONS[section.type];
   const sectionTitle = SECTION_TYPE_LABELS[section.type] || 'Section';
+  const bannerClickableArea = section.type === 'banner' ? section.settings.clickableArea || 'button' : 'button';
+  const showButtonStyles = section.type !== 'banner' || bannerClickableArea === 'button';
 
   return (
     <div className="sidebar-panel">
@@ -70,13 +73,33 @@ export default function SectionQuickPanel({
         </div>
       </div>
 
+      {section.type === 'banner' && (
+        <SidebarSection title="Click behavior" description="Choose what customers can click">
+          <div className="sidebar-field">
+            <label className="panel-label">Clickable area</label>
+            <SidebarDropdownField
+              ariaLabel="Banner clickable area"
+              value={bannerClickableArea}
+              options={[
+                { value: 'button', label: 'Button' },
+                { value: 'banner', label: 'Entire banner' },
+              ]}
+              onChange={(clickableArea) =>
+                onUpdate({
+                  settings: { ...section.settings, clickableArea },
+                } as Partial<HomepageSection>)}
+            />
+          </div>
+        </SidebarSection>
+      )}
+
       {section.type !== 'footer' && section.type !== 'freeform' && sectionHasStyleControls(section.type) && (
         <SidebarSection title="Style" icon={<FiDroplet />} description="Spacing, colors & layout">
           <SectionStyleControls section={section} onUpdate={onUpdate} />
         </SidebarSection>
       )}
 
-      {sectionHasButtonStyleControls(section.type) && (
+      {sectionHasButtonStyleControls(section.type) && showButtonStyles && (
         <SidebarSection title="Button" icon={<FiSliders />} description="Style, color & shadow">
           <ButtonStyleControls
             settings={((section as HomepageSection & { settings?: Record<string, unknown> }).settings ||
@@ -144,7 +167,13 @@ export default function SectionQuickPanel({
           />
         )}
         {section.type !== 'footer' && !DEDICATED_EDITOR_TYPES.includes(section.type) && (
-          <GenericSectionEditor section={section} storeId={storeId} websiteConfig={websiteConfig} onUpdate={onUpdate} />
+          <GenericSectionEditor
+            section={section}
+            storeId={storeId}
+            websiteConfig={websiteConfig}
+            onUpdate={onUpdate}
+            showBannerClickTarget={false}
+          />
         )}
       </SidebarSection>
     </div>
