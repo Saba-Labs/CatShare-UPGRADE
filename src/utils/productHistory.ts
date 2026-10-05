@@ -30,21 +30,22 @@ function historyKey(userId: string | undefined, productId: string): string {
   return `productHistory::${ownerId}::${encodeURIComponent(productId)}`;
 }
 
-function historyCloudClearKey(userId: string, productId: string): string {
-  return `productHistoryCloudClear::${userId}::${encodeURIComponent(productId)}`;
-}
-
-function historyClearedAtKey(userId: string, productId: string): string {
-  return `productHistoryClearedAt::${userId}::${encodeURIComponent(productId)}`;
+function historyDeletedEntryIdsKey(userId: string, productId: string): string {
+  return `productHistoryDeletedEntryIds::${userId}::${encodeURIComponent(productId)}`;
 }
 
 function isSupabaseUserId(userId: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
 }
 
-export function isProductHistoryCloudClearPending(userId: string | undefined, productId: string): boolean {
-  const ownerId = userId || getPersistedAuthUserId();
-  return Boolean(ownerId && localStorage.getItem(historyCloudClearKey(ownerId, String(productId))));
+function readDeletedEntryIds(userId: string | undefined, productId: string): Set<string> {
+  const ownerId = userId || getPersistedAuthUserId() || "local";
+  try {
+    const ids: unknown = JSON.parse(localStorage.getItem(historyDeletedEntryIdsKey(ownerId, productId)) || "[]");
+    return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -184,20 +185,37 @@ export function readProductHistory(userId: string | undefined, productId: string
   return Array.isArray(entries) ? entries : [];
 }
 
-export function clearProductHistory(userId: string | undefined, productId: string): void {
+export function removeProductHistoryEntry(
+  userId: string | undefined,
+  productId: string,
+  entryId: string
+): void {
   const ownerId = userId || getPersistedAuthUserId();
   const normalizedProductId = String(productId);
-  safeSetInStorage(historyKey(ownerId, normalizedProductId), []);
+  const entries = readProductHistory(ownerId, normalizedProductId);
+  safeSetInStorage(
+    historyKey(ownerId, normalizedProductId),
+    entries.filter((entry) => entry.id !== entryId)
+  );
 
-  if (ownerId && isSupabaseUserId(ownerId)) {
-    const clearId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    try {
-      localStorage.setItem(historyClearedAtKey(ownerId, normalizedProductId), new Date().toISOString());
-      localStorage.setItem(historyCloudClearKey(ownerId, normalizedProductId), clearId);
-      syncQueue.removeProductHistoryUploads(ownerId, normalizedProductId);
-      syncQueue.addToQueue("productHistoryDelete", ownerId, { productId: normalizedProductId, clearId });
-    } catch {
-      return;
+  const deletedIds = readDeletedEntryIds(ownerId, normalizedProductId);
+  deletedIds.add(entryId);
+  try {
+    localStorage.setItem(
+      historyDeletedEntryIdsKey(ownerId || "local", normalizedProductId),
+      JSON.stringify(Array.from(deletedIds))
+    );
+  } catch {
+    return;
+  }
+
+  if (ownerId) {
+    syncQueue.removeProductHistoryEntryUpload(ownerId, normalizedProductId, entryId);
+    if (isSupabaseUserId(ownerId)) {
+      syncQueue.addToQueue("productHistoryEntryDelete", ownerId, {
+        productId: normalizedProductId,
+        entryId,
+      });
     }
   }
 
@@ -264,15 +282,9 @@ export function queueProductHistorySync(
     entries.length === 0
   ) return;
 
-  let entriesAllowedToSync = entries;
-  try {
-    entriesAllowedToSync = entries.filter((entry) => {
-      const clearedAt = localStorage.getItem(historyClearedAtKey(ownerId, entry.productId));
-      return !clearedAt || Date.parse(entry.timestamp) >= Date.parse(clearedAt);
-    });
-  } catch {
-    return;
-  }
+  const entriesAllowedToSync = entries.filter(
+    (entry) => !readDeletedEntryIds(ownerId, entry.productId).has(entry.id)
+  );
 
   const queuedIds = new Set(
     syncQueue.getQueue()
@@ -294,17 +306,12 @@ export function mergeProductHistory(
   productId: string,
   incomingEntries: ProductHistoryEntry[]
 ): ProductHistoryEntry[] {
-  const ownerId = userId || getPersistedAuthUserId();
-  const clearedAt = ownerId
-    ? localStorage.getItem(historyClearedAtKey(ownerId, String(productId)))
-    : null;
-  const clearTimestamp = clearedAt ? Date.parse(clearedAt) : null;
+  const deletedIds = readDeletedEntryIds(userId, String(productId));
   const entriesById = new Map<string, ProductHistoryEntry>();
   [...readProductHistory(userId, productId), ...incomingEntries].forEach((entry) => {
-    const entryTimestamp = Date.parse(entry.timestamp);
     if (
       entry.productId === String(productId) &&
-      (clearTimestamp == null || entryTimestamp > clearTimestamp) &&
+      !deletedIds.has(entry.id) &&
       !entriesById.has(entry.id)
     ) {
       entriesById.set(entry.id, entry);

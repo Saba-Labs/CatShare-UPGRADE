@@ -11,7 +11,7 @@ import {
   syncFieldsDefinition,
   syncUserSettings,
 } from './supabaseSync';
-import { deleteProductHistory, syncProductHistory } from './productHistoryCloud';
+import { deleteProductHistoryEntry, syncProductHistory } from './productHistoryCloud';
 
 export type SyncQueueItemType =
   | 'products'
@@ -20,7 +20,7 @@ export type SyncQueueItemType =
   | 'fieldsDefinition'
   | 'userSettings'
   | 'productHistory'
-  | 'productHistoryDelete';
+  | 'productHistoryEntryDelete';
 
 export interface SyncQueueItem {
   id: string;
@@ -84,10 +84,13 @@ class OfflineSyncQueue {
     return id;
   }
 
-  removeProductHistoryUploads(userId: string, productId: string): void {
+  removeProductHistoryEntryUpload(userId: string, productId: string, entryId: string): void {
     this.queue.forEach((item, id) => {
       if (item.type !== 'productHistory' || item.userId !== userId || !Array.isArray(item.data)) return;
-      item.data = item.data.filter((entry: { productId?: string }) => String(entry.productId) !== String(productId));
+      item.data = item.data.filter(
+        (entry: { productId?: string; id?: string }) =>
+          String(entry.productId) !== String(productId) || entry.id !== entryId
+      );
       if (item.data.length === 0) this.queue.delete(id);
     });
     this.saveQueueToStorage();
@@ -218,8 +221,8 @@ class OfflineSyncQueue {
         case 'productHistory':
           result = await syncProductHistory(item.userId, item.data);
           break;
-        case 'productHistoryDelete':
-          result = await deleteProductHistory(item.userId, item.data.productId);
+        case 'productHistoryEntryDelete':
+          result = await deleteProductHistoryEntry(item.userId, item.data.productId, item.data.entryId);
           break;
         default:
           throw new Error(`Unknown sync type: ${item.type}`);
@@ -228,15 +231,6 @@ class OfflineSyncQueue {
       if (result.success) {
         item.status = 'succeeded';
         item.error = undefined;
-        if (item.type === 'productHistoryDelete') {
-          const { productId, clearId } = item.data as { productId: string; clearId: string };
-          const clearKey = `productHistoryCloudClear::${item.userId}::${encodeURIComponent(productId)}`;
-          try {
-            if (localStorage.getItem(clearKey) === clearId) localStorage.removeItem(clearKey);
-          } catch {
-            // The local clear marker can expire naturally if storage is unavailable.
-          }
-        }
         console.log(`✅ Synced ${item.type} from queue`);
       } else {
         item.status = 'failed';

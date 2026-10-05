@@ -49,15 +49,17 @@ export async function syncProductHistory(
   return error ? { success: false, error: error.message } : { success: true };
 }
 
-export async function deleteProductHistory(
+export async function deleteProductHistoryEntry(
   userId: string,
-  productId: string
+  productId: string,
+  entryId: string
 ): Promise<{ success: boolean; error?: string }> {
   const { error } = await getSupabaseClient()
     .from("product_history")
     .delete()
     .eq("user_id", userId)
-    .eq("product_id", String(productId));
+    .eq("product_id", String(productId))
+    .eq("entry_id", entryId);
 
   return error ? { success: false, error: error.message } : { success: true };
 }

@@ -4,8 +4,7 @@ import { getPersistedAuthUserId } from "../utils/authUserId";
 import { getAllCatalogues } from "../config/catalogueConfig";
 import { getAllFields } from "../config/fieldConfig";
 import {
-  clearProductHistory,
-  isProductHistoryCloudClearPending,
+  removeProductHistoryEntry,
   mergeProductHistory,
   queueProductHistorySync,
   readProductHistory,
@@ -161,7 +160,7 @@ function ChangeDetails({
 export default function ProductHistoryModal({ productId, productName, open, onClose }: ProductHistoryModalProps) {
   const [entries, setEntries] = useState<ProductHistoryEntry[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const userId = getPersistedAuthUserId() || undefined;
   const catalogueLabels = useMemo(
     () => new Map(getAllCatalogues(userId).map((catalogue) => [catalogue.id, catalogue.label])),
@@ -184,10 +183,6 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
       fetchProductHistory(userId, String(productId))
         .then((cloudEntries) => {
           if (!active) return;
-          if (isProductHistoryCloudClearPending(userId, String(productId))) {
-            refresh();
-            return;
-          }
           const localEntries = readProductHistory(userId, productId);
           const cloudIds = new Set(cloudEntries.map((entry) => entry.id));
           mergeProductHistory(userId, productId, cloudEntries);
@@ -216,11 +211,11 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
-  const handleClearHistory = () => {
-    clearProductHistory(userId, String(productId));
+  const handleDeleteEntry = (entryId: string) => {
+    removeProductHistoryEntry(userId, String(productId), entryId);
     setEntries(readProductHistory(userId, productId));
-    setExpanded(null);
-    setShowClearConfirmation(false);
+    if (expanded === entryId) setExpanded(null);
+    setDeletingEntryId(null);
   };
 
   if (!open) return null;
@@ -243,47 +238,10 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
               <p className="truncate text-xs text-gray-500 dark:text-gray-400">{productName}</p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {entries.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowClearConfirmation(true)}
-                aria-label="Clear product history"
-                title="Clear product history"
-                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-              >
-                <FiTrash2 size={16} />
-              </button>
-            )}
-            <button type="button" onClick={onClose} aria-label="Close history" className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"><FiX size={18} /></button>
-          </div>
+          <button type="button" onClick={onClose} aria-label="Close history" className="rounded-lg p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800"><FiX size={18} /></button>
         </header>
 
         <div className="overflow-y-auto p-4 sm:p-5">
-          {showClearConfirmation && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/30">
-              <p id="clear-product-history-confirmation" className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                Clear all history for this product? This can’t be undone.
-              </p>
-              <div className="mt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowClearConfirmation(false)}
-                  className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearHistory}
-                  aria-describedby="clear-product-history-confirmation"
-                  className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-                >
-                  Clear history
-                </button>
-              </div>
-            </div>
-          )}
           {entries.length === 0 ? (
             <div className="py-12 text-center">
               <FiClock className="mx-auto mb-3 text-gray-400" size={24} />
@@ -303,12 +261,13 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                 const changeCount = visibleChanges.length + (legacyEntry ? 0 : entry.omittedChangeCount || 0);
                 return (
                   <li key={entry.id} className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                    <div className="flex items-start gap-2">
                     <button
                       type="button"
                       aria-expanded={isExpanded}
                       aria-label={`${entryTitle(entry)}, ${changeCount} ${changeCount === 1 ? "field" : "fields"}, ${isExpanded ? "collapse" : "expand"}`}
                       onClick={() => setExpanded(isExpanded ? null : entry.id)}
-                      className="flex w-full items-center justify-between gap-4 text-left"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-4 text-left"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{entryTitle(entry)}</span>
@@ -334,6 +293,37 @@ export default function ProductHistoryModal({ productId, productName, open, onCl
                         />
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingEntryId(deletingEntryId === entry.id ? null : entry.id)}
+                      aria-label={`Delete ${entryTitle(entry)} from ${timestamp}`}
+                      title="Delete this entry"
+                      className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+                    >
+                      <FiTrash2 size={15} />
+                    </button>
+                    </div>
+                    {deletingEntryId === entry.id && (
+                      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/30">
+                        <p className="text-xs font-medium text-gray-800 dark:text-gray-100">Delete only this history entry? This can’t be undone.</p>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDeletingEntryId(null)}
+                            className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white dark:text-gray-300 dark:hover:bg-gray-800"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                          >
+                            Delete entry
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {isExpanded && legacyEntry && visibleChanges.length > 0 && (
                       <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
                         Recovered from an older history entry; unchanged aliases are hidden.
