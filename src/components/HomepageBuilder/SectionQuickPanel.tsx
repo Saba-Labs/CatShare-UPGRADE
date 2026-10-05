@@ -131,7 +131,12 @@ export default function SectionQuickPanel({
         )}
         {section.type === 'text' && <TextSectionEditor section={section as any} onUpdate={onUpdate} />}
         {section.type === 'carousel' && (
-          <CarouselSectionEditor section={section as any} storeId={storeId} onUpdate={onUpdate} />
+          <CarouselSectionEditor
+            section={section as any}
+            storeId={storeId}
+            websiteConfig={websiteConfig}
+            onUpdate={onUpdate}
+          />
         )}
         {section.type === 'faq' && <FaqSectionEditor section={section as any} onUpdate={onUpdate} />}
         {section.type === 'embed' && <EmbedSectionEditor section={section as any} onUpdate={onUpdate} />}

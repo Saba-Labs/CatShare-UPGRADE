@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CarouselSection } from '../../../types/homepage';
+import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import './CarouselSection.css';
 
 interface CarouselSectionViewProps {
@@ -95,9 +96,17 @@ export default function CarouselSectionView({
               className={`carousel-section__slide${index === activeIndex ? ' is-active' : ''}`}
               aria-hidden={index !== activeIndex}
             >
-              <div className="carousel-section__frame">
-                <img src={image.url} alt={image.title || image.caption || `Slide ${index + 1}`} />
-              </div>
+              {image.link ? (
+                <StorefrontLink href={image.link} className="carousel-section__link" preview={editMode || builderCanvas}>
+                  <div className="carousel-section__frame">
+                    <img src={image.url} alt={image.title || image.caption || `Slide ${index + 1}`} />
+                  </div>
+                </StorefrontLink>
+              ) : (
+                <div className="carousel-section__frame">
+                  <img src={image.url} alt={image.title || image.caption || `Slide ${index + 1}`} />
+                </div>
+              )}
             </div>
           ))}
         </div>

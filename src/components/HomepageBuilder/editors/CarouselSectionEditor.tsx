@@ -1,16 +1,18 @@
 import React from 'react';
-import { CarouselSection } from '../../../types/homepage';
+import type { CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
+import StoreLinkPicker from '../StoreLinkPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
   storeId: string;
+  websiteConfig?: WebsiteModeConfig;
   onUpdate: (updates: Partial<CarouselSection>) => void;
 }
 
-export default function CarouselSectionEditor({ section, storeId, onUpdate }: CarouselSectionEditorProps) {
+export default function CarouselSectionEditor({ section, storeId, websiteConfig, onUpdate }: CarouselSectionEditorProps) {
   const { openMediaPicker } = useBuilderMedia();
 
   const addImagesFromLibrary = () => {
@@ -47,14 +49,32 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
 
         <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
           {section.content.images.map((img) => (
-            <div key={img.id} className="carousel-editor-thumb-row">
-              <img src={img.url} alt={img.title} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</p>
+            <div key={img.id} style={{ marginBottom: 8, padding: 8, background: '#f3f4f6', borderRadius: 4 }}>
+              <div className="carousel-editor-thumb-row" style={{ marginBottom: 0, padding: 0, background: 'transparent' }}>
+                <img src={img.url} alt={img.title} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</p>
+                </div>
+                <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
+                  ✕
+                </button>
               </div>
-              <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
-                ✕
-              </button>
+              <label className="panel-label" style={{ marginTop: 8 }}>
+                Link (optional)
+              </label>
+              <StoreLinkPicker
+                value={img.link || ''}
+                websiteConfig={websiteConfig}
+                onChange={(link) =>
+                  onUpdate({
+                    content: {
+                      images: section.content.images.map((image) =>
+                        image.id === img.id ? { ...image, link: link || undefined } : image
+                      ),
+                    },
+                  })
+                }
+              />
             </div>
           ))}
         </div>

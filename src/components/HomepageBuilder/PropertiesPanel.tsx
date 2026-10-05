@@ -284,6 +284,7 @@ export default function PropertiesPanel({
           <CarouselSectionEditor
             section={selectedSection as any}
             storeId={storeId}
+            websiteConfig={websiteConfig}
             onUpdate={(updates) => onUpdateSection(selectedSectionId, updates)}
           />
         )}
