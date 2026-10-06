@@ -118,6 +118,16 @@
   display: block;
 }
 
+.carousel-section__frame--editable img {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.carousel-section__frame--dragging img {
+  cursor: grabbing;
+}
+
 .carousel-section__arrows {
   position: absolute;
   inset: 0;

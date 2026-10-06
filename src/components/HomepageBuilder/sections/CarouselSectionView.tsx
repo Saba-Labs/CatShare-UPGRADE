@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CarouselSection } from '../../../types/homepage';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import './CarouselSection.css';
@@ -8,7 +8,23 @@ interface CarouselSectionViewProps {
   blockHeightPx?: number;
   editMode?: boolean;
   builderCanvas?: boolean;
+  onUpdateSection?: (updates: Partial<CarouselSection>) => void;
 }
+
+type ImagePanPreview = { id: string; x: number; y: number };
+type ImagePanDrag = {
+  id: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  zoom: number;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 function getHeightClass(height: CarouselSection['settings']['height']) {
   if (height === 'small') return 'carousel-section--height-small';
@@ -27,11 +43,15 @@ export default function CarouselSectionView({
   blockHeightPx,
   editMode = false,
   builderCanvas = false,
+  onUpdateSection,
 }: CarouselSectionViewProps) {
   const { settings, content } = section;
   const images = content.images;
   const [activeIndex, setActiveIndex] = useState(0);
+  const [imagePanPreview, setImagePanPreview] = useState<ImagePanPreview | null>(null);
+  const imagePanDragRef = useRef<ImagePanDrag | null>(null);
   const pauseAutoPlay = editMode || builderCanvas;
+  const canDragImages = editMode && builderCanvas && !!onUpdateSection;
 
   const goTo = useCallback(
     (index: number) => {
@@ -44,6 +64,60 @@ export default function CarouselSectionView({
 
   const goNext = useCallback(() => goTo(activeIndex + 1), [activeIndex, goTo]);
   const goPrev = useCallback(() => goTo(activeIndex - 1), [activeIndex, goTo]);
+
+  const handleImagePointerDown = (image: CarouselSection['content']['images'][number], event: React.PointerEvent<HTMLImageElement>) => {
+    if (!canDragImages || event.button !== 0) return;
+    const frame = event.currentTarget.parentElement;
+    if (!frame) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const drag: ImagePanDrag = {
+      id: image.id,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: image.imageView?.x ?? 50,
+      startY: image.imageView?.y ?? 50,
+      x: image.imageView?.x ?? 50,
+      y: image.imageView?.y ?? 50,
+      zoom: image.imageView?.zoom ?? 1,
+    };
+    imagePanDragRef.current = drag;
+    setImagePanPreview({ id: image.id, x: drag.x, y: drag.y });
+  };
+
+  const handleImagePointerMove = (event: React.PointerEvent<HTMLImageElement>) => {
+    const drag = imagePanDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const frame = event.currentTarget.parentElement;
+    if (!frame) return;
+    const bounds = frame.getBoundingClientRect();
+    drag.x = clamp(drag.startX + ((event.clientX - drag.startClientX) / bounds.width) * 100, 0, 100);
+    drag.y = clamp(drag.startY + ((event.clientY - drag.startClientY) / bounds.height) * 100, 0, 100);
+    setImagePanPreview({ id: drag.id, x: drag.x, y: drag.y });
+  };
+
+  const finishImagePan = (event: React.PointerEvent<HTMLImageElement>, commit: boolean) => {
+    const drag = imagePanDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    if (commit && (drag.x !== drag.startX || drag.y !== drag.startY)) {
+      onUpdateSection?.({
+        content: {
+          ...content,
+          images: images.map((image) =>
+            image.id === drag.id
+              ? { ...image, imageView: { zoom: drag.zoom, x: drag.x, y: drag.y } }
+              : image
+          ),
+        },
+      });
+    }
+    imagePanDragRef.current = null;
+    setImagePanPreview(null);
+  };
 
   useEffect(() => {
     if (activeIndex >= images.length) {
@@ -96,25 +170,46 @@ export default function CarouselSectionView({
               : undefined
           }
         >
-          {images.map((image, index) => (
-            <div
-              key={image.id}
-              className={`carousel-section__slide${index === activeIndex ? ' is-active' : ''}`}
-              aria-hidden={index !== activeIndex}
-            >
-              {image.link ? (
-                <StorefrontLink href={image.link} className="carousel-section__link" preview={editMode || builderCanvas}>
-                  <div className="carousel-section__frame">
-                    <img src={image.url} alt={image.title || image.caption || `Slide ${index + 1}`} />
-                  </div>
-                </StorefrontLink>
-              ) : (
-                <div className="carousel-section__frame">
-                  <img src={image.url} alt={image.title || image.caption || `Slide ${index + 1}`} />
-                </div>
-              )}
-            </div>
-          ))}
+          {images.map((image, index) => {
+            const zoom = image.imageView?.zoom ?? 1;
+            const canDragImage = canDragImages && zoom > 1;
+            const panX = imagePanPreview?.id === image.id ? imagePanPreview.x : image.imageView?.x ?? 50;
+            const panY = imagePanPreview?.id === image.id ? imagePanPreview.y : image.imageView?.y ?? 50;
+            const translateX = ((panX - 50) / 50) * ((zoom - 1) * 50);
+            const translateY = ((panY - 50) / 50) * ((zoom - 1) * 50);
+            const frame = (
+              <div
+                className={`carousel-section__frame${canDragImage ? ' carousel-section__frame--editable' : ''}${imagePanPreview?.id === image.id ? ' carousel-section__frame--dragging' : ''}`}
+              >
+                <img
+                  src={image.url}
+                  alt={image.title || image.caption || `Slide ${index + 1}`}
+                  draggable={false}
+                  style={{ transform: `translate(${translateX}%, ${translateY}%) scale(${zoom})`, transformOrigin: 'center' }}
+                  onPointerDown={canDragImage ? (event) => handleImagePointerDown(image, event) : undefined}
+                  onPointerMove={canDragImage ? handleImagePointerMove : undefined}
+                  onPointerUp={canDragImage ? (event) => finishImagePan(event, true) : undefined}
+                  onPointerCancel={canDragImage ? (event) => finishImagePan(event, false) : undefined}
+                />
+              </div>
+            );
+
+            return (
+              <div
+                key={image.id}
+                className={`carousel-section__slide${index === activeIndex ? ' is-active' : ''}`}
+                aria-hidden={index !== activeIndex}
+              >
+                {image.link ? (
+                  <StorefrontLink href={image.link} className="carousel-section__link" preview={editMode || builderCanvas}>
+                    {frame}
+                  </StorefrontLink>
+                ) : (
+                  frame
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {showArrows && images.length > 1 ? (
