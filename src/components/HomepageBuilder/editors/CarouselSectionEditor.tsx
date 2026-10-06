@@ -1,4 +1,5 @@
 import React from 'react';
+import { useState } from 'react';
 import type { CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
@@ -14,6 +15,7 @@ interface CarouselSectionEditorProps {
 
 export default function CarouselSectionEditor({ section, storeId, websiteConfig, onUpdate }: CarouselSectionEditorProps) {
   const { openMediaPicker } = useBuilderMedia();
+  const [expandedSlideIds, setExpandedSlideIds] = useState<Set<string>>(() => new Set());
 
   const addImagesFromLibrary = () => {
     openMediaPicker({
@@ -48,35 +50,74 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
         </button>
 
         <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-          {section.content.images.map((img) => (
-            <div key={img.id} style={{ marginBottom: 8, padding: 8, background: '#f3f4f6', borderRadius: 4 }}>
-              <div className="carousel-editor-thumb-row" style={{ marginBottom: 0, padding: 0, background: 'transparent' }}>
-                <img src={img.url} alt={img.title} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</p>
+          {section.content.images.map((img) => {
+            const expanded = expandedSlideIds.has(img.id);
+            const linkSettingsId = `carousel-slide-link-${section.id}-${img.id}`;
+
+            return (
+              <div key={img.id} style={{ marginBottom: 8, padding: 8, background: '#f3f4f6', borderRadius: 4 }}>
+                <div className="carousel-editor-thumb-row" style={{ marginBottom: 0, padding: 0, background: 'transparent' }}>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={expanded ? linkSettingsId : undefined}
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} link settings for ${img.title || 'slide'}`}
+                    onClick={() =>
+                      setExpandedSlideIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(img.id)) next.delete(img.id);
+                        else next.add(img.id);
+                        return next;
+                      })
+                    }
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flex: 1,
+                      minWidth: 0,
+                      gap: 8,
+                      padding: 0,
+                      border: 0,
+                      background: 'transparent',
+                      color: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                    }}
+                  >
+                    <img src={img.url} alt={img.title} />
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                      {expanded ? 'Hide link' : img.link ? 'Edit link' : 'Add link'}
+                    </span>
+                  </button>
+                  <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
+                    ✕
+                  </button>
                 </div>
-                <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
-                  ✕
-                </button>
+                {expanded && (
+                  <div id={linkSettingsId}>
+                    <label className="panel-label" style={{ marginTop: 8 }}>
+                      Link (optional)
+                    </label>
+                    <StoreLinkPicker
+                      value={img.link || ''}
+                      websiteConfig={websiteConfig}
+                      onChange={(link) =>
+                        onUpdate({
+                          content: {
+                            images: section.content.images.map((image) =>
+                              image.id === img.id ? { ...image, link: link || undefined } : image
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                )}
               </div>
-              <label className="panel-label" style={{ marginTop: 8 }}>
-                Link (optional)
-              </label>
-              <StoreLinkPicker
-                value={img.link || ''}
-                websiteConfig={websiteConfig}
-                onChange={(link) =>
-                  onUpdate({
-                    content: {
-                      images: section.content.images.map((image) =>
-                        image.id === img.id ? { ...image, link: link || undefined } : image
-                      ),
-                    },
-                  })
-                }
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
