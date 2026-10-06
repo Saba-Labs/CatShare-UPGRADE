@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
-import type { CarouselImage, CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
+import type { CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
 import StoreLinkPicker from '../StoreLinkPicker';
@@ -45,27 +45,6 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
       },
     });
     setImageToRemoveId(null);
-  };
-
-  const updateImageView = (imageId: string, patch: Partial<NonNullable<CarouselImage['imageView']>>) => {
-    onUpdate({
-      content: {
-        images: section.content.images.map((image) => {
-          if (image.id !== imageId) return image;
-          const zoom = patch.zoom ?? image.imageView?.zoom ?? 1;
-          const x = patch.x ?? image.imageView?.x ?? 50;
-          const y = patch.y ?? image.imageView?.y ?? 50;
-          return {
-            ...image,
-            imageView: {
-              zoom,
-              x: Math.max(-100, Math.min(100, x)),
-              y: Math.max(-100, Math.min(100, y)),
-            },
-          };
-        }),
-      },
-    });
   };
 
   const resetImageView = (imageId: string) =>
@@ -133,53 +112,9 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                 </div>
                 {expanded && (
                   <div id={linkSettingsId}>
-                    <label className="panel-label" style={{ marginTop: 8 }}>
-                      Image zoom
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="range"
-                        min="1"
-                        max="3"
-                        step="0.1"
-                        aria-label={`Zoom ${img.title || 'slide'} image`}
-                        value={img.imageView?.zoom ?? 1}
-                        onChange={(event) => updateImageView(img.id, { zoom: Number(event.target.value) })}
-                        style={{ flex: 1 }}
-                      />
-                      <span style={{ minWidth: 36, fontSize: '0.75rem' }}>
-                        {(img.imageView?.zoom ?? 1).toFixed(1)}×
-                      </span>
-                    </div>
-                    <label className="panel-label" style={{ marginTop: 8 }}>
-                      Horizontal position
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      aria-label={`Horizontal position of ${img.title || 'slide'} image`}
-                      value={img.imageView?.x ?? 50}
-                      disabled={(img.imageView?.zoom ?? 1) <= 1}
-                      onChange={(event) => updateImageView(img.id, { x: Number(event.target.value) })}
-                      style={{ width: '100%' }}
-                    />
-                    <label className="panel-label" style={{ marginTop: 8 }}>
-                      Vertical position
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      aria-label={`Vertical position of ${img.title || 'slide'} image`}
-                      value={img.imageView?.y ?? 50}
-                      disabled={(img.imageView?.zoom ?? 1) <= 1}
-                      onChange={(event) => updateImageView(img.id, { y: Number(event.target.value) })}
-                      style={{ width: '100%' }}
-                    />
-                    <p className="sidebar-field-hint">Zoom above 1×, then use the sliders or drag the selected slide in the canvas.</p>
+                    <p className="sidebar-field-hint" style={{ marginTop: 8 }}>
+                      Hover over the image, scroll to zoom, then drag it to reposition.
+                    </p>
                     <button
                       type="button"
                       className="btn-secondary"
