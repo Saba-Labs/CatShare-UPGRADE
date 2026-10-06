@@ -26,6 +26,7 @@ import type { FreeformElementType, FreeformSection } from '../../../types/homepa
 
 interface SectionRendererProps {
   section: HomepageSection & { id: string };
+  blockHeightPx?: number;
   theme?: ThemeSettings;
   storeId?: string;
   editMode?: boolean;
@@ -41,6 +42,7 @@ interface SectionRendererProps {
 
 export default function SectionRenderer({
   section,
+  blockHeightPx,
   theme,
   storeId,
   editMode = false,
@@ -66,7 +68,7 @@ export default function SectionRenderer({
 
   switch (section.type) {
     case 'carousel':
-      return <CarouselSectionView {...commonProps} section={section as any} />;
+      return <CarouselSectionView {...commonProps} section={section as any} blockHeightPx={blockHeightPx} />;
     case 'text':
       return <TextSectionView {...commonProps} section={section as any} />;
     case 'image':

@@ -5,6 +5,7 @@ import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
 import StoreLinkPicker from '../StoreLinkPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
+import ConfirmDialog from '../../../pages/store/components/ConfirmDialog';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
@@ -16,6 +17,7 @@ interface CarouselSectionEditorProps {
 export default function CarouselSectionEditor({ section, storeId, websiteConfig, onUpdate }: CarouselSectionEditorProps) {
   const { openMediaPicker } = useBuilderMedia();
   const [expandedSlideIds, setExpandedSlideIds] = useState<Set<string>>(() => new Set());
+  const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
 
   const addImagesFromLibrary = () => {
     openMediaPicker({
@@ -33,14 +35,16 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
     });
   };
 
-  const handleRemoveImage = (imageId: string) => {
-    if (!window.confirm('Remove this image from the carousel?')) return;
+  const handleRemoveImage = (imageId: string) => setImageToRemoveId(imageId);
 
+  const confirmRemoveImage = () => {
+    if (!imageToRemoveId) return;
     onUpdate({
       content: {
-        images: section.content.images.filter((img) => img.id !== imageId),
+        images: section.content.images.filter((img) => img.id !== imageToRemoveId),
       },
     });
+    setImageToRemoveId(null);
   };
 
   return (
@@ -231,6 +235,16 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
           }
         />
       </div>
+      <ConfirmDialog
+        open={imageToRemoveId !== null}
+        title="Remove carousel image?"
+        description="This image will be removed from the carousel."
+        confirmLabel="Remove image"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmRemoveImage}
+        onClose={() => setImageToRemoveId(null)}
+      />
     </>
   );
 }

@@ -5,6 +5,7 @@ import './CarouselSection.css';
 
 interface CarouselSectionViewProps {
   section: CarouselSection & { id: string };
+  blockHeightPx?: number;
   editMode?: boolean;
   builderCanvas?: boolean;
 }
@@ -23,6 +24,7 @@ function getRatioClass(aspectRatio: CarouselSection['settings']['aspectRatio']) 
 
 export default function CarouselSectionView({
   section,
+  blockHeightPx,
   editMode = false,
   builderCanvas = false,
 }: CarouselSectionViewProps) {
@@ -80,8 +82,12 @@ export default function CarouselSectionView({
     <div
       className={`carousel-section ${getHeightClass(settings.height)} ${getRatioClass(settings.aspectRatio)}`}
       data-animation={settings.animation}
+      style={blockHeightPx ? { height: '100%' } : undefined}
     >
-      <div className="carousel-section__viewport">
+      <div
+        className="carousel-section__viewport"
+        style={blockHeightPx ? { height: '100%', maxHeight: 'none', aspectRatio: 'auto' } : undefined}
+      >
         <div
           className={`carousel-section__track ${trackClass}`}
           style={
