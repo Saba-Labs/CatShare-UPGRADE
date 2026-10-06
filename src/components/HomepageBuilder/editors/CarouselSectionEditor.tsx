@@ -34,6 +34,8 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
   };
 
   const handleRemoveImage = (imageId: string) => {
+    if (!window.confirm('Remove this image from the carousel?')) return;
+
     onUpdate({
       content: {
         images: section.content.images.filter((img) => img.id !== imageId),
