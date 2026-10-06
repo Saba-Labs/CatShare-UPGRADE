@@ -97,7 +97,7 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                     type="button"
                     aria-expanded={expanded}
                     aria-controls={expanded ? linkSettingsId : undefined}
-                    aria-label={`${expanded ? 'Collapse' : 'Expand'} link settings for ${img.title || 'slide'}`}
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} image settings for ${img.title || 'slide'}`}
                     onClick={() =>
                       setExpandedSlideIds((current) => {
                         const next = new Set(current);
@@ -124,7 +124,7 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                     <img src={img.url} alt={img.title} />
                     <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</span>
                     <span style={{ fontSize: '0.7rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                      {expanded ? 'Hide link' : img.link ? 'Edit link' : 'Add link'}
+                      {expanded ? 'Hide settings' : 'Adjust image'}
                     </span>
                   </button>
                   <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
@@ -151,7 +151,35 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                         {(img.imageView?.zoom ?? 1).toFixed(1)}×
                       </span>
                     </div>
-                    <p className="sidebar-field-hint">Zoom in, then drag the image in the canvas to reposition it.</p>
+                    <label className="panel-label" style={{ marginTop: 8 }}>
+                      Horizontal position
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      aria-label={`Horizontal position of ${img.title || 'slide'} image`}
+                      value={img.imageView?.x ?? 50}
+                      disabled={(img.imageView?.zoom ?? 1) <= 1}
+                      onChange={(event) => updateImageView(img.id, { x: Number(event.target.value) })}
+                      style={{ width: '100%' }}
+                    />
+                    <label className="panel-label" style={{ marginTop: 8 }}>
+                      Vertical position
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      aria-label={`Vertical position of ${img.title || 'slide'} image`}
+                      value={img.imageView?.y ?? 50}
+                      disabled={(img.imageView?.zoom ?? 1) <= 1}
+                      onChange={(event) => updateImageView(img.id, { y: Number(event.target.value) })}
+                      style={{ width: '100%' }}
+                    />
+                    <p className="sidebar-field-hint">Zoom above 1×, then use the sliders or drag the selected slide in the canvas.</p>
                     <button
                       type="button"
                       className="btn-secondary"
