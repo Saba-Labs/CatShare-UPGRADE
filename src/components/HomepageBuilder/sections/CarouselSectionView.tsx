@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { FiMinus, FiPlus } from 'react-icons/fi';
 import { CarouselSection } from '../../../types/homepage';
 import StorefrontLink from '../../WebsiteBuilder/StorefrontLink';
 import './CarouselSection.css';
@@ -88,13 +89,9 @@ export default function CarouselSectionView({
     setImagePanPreview({ id: image.id, x: drag.x, y: drag.y });
   };
 
-  const handleImageWheel = (image: CarouselSection['content']['images'][number], event: React.WheelEvent<HTMLImageElement>) => {
-    if (!canDragImages) return;
-    event.preventDefault();
-    event.stopPropagation();
-
+  const updateImageZoom = (image: CarouselSection['content']['images'][number], change: number) => {
     const currentZoom = image.imageView?.zoom ?? 1;
-    const zoom = clamp(currentZoom * Math.exp(-event.deltaY * 0.001), 1, 3);
+    const zoom = clamp(Math.round((currentZoom + change) * 10) / 10, 1, 3);
     if (zoom === currentZoom) return;
     onUpdateSection?.({
       content: {
@@ -211,15 +208,40 @@ export default function CarouselSectionView({
                 <img
                   src={image.url}
                   alt={image.title || image.caption || `Slide ${index + 1}`}
-                  title={canDragImages ? 'Scroll to zoom; drag to reposition' : undefined}
                   draggable={false}
                   style={{ transform: `translate(${translateX}%, ${translateY}%) scale(${zoom})`, transformOrigin: 'center' }}
-                  onWheel={canDragImages ? (event) => handleImageWheel(image, event) : undefined}
                   onPointerDown={canDragImage ? (event) => handleImagePointerDown(image, event) : undefined}
                   onPointerMove={canDragImage ? handleImagePointerMove : undefined}
                   onPointerUp={canDragImage ? (event) => finishImagePan(event, true) : undefined}
                   onPointerCancel={canDragImage ? (event) => finishImagePan(event, false) : undefined}
                 />
+                {canDragImages ? (
+                  <div
+                    className="carousel-section__image-zoom-controls"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                      disabled={zoom <= 1}
+                      onClick={() => updateImageZoom(image, -0.1)}
+                    >
+                      <FiMinus aria-hidden />
+                    </button>
+                    <span aria-live="polite">{zoom.toFixed(1)}×</span>
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                      disabled={zoom >= 3}
+                      onClick={() => updateImageZoom(image, 0.1)}
+                    >
+                      <FiPlus aria-hidden />
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
 
@@ -240,8 +262,6 @@ export default function CarouselSectionView({
             );
           })}
         </div>
-
-        {canDragImages ? <div className="carousel-section__image-controls-hint">Scroll to zoom · Drag to move</div> : null}
 
         {showArrows && images.length > 1 ? (
           <div className="carousel-section__arrows">

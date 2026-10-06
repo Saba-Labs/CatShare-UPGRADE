@@ -1,5 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
+import { FiSliders, FiTrash2 } from 'react-icons/fi';
 import type { CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
@@ -47,15 +48,6 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
     setImageToRemoveId(null);
   };
 
-  const resetImageView = (imageId: string) =>
-    onUpdate({
-      content: {
-        images: section.content.images.map((image) =>
-          image.id === imageId ? { ...image, imageView: undefined } : image
-        ),
-      },
-    });
-
   return (
     <>
       <div className="panel-section">
@@ -76,7 +68,8 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                     type="button"
                     aria-expanded={expanded}
                     aria-controls={expanded ? linkSettingsId : undefined}
-                    aria-label={`${expanded ? 'Collapse' : 'Expand'} image settings for ${img.title || 'slide'}`}
+                    aria-label={`${expanded ? 'Close' : 'Open'} settings for ${img.title || 'slide'}`}
+                    title={`${expanded ? 'Close' : 'Open'} slide settings`}
                     onClick={() =>
                       setExpandedSlideIds((current) => {
                         const next = new Set(current);
@@ -102,27 +95,21 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
                   >
                     <img src={img.url} alt={img.title} />
                     <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                      {expanded ? 'Hide settings' : 'Adjust image'}
-                    </span>
+                    <FiSliders size={16} aria-hidden />
                   </button>
-                  <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
-                    ✕
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Remove ${img.title || 'slide'}`}
+                    title="Remove slide"
+                    onClick={() => handleRemoveImage(img.id)}
+                    style={{ color: '#dc2626' }}
+                  >
+                    <FiTrash2 size={15} aria-hidden />
                   </button>
                 </div>
                 {expanded && (
                   <div id={linkSettingsId}>
-                    <p className="sidebar-field-hint" style={{ marginTop: 8 }}>
-                      Hover over the image, scroll to zoom, then drag it to reposition.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      disabled={!img.imageView}
-                      onClick={() => resetImageView(img.id)}
-                    >
-                      Reset image view
-                    </button>
                     <label className="panel-label" style={{ marginTop: 12 }}>
                       Link (optional)
                     </label>
