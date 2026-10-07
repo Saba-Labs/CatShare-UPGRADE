@@ -56,7 +56,7 @@ export default function CarouselSectionEditor({ section, storeId, websiteConfig,
           + Add images
         </button>
 
-        <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+        <div style={{ marginTop: '12px' }}>
           {section.content.images.map((img) => {
             const expanded = expandedSlideIds.has(img.id);
             const linkSettingsId = `carousel-slide-link-${section.id}-${img.id}`;
