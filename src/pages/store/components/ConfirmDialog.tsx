@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { FiAlertTriangle, FiX } from 'react-icons/fi';
 import { STORE_SECTION_TITLE } from '../storeTypography';
 
@@ -70,9 +71,9 @@ export default function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[200000] flex items-center justify-center p-4 sm:p-6"
       role="presentation"
     >
       <button
@@ -174,6 +175,7 @@ export default function ConfirmDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

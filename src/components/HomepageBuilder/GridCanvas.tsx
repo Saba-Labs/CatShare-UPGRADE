@@ -422,6 +422,7 @@ export default function GridCanvas({
                   <div className="sites-document-block__clip" style={contentClipStyle}>
                   <SectionRenderer
                     section={section}
+                    blockHeightPx={liveHeight}
                     theme={theme}
                     storeId={storeId}
                     editMode={isSelected}

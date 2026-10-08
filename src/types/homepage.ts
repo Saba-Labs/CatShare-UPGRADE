@@ -33,6 +33,11 @@ export interface CarouselImage {
   title?: string;
   caption?: string;
   link?: string;
+  imageView?: {
+    zoom: number;
+    x: number;
+    y: number;
+  };
 }
 
 export interface CarouselSection {

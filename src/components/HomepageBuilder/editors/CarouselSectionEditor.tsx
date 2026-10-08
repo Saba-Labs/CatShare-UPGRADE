@@ -1,17 +1,24 @@
 import React from 'react';
-import { CarouselSection } from '../../../types/homepage';
+import { useState } from 'react';
+import { FiSliders, FiTrash2 } from 'react-icons/fi';
+import type { CarouselSection, WebsiteModeConfig } from '../../../types/homepage';
 import { createCarouselImagesFromUrls } from '../../../utils/sectionMedia';
 import { useBuilderMedia } from '../media/BuilderMediaContext';
+import StoreLinkPicker from '../StoreLinkPicker';
 import SidebarDropdownField from '../SidebarDropdownField';
+import ConfirmDialog from '../../../pages/store/components/ConfirmDialog';
 
 interface CarouselSectionEditorProps {
   section: CarouselSection & { id: string };
   storeId: string;
+  websiteConfig?: WebsiteModeConfig;
   onUpdate: (updates: Partial<CarouselSection>) => void;
 }
 
-export default function CarouselSectionEditor({ section, storeId, onUpdate }: CarouselSectionEditorProps) {
+export default function CarouselSectionEditor({ section, storeId, websiteConfig, onUpdate }: CarouselSectionEditorProps) {
   const { openMediaPicker } = useBuilderMedia();
+  const [expandedSlideIds, setExpandedSlideIds] = useState<Set<string>>(() => new Set());
+  const [imageToRemoveId, setImageToRemoveId] = useState<string | null>(null);
 
   const addImagesFromLibrary = () => {
     openMediaPicker({
@@ -29,12 +36,16 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
     });
   };
 
-  const handleRemoveImage = (imageId: string) => {
+  const handleRemoveImage = (imageId: string) => setImageToRemoveId(imageId);
+
+  const confirmRemoveImage = () => {
+    if (!imageToRemoveId) return;
     onUpdate({
       content: {
-        images: section.content.images.filter((img) => img.id !== imageId),
+        images: section.content.images.filter((img) => img.id !== imageToRemoveId),
       },
     });
+    setImageToRemoveId(null);
   };
 
   return (
@@ -45,18 +56,81 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           + Add images
         </button>
 
-        <div style={{ marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-          {section.content.images.map((img) => (
-            <div key={img.id} className="carousel-editor-thumb-row">
-              <img src={img.url} alt={img.title} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</p>
+        <div style={{ marginTop: '12px' }}>
+          {section.content.images.map((img) => {
+            const expanded = expandedSlideIds.has(img.id);
+            const linkSettingsId = `carousel-slide-link-${section.id}-${img.id}`;
+
+            return (
+              <div key={img.id} style={{ marginBottom: 8, padding: 8, background: '#f3f4f6', borderRadius: 4 }}>
+                <div className="carousel-editor-thumb-row" style={{ marginBottom: 0, padding: 0, background: 'transparent' }}>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={expanded ? linkSettingsId : undefined}
+                    aria-label={`${expanded ? 'Close' : 'Open'} settings for ${img.title || 'slide'}`}
+                    title={`${expanded ? 'Close' : 'Open'} slide settings`}
+                    onClick={() =>
+                      setExpandedSlideIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(img.id)) next.delete(img.id);
+                        else next.add(img.id);
+                        return next;
+                      })
+                    }
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flex: 1,
+                      minWidth: 0,
+                      gap: 8,
+                      padding: 0,
+                      border: 0,
+                      background: 'transparent',
+                      color: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                    }}
+                  >
+                    <img src={img.url} alt={img.title} />
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 500, fontSize: '0.75rem' }}>{img.title || 'Slide'}</span>
+                    <FiSliders size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Remove ${img.title || 'slide'}`}
+                    title="Remove slide"
+                    onClick={() => handleRemoveImage(img.id)}
+                    style={{ color: '#dc2626' }}
+                  >
+                    <FiTrash2 size={15} aria-hidden />
+                  </button>
+                </div>
+                {expanded && (
+                  <div id={linkSettingsId}>
+                    <label className="panel-label" style={{ marginTop: 12 }}>
+                      Link (optional)
+                    </label>
+                    <StoreLinkPicker
+                      value={img.link || ''}
+                      websiteConfig={websiteConfig}
+                      onChange={(link) =>
+                        onUpdate({
+                          content: {
+                            images: section.content.images.map((image) =>
+                              image.id === img.id ? { ...image, link: link || undefined } : image
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                )}
               </div>
-              <button type="button" className="btn-icon" onClick={() => handleRemoveImage(img.id)} style={{ color: '#dc2626' }}>
-                ✕
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -168,6 +242,16 @@ export default function CarouselSectionEditor({ section, storeId, onUpdate }: Ca
           }
         />
       </div>
+      <ConfirmDialog
+        open={imageToRemoveId !== null}
+        title="Remove carousel image?"
+        description="This image will be removed from the carousel."
+        confirmLabel="Remove image"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmRemoveImage}
+        onClose={() => setImageToRemoveId(null)}
+      />
     </>
   );
 }
