@@ -2070,11 +2070,12 @@ export default function Orders() {
       >
         <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: 52, position: 'relative' }}>
           <div style={{ position: 'absolute', left: 16, top: 14, display: 'flex', alignItems: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ord-text)', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
+            <div className="orders-page-heading" style={{ fontSize: 20, fontWeight: 800, color: 'var(--ord-text)', letterSpacing: '-0.4px', transition: 'opacity 0.15s ease, visibility 0.15s ease', opacity: showSearch ? 0 : 1, visibility: showSearch ? 'hidden' : 'visible' }}>Orders</div>
           </div>
 
           {/* Create Order Button */}
           <button
+            className="orders-new-order"
             onClick={() => {
               persistListScroll(ORDERS_LIST_SCROLL_KEY, scrollRef.current);
               handleNavigate('/create-order');
@@ -2108,6 +2109,7 @@ export default function Orders() {
 
           {/* Expanding Search Box */}
           <div
+            className="orders-search-expand"
             style={{
               transition: 'all 0.3s ease-out',
               display: 'flex',
@@ -2255,6 +2257,7 @@ export default function Orders() {
               ) : null}
             </button>
             <button
+              className="orders-search-toggle"
               onClick={() => setShowSearch((prev) => !prev)}
               style={{
                 background: 'none',
@@ -2306,6 +2309,7 @@ export default function Orders() {
                 >
                   <StatusTabGlyph tabKey={t.key} size={20} />
                 </div>
+                <span className="orders-status-tab__label">{t.label}</span>
                 {(count > 0 || isActive) ? (
                   <span
                     className="orders-status-tab__count"
@@ -2385,7 +2389,7 @@ export default function Orders() {
         >
         {/* Sales Box at Top of Scrollable Content (All tab only) */}
         {tab === 'all' && (
-          <div style={{
+          <div className="orders-revenue-section" style={{
             background: 'var(--ord-surface)',
             borderBottom: '1px solid var(--ord-border)',
             padding: '16px 16px 16px',
@@ -2394,7 +2398,7 @@ export default function Orders() {
             gap: 16,
           }}>
             {/* Sales Card */}
-            <div style={{
+            <div className="orders-revenue-card" style={{
               background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%)',
               borderRadius: '16px',
               padding: '24px',
