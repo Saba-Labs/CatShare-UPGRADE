@@ -309,7 +309,14 @@ export default function StorefrontHeaderSearch({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') {
+          if (e.key === 'Enter' && query.trim()) {
+            e.preventDefault();
+            navigate({
+              pathname: storeCtx.collectionPath,
+              search: `?q=${encodeURIComponent(query.trim())}`,
+            });
+            collapseSearch();
+          } else if (e.key === 'Escape') {
             collapseSearch();
           }
         }}

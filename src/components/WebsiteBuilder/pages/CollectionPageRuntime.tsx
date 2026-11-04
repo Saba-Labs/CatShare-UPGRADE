@@ -8,6 +8,7 @@ import {
 } from '../../../config/catalogueProductUtils';
 import type { DefaultSorting, ProductImageRatio } from '../../../types/storeBehaviorSettings';
 import { normalizeProductCategories } from '../../../utils/productCategoryUtils';
+import { productMatchesSearchQuery } from '../../../utils/productSearchUtils';
 import {
   productsInCategory,
   resolveStoreCategoryParam,
@@ -95,6 +96,7 @@ export default function CollectionPageRuntime({
   const catalogProductLayout = resolvedCardsStyle === 'catalog';
   const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc'>('default');
   const [embeddedCategory, setEmbeddedCategory] = useState<string | null>(null);
+  const searchQuery = new URLSearchParams(location.search).get('q')?.trim() ?? '';
   const initialCategoryParam = new URLSearchParams(location.search).get('category');
   const categoryParam =
     previewCategoryId ??
@@ -150,9 +152,13 @@ export default function CollectionPageRuntime({
   };
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === 'all') return scopedProducts;
-    return productsInCategory(scopedProducts, selectedCategory);
-  }, [scopedProducts, selectedCategory]);
+    const categoryFiltered = selectedCategory === 'all'
+      ? scopedProducts
+      : productsInCategory(scopedProducts, selectedCategory);
+    return searchQuery
+      ? categoryFiltered.filter((product) => productMatchesSearchQuery(product, searchQuery))
+      : categoryFiltered;
+  }, [scopedProducts, selectedCategory, searchQuery]);
 
   const sortedProducts = useMemo(() => {
     if (sortBy === 'default') {
@@ -198,18 +204,20 @@ export default function CollectionPageRuntime({
     return selectedCategory;
   }, [selectedCategory, scopedProducts]);
 
-  const pageTitle = embedded
-    ? (sectionTitle?.trim() || categoryLabel || 'Products')
-    : categoryLabel
-      ? String(categoryLabel)
-      : 'All products';
+  const pageTitle = searchQuery
+    ? `Search results for “${searchQuery}”`
+    : embedded
+      ? (sectionTitle?.trim() || categoryLabel || 'Products')
+      : categoryLabel
+        ? String(categoryLabel)
+        : 'All products';
 
   return (
     <main
       className={`website-section-products website-section-products--order-form${embedded ? ' website-section-products--embedded' : ''}`}
     >
       <div className="website-of-panel">
-        {!embedded || sectionTitle?.trim() || categoryLabel ? (
+        {!embedded || sectionTitle?.trim() || categoryLabel || searchQuery ? (
           embedded ? (
             <h2 className="website-section-products__title">{pageTitle}</h2>
           ) : (
@@ -258,7 +266,9 @@ export default function CollectionPageRuntime({
         </div>
       </div>
       {productsLoading && sortedProducts.length === 0 ? null : sortedProducts.length === 0 ? (
-        <p style={{ color: '#5f6368' }}>No products available yet.</p>
+        <p style={{ color: '#5f6368' }}>
+          {searchQuery ? `No products found for “${searchQuery}”.` : 'No products available yet.'}
+        </p>
       ) : (
         <div
           className={
