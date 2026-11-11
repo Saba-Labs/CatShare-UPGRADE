@@ -428,6 +428,16 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     }
   }, [searchParams, navigate]);
 
+  useEffect(() => {
+    const handleMilestone = (event: Event) => {
+      const count = (event as CustomEvent<number>).detail;
+      setProductCountForRating(count);
+      setShowRatingModal(true);
+    };
+    window.addEventListener("product-rating-milestone", handleMilestone);
+    return () => window.removeEventListener("product-rating-milestone", handleMilestone);
+  }, []);
+
   // Restore scroll position when a catalogue is displayed
   useEffect(() => {
     if (selectedCatalogueInCataloguesTab && tab === "catalogues") {

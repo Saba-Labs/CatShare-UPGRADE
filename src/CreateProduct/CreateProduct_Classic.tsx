@@ -328,6 +328,12 @@ function ColorPickerModal({ value, onChange, onClose }) {
   );
 }
 
+const pendingProductSaves = new Set<string>();
+const warnPendingProductSaves = (event: BeforeUnloadEvent) => {
+  event.preventDefault();
+  event.returnValue = "";
+};
+
 export default function CreateProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -337,7 +343,7 @@ export default function CreateProduct() {
   const stockProductId = editingId || draftProductIdRef.current;
   const catalogueParam = searchParams.get("catalogue");
   const fromParam = searchParams.get("from");
-  const { showToast } = useToast();
+  const { showToast, removeToast } = useToast();
   const { currentTheme } = useTheme();
   const { isPro } = useSubscription();
   const { guardCloudWrite } = useCloudWriteGate();
@@ -545,7 +551,6 @@ export default function CreateProduct() {
   const [ageGroupUnit, setAgeGroupUnit] = useState("months");
   const [catalogues, setCatalogues] = useState<Catalogue[]>([]);
   const [, setFieldDefinitionsUpdated] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
 
   // Sync theme defaults for new products (font color is always black or white).
   useEffect(() => {
@@ -1254,11 +1259,6 @@ if (migratedProduct.suggestedColors?.length > 0) {
   );
 
   const saveAndNavigate = async () => {
-    // Prevent multiple rapid clicks
-    if (isSaving) {
-      return;
-    }
-
     if (authUserId && !guardCloudWrite()) return;
 
     if (!cardPreview || imageSlots.length === 0) {
@@ -1286,11 +1286,39 @@ if (migratedProduct.suggestedColors?.length > 0) {
       }
     }
 
-    setIsSaving(true);
     const id = editingId || draftProductIdRef.current;
+    if (pendingProductSaves.has(id)) {
+      showToast("This product is already being saved. Please wait before updating it again.", "warning");
+      return;
+    }
+    const savedFormData = structuredClone(formData);
+    const savedHistoryForm = initialHistoryFormRef.current && structuredClone(initialHistoryFormRef.current);
+    const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
+    const navigationPath = isCatalogueId ? `/catalogues?catalogue=${fromParam}` : "/";
+    const originalProduct = editingId
+      ? safeGetFromStorage(productsStorageKey, []).find((p: any) => p.id === editingId)
+      : undefined;
+    if (editingId && !originalProduct) {
+      showToast("This product no longer exists. Reopen the product list and try again.", "error");
+      return;
+    }
+    const stockSave = stockEditorRef.current?.flushPending().catch(() => {
+      showToast("Could not save stock. Please check the product's stock.", "error", 0);
+    });
+
+    const runSave = async () => {
+      if (pendingProductSaves.has(id)) return;
+      pendingProductSaves.add(id);
+      window.addEventListener("beforeunload", warnPendingProductSaves);
+      const toastId = showToast(`${editingId ? "Updating" : "Saving"} product in the background. Keep the app open.`, "info", 0);
+      const formData = structuredClone(savedFormData);
+      try {
     // Re-read user id at the time of saving to avoid timing issues
     // when the auth/localStorage value is still being populated.
     const authUserIdNow = getPersistedAuthUserId();
+    if (authUserIdNow !== authUserId) {
+      throw new Error("The signed-in account changed. Sign back in before retrying.");
+    }
     const productsStorageKeyNow = authUserIdNow
       ? getStorageKey("products", authUserIdNow)
       : "products";
@@ -1303,27 +1331,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
     const primIx = Math.min(primarySlotIndex, Math.max(0, imageSlots.length - 1));
     const primaryPreview = imageSlots[primIx] ?? imageSlots[0];
 
-    try {
-      if (primaryPreview?.startsWith("data:image")) {
-        const base64 = primaryPreview.split(",")[1];
-        await Filesystem.writeFile({
-          path: imagePath,
-          data: base64,
-          // Save to External so user-* folders are visible under android/data/.../files
-          directory: Directory.External,
-          recursive: true,
-        });
-        console.log("📂 Saved product source image to:", imagePath);
-      }
-    } catch (err) {
-      setIsSaving(false);
-      showToast("Image save failed: " + err.message, "error");
-      return;
-    }
-
-    const existingProduct = editingId
-      ? safeGetFromStorage(productsStorageKeyNow, []).find((p: any) => p.id === editingId)
-      : undefined;
+    const existingProduct = originalProduct;
 
     const stripQuery = (u: string) => {
       const s = String(u || "").trim();
@@ -1333,6 +1341,9 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
     const imageUrls: string[] = [];
     for (let i = 0; i < imageSlots.length; i++) {
+      if (getPersistedAuthUserId() !== authUserId) {
+        throw new Error("The signed-in account changed. Sign back in before retrying.");
+      }
       const slot = imageSlots[i];
       if (slot.startsWith("http")) {
         imageUrls.push(slot.trim());
@@ -1342,17 +1353,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
           if (uploaded?.url) {
             imageUrls.push(uploaded.url);
           } else {
-            setIsSaving(false);
-            showToast("Image upload failed: invalid response.", "error");
-            return;
+            throw new Error("Image upload failed: invalid response.");
           }
         } catch (err: any) {
-          setIsSaving(false);
-          showToast(
-            err?.message || "Could not upload image. Check your connection and try again.",
-            "error"
-          );
-          return;
+          throw new Error(err?.message || "Could not upload image. Check your connection and try again.");
         }
       }
     }
@@ -1446,21 +1450,43 @@ if (migratedProduct.suggestedColors?.length > 0) {
     newItem.wholesale = newItem.price1 || "";
     newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
 
-    try {
-      const all = safeGetFromStorage(productsStorageKeyNow, []);
+      if (getPersistedAuthUserId() !== authUserId) {
+        throw new Error("The signed-in account changed. Sign back in before retrying.");
+      }
+      let all = safeGetFromStorage(productsStorageKeyNow, []);
+      const currentProduct = all.find((p: any) => p.id === id);
+      if (JSON.stringify(currentProduct) !== JSON.stringify(originalProduct)) {
+        throw new Error("This product changed while it was saving. Reopen it and apply your changes again.");
+      }
       const isNewProduct = !editingId;
+      if (isNewProduct && !isPro && all.length >= FREE_MAX_PRODUCTS) {
+        throw new Error(`Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro.`);
+      }
+      if (primaryPreview?.startsWith("data:image")) {
+        await Filesystem.writeFile({
+          path: imagePath,
+          data: primaryPreview.split(",")[1],
+          directory: Directory.External,
+          recursive: true,
+        });
+        if (getPersistedAuthUserId() !== authUserId) {
+          throw new Error("The signed-in account changed. Sign back in before retrying.");
+        }
+        all = safeGetFromStorage(productsStorageKeyNow, []);
+        if (JSON.stringify(all.find((p: any) => p.id === id)) !== JSON.stringify(originalProduct)) {
+          throw new Error("This product changed while it was saving. Reopen it and apply your changes again.");
+        }
+        if (isNewProduct && !isPro && all.length >= FREE_MAX_PRODUCTS) {
+          throw new Error(`Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro.`);
+        }
+      }
       const updated = editingId
         ? all.map((p) => (p.id === editingId ? newItem : p))
         : [newItem, ...all];
 
       const ok = safeSetInStorage(productsStorageKeyNow, updated);
       if (!ok) {
-        setIsSaving(false);
-        showToast(
-          "Product save failed: local storage quota exceeded. Please sync or clear old offline products.",
-          "error"
-        );
-        return;
+        throw new Error("Local storage quota exceeded. Please sync or clear old offline products.");
       }
 
       recordProductHistory({
@@ -1472,7 +1498,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         changesOverride: isNewProduct
           ? undefined
           : createProductEditHistoryChanges(
-              initialHistoryFormRef.current || formData,
+              savedHistoryForm || formData,
               formData,
               existingProduct,
               newItem
@@ -1489,29 +1515,18 @@ if (migratedProduct.suggestedColors?.length > 0) {
         })
       );
 
-      await stockEditorRef.current?.flushPending();
-
-      const totalProducts = updated.length;
-      const isRatingMilestone = (count: number): boolean => {
-        let milestone = 10;
-        let increment = 15;
-        while (milestone < count) {
-          milestone += increment;
-          increment += 5;
-        }
-        return count === milestone;
-      };
-      const shouldShowRating = isRatingMilestone(totalProducts);
-
-      const isCatalogueId = fromParam && catalogues.some((c) => c.id === fromParam);
-      const basePath = isCatalogueId ? `/catalogues?catalogue=${fromParam}` : "/";
-      const navigationPath = shouldShowRating
-        ? `${basePath}${basePath.includes('?') ? '&' : '?'}showRating=true&productCount=${totalProducts}`
-        : basePath;
-
-      // Navigate immediately without waiting for background tasks
-      navigate(navigationPath);
-      setIsSaving(false);
+      await stockSave;
+      removeToast(toastId);
+      showToast(editingId ? "Product updated on this device." : "Product saved on this device.", "success");
+      let milestone = 10;
+      let increment = 15;
+      while (milestone < updated.length) {
+        milestone += increment;
+        increment += 5;
+      }
+      if (updated.length === milestone) {
+        window.dispatchEvent(new CustomEvent("product-rating-milestone", { detail: updated.length }));
+      }
 
       // PNG rendering in background (R2 upload already completed when preview was data:image)
       (async () => {
@@ -1545,10 +1560,21 @@ if (migratedProduct.suggestedColors?.length > 0) {
           console.error("Background tasks failed:", err);
         }
       })();
-    } catch (err) {
-      setIsSaving(false);
-      showToast("Product save failed: " + err.message, "error");
-    }
+      } catch (err: any) {
+        removeToast(toastId);
+        const message = err?.message || "Please check your connection and try again.";
+        showToast(`Product save failed: ${message}`, "error", 0,
+          message.startsWith("This product changed") ? undefined : { label: "Retry", onClick: () => void runSave() });
+      } finally {
+        pendingProductSaves.delete(id);
+        if (pendingProductSaves.size === 0) {
+          window.removeEventListener("beforeunload", warnPendingProductSaves);
+        }
+      }
+    };
+
+    void runSave();
+    navigate(navigationPath);
   };
 
   const handleCancel = () => {
@@ -2778,16 +2804,14 @@ if (migratedProduct.suggestedColors?.length > 0) {
               return (
                 <button
                   onClick={saveAndNavigate}
-                  disabled={isSaving}
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
                 >
-                  {isSaving ? (editingId ? "Updating..." : "Saving...") : (editingId ? "Update" : "Save")}
+                  {editingId ? "Update" : "Save"}
                 </button>
               );
             })()}
             <button
               onClick={handleCancel}
-              disabled={isSaving}
               className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed text-gray-700 py-2.5 px-4 rounded w-full text-xs font-medium transition-colors"
             >
               Cancel
