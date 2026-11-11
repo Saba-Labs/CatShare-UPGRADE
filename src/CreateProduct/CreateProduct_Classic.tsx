@@ -329,6 +329,7 @@ function ColorPickerModal({ value, onChange, onClose }) {
 }
 
 const pendingProductSaves = new Set<string>();
+const conflictedProductDrafts = new Map<string, any>();
 const warnPendingProductSaves = (event: BeforeUnloadEvent) => {
   event.preventDefault();
   event.returnValue = "";
@@ -338,8 +339,11 @@ export default function CreateProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
+  const reviewDraft = searchParams.get("reviewDraft");
   const draftProductIdRef = useRef(editingId || String(Date.now()));
   const stockEditorRef = useRef<ProductCatalogueStockEditorHandle>(null);
+  const productLoadedDuringSaveRef = useRef<string | null>(null);
+  const skipRestoredVariantSaveRef = useRef(false);
   const stockProductId = editingId || draftProductIdRef.current;
   const catalogueParam = searchParams.get("catalogue");
   const fromParam = searchParams.get("from");
@@ -588,7 +592,11 @@ export default function CreateProduct() {
 
   // Auto-save variant changes to Supabase when editing an existing product
   useEffect(() => {
-    if (!editingId || !variantConfig.combinations?.length) return;
+    if (!editingId || !variantConfig.combinations?.length || pendingProductSaves.has(editingId)) return;
+    if (skipRestoredVariantSaveRef.current) {
+      skipRestoredVariantSaveRef.current = false;
+      return;
+    }
 
     // Skip the initial load—only sync when user actually changes variants
     if (!isVariantConfigInitializedRef.current) {
@@ -729,6 +737,11 @@ export default function CreateProduct() {
     if (editingId) {
       const products = safeGetFromStorage(productsStorageKey, []);
       const product = products.find((p) => p.id === editingId);
+      const restoredDraft = conflictedProductDrafts.get(editingId);
+      if (restoredDraft && restoredDraft.userId === authUserId) {
+        conflictedProductDrafts.delete(editingId);
+      }
+      productLoadedDuringSaveRef.current = pendingProductSaves.has(editingId) ? JSON.stringify(product) : null;
       if (product) {
         const migratedProduct = normalizeProductImageFields(
           migrateProductToNewFormat(product) as ProductWithCatalogueData
@@ -786,7 +799,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
           } else if (migratedProduct.imageUrl) {
             setImageSlots([migratedProduct.imageUrl]);
             setPrimarySlotIndex(0);
-          } else if (migratedProduct.imagePath) {
+          } else if (migratedProduct.imagePath && !restoredDraft) {
             setImageFilePath(migratedProduct.imagePath);
             Filesystem.readFile({
               path: migratedProduct.imagePath,
@@ -813,6 +826,20 @@ if (migratedProduct.suggestedColors?.length > 0) {
               });
           }
         }
+        if (restoredDraft && restoredDraft.userId === authUserId) {
+          skipRestoredVariantSaveRef.current = true;
+          setFormData(restoredDraft.formData);
+          setImageSlots(restoredDraft.imageSlots);
+          setPrimarySlotIndex(restoredDraft.primarySlotIndex);
+          setVideoUrls(restoredDraft.videoUrls);
+          setVariantGroups(restoredDraft.variantGroups);
+          setVariantConfig(restoredDraft.variantConfig);
+          setOverrideColor(restoredDraft.overrideColor);
+          setFontColor(restoredDraft.fontColor);
+          setImageBgOverride(restoredDraft.imageBgOverride);
+          setAppliedAspectRatio(restoredDraft.appliedAspectRatio);
+          setSuggestedColors(restoredDraft.suggestedColors);
+        }
       }
     } else {
       setFormData((prev) => ({
@@ -822,7 +849,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
       setImageSlots([]);
       setPrimarySlotIndex(0);
     }
-  }, [editingId]);
+  }, [editingId, reviewDraft]);
 
   const getCatalogueFormData = () => {
     return getCatalogueData(formData, selectedCatalogue);
@@ -1302,6 +1329,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
       showToast("This product no longer exists. Reopen the product list and try again.", "error");
       return;
     }
+    if (productLoadedDuringSaveRef.current !== null && productLoadedDuringSaveRef.current !== JSON.stringify(originalProduct)) {
+      showToast("This product finished saving while you were editing it. Reopen it to see the latest changes.", "warning", 0);
+      return;
+    }
     const stockSave = stockEditorRef.current?.flushPending().catch(() => {
       showToast("Could not save stock. Please check the product's stock.", "error", 0);
     });
@@ -1313,258 +1344,276 @@ if (migratedProduct.suggestedColors?.length > 0) {
       const toastId = showToast(`${editingId ? "Updating" : "Saving"} product in the background. Keep the app open.`, "info", 0);
       const formData = structuredClone(savedFormData);
       try {
-    // Re-read user id at the time of saving to avoid timing issues
-    // when the auth/localStorage value is still being populated.
-    const authUserIdNow = getPersistedAuthUserId();
-    if (authUserIdNow !== authUserId) {
-      throw new Error("The signed-in account changed. Sign back in before retrying.");
-    }
-    const productsStorageKeyNow = authUserIdNow
-      ? getStorageKey("products", authUserIdNow)
-      : "products";
-    const useUserImagesNow = Boolean(authUserIdNow);
-
-    const imagePath = useUserImagesNow
-      ? getUserImagePath(id, authUserIdNow || undefined)
-      : `catalogue/product-${id}.png`;
-
-    const primIx = Math.min(primarySlotIndex, Math.max(0, imageSlots.length - 1));
-    const primaryPreview = imageSlots[primIx] ?? imageSlots[0];
-
-    const existingProduct = originalProduct;
-
-    const stripQuery = (u: string) => {
-      const s = String(u || "").trim();
-      const i = s.indexOf("?");
-      return i === -1 ? s : s.slice(0, i);
-    };
-
-    const imageUrls: string[] = [];
-    for (let i = 0; i < imageSlots.length; i++) {
-      if (getPersistedAuthUserId() !== authUserId) {
-        throw new Error("The signed-in account changed. Sign back in before retrying.");
-      }
-      const slot = imageSlots[i];
-      if (slot.startsWith("http")) {
-        imageUrls.push(slot.trim());
-      } else if (slot.startsWith("data:image")) {
-        try {
-          const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: slot });
-          if (uploaded?.url) {
-            imageUrls.push(uploaded.url);
-          } else {
-            throw new Error("Image upload failed: invalid response.");
-          }
-        } catch (err: any) {
-          throw new Error(err?.message || "Could not upload image. Check your connection and try again.");
+        // Re-read user id at the time of saving to avoid timing issues
+        // when the auth/localStorage value is still being populated.
+        const authUserIdNow = getPersistedAuthUserId();
+        if (authUserIdNow !== authUserId) {
+          throw new Error("The signed-in account changed. Sign back in before retrying.");
         }
-      }
-    }
+        const productsStorageKeyNow = authUserIdNow
+          ? getStorageKey("products", authUserIdNow)
+          : "products";
+        const useUserImagesNow = Boolean(authUserIdNow);
 
-    const imageFields = buildProductImagePersistFields({
-      imageUrls,
-      primaryImageIndex: primIx,
-    });
-    let imageVersion: number | undefined = imageFields.imageVersion;
-    if (imageVersion == null && typeof existingProduct?.imageVersion === "number" && Number.isFinite(existingProduct.imageVersion)) {
-      const prevPrimary = stripQuery(String(existingProduct.imageUrl || ""));
-      if (prevPrimary && prevPrimary === stripQuery(String(imageFields.imageUrl || ""))) {
-        imageVersion = existingProduct.imageVersion;
-      }
-    }
-    if (imageVersion == null && typeof imageFields.imageUrl === "string" && imageFields.imageUrl.startsWith("http")) {
-      imageVersion = Date.now();
-    }
+        const imagePath = useUserImagesNow
+          ? getUserImagePath(id, authUserIdNow || undefined)
+          : `catalogue/product-${id}.png`;
 
-    const defaultCatalogueData = getCatalogueData(formData, 'cat1');
-    const allCatalogues = getAllCatalogues();
+        const primIx = Math.min(primarySlotIndex, Math.max(0, imageSlots.length - 1));
+        const primaryPreview = imageSlots[primIx] ?? imageSlots[0];
 
-    const persistedVideos = normalizeProductVideoUrls(videoUrls);
+        const existingProduct = originalProduct;
 
-    const newItem: ProductWithCatalogueData = {
-      ...formData,
-      id,
-      imagePath,
-      ...imageFields,
-      ...(typeof imageVersion === "number" && Number.isFinite(imageVersion) ? { imageVersion } : {}),
-      updatedAt: new Date().toISOString(),
-      suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
-      fontColor: normalizeProductFontColor(fontColor),
-      imageBgColor: imageBgOverride || "white",
-      bgColor: overrideColor || "#add8e6",
-      cropAspectRatio: appliedAspectRatio,
-      renderingType: "classic",
-    };
-    if (persistedVideos.length > 0) {
-      newItem.videoUrls = persistedVideos;
-    } else {
-      delete newItem.videoUrls;
-    }
-
-    if (newItem.catalogueData) {
-      for (const cat of allCatalogues) {
-        const row = newItem.catalogueData[cat.id];
-        if (!row) continue;
-        const slabs = normalizeQuantitySlabs(row.quantitySlabs);
-        newItem.catalogueData[cat.id] = {
-          ...row,
-          quantitySlabs: slabs.length > 0 ? slabs : undefined,
+        const stripQuery = (u: string) => {
+          const s = String(u || "").trim();
+          const i = s.indexOf("?");
+          return i === -1 ? s : s.slice(0, i);
         };
-      }
-    }
 
-    const savedVariants = pruneVariantGroupsForSave(variantGroups);
-    if (variantConfig.combinations && variantConfig.combinations.length > 0) {
-      savedVariants.combinations = variantConfig.combinations;
-    }
-    if (savedVariants.groups.length > 0) {
-      newItem.variants = savedVariants;
-    } else {
-      delete newItem.variants;
-    }
+        const imageUrls: string[] = [];
+        for (let i = 0; i < imageSlots.length; i++) {
+          if (getPersistedAuthUserId() !== authUserId) {
+            throw new Error("The signed-in account changed. Sign back in before retrying.");
+          }
+          const slot = imageSlots[i];
+          if (slot.startsWith("http")) {
+            imageUrls.push(slot.trim());
+          } else if (slot.startsWith("data:image")) {
+            try {
+              const uploaded = await uploadProductImageToR2({ productId: id, dataUrl: slot });
+              if (uploaded?.url) {
+                imageUrls.push(uploaded.url);
+              } else {
+                throw new Error("Image upload failed: invalid response.");
+              }
+            } catch (err: any) {
+              throw new Error(err?.message || "Could not upload image. Check your connection and try again.");
+            }
+          }
+        }
 
-    if (newItem.image) {
-      delete newItem.image;
-    }
-
-    for (const cat of allCatalogues) {
-      const catData = getCatalogueData(formData, cat.id);
-      newItem[cat.priceField] = catData[cat.priceField] || "";
-      newItem[cat.priceUnitField] = catData[cat.priceUnitField] || "/ piece";
-      newItem[offerPriceFieldFor(cat.priceField)] = catData[offerPriceFieldFor(cat.priceField)] || "";
-      newItem[cat.stockField] = catData[cat.stockField] !== false;
-    }
-
-    newItem.price1 = newItem.price1 || "";
-    newItem.price1Unit = newItem.price1Unit || "/ piece";
-
-    for (let i = 1; i <= 10; i++) {
-      newItem[`field${i}`] = defaultCatalogueData[`field${i}`] || "";
-      newItem[`field${i}Unit`] = defaultCatalogueData[`field${i}Unit`] || "None";
-    }
-
-    newItem.badge = defaultCatalogueData.badge || "";
-    newItem.wholesaleUnit = defaultCatalogueData.price1Unit || "/ piece";
-    newItem.packageUnit = defaultCatalogueData.field2Unit || "pcs / set";
-    newItem.ageUnit = defaultCatalogueData.field3Unit || "months";
-    newItem.wholesale = newItem.price1 || "";
-    newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
-
-      if (getPersistedAuthUserId() !== authUserId) {
-        throw new Error("The signed-in account changed. Sign back in before retrying.");
-      }
-      let all = safeGetFromStorage(productsStorageKeyNow, []);
-      const currentProduct = all.find((p: any) => p.id === id);
-      if (JSON.stringify(currentProduct) !== JSON.stringify(originalProduct)) {
-        throw new Error("This product changed while it was saving. Reopen it and apply your changes again.");
-      }
-      const isNewProduct = !editingId;
-      if (isNewProduct && !isPro && all.length >= FREE_MAX_PRODUCTS) {
-        throw new Error(`Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro.`);
-      }
-      if (primaryPreview?.startsWith("data:image")) {
-        await Filesystem.writeFile({
-          path: imagePath,
-          data: primaryPreview.split(",")[1],
-          directory: Directory.External,
-          recursive: true,
+        const imageFields = buildProductImagePersistFields({
+          imageUrls,
+          primaryImageIndex: primIx,
         });
+        let imageVersion: number | undefined = imageFields.imageVersion;
+        if (imageVersion == null && typeof existingProduct?.imageVersion === "number" && Number.isFinite(existingProduct.imageVersion)) {
+          const prevPrimary = stripQuery(String(existingProduct.imageUrl || ""));
+          if (prevPrimary && prevPrimary === stripQuery(String(imageFields.imageUrl || ""))) {
+            imageVersion = existingProduct.imageVersion;
+          }
+        }
+        if (imageVersion == null && typeof imageFields.imageUrl === "string" && imageFields.imageUrl.startsWith("http")) {
+          imageVersion = Date.now();
+        }
+
+        const defaultCatalogueData = getCatalogueData(formData, 'cat1');
+        const allCatalogues = getAllCatalogues();
+
+        const persistedVideos = normalizeProductVideoUrls(videoUrls);
+
+        const newItem: ProductWithCatalogueData = {
+          ...formData,
+          id,
+          imagePath,
+          ...imageFields,
+          ...(typeof imageVersion === "number" && Number.isFinite(imageVersion) ? { imageVersion } : {}),
+          updatedAt: new Date().toISOString(),
+          suggestedColors: suggestedColors.length > 0 ? suggestedColors : undefined,
+          fontColor: normalizeProductFontColor(fontColor),
+          imageBgColor: imageBgOverride || "white",
+          bgColor: overrideColor || "#add8e6",
+          cropAspectRatio: appliedAspectRatio,
+          renderingType: "classic",
+        };
+        if (persistedVideos.length > 0) {
+          newItem.videoUrls = persistedVideos;
+        } else {
+          delete newItem.videoUrls;
+        }
+
+        if (newItem.catalogueData) {
+          for (const cat of allCatalogues) {
+            const row = newItem.catalogueData[cat.id];
+            if (!row) continue;
+            const slabs = normalizeQuantitySlabs(row.quantitySlabs);
+            newItem.catalogueData[cat.id] = {
+              ...row,
+              quantitySlabs: slabs.length > 0 ? slabs : undefined,
+            };
+          }
+        }
+
+        const savedVariants = pruneVariantGroupsForSave(variantGroups);
+        if (variantConfig.combinations && variantConfig.combinations.length > 0) {
+          savedVariants.combinations = variantConfig.combinations;
+        }
+        if (savedVariants.groups.length > 0) {
+          newItem.variants = savedVariants;
+        } else {
+          delete newItem.variants;
+        }
+
+        if (newItem.image) {
+          delete newItem.image;
+        }
+
+        for (const cat of allCatalogues) {
+          const catData = getCatalogueData(formData, cat.id);
+          newItem[cat.priceField] = catData[cat.priceField] || "";
+          newItem[cat.priceUnitField] = catData[cat.priceUnitField] || "/ piece";
+          newItem[offerPriceFieldFor(cat.priceField)] = catData[offerPriceFieldFor(cat.priceField)] || "";
+          newItem[cat.stockField] = catData[cat.stockField] !== false;
+        }
+
+        newItem.price1 = newItem.price1 || "";
+        newItem.price1Unit = newItem.price1Unit || "/ piece";
+
+        for (let i = 1; i <= 10; i++) {
+          newItem[`field${i}`] = defaultCatalogueData[`field${i}`] || "";
+          newItem[`field${i}Unit`] = defaultCatalogueData[`field${i}Unit`] || "None";
+        }
+
+        newItem.badge = defaultCatalogueData.badge || "";
+        newItem.wholesaleUnit = defaultCatalogueData.price1Unit || "/ piece";
+        newItem.packageUnit = defaultCatalogueData.field2Unit || "pcs / set";
+        newItem.ageUnit = defaultCatalogueData.field3Unit || "months";
+        newItem.wholesale = newItem.price1 || "";
+        newItem.stock = newItem[allCatalogues[0]?.stockField || "wholesaleStock"] !== false;
+
         if (getPersistedAuthUserId() !== authUserId) {
           throw new Error("The signed-in account changed. Sign back in before retrying.");
         }
-        all = safeGetFromStorage(productsStorageKeyNow, []);
-        if (JSON.stringify(all.find((p: any) => p.id === id)) !== JSON.stringify(originalProduct)) {
+        let all = safeGetFromStorage(productsStorageKeyNow, []);
+        const currentProduct = all.find((p: any) => p.id === id);
+        if (JSON.stringify(currentProduct) !== JSON.stringify(originalProduct)) {
           throw new Error("This product changed while it was saving. Reopen it and apply your changes again.");
         }
+        const isNewProduct = !editingId;
         if (isNewProduct && !isPro && all.length >= FREE_MAX_PRODUCTS) {
           throw new Error(`Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro.`);
         }
-      }
-      const updated = editingId
-        ? all.map((p) => (p.id === editingId ? newItem : p))
-        : [newItem, ...all];
+        if (primaryPreview?.startsWith("data:image")) {
+          await Filesystem.writeFile({
+            path: imagePath,
+            data: primaryPreview.split(",")[1],
+            directory: Directory.External,
+            recursive: true,
+          });
+          if (getPersistedAuthUserId() !== authUserId) {
+            throw new Error("The signed-in account changed. Sign back in before retrying.");
+          }
+          all = safeGetFromStorage(productsStorageKeyNow, []);
+          if (JSON.stringify(all.find((p: any) => p.id === id)) !== JSON.stringify(originalProduct)) {
+            throw new Error("This product changed while it was saving. Reopen it and apply your changes again.");
+          }
+          if (isNewProduct && !isPro && all.length >= FREE_MAX_PRODUCTS) {
+            throw new Error(`Free plan allows up to ${FREE_MAX_PRODUCTS} products. Delete a product or upgrade to Pro.`);
+          }
+        }
+        const updated = editingId
+          ? all.map((p) => (p.id === editingId ? newItem : p))
+          : [newItem, ...all];
 
-      const ok = safeSetInStorage(productsStorageKeyNow, updated);
-      if (!ok) {
-        throw new Error("Local storage quota exceeded. Please sync or clear old offline products.");
-      }
+        const ok = safeSetInStorage(productsStorageKeyNow, updated);
+        if (!ok) {
+          throw new Error("Local storage quota exceeded. Please sync or clear old offline products.");
+        }
 
-      recordProductHistory({
-        userId: authUserIdNow,
-        productId: String(newItem.id),
-        before: existingProduct,
-        after: newItem,
-        source: isNewProduct ? "created" : "product",
-        changesOverride: isNewProduct
-          ? undefined
-          : createProductEditHistoryChanges(
-              savedHistoryForm || formData,
-              formData,
-              existingProduct,
-              newItem
-            ),
-      });
+        recordProductHistory({
+          userId: authUserIdNow,
+          productId: String(newItem.id),
+          before: existingProduct,
+          after: newItem,
+          source: isNewProduct ? "created" : "product",
+          changesOverride: isNewProduct
+            ? undefined
+            : createProductEditHistoryChanges(
+                savedHistoryForm || formData,
+                formData,
+                existingProduct,
+                newItem
+              ),
+        });
 
-      if (isNewProduct) {
-        logProductAdded(updated.length);
-      }
+        if (isNewProduct) {
+          logProductAdded(updated.length);
+        }
 
-      window.dispatchEvent(
-        new CustomEvent("product-added", {
-          detail: { onlyProductId: String(newItem.id), forceCloudSync: true },
-        })
-      );
+        window.dispatchEvent(
+          new CustomEvent("product-added", {
+            detail: { onlyProductId: String(newItem.id), forceCloudSync: true },
+          })
+        );
 
-      await stockSave;
-      removeToast(toastId);
-      showToast(editingId ? "Product updated on this device." : "Product saved on this device.", "success");
-      let milestone = 10;
-      let increment = 15;
-      while (milestone < updated.length) {
-        milestone += increment;
-        increment += 5;
-      }
-      if (updated.length === milestone) {
-        window.dispatchEvent(new CustomEvent("product-rating-milestone", { detail: updated.length }));
-      }
+        await stockSave;
+        removeToast(toastId);
+        showToast(editingId ? "Product updated on this device." : "Product saved on this device.", "success");
+        let milestone = 10;
+        let increment = 15;
+        while (milestone < updated.length) {
+          milestone += increment;
+          increment += 5;
+        }
+        if (updated.length === milestone) {
+          window.dispatchEvent(new CustomEvent("product-rating-milestone", { detail: updated.length }));
+        }
 
-      // PNG rendering in background (R2 upload already completed when preview was data:image)
-      (async () => {
-        try {
-          // Render PNG images in background
+        // PNG rendering in background (R2 upload already completed when preview was data:image)
+        (async () => {
           try {
-            const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
-            for (const cat of enabledCats) {
-              const catData = getCatalogueData(newItem, cat.id);
-              const renderOptions: any = {
-                catalogueId: cat.id,
-                catalogueLabel: cat.label,
-                folder: cat.folder || cat.label,
-                priceField: cat.priceField,
-                priceUnitField: cat.priceUnitField,
-                price1Unit: catData.price1Unit || "/ piece",
-                wholesaleUnit: catData.price1Unit || "/ piece",
-              };
+            // Render PNG images in background
+            try {
+              const enabledCats = catalogues.filter(cat => isCatalogueEnabled(cat.id));
+              for (const cat of enabledCats) {
+                if (getPersistedAuthUserId() !== authUserId) break;
+                const catData = getCatalogueData(newItem, cat.id);
+                const renderOptions: any = {
+                  catalogueId: cat.id,
+                  catalogueLabel: cat.label,
+                  folder: cat.folder || cat.label,
+                  priceField: cat.priceField,
+                  priceUnitField: cat.priceUnitField,
+                  price1Unit: catData.price1Unit || "/ piece",
+                  wholesaleUnit: catData.price1Unit || "/ piece",
+                };
 
-              for (let i = 1; i <= 10; i++) {
-                renderOptions[`field${i}Unit`] = catData[`field${i}Unit`] || "None";
+                for (let i = 1; i <= 10; i++) {
+                  renderOptions[`field${i}Unit`] = catData[`field${i}Unit`] || "None";
+                }
+
+                const legacyType = cat.id === "cat1" ? "wholesale" : cat.id === "cat2" ? "resell" : cat.id;
+                await saveRenderedImage(newItem, legacyType, renderOptions);
               }
-
-              const legacyType = cat.id === "cat1" ? "wholesale" : cat.id === "cat2" ? "resell" : cat.id;
-              await saveRenderedImage(newItem, legacyType, renderOptions);
+            } catch (err) {
+              console.warn("⏱️ PNG render failed in background:", err);
             }
           } catch (err) {
-            console.warn("⏱️ PNG render failed in background:", err);
+            console.error("Background tasks failed:", err);
           }
-        } catch (err) {
-          console.error("Background tasks failed:", err);
-        }
-      })();
+        })();
       } catch (err: any) {
         removeToast(toastId);
         const message = err?.message || "Please check your connection and try again.";
-        showToast(`Product save failed: ${message}`, "error", 0,
-          message.startsWith("This product changed") ? undefined : { label: "Retry", onClick: () => void runSave() });
+        if (message.startsWith("This product changed") && editingId) {
+          showToast(`Product save failed: ${message}`, "error", 0, {
+            label: "Review draft",
+            onClick: () => {
+              if (getPersistedAuthUserId() !== authUserId) {
+                showToast("Sign back into the original account to review this draft.", "error");
+                return;
+              }
+              conflictedProductDrafts.set(id, {
+                userId: authUserId, formData: savedFormData, imageSlots, primarySlotIndex,
+                videoUrls, variantGroups, variantConfig, overrideColor, fontColor,
+                imageBgOverride, appliedAspectRatio, suggestedColors,
+              });
+              window.dispatchEvent(new CustomEvent("review-product-draft", { detail: id }));
+            },
+          });
+        } else {
+          showToast(`Product save failed: ${message}`, "error", 0, { label: "Retry", onClick: () => void runSave() });
+        }
       } finally {
         pendingProductSaves.delete(id);
         if (pendingProductSaves.size === 0) {
