@@ -62,30 +62,16 @@ function resolveUploadApiBase(): string {
   return '';
 }
 
-function buildFormData(productId: string, blob: Blob, assetId: string): FormData {
-  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-  const form = new FormData();
-  form.append('productId', productId);
-  form.append('assetId', assetId);
-  form.append('ext', ext);
-  form.append('file', blob, `product-${productId}-${assetId}.${ext}`);
-  return form;
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Upload with retries: cold starts, transient 5xx/429, expired tokens, flaky networks.
- * FormData is rebuilt each attempt (body is consumed by fetch).
- */
-async function postUploadWithRetries(
-  endpoint: string,
+async function uploadBlobWithPresignedUrl(
+  apiBase: string,
   productId: string,
   blob: Blob,
   assetId: string
-): Promise<{ url: string; key: string; imageVersion?: number }> {
+): Promise<{ url: string; key: string; imageVersion: number }> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < MAX_UPLOAD_ATTEMPTS; attempt++) {
@@ -93,52 +79,64 @@ async function postUploadWithRetries(
       await sleep(Math.round(BASE_BACKOFF_MS * Math.pow(1.6, attempt - 1)));
     }
 
-    let token = await getSupabaseAccessToken();
+    const token = await getSupabaseAccessToken();
     if (!token) {
       lastError = new Error('Could not get session token');
       continue;
     }
 
-    const form = buildFormData(productId, blob, assetId);
-
     try {
-      const resp = await fetch(endpoint, {
+      const signResponse = await fetch(`${apiBase}/api/get-upload-url`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: form,
+        body: JSON.stringify({ productId, assetId, contentType: blob.type }),
       });
 
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json?.url && json?.key) {
-          const imageVersion =
-            typeof json.imageVersion === 'number' && Number.isFinite(json.imageVersion)
-              ? json.imageVersion
-              : undefined;
-          return { url: json.url, key: json.key, imageVersion };
-        }
-        lastError = new Error('Upload response missing url/key');
-        continue;
-      }
-
-      const text = await resp.text().catch(() => '');
-
-      if (resp.status === 401) {
+      if (signResponse.status === 401) {
         await supabase.auth.refreshSession();
-        lastError = new Error(`Upload unauthorized (401), refreshed session — retrying`);
+        lastError = new Error('Upload unauthorized (401), refreshed session — retrying');
         continue;
       }
 
-      if (resp.status >= 500 || resp.status === 429) {
-        lastError = new Error(`Upload failed (${resp.status}): ${text || resp.statusText}`);
-        continue;
+      if (!signResponse.ok) {
+        const body = await signResponse.json().catch(() => ({}));
+        const error = new Error(
+          `Upload URL request failed (${signResponse.status}): ${body.error || signResponse.statusText}`
+        );
+        if (signResponse.status >= 500 || signResponse.status === 429) {
+          lastError = error;
+          continue;
+        }
+        throw error;
       }
 
-      throw new Error(`Upload failed (${resp.status}): ${text || resp.statusText}`);
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
+      const { presignedUrl, publicUrl, key } = await signResponse.json();
+      if (!presignedUrl || !publicUrl || !key) {
+        throw new Error('Upload URL response missing required fields');
+      }
+
+      const uploadResponse = await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': blob.type },
+        body: blob,
+      });
+
+      if (!uploadResponse.ok) {
+        const error = new Error(`R2 upload failed (${uploadResponse.status}): ${uploadResponse.statusText}`);
+        if (uploadResponse.status >= 500 || uploadResponse.status === 429 || uploadResponse.status === 403) {
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+
+      const imageVersion = Date.now();
+      return { url: `${publicUrl}?v=${imageVersion}`, key, imageVersion };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
       if (err.name === 'TypeError' && /fetch|network|failed/i.test(err.message)) {
         lastError = err;
         continue;
@@ -179,7 +177,6 @@ export async function uploadProductImageToR2(options: {
       'Missing VITE_BACKEND_URL (or VITE_APP_URL). Set it to your deployed API origin (e.g. https://your-app.vercel.app), rebuild, then run npx cap sync for Android.'
     );
   }
-  const endpoint = `${base}/api/upload-product-image`;
 
   const assetId = (options.assetId && String(options.assetId).trim()) || newUploadAssetId();
   const flightKey = `${options.productId}:${assetId}`;
@@ -187,8 +184,8 @@ export async function uploadProductImageToR2(options: {
   if (existing) return existing;
 
   const promise = (async () => {
-    const blob = await dataUrlToUploadBlob(options.dataUrl, 0.95);
-    return postUploadWithRetries(endpoint, options.productId, blob, assetId);
+    const blob = await dataUrlToUploadBlob(options.dataUrl);
+    return uploadBlobWithPresignedUrl(base, options.productId, blob, assetId);
   })();
 
   inFlightProductUploads.set(flightKey, promise);

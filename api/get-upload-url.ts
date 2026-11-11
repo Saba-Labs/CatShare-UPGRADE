@@ -9,9 +9,10 @@ import { getSupabaseUserFromRequest } from "../lib/supabaseAuthRequest.js";
 import { applyApiCors } from "../lib/apiCors.js";
 
 // ─── R2 S3-compatible client ──────────────────────────────────────────────────
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const r2 = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: process.env.R2_ENDPOINT || `https://${accountId}.r2.cloudflarestorage.com`,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
@@ -38,23 +39,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const uid = authResult.userId;
 
   // ── 2. Validate request body ─────────────────────────────────────────────
-  const { filename, folder, contentType } = req.body as {
-    filename?: string;
-    folder?: string;
-    contentType?: string;
+  const body = req.body as {
+    filename?: unknown;
+    folder?: unknown;
+    productId?: unknown;
+    assetId?: unknown;
+    contentType?: unknown;
   };
+  const contentType = typeof body?.contentType === "string" ? body.contentType : "";
+  let key: string;
+  let mime: string;
 
-  if (!filename || !folder) {
-    return res.status(400).json({ error: "filename and folder are required" });
+  if (body?.productId !== undefined || body?.assetId !== undefined) {
+    const productId = typeof body.productId === "string"
+      ? body.productId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 128)
+      : "";
+    const assetId = typeof body.assetId === "string"
+      ? body.assetId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)
+      : "";
+    const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+    if (!productId || !assetId || !imageTypes.has(contentType)) {
+      return res.status(400).json({ error: "Valid productId, assetId, and image contentType are required" });
+    }
+
+    const extension = contentType === "image/jpeg" ? "jpg" : contentType === "image/webp" ? "webp" : "png";
+    key = `products/${uid}/${productId}/${assetId}.${extension}`;
+    mime = contentType;
+  } else {
+    const { filename, folder } = body;
+    if (typeof filename !== "string" || typeof folder !== "string" || !filename || !folder) {
+      return res.status(400).json({ error: "filename and folder are required" });
+    }
+
+    const safeFolder = folder.replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 64);
+    const safeFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, "_").slice(0, MAX_FILENAME_LENGTH);
+    mime = contentType === "image/jpeg" ? "image/jpeg" : "image/png";
+    key = `${uid}/${safeFolder}/${safeFilename}`;
   }
-
-  // Sanitize inputs — prevent path traversal
-  const safeFolder = folder.replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 64);
-  const safeFilename = filename.replace(/[^a-zA-Z0-9_\-\.]/g, "_").slice(0, MAX_FILENAME_LENGTH);
-  const mime = contentType === "image/jpeg" ? "image/jpeg" : "image/png";
-
-  // Key format: userId/folder/filename  — scoped per user
-  const key = `${uid}/${safeFolder}/${safeFilename}`;
 
   // ── 3. Generate presigned PUT URL ────────────────────────────────────────
   try {
@@ -69,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // The public URL your app will store in Supabase after upload
-    const publicUrl = `${process.env.R2_PUBLIC_BASE_URL}/${key}`;
+    const publicUrl = `${String(process.env.R2_PUBLIC_BASE_URL).replace(/\/$/, "")}/${key}`;
 
     return res.status(200).json({ presignedUrl, publicUrl, key });
   } catch (err) {
