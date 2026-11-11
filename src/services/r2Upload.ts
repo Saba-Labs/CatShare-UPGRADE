@@ -7,14 +7,15 @@ const BASE_BACKOFF_MS = 400;
 /** Coalesce concurrent uploads for the same product + asset (avoids duplicate work / races). */
 const inFlightProductUploads = new Map<string, Promise<{ url: string; key: string; imageVersion?: number }>>();
 
-async function dataUrlToJpegBlob(dataUrl: string, quality = 0.95): Promise<Blob> {
+async function dataUrlToUploadBlob(dataUrl: string, quality = 0.95): Promise<Blob> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) throw new Error('Invalid data URL');
 
-  const mime = match[1];
-  const b64 = match[2];
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const mime = match[1].toLowerCase();
+  const bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
   const inputBlob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(mime)) return inputBlob;
 
   const bitmap = await createImageBitmap(inputBlob);
   const canvas = document.createElement('canvas');
@@ -62,11 +63,12 @@ function resolveUploadApiBase(): string {
 }
 
 function buildFormData(productId: string, blob: Blob, assetId: string): FormData {
+  const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
   const form = new FormData();
   form.append('productId', productId);
   form.append('assetId', assetId);
-  form.append('ext', 'jpg');
-  form.append('file', blob, `product-${productId}-${assetId}.jpg`);
+  form.append('ext', ext);
+  form.append('file', blob, `product-${productId}-${assetId}.${ext}`);
   return form;
 }
 
@@ -185,7 +187,7 @@ export async function uploadProductImageToR2(options: {
   if (existing) return existing;
 
   const promise = (async () => {
-    const blob = await dataUrlToJpegBlob(options.dataUrl, 0.95);
+    const blob = await dataUrlToUploadBlob(options.dataUrl, 0.95);
     return postUploadWithRetries(endpoint, options.productId, blob, assetId);
   })();
 
