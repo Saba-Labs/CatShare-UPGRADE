@@ -86,7 +86,7 @@ async function uploadBlobWithPresignedUrl(
     }
 
     try {
-      const signResponse = await fetch(`${apiBase}/api/get-product-image-upload-url`, {
+      const signResponse = await fetch(`${apiBase}/api/get-upload-url`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
