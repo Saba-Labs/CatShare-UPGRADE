@@ -31,8 +31,8 @@ export const getCroppedImg = async (
     pixelCrop.height
   );
 
-  // Step 2: Downscale if larger than 600x600
-  const maxSize = 600;
+  // Step 2: Downscale only very large crops
+  const maxSize = 2048;
   const scale = Math.min(
     1,
     maxSize / cropCanvas.width,
@@ -51,13 +51,13 @@ export const getCroppedImg = async (
 
   outputCtx.drawImage(cropCanvas, 0, 0, outputWidth, outputHeight);
 
-  // Step 3: Export to Base64 JPEG (80% quality)
-  return outputCanvas.toDataURL("image/jpeg", 0.8);
+  // Step 3: Export to Base64 JPEG (95% quality)
+  return outputCanvas.toDataURL("image/jpeg", 0.95);
 };
 
 /**
  * Center-crop loaded image to a target aspect ratio (width / height), then apply the same
- * downscale + JPEG export as {@link getCroppedImg} (max dimension 600).
+ * downscale + JPEG export as {@link getCroppedImg} (max dimension 2048).
  */
 export async function getCenterCroppedImg(
   imageSrc: string,

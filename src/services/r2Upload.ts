@@ -7,7 +7,7 @@ const BASE_BACKOFF_MS = 400;
 /** Coalesce concurrent uploads for the same product + asset (avoids duplicate work / races). */
 const inFlightProductUploads = new Map<string, Promise<{ url: string; key: string; imageVersion?: number }>>();
 
-async function dataUrlToJpegBlob(dataUrl: string, quality = 0.88): Promise<Blob> {
+async function dataUrlToJpegBlob(dataUrl: string, quality = 0.95): Promise<Blob> {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) throw new Error('Invalid data URL');
 
@@ -185,7 +185,7 @@ export async function uploadProductImageToR2(options: {
   if (existing) return existing;
 
   const promise = (async () => {
-    const blob = await dataUrlToJpegBlob(options.dataUrl, 0.88);
+    const blob = await dataUrlToJpegBlob(options.dataUrl, 0.95);
     return postUploadWithRetries(endpoint, options.productId, blob, assetId);
   })();
 
