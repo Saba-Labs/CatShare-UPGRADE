@@ -31,33 +31,11 @@ export const getCroppedImg = async (
     pixelCrop.height
   );
 
-  // Step 2: Downscale if larger than 600x600
-  const maxSize = 600;
-  const scale = Math.min(
-    1,
-    maxSize / cropCanvas.width,
-    maxSize / cropCanvas.height
-  );
-
-  const outputWidth = Math.floor(cropCanvas.width * scale);
-  const outputHeight = Math.floor(cropCanvas.height * scale);
-
-  const outputCanvas = document.createElement("canvas");
-  outputCanvas.width = outputWidth;
-  outputCanvas.height = outputHeight;
-  const outputCtx = outputCanvas.getContext("2d");
-
-  if (!outputCtx) throw new Error("Could not get output canvas context");
-
-  outputCtx.drawImage(cropCanvas, 0, 0, outputWidth, outputHeight);
-
-  // Step 3: Export to Base64 JPEG (80% quality)
-  return outputCanvas.toDataURL("image/jpeg", 0.8);
+  return cropCanvas.toDataURL("image/png");
 };
 
 /**
- * Center-crop loaded image to a target aspect ratio (width / height), then apply the same
- * downscale + JPEG export as {@link getCroppedImg} (max dimension 600).
+ * Center-crop loaded image to a target aspect ratio (width / height), then export at source crop resolution as PNG.
  */
 export async function getCenterCroppedImg(
   imageSrc: string,
