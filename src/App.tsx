@@ -173,6 +173,15 @@ function AppWithBackHandler() {
   const isGuestUser = authService.isOfflineGuest() || Boolean(user?.isAnonymous);
 
   useEffect(() => {
+    const reviewDraft = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      navigate(`/create?id=${encodeURIComponent(id)}&reviewDraft=${Date.now()}`);
+    };
+    window.addEventListener("review-product-draft", reviewDraft);
+    return () => window.removeEventListener("review-product-draft", reviewDraft);
+  }, [navigate]);
+
+  useEffect(() => {
     (window as unknown as { __offlineSyncInProgress?: boolean }).__offlineSyncInProgress =
       syncNowLoading;
   }, [syncNowLoading]);

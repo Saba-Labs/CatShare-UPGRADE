@@ -7,11 +7,12 @@ export interface Toast {
   message: string;
   type: ToastType;
   duration?: number;
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastContextType {
   toasts: Toast[];
-  showToast: (message: string, type: ToastType, duration?: number) => string;
+  showToast: (message: string, type: ToastType, duration?: number, action?: Toast["action"]) => string;
   updateToast: (id: string, message: string, type: ToastType, duration?: number) => void;
   removeToast: (id: string) => void;
 }
@@ -51,9 +52,9 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const showToast = useCallback(
-    (message: string, type: ToastType, duration = 4000) => {
+    (message: string, type: ToastType, duration = 4000, action?: Toast["action"]) => {
       const id = Math.random().toString(36).substr(2, 9);
-      const newToast: Toast = { id, message, type, duration };
+      const newToast: Toast = { id, message, type, duration, action };
 
       setToasts((prev) => [...prev, newToast]);
       scheduleRemoval(id, duration);

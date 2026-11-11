@@ -67,6 +67,17 @@ export const ToastContainer: React.FC = () => {
             <div className={`flex-1 ${getTextColor(toast.type)} text-[10px] leading-tight`}>
               {toast.message}
             </div>
+            {toast.action && (
+              <button
+                className={`font-semibold underline ${getTextColor(toast.type)}`}
+                onClick={() => {
+                  removeToast(toast.id);
+                  toast.action?.onClick();
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
             <button
               onClick={() => removeToast(toast.id)}
               className={`p-0.5 hover:bg-black/10 rounded transition ${getTextColor(
