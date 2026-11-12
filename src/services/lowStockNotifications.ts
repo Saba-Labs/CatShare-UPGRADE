@@ -62,10 +62,19 @@ export async function showLowStockNotification(level: InventoryLevel): Promise<v
   }
 }
 
+let lowStockPollInFlight = false;
+
 export async function pollLowStockForSeller(userId: string): Promise<void> {
-  const { data } = await fetchLowStockLevels(userId);
-  for (const level of data ?? []) {
-    await showLowStockNotification(level);
+  if (!Capacitor.isNativePlatform() && document.visibilityState !== 'visible') return;
+  if (lowStockPollInFlight) return;
+  lowStockPollInFlight = true;
+  try {
+    const { data } = await fetchLowStockLevels(userId);
+    for (const level of data ?? []) {
+      await showLowStockNotification(level);
+    }
+  } finally {
+    lowStockPollInFlight = false;
   }
 }
 
@@ -91,8 +100,13 @@ export function startPollingForLowStock(userId: string): () => void {
   pollTimer = setInterval(() => {
     void pollLowStockForSeller(userId);
   }, 60_000);
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') void pollLowStockForSeller(userId);
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   return () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     if (pollTimer) {
       clearInterval(pollTimer);
       pollTimer = null;

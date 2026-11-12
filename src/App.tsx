@@ -1682,6 +1682,7 @@ function AppWithBackHandler() {
         const cloudData = await syncProductsToCloud(freshProducts, freshDeleted, {
           skipFullCloudRefresh: true,
           fullListForPosition: freshProducts,
+          onlyProductIds: e.detail?.onlyProductIds?.map(String),
           maxSyncUiMs: 1000,
         });
         setProducts(cloudData.products);

@@ -82,11 +82,12 @@ const PULL_REFRESH_SUCCESS_DISPLAY_MS = 1200;
 const PRODUCTS_HEADER_CHROME_HEIGHT = 96;
 
 /** List ↔ shelf, stock in/out: cap “Syncing to cloud” overlay at 1s; Supabase upload continues; skip full cloud re-download. */
-function shelfMoveCloudSyncOptions(fullListForPosition: any[]) {
+function shelfMoveCloudSyncOptions(fullListForPosition: any[], onlyProductIds?: string[]) {
   return {
     skipFullCloudRefresh: true,
     maxSyncUiMs: 1000,
     fullListForPosition,
+    ...(onlyProductIds?.length ? { onlyProductIds } : {}),
   };
 }
 
@@ -870,7 +871,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     setProducts(freshProducts);
 
     if (isStrictMode() && user?.uid) {
-      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts, [String(id)])).then(cloudData => {
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
       }).catch(err => console.error('Strict sync failed:', err));
@@ -904,7 +905,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts, [String(id)])).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -944,7 +945,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       setProducts(freshProducts);
 
       if (isStrictMode() && user?.uid) {
-        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+        syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts, [String(id)])).then(cloudData => {
           setProducts(cloudData.products);
           setDeletedProducts(cloudData.deletedProducts);
         }).catch(err => console.error('Strict sync failed:', err));
@@ -972,7 +973,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
     });
 
     if (isStrictMode() && user?.uid) {
-      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+      syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts, [String(item.id)])).then(cloudData => {
         setProducts(cloudData.products);
         setDeletedProducts(cloudData.deletedProducts);
       }).catch(err => console.error('Strict sync failed:', err));
@@ -1009,7 +1010,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
     if (isStrictMode() && user?.uid) {
       syncProductsToCloud(freshProducts, deletedProducts, {
-        ...shelfMoveCloudSyncOptions(freshProducts),
+        ...shelfMoveCloudSyncOptions(freshProducts, [String(duplicate.id)]),
         background: true,
       })
         .catch((err) => {
@@ -2130,7 +2131,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                   setProducts(freshProducts);
 
                   if (isStrictMode() && user?.uid) {
-                    syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts)).then(cloudData => {
+                    syncProductsToCloud(freshProducts, deletedProducts, shelfMoveCloudSyncOptions(freshProducts, [String(id)])).then(cloudData => {
                       setProducts(cloudData.products);
                       setDeletedProducts(cloudData.deletedProducts);
                     }).catch(err => console.error('Strict sync failed:', err));

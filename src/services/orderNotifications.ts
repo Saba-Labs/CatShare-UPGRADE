@@ -221,8 +221,12 @@ export function startPollingForNewSellerOrders(
   let createdAtWatermark = '';
   /** Upper bound on updated_at we've processed for edits to existing orders. */
   let updatedAtWatermark = '';
+  let pollInFlight = false;
 
   const tick = async () => {
+    if (!Capacitor.isNativePlatform() && document.visibilityState !== 'visible') return;
+    if (pollInFlight) return;
+    pollInFlight = true;
     try {
       if (!baselineReady) {
         const { data, error } = await fetchSellerOrders(sellerUserId);
@@ -275,6 +279,8 @@ export function startPollingForNewSellerOrders(
       }
     } catch (e) {
       console.warn('[CatShare] order poll failed:', e);
+    } finally {
+      pollInFlight = false;
     }
   };
 
