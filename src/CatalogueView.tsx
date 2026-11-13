@@ -1575,7 +1575,7 @@ const handleTouchEnd = useCallback(() => {
                   // strict sync — that path runs syncProductsToCloud without maxSyncUiMs and blocks the UI longer.
                   window.dispatchEvent(
                     new CustomEvent("sync-to-supabase", {
-                      detail: { products: updated, deletedProducts },
+                      detail: { products: updated, deletedProducts, onlyProductIds: selected.map(String) },
                     })
                   );
                   console.log('✅ sync-to-supabase dispatched (bulk in stock)');
@@ -1615,7 +1615,7 @@ const handleTouchEnd = useCallback(() => {
                   localStorage.setItem(storageKey, JSON.stringify(updated));
                   window.dispatchEvent(
                     new CustomEvent("sync-to-supabase", {
-                      detail: { products: updated, deletedProducts },
+                      detail: { products: updated, deletedProducts, onlyProductIds: selected.map(String) },
                     })
                   );
                   console.log('✅ sync-to-supabase dispatched (bulk out of stock)');
