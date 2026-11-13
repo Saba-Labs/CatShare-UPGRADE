@@ -1,5 +1,5 @@
 ext {
-    minSdkVersion = 23
+    minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.9.2'
@@ -13,5 +13,5 @@ ext {
     androidxJunitVersion = '1.2.1'
     androidxEspressoCoreVersion = '3.6.1'
     cordovaAndroidVersion = '10.1.1'
-    billingVersion = '8.1.0'
+    billingVersion = '9.1.0'
 }
