@@ -112,3 +112,93 @@
   .desktop-workspace__content .catalogue-product-fab { right: 36px; bottom: 32px !important; }
   body:has(.desktop-workspace) .main-app-bottom-nav { display: none; }
 }
+
+@media (min-width: 1024px) {
+  .desktop-workspace__content .create-product-page {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: #f4f6fa;
+  }
+  .desktop-workspace__content .create-product-status { display: none; }
+  .desktop-workspace__content .create-product-topbar { position: absolute; top: 8px; right: 12px; left: auto; z-index: 80; width: 40px; height: 40px; padding: 0; background: transparent; }
+  .desktop-workspace__content .create-product-topbar button { width: 36px; height: 36px; border-radius: 9px; color: #53627a; }
+  .desktop-workspace__content .create-product-preview {
+    flex: 0 0 36%;
+    min-width: 0;
+    min-height: 180px;
+    padding: 16px;
+    border: 1px solid #e0e6ef;
+    border-radius: 16px;
+    background: linear-gradient(145deg, #e8edf5, #f5f7fb);
+  }
+  .desktop-workspace__content .create-product-preview-content { width: 100%; max-height: 100%; }
+  .desktop-workspace__content .create-product-panel {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    border: 1px solid #e1e7f0;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgb(23 36 61 / 7%);
+    cursor: default !important;
+    touch-action: auto !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+  .desktop-workspace__content .create-product-drag-handle { display: none; }
+  .desktop-workspace__content .create-product-save-actions { position: sticky; bottom: 0; z-index: 5; margin: 0; padding: 12px 20px 16px; border-top: 1px solid #e7ebf2; background: #fff; }
+}
+
+@media (min-width: 1200px) {
+  .desktop-workspace__content .create-product-page {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(360px, 0.85fr) minmax(520px, 1.15fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 20px;
+    height: 100%;
+    padding: 24px;
+    background: #f4f6fa;
+  }
+
+  .desktop-workspace__content .create-product-status { display: none; }
+  .desktop-workspace__content .create-product-topbar { position: absolute; top: 8px; right: 18px; left: auto; z-index: 80; width: 40px; height: 40px; padding: 0; background: transparent; }
+  .desktop-workspace__content .create-product-topbar button { width: 36px; height: 36px; border-radius: 9px; color: #53627a; }
+  .desktop-workspace__content .create-product-topbar button:hover { background: #edf1f7; color: #17243d; }
+  .desktop-workspace__content .create-product-preview {
+    min-width: 0;
+    min-height: 0;
+    padding: 28px;
+    border: 1px solid #e0e6ef;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #e8edf5, #f5f7fb);
+  }
+  .desktop-workspace__content .create-product-preview-content { width: 100%; max-height: 100%; }
+  .desktop-workspace__content .create-product-panel {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    height: auto !important;
+    align-self: stretch;
+    border: 1px solid #e1e7f0;
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgb(23 36 61 / 7%);
+    cursor: default !important;
+    touch-action: auto !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+  .desktop-workspace__content .create-product-drag-handle { display: none; }
+  .desktop-workspace__content .create-product-form-header { min-height: 64px; padding: 12px 24px; }
+  .desktop-workspace__content .create-product-form-header h1 { font-size: 18px; }
+  .desktop-workspace__content .create-product-form-tabs { gap: 8px; padding: 12px 24px; }
+  .desktop-workspace__content .create-product-form-tabs button { min-height: 40px; font-size: 13px; }
+  .desktop-workspace__content .create-product-form-scroll { min-height: 0; padding: 22px 24px 12px; }
+  .desktop-workspace__content .create-product-save-actions { position: sticky; bottom: 0; z-index: 5; margin: 0; padding: 16px 24px 20px; border-top: 1px solid #e7ebf2; background: #fff; }
+  .desktop-workspace__content .create-product-save-actions button { min-height: 42px; font-size: 13px; }
+}

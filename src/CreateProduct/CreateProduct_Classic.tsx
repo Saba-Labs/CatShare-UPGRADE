@@ -442,6 +442,7 @@ export default function CreateProduct() {
   };
 
   const handleDragEnd = (_: any, info: any) => {
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
     setIsDragging(false);
     const velocity = info.velocity.y;
     const currentY = y.get();
@@ -1710,12 +1711,12 @@ if (migratedProduct.suggestedColors?.length > 0) {
   }
 
   return (
-    <div className="w-full h-screen flex flex-col bg-black overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5px)' }}>
+    <div className="create-product-page w-full h-screen flex flex-col bg-black overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5px)' }}>
       {/* Status Bar */}
-      <div className="fixed top-0 left-0 right-0 h-[40px] bg-black z-50"></div>
+      <div className="create-product-status fixed top-0 left-0 right-0 h-[40px] bg-black z-50"></div>
 
       {/* Header below status bar */}
-      <div className="fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-end px-4">
+      <div className="create-product-topbar fixed top-[40px] left-0 right-0 h-12 bg-black/50 z-40 flex items-center justify-end px-4">
         <button
           onClick={() => navigate('/')}
           className="text-white/40 hover:text-white/70 transition-colors flex items-center justify-center w-6 h-6"
@@ -1730,10 +1731,10 @@ if (migratedProduct.suggestedColors?.length > 0) {
       {/* Image Preview Section with Product Card */}
       <div
         ref={previewContainerRef}
-        className="flex-1 flex items-center justify-center overflow-y-auto overflow-x-hidden pt-[88px] pb-2 relative"
+        className="create-product-preview flex-1 flex items-center justify-center overflow-y-auto overflow-x-hidden pt-[88px] pb-2 relative"
       >
         <motion.div
-          className="relative flex items-center justify-center"
+          className="create-product-preview-content relative flex items-center justify-center"
           style={{ opacity: imageOpacity }}
         >
           {cardPreview && (
@@ -1958,14 +1959,17 @@ if (migratedProduct.suggestedColors?.length > 0) {
 
       {/* Draggable Bottom Sheet */}
       <motion.div
-        onPanStart={() => setIsDragging(true)}
+        onPanStart={() => {
+          if (!window.matchMedia('(min-width: 1024px)').matches) setIsDragging(true);
+        }}
         onPan={(_, info) => {
+          if (window.matchMedia('(min-width: 1024px)').matches) return;
           // Allow dragging (up/down) from any scroll position
           const newY = Math.max(0, Math.min(DRAG_RANGE, y.get() + info.delta.y));
           y.set(newY);
         }}
         onPanEnd={handleDragEnd}
-        className="bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden flex flex-col select-none"
+        className="create-product-panel bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl overflow-hidden flex flex-col select-none"
         style={{
           height: sheetHeight,
           cursor: isDragging ? "grabbing" : "grab",
@@ -1974,7 +1978,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         }}
       >
         {/* Drag Handle - Extended to full width */}
-        <div className="flex-shrink-0 px-4 py-2 flex items-center justify-between select-none w-full pointer-events-none">
+        <div className="create-product-drag-handle flex-shrink-0 px-4 py-2 flex items-center justify-between select-none w-full pointer-events-none">
           {/* Drag Handle Icon */}
           <div className="mx-auto flex items-center justify-center hover:opacity-70 transition-opacity py-1">
             <motion.svg
@@ -1993,7 +1997,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         </div>
 
         {/* Header inside sheet */}
-        <header className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between select-none">
+        <header className="create-product-form-header flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between select-none">
           <h1 className="text-base font-bold">{editingId ? "Edit Product" : "Create Product"}</h1>
           <div className="flex items-center gap-2">
             {editingId && (
@@ -2018,7 +2022,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         </header>
 
         {/* Form Tabs */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex gap-2">
+        <div className="create-product-form-tabs flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex gap-2">
           <button
             onClick={() => setFormSection('basic')}
             className={`flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-all ${
@@ -2055,7 +2059,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
         <div
           ref={scrollRef}
           onScroll={handleScrollCheck}
-          className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4 text-sm"
+          className="create-product-form-scroll flex-1 overflow-y-auto scrollbar-hide px-4 py-4 text-sm"
           style={{
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 5px)',
           }}
@@ -2848,7 +2852,7 @@ if (migratedProduct.suggestedColors?.length > 0) {
           )}
 
           {/* Save/Cancel Buttons */}
-          <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+          <div className="create-product-save-actions flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
             {(() => {
               return (
                 <button
