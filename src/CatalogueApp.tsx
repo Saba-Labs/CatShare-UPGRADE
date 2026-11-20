@@ -1868,9 +1868,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                                   persistProductsListScrollForEdit(scrollRef.current);
                                   navigate(`/create?id=${p.id}`);
                                 }}
-                                className="text-blue-600 hover:text-blue-800"
+                                className="catalogue-product-action catalogue-product-edit text-blue-600 hover:text-blue-800"
+                                title="Edit product"
+                                aria-label="Edit product"
                               >
                                 <FiEdit size={16} />
+                                <span className="catalogue-product-action-label hidden">Edit</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -1878,16 +1881,18 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                                   setShelfTarget(p);
                                   setShowShelfConfirm(true);
                                 }}
-                                className="text-red-500 hover:text-red-800"
+                                className="catalogue-product-action catalogue-product-shelf text-red-500 hover:text-red-800"
                                 title="Shelf Item"
+                                aria-label="Shelf item"
                               >
                                 <MdInventory2 className="text-[18px]" />
+                                <span className="catalogue-product-action-label hidden">Shelf</span>
                               </button>
 
                               {/* Master Toggle Button - All Catalogues */}
                               <button
                                 onClick={() => handleMasterStockToggleRequest(p.id)}
-                                className={`text-xs font-semibold px-2 py-1 rounded ${
+                                className={`catalogue-product-stock-toggle text-xs font-semibold px-2 py-1 rounded ${
                                   catalogues.every((cat) => (p as any)[cat.stockField])
                                     ? "bg-green-600 text-white"
                                     : "bg-gray-300 text-gray-700"
