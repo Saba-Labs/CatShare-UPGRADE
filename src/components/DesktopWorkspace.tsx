@@ -41,7 +41,6 @@ export default function DesktopWorkspace({ children }: { children: ReactNode }) 
       <div className="desktop-workspace">
         <aside className="desktop-workspace__sidebar" aria-label="Workspace navigation">
           <Link to="/" className="desktop-workspace__brand">
-            <img src="/logo-catalogue-share.svg" alt="" />
             <span>CatShare<small>SELLER WORKSPACE</small></span>
           </Link>
           <div className="desktop-workspace__nav-label">WORKSPACE</div>
