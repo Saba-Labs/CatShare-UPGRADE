@@ -72,8 +72,8 @@ export default React.memo(function CataloguesList({
 
   return (
     <>
-      <div className="sticky top-0 h-[40px] bg-black z-50"></div>
-      <header className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
+      <div className="catalogues-page__status sticky top-0 h-[40px] bg-black z-50"></div>
+      <header className="catalogues-page__toolbar sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 h-14 flex items-center gap-3 px-4 relative">
         {/* Menu Button */}
         <button
           onClick={() => window.dispatchEvent(new Event("toggle-menu"))}
@@ -100,19 +100,25 @@ export default React.memo(function CataloguesList({
             await Haptics.impact({ style: ImpactStyle.Light });
             onManageCatalogues();
           }}
-          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition shrink-0"
+          className="catalogues-page__manage p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition shrink-0"
           title="Add, edit, or delete catalogues"
         >
           <FiSettings size={20} />
+          <span className="catalogues-page__manage-label hidden">Manage catalogues</span>
         </button>
       </header>
 
       {catalogues.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="catalogues-page__empty text-center py-12">
           <p className="text-gray-500">No catalogues available</p>
         </div>
       ) : (
-        <div className="space-y-3 px-4 pb-4">
+        <>
+        <div className="catalogues-page__table-head" aria-hidden="true">
+          <span>CATALOGUE</span>
+          <span>INVENTORY</span>
+        </div>
+        <div className="catalogues-page__list space-y-3 px-4 pb-4">
           {catalogues.map((catalogue) => {
             const stats = catalogueStats[catalogue.id] || {
               total: 0,
@@ -132,14 +138,14 @@ export default React.memo(function CataloguesList({
               <button
                 key={catalogue.id}
                 onClick={() => handleCatalogueClick(catalogue.id)}
-                className="w-full group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 hover:border-blue-300"
+                className="catalogues-page__card w-full group relative bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 hover:border-blue-300"
               >
                 {/* Background gradient on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                <div className="relative p-4 flex items-center gap-4">
+                <div className="catalogues-page__card-inner relative p-4 flex items-center gap-4">
                   {/* Image preview - Hero image front with product images layered behind */}
-                  <div className="relative w-20 h-20 flex-shrink-0">
+                  <div className="catalogues-page__preview relative w-20 h-20 flex-shrink-0">
                     {/* Product images layered behind (fan effect) */}
                     {catalogueProducts.length > 0 &&
                       catalogueProducts.map((product, idx) => {
@@ -213,7 +219,7 @@ export default React.memo(function CataloguesList({
                   </div>
 
                   {/* Catalogue info */}
-                  <div className="flex-1 text-left min-w-0">
+                  <div className="catalogues-page__info flex-1 text-left min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors truncate">
                         {catalogue.label}
@@ -222,7 +228,7 @@ export default React.memo(function CataloguesList({
                         <FiLoader className="animate-spin text-blue-500 shrink-0" size={14} />
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="catalogues-page__stats text-xs text-gray-500 mt-1">
                       {stats.total} products · {stats.inStock} in stock
                     </p>
                   </div>
@@ -231,6 +237,7 @@ export default React.memo(function CataloguesList({
             );
           })}
         </div>
+        </>
       )}
 
       {/* Add Catalogue Button - Fixed in bottom right */}
@@ -239,7 +246,7 @@ export default React.memo(function CataloguesList({
           await Haptics.impact({ style: ImpactStyle.Light });
           onManageCatalogues();
         }}
-        className="fixed right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 active:scale-95 z-20"
+        className="catalogues-page__add fixed right-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center gap-2 active:scale-95 z-20"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
         title="Add new catalogue"
       >

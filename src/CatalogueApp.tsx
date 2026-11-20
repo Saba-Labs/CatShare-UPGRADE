@@ -1696,7 +1696,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
       <main
         ref={scrollRef}
-        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'catalogue-products-scroll pt-6' : ''} px-4 pb-24`}
+        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'catalogue-products-scroll pt-6' : ''} ${tab === 'catalogues' && !selectedCatalogueInCataloguesTab ? 'catalogues-page-scroll' : ''} px-4 pb-24`}
         onTouchStart={handleProductsTouchStart}
         onTouchMove={handleProductsTouchMove}
         onTouchEnd={handleProductsTouchEnd}
@@ -1929,7 +1929,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
         <div
-          className="relative -mx-4"
+          className="catalogues-page relative -mx-4"
           hidden={tab !== "catalogues" || selectedCatalogueInCataloguesTab != null}
         >
           <CataloguesList

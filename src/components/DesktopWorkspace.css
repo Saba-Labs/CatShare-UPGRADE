@@ -1,6 +1,7 @@
 .desktop-workspace__sidebar,
 .desktop-workspace__header,
 .catalogue-products-table-head,
+.catalogues-page__table-head,
 .catalogue-products-page-title,
 .catalogue-products-add,
 .catalogue-products-bulk-add {
@@ -57,7 +58,8 @@
   .desktop-workspace__avatar { display: grid; width: 34px; height: 34px; flex-shrink: 0; place-items: center; border-radius: 10px; background: #dbe8ff; color: #3158a2; font-weight: 700; }
   .desktop-workspace__main { display: flex; height: 100dvh; min-width: 0; flex-direction: column; margin-left: 244px; }
   .desktop-workspace__header { display: flex; height: 72px; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e5eaf2; background: #fff; }
-  .desktop-workspace__header--products { display: none; }
+  .desktop-workspace__header--products,
+  .desktop-workspace__header--catalogues { display: none; }
   .desktop-workspace__header strong { display: block; margin-top: 3px; font-size: 16px; font-weight: 700; }
   .desktop-workspace__eyebrow { display: block; color: #9aa7b8; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
   .desktop-workspace__header-actions { display: flex; align-items: center; gap: 12px; }
@@ -80,6 +82,31 @@
   .desktop-workspace__content .wh-main { max-width: 1100px; }
   .desktop-workspace__content a[aria-label="CatShare Support on WhatsApp"] { left: 264px; }
   .desktop-workspace__content .catalogue-app-shell { background: #f6f8fc; }
+  .desktop-workspace__content .catalogues-page-scroll { padding: 0 !important; background: #f6f8fc; }
+  .desktop-workspace__content .catalogues-page { min-height: 100%; margin: 0; }
+  .desktop-workspace__content .catalogues-page__status { display: none; }
+  .desktop-workspace__content .catalogues-page__toolbar { position: relative; top: auto; z-index: 20; height: 80px; padding: 0 28px; background: #fff; box-shadow: none; }
+  .desktop-workspace__content .catalogues-page__toolbar > button:first-child { display: none; }
+  .desktop-workspace__content .catalogues-page__toolbar h1 { margin: 0; color: #18243a; font-size: 22px; font-weight: 750; letter-spacing: -.03em; }
+  .desktop-workspace__content .catalogues-page__manage { display: inline-flex; height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid #dce3ee; border-radius: 9px; background: #fff; color: #34445d; font-size: 12px; font-weight: 700; }
+  .desktop-workspace__content .catalogues-page__manage-label { display: inline; }
+  .desktop-workspace__content .catalogues-page__table-head { display: grid; grid-template-columns: minmax(0, 1fr) 220px; align-items: center; max-width: 1320px; min-height: 44px; margin: 24px auto 0; padding: 0 22px; border: 1px solid #e1e6ed; border-bottom: 0; border-radius: 12px 12px 0 0; background: #f8fafc; color: #78869a; font-size: 10px; font-weight: 750; letter-spacing: .1em; }
+  .desktop-workspace__content .catalogues-page__table-head span:last-child { text-align: right; }
+  .desktop-workspace__content .catalogues-page__list { display: block; max-width: 1320px; margin: 0 auto; padding: 0 0 32px; border: 1px solid #e1e6ed; border-radius: 0 0 12px 12px; background: #fff; }
+  .desktop-workspace__content .catalogues-page__card { position: relative; display: block; min-height: 88px; overflow: hidden; border: 0; border-bottom: 1px solid #edf0f4; border-radius: 0; background: #fff; box-shadow: none; text-align: left; transition: background-color .15s ease; }
+  .desktop-workspace__content .catalogues-page__list > .catalogues-page__card ~ .catalogues-page__card { margin-top: 0; }
+  .desktop-workspace__content .catalogues-page__card:last-child { border-bottom: 0; }
+  .desktop-workspace__content .catalogues-page__card::before { position: absolute; inset: 14px auto 14px 0; width: 3px; border-radius: 0 3px 3px 0; background: transparent; content: ""; transition: background-color .15s ease; }
+  .desktop-workspace__content .catalogues-page__card:hover { border-color: #edf0f4; background: #f8faff; box-shadow: none; }
+  .desktop-workspace__content .catalogues-page__card:hover::before { background: #6689dc; }
+  .desktop-workspace__content .catalogues-page__card-inner { display: grid; grid-template-columns: 70px minmax(0, 1fr); min-height: 88px; align-items: center; gap: 18px; padding: 12px 22px; }
+  .desktop-workspace__content .catalogues-page__preview { width: 56px; height: 56px; }
+  .desktop-workspace__content .catalogues-page__preview > div { width: 56px; height: 56px; border-color: #e5eaf1; border-radius: 10px; background: #f7f9fc; }
+  .desktop-workspace__content .catalogues-page__info { display: grid; grid-template-columns: minmax(0, 1fr) 220px; align-items: center; gap: 16px; }
+  .desktop-workspace__content .catalogues-page__info h3 { color: #202d43; font-size: 13px; }
+  .desktop-workspace__content .catalogues-page__stats { margin: 0; color: #78869a; font-size: 11px; text-align: right; }
+  .desktop-workspace__content .catalogues-page__empty { max-width: 1320px; margin: 24px auto; border: 1px dashed #d6deea; border-radius: 12px; background: #fff; }
+  .desktop-workspace__content .catalogues-page__add { display: none; }
   .desktop-workspace__content .catalogue-products-toolbar { position: relative; top: auto; z-index: 20; padding: 0 28px; background: #fff; box-shadow: none; }
   .desktop-workspace__content .catalogue-products-toolbar__inner { height: 80px; max-width: 1320px; margin: 0 auto; gap: 20px; padding: 0; }
   .desktop-workspace__content .catalogue-products-menu,
