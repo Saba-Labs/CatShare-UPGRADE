@@ -1,5 +1,8 @@
 .desktop-workspace__sidebar,
-.desktop-workspace__header {
+.desktop-workspace__header,
+.catalogue-products-page-title,
+.catalogue-products-add,
+.catalogue-products-bulk-add {
   display: none;
 }
 
@@ -74,5 +77,38 @@
   .desktop-workspace__content .wh-bottom-nav { left: 244px; }
   .desktop-workspace__content .wh-main { max-width: 1100px; }
   .desktop-workspace__content a[aria-label="CatShare Support on WhatsApp"] { left: 264px; }
+  .desktop-workspace__content .catalogue-app-shell { background: #f6f8fc; }
+  .desktop-workspace__content .catalogue-products-toolbar { position: relative; top: auto; z-index: 20; padding: 0 28px; background: #fff; box-shadow: none; }
+  .desktop-workspace__content .catalogue-products-toolbar__inner { height: 80px; max-width: 1320px; margin: 0 auto; gap: 20px; padding: 0; }
+  .desktop-workspace__content .catalogue-products-menu,
+  .desktop-workspace__content .catalogue-products-brand,
+  .desktop-workspace__content .catalogue-products-search-toggle { display: none; }
+  .desktop-workspace__content .catalogue-products-page-title { display: block; margin: 0; color: #18243a; font-size: 22px; font-weight: 750; letter-spacing: -.03em; white-space: nowrap; }
+  .desktop-workspace__content .catalogue-products-toolbar__inner > .flex-1 { display: none; }
+  .desktop-workspace__content .catalogue-products-search { width: min(38vw, 430px) !important; min-width: 220px; opacity: 1 !important; transform: none !important; }
+  .desktop-workspace__content .catalogue-products-search input { height: 40px; border-color: #dce3ee; border-radius: 9px; background: #f8faff; box-shadow: none; }
+  .desktop-workspace__content .catalogue-products-actions { margin-left: auto; gap: 8px; }
+  .desktop-workspace__content .catalogue-products-actions > button:not(.catalogue-products-add):not(.catalogue-products-bulk-add) { display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 9px; background: white; font-size: 17px; }
+  .desktop-workspace__content .catalogue-products-add,
+  .desktop-workspace__content .catalogue-products-bulk-add { display: inline-flex; height: 40px; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .desktop-workspace__content .catalogue-products-add { background: #17243d; color: #fff; }
+  .desktop-workspace__content .catalogue-products-bulk-add { border: 1px solid #dce3ee; background: #fff; color: #34445d; }
+  .desktop-workspace__content .catalogue-products-add svg,
+  .desktop-workspace__content .catalogue-products-bulk-add svg { width: 16px; height: 16px; }
+  .desktop-workspace__content .catalogue-product-fab { display: none; }
+  .desktop-workspace__content .catalogue-products-scroll { padding: 24px 28px 32px; }
+  .desktop-workspace__content .catalogue-products-content { width: 100%; max-width: 1320px; margin: 0 auto; }
+  .desktop-workspace__content .catalogue-products-list { display: flex; flex-direction: column; gap: 10px; margin-top: 0; }
+  .desktop-workspace__content .catalogue-product-row { min-height: 88px; align-items: center; gap: 24px; padding: 13px 18px; border: 1px solid #e5eaf2; border-radius: 12px; box-shadow: 0 2px 8px rgb(23 36 61 / 4%); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+  .desktop-workspace__content .catalogue-product-row:hover { transform: translateY(-1px); border-color: #cfd9e8; box-shadow: 0 5px 14px rgb(23 36 61 / 7%); }
+  .desktop-workspace__content .catalogue-product-row__identity { min-width: 0; flex: 1; gap: 16px; }
+  .desktop-workspace__content .catalogue-product-row__image { width: 62px; height: 62px; border: 0; border-radius: 9px; }
+  .desktop-workspace__content .catalogue-product-row__identity > div:last-child { min-width: 0; }
+  .desktop-workspace__content .catalogue-product-row__identity > div:last-child > div:first-child { color: #202d43; font-size: 14px; }
+  .desktop-workspace__content .catalogue-product-row__actions { width: auto; flex-shrink: 0; margin: 0; }
+  .desktop-workspace__content .catalogue-product-row__actions > div { align-items: center; gap: 10px; }
+  .desktop-workspace__content .catalogue-product-row__actions button { min-width: 36px; min-height: 34px; }
+  .desktop-workspace__content .catalogue-product-row__actions button[title="Toggle all catalogues"] { min-width: 94px; }
+  .desktop-workspace__content .catalogue-product-fab { right: 36px; bottom: 32px !important; }
   body:has(.desktop-workspace) .main-app-bottom-nav { display: none; }
 }
