@@ -2055,7 +2055,7 @@ export default function Orders() {
       )}
 
       {/* Status bar */}
-      <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
+      <div className="orders-status-bar" style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
 
       {/* Toolbar + tabs (fixed height, not sticky — list scrolls below) */}
       <div

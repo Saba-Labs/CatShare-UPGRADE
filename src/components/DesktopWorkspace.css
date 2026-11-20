@@ -1,0 +1,78 @@
+.desktop-workspace__sidebar,
+.desktop-workspace__header {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .desktop-workspace {
+    min-height: 100dvh;
+    background: #f6f8fc;
+    color: #172033;
+  }
+
+  .desktop-workspace__sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 70;
+    display: flex;
+    width: 244px;
+    flex-direction: column;
+    padding: 26px 16px 16px;
+    background: #101b34;
+    color: #d6dfef;
+  }
+
+  .desktop-workspace__brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 0 8px 29px;
+    color: white;
+    font-size: 21px;
+    font-weight: 750;
+    letter-spacing: -.04em;
+    text-decoration: none;
+  }
+
+  .desktop-workspace__brand img { width: 39px; height: 39px; border-radius: 11px; }
+  .desktop-workspace__brand small { display: block; margin-top: 1px; color: #8798b7; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
+  .desktop-workspace__nav-label { padding: 0 12px 11px; color: #7788a8; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+  .desktop-workspace__nav { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  .desktop-workspace__nav a, .desktop-workspace__plan, .desktop-workspace__account { display: flex; align-items: center; gap: 13px; color: #b7c5dd; text-decoration: none; }
+  .desktop-workspace__nav a { min-height: 43px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 550; }
+  .desktop-workspace__nav a svg, .desktop-workspace__plan > svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .desktop-workspace__nav a:hover, .desktop-workspace__nav a.is-active { background: #253657; color: #fff; }
+  .desktop-workspace__nav a.is-active { box-shadow: inset 3px 0 #6b96ff; }
+  .desktop-workspace__sidebar-bottom { margin-top: auto; padding-top: 20px; }
+  .desktop-workspace__plan { padding: 13px 12px; border: 1px solid #344667; border-radius: 10px; background: #1b2b4a; }
+  .desktop-workspace__plan > svg { color: #91b0ff; }
+  .desktop-workspace__plan > span:nth-child(2), .desktop-workspace__account > span:nth-child(2) { flex: 1; min-width: 0; }
+  .desktop-workspace__plan strong, .desktop-workspace__account strong { display: block; overflow: hidden; color: #fff; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .desktop-workspace__plan small, .desktop-workspace__account small { display: block; margin-top: 3px; color: #96a7c3; font-size: 11px; }
+  .desktop-workspace__account { margin-top: 15px; padding: 15px 3px 0; border-top: 1px solid #2a3b59; }
+  .desktop-workspace__avatar { display: grid; width: 34px; height: 34px; flex-shrink: 0; place-items: center; border-radius: 10px; background: #dbe8ff; color: #3158a2; font-weight: 700; }
+  .desktop-workspace__main { display: flex; height: 100dvh; min-width: 0; flex-direction: column; margin-left: 244px; }
+  .desktop-workspace__header { display: flex; height: 72px; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e5eaf2; background: #fff; }
+  .desktop-workspace__header strong { display: block; margin-top: 3px; font-size: 16px; font-weight: 700; }
+  .desktop-workspace__eyebrow { display: block; color: #9aa7b8; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
+  .desktop-workspace__header-actions { display: flex; align-items: center; gap: 12px; }
+  .desktop-workspace__upgrade { display: inline-flex; align-items: center; gap: 7px; padding: 9px 13px; border-radius: 8px; background: #edf3ff; color: #315fbd; font-size: 12px; font-weight: 700; text-decoration: none; }
+  .desktop-workspace__header-account { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid #e5eaf2; border-radius: 10px; color: #53657f; }
+  .desktop-workspace__content { flex: 1; min-height: 0; overflow: auto; }
+  .desktop-workspace__content > [class*="h-[100dvh]"],
+  .desktop-workspace__content > [class*="h-screen"],
+  .desktop-workspace__content > .store-admin { height: 100%; min-height: 0; }
+  .desktop-workspace__content [class*="h-[40px]"][class*="bg-black"],
+  .desktop-workspace__content [class*="h-[40px]"][class*="bg-[#0F172A]"],
+  .desktop-workspace__content .orders-status-bar,
+  .desktop-workspace__content .wh-status-bar { display: none; }
+  .desktop-workspace__content [class*="sticky"][class*="top-[40px]"] { top: 0; }
+  .desktop-workspace__content .store-admin > main { padding-top: 0; }
+  .desktop-workspace__content .orders-page-root { height: 100% !important; }
+  .desktop-workspace__content .orders-page-header { margin-top: 0 !important; }
+  .desktop-workspace__content .wh-root { --status-h: 0px; min-height: 100%; }
+  .desktop-workspace__content .wh-bottom-nav { left: 244px; }
+  .desktop-workspace__content .wh-main { max-width: 1100px; }
+  .desktop-workspace__content a[aria-label="CatShare Support on WhatsApp"] { left: 264px; }
+  body:has(.desktop-workspace) .main-app-bottom-nav { display: none; }
+}
