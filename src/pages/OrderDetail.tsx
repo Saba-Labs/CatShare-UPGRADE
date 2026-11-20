@@ -2089,12 +2089,12 @@ useEffect(() => {
   const statusCfg = getStatusConfig(order.status);
 
   return (
-    <div {...swipeHandlers} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
+    <div {...swipeHandlers} className="order-detail-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
       {/* Status bar */}
-      <div style={{ position: 'fixed', inset: '0 0 auto', height: 40, background: '#1C1C1E', zIndex: 100 }} />
+      <div className="order-detail-status-bar" style={{ position: 'fixed', inset: '0 0 auto', height: 40, background: '#1C1C1E', zIndex: 100 }} />
 
       {/* ── Header ── */}
-      <div style={{
+      <div className="order-detail-header" style={{
         position: 'sticky', top: 40, zIndex: 50,
         background: 'rgba(245,245,247,0.92)',
         backdropFilter: 'blur(20px)',
@@ -2102,7 +2102,7 @@ useEffect(() => {
         borderBottom: `1px solid ${COLORS.border}`,
       }}>
         {/* Nav row */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 12 }}>
+        <div className="order-detail-header-inner" style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 12 }}>
           <button
             onClick={handleBack}
             style={{
@@ -2194,8 +2194,8 @@ useEffect(() => {
       </div>
 
       {/* ── Scrollable content ── */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
-        <div style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <main className="order-detail-main" style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className={`order-detail-content${editMode ? ' order-detail-content--edit' : ' order-detail-content--view'}`} style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* ── Customer + items: edit mode vs snapshot ref for share/download image ── */}
           {editMode ? (
@@ -2699,6 +2699,7 @@ useEffect(() => {
             <div
               ref={orderShareCaptureRef}
               data-order-snapshot-root
+              className="order-detail-snapshot"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -2891,7 +2892,7 @@ useEffect(() => {
                 const { orderNote, giftMessage } = getTrackedOrderCustomerNotes(order);
                 if (!orderNote && !giftMessage) return null;
                 return (
-                <div style={{ padding: '0 6px' }}>
+                <div className="order-detail-notes" style={{ padding: '0 6px' }}>
                   <SectionLabel>Notes</SectionLabel>
                   <Card>
                     <div style={{ padding: '12px 16px' }}>
@@ -2920,9 +2921,9 @@ useEffect(() => {
                 );
               })()}
 
-              <div style={{ padding: '0 6px' }}>
+              <div className="order-detail-actions" style={{ padding: '0 6px' }}>
                 <SectionLabel>Quick Actions</SectionLabel>
-                <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="order-detail-actions__content" style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {ORDER_STATUSES.filter(s => s !== order.status).map(s => {
                     const cfg = getStatusConfig(s);
@@ -2999,6 +3000,7 @@ useEffect(() => {
                 </div>
               </div>
 
+              <div className="order-detail-integrations">
               <OdIntegrationsStack>
                 <OrderPaymentSection order={order} />
                 <OrderShipmentSection
@@ -3035,6 +3037,7 @@ useEffect(() => {
                   }}
                 />
               </OdIntegrationsStack>
+              </div>
             </>
           )}
         </div>
