@@ -1026,6 +1026,7 @@ html.dark .orders-filter-grabber span {
   .orders-list-head {
     display: grid;
     grid-template-columns: minmax(170px, 1.15fr) minmax(120px, .8fr) minmax(100px, .7fr) minmax(240px, 1.5fr);
+    column-gap: 10px;
     align-items: center;
     min-height: 44px;
     padding: 0 22px;
@@ -1033,9 +1034,9 @@ html.dark .orders-filter-grabber span {
     border-radius: 12px 12px 0 0;
     background: #f8fafc;
     color: #78869a;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 750;
-    letter-spacing: .1em;
+    letter-spacing: .08em;
   }
 
   .orders-list-head span:nth-child(3),
@@ -1055,13 +1056,15 @@ html.dark .orders-filter-grabber span {
   .order-row-card:last-child { border-bottom: 0; }
   .order-row-card:hover { border-color: #edf0f4; background: #f8faff; box-shadow: none; }
   .order-row-status-stripe { height: 2px !important; border-radius: 0 !important; opacity: .55; }
-  .order-row-content { display: grid; grid-template-columns: minmax(170px, 1.15fr) minmax(120px, .8fr) minmax(100px, .7fr) minmax(240px, 1.5fr); align-items: center; min-height: 72px; padding: 12px 22px !important; }
+  .order-row-content { display: grid; grid-template-columns: minmax(170px, 1.15fr) minmax(120px, .8fr) minmax(100px, .7fr) minmax(240px, 1.5fr); column-gap: 10px; align-items: center; min-height: 76px; padding: 12px 22px !important; }
   .order-row-primary, .order-row-foot { display: contents !important; }
   .order-row-customer { grid-column: 1; grid-row: 1; min-width: 0; }
-  .order-row-customer > div:first-child { overflow: hidden; font-size: 13px !important; text-overflow: ellipsis; white-space: nowrap; }
-  .order-row-customer > div:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .order-row-date { grid-column: 2; grid-row: 1; }
+  .order-row-customer > div:first-child { overflow: hidden; font-size: 14px !important; line-height: 1.35 !important; text-overflow: ellipsis; white-space: nowrap; }
+  .order-row-customer > div:nth-child(2) { overflow: hidden; font-size: 12px !important; text-overflow: ellipsis; white-space: nowrap; }
+  .order-row-date { grid-column: 2; grid-row: 1; font-size: 12px; color: var(--ord-text-muted); }
   .order-row-total { grid-column: 3; grid-row: 1; text-align: right !important; }
-  .order-row-total > div:first-child { font-size: 14px !important; }
-  .order-row-foot-tags { grid-column: 4; grid-row: 1; justify-content: flex-end; }
+  .order-row-total > div:first-child { font-size: 16px !important; }
+  .order-row-foot-tags { grid-column: 4; grid-row: 1; justify-content: flex-end; gap: 8px; }
+  .order-row-catalogue { max-width: 100px; font-size: 11px; }
+  .order-row-status-btn { font-size: 12px; padding: 5px 10px; }
 }
