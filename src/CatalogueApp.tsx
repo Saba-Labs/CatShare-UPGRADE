@@ -1545,30 +1545,6 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
           <h1 className="catalogue-products-page-title">Products</h1>
 
-          {showSortMenu && (
-            <div
-              className="absolute top-14 right-4 z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-48 animate-dropdown overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {[
-                { label: "Original", value: "" },
-                { label: "A - Z", value: "name" },
-                { label: "In Stock", value: catalogues[0]?.stockField || "wholesaleStock" },
-                { label: "Out of Stock", value: `${catalogues[0]?.stockField || "wholesaleStock"}:out` },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => handleSort(option.value)}
-                  className={`w-full text-left px-4 py-3 text-sm tracking-wide hover:bg-gray-50 transition-all ${
-                    sortBy === option.value ? "bg-gray-100 font-semibold text-blue-600" : "text-gray-800"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Flexible Spacer */}
           <div className="flex-1" />
 
@@ -1638,21 +1614,50 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
               <FiSearch />
             </button>
 
-            <button
-              onClick={() => window.dispatchEvent(new Event("toggle-sort"))}
-              className="catalogue-products-sort text-xl text-gray-600 hover:text-black"
-              title="Sort"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                viewBox="0 0 24 24"
+            <div className="catalogue-products-sort-wrap relative">
+              <button
+                onClick={() => window.dispatchEvent(new Event("toggle-sort"))}
+                className="catalogue-products-sort text-xl text-gray-600 hover:text-black"
+                title="Sort"
+                aria-expanded={showSortMenu}
+                aria-haspopup="menu"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M6 12h12M10 17h8" />
-              </svg>
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M6 12h12M10 17h8" />
+                </svg>
+              </button>
+              {showSortMenu && (
+                <div
+                  className="catalogue-products-sort-menu absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl animate-dropdown"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {[
+                    { label: "Original", value: "" },
+                    { label: "A - Z", value: "name" },
+                    { label: "In Stock", value: catalogues[0]?.stockField || "wholesaleStock" },
+                    { label: "Out of Stock", value: `${catalogues[0]?.stockField || "wholesaleStock"}:out` },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      role="menuitem"
+                      onClick={() => handleSort(option.value)}
+                      className={`w-full text-left px-4 py-3 text-sm tracking-wide hover:bg-gray-50 transition-all ${
+                        sortBy === option.value ? "bg-gray-100 font-semibold text-blue-600" : "text-gray-800"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => window.open("https://docs.google.com/forms/d/e/1FAIpQLSeRdoXJAaLXEpuyGZa3de45urVBCO86mvSUr2HO6xoHJzLlCQ/viewform?usp=dialog", "_blank")}
