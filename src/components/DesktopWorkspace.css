@@ -34,6 +34,7 @@
     text-decoration: none;
   }
 
+  .desktop-workspace__brand img { width: 39px; height: 39px; border-radius: 11px; object-fit: contain; flex-shrink: 0; }
   .desktop-workspace__brand small { display: block; margin-top: 1px; color: #8798b7; font-size: 9px; font-weight: 700; letter-spacing: .13em; }
   .desktop-workspace__nav-label { padding: 0 12px 11px; color: #7788a8; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
   .desktop-workspace__nav { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
