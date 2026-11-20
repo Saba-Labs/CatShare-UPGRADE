@@ -2523,8 +2523,10 @@ export default function Orders() {
         <div className="orders-list-body">
           {!loading && !error && filteredOrders.length > 0 && (
             <div className="orders-list-head" aria-hidden="true">
-              <span>CUSTOMER / DATE</span>
-              <span>ORDER TOTAL / STATUS</span>
+              <span>Customer</span>
+              <span>Order date</span>
+              <span>Total</span>
+              <span>Catalogue / status</span>
             </div>
           )}
           {loading ? (
