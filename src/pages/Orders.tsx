@@ -979,12 +979,12 @@ function OrderRow({
       onClick={onClick}
     >
       {/* Top stripe by status */}
-      <div style={{ height: 3, background: statusCfg.dot, borderRadius: '14px 14px 0 0' }} />
+      <div className="order-row-status-stripe" style={{ height: 3, background: statusCfg.dot, borderRadius: '14px 14px 0 0' }} />
 
-      <div style={{ padding: '12px 14px 14px' }}>
+      <div className="order-row-content" style={{ padding: '12px 14px 14px' }}>
         {/* Row 1: Name + Total */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="order-row-primary" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <div className="order-row-customer" style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ord-text)', lineHeight: 1.2, marginBottom: 2 }}>
               {order.customer_name}
             </div>
@@ -995,7 +995,7 @@ function OrderRow({
               </div>
             ) : null}
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div className="order-row-total" style={{ textAlign: 'right', flexShrink: 0 }}>
             {total ? (
               <div style={{ fontSize: 17, fontWeight: 800, color: '#166534' }}>{total}</div>
             ) : (
@@ -2521,6 +2521,12 @@ export default function Orders() {
         )}
 
         <div className="orders-list-body">
+          {!loading && !error && filteredOrders.length > 0 && (
+            <div className="orders-list-head" aria-hidden="true">
+              <span>CUSTOMER / DATE</span>
+              <span>ORDER TOTAL / STATUS</span>
+            </div>
+          )}
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />
