@@ -1783,6 +1783,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         )}
 
         {tab === "products" && visible.length > 0 && (
+          <div className="catalogue-products-table-head" aria-hidden="true">
+            <span>PRODUCT</span>
+            <span>ACTIONS</span>
+          </div>
+        )}
+
+        {tab === "products" && visible.length > 0 && (
           <DragDropContext onDragEnd={({ source, destination }) => {
             if (!destination) return;
             if (source.droppableId !== destination.droppableId) return;
