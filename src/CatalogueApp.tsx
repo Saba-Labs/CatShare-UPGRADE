@@ -1326,7 +1326,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleProductsTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     if (tab !== 'products') return;
     const target = e.target as HTMLElement;
-    if (target.closest('[data-rbd-drag-handle-draggable-id], button, input, textarea, select, a')) {
+    if (target.closest('[data-rfd-drag-handle-draggable-id], button, input, textarea, select, a')) {
       productPullActive.current = false;
       return;
     }
@@ -1733,8 +1733,9 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           style={
             tab === 'products'
               ? {
-                  transform: `translateY(${productPullOffset}px)`,
-                  transition: productPullDragging ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  position: "relative",
+                  top: `${productPullOffset}px`,
+                  transition: productPullDragging ? "none" : "top 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }
               : undefined
           }
