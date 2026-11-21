@@ -2480,7 +2480,7 @@ export default function Orders() {
               </div>
 
               {(dateRangeStart || dateRangeEnd) && (
-                <div style={{
+                <div className="orders-revenue-card__selected-range" style={{
                   fontSize: 12,
                   opacity: 0.8,
                   fontWeight: 500,

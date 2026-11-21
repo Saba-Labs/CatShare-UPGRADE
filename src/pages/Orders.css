@@ -1063,8 +1063,8 @@ html.dark .orders-filter-grabber span {
     display: inline;
   }
 
-  .orders-revenue-card > div:nth-child(3) {
-    display: none;
+  .orders-revenue-card__selected-range {
+    display: none !important;
   }
 
   .orders-revenue-calendar {
