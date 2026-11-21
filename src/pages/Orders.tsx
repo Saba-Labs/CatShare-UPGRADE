@@ -709,6 +709,7 @@ function IconCatalogueMeta() {
 }
 
 function OrderMetaHit({
+  className,
   open,
   onToggle,
   onClose,
@@ -716,6 +717,7 @@ function OrderMetaHit({
   icon,
   text,
 }: {
+  className?: string;
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -735,7 +737,7 @@ function OrderMetaHit({
   }, [open, onClose]);
 
   return (
-    <div ref={hitRef} className="order-row-meta-hit">
+    <div ref={hitRef} className={`order-row-meta-hit ${className || ''}`}>
       <div
         onClick={(e) => {
           e.stopPropagation();
@@ -962,6 +964,8 @@ function OrderRow({
       ? formatMoney(resolvedTotal, currencySymbol)
       : null;
   const phone = (order as any).customer_whatsapp || (order as any).customerWhatsapp || '';
+  const itemCount = (order.items || []).reduce((count, item) => count + (Number(item.quantity) || 0), 0);
+  const itemNames = (order.items || []).slice(0, 2).map((item) => item.name).filter(Boolean).join(', ');
 
   const sourceKey =
     order.order_source === 'link' || order.order_source === 'manual' || order.order_source === 'store'
@@ -994,6 +998,11 @@ function OrderRow({
                 {phone}
               </div>
             ) : null}
+            {order.items?.length ? (
+              <div className="order-row-item-summary">
+                {itemCount} {itemCount === 1 ? 'item' : 'items'}{itemNames ? ` · ${itemNames}` : ''}
+              </div>
+            ) : null}
           </div>
           <div className="order-row-total" style={{ textAlign: 'right', flexShrink: 0 }}>
             {total ? (
@@ -1014,6 +1023,7 @@ function OrderRow({
           <div className="order-row-foot-tags" onClick={(e) => e.stopPropagation()}>
             {order.order_source ? (
               <OrderMetaHit
+                className="order-row-meta-hit--source"
                 open={metaInfoOpen === 'source'}
                 onToggle={() => toggleMetaInfo('source')}
                 onClose={() => setMetaInfoOpen(null)}
@@ -1027,6 +1037,7 @@ function OrderRow({
                     aria-expanded={metaInfoOpen === 'source'}
                   >
                     <FilterSourceIcon type={sourceKey === 'unknown' ? 'all' : sourceKey} />
+                    <span className="order-row-source-text">{getOrderSourceInfoText(order.order_source)}</span>
                   </button>
                 }
               />
@@ -1034,6 +1045,7 @@ function OrderRow({
 
             {catalogueLabel ? (
               <OrderMetaHit
+                className="order-row-meta-hit--catalogue"
                 open={metaInfoOpen === 'catalogue'}
                 onToggle={() => toggleMetaInfo('catalogue')}
                 onClose={() => setMetaInfoOpen(null)}
@@ -2526,7 +2538,9 @@ export default function Orders() {
               <span>Customer</span>
               <span>Order date</span>
               <span>Total</span>
-              <span>Catalogue / status</span>
+              <span>Source</span>
+              <span>Catalogue</span>
+              <span>Status</span>
             </div>
           )}
           {loading ? (
