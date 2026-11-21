@@ -16,8 +16,11 @@ import { readProductsWithLegacyFallback } from '../../utils/safeStorage';
 import { getOrderStatusLabel } from '../../types/orderStatus';
 import StoreLayout from './components/StoreLayout';
 import StoreHeader from './components/StoreHeader';
+import NavigationCard from './components/NavigationCard';
 import StoreIconTile from './components/StoreIconTile';
 import CreateStoreForm from './components/CreateStoreForm';
+import { STORE_NAVIGATION } from './config/storeNavigation';
+import { STORE_CATEGORY_TITLE } from './storeTypography';
 
 function isToday(dateStr: string): boolean {
   const date = new Date(dateStr);
@@ -251,6 +254,26 @@ export default function StoreDashboard() {
         storeUrl={storeUrl}
         isLive={store?.isLive ?? false}
       />
+
+      <div className="store-dashboard__mobile-navigation space-y-8">
+        {STORE_NAVIGATION.map((category) => (
+          <section key={category.title}>
+            <h2 className={`${STORE_CATEGORY_TITLE} mb-3`}>{category.title}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {category.cards.map((card) => (
+                <NavigationCard
+                  key={card.href}
+                  title={card.title}
+                  description={card.description}
+                  icon={<StoreIconTile iconKey={card.iconKey} />}
+                  href={card.href}
+                  proOnly={card.proOnly}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
 
       <div className="store-dashboard__overview">
         <div className="store-dashboard__overview-heading">
