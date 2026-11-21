@@ -2467,9 +2467,13 @@ export default function Orders() {
                       <path d="M6 9l6 6 6-6" />
                     </svg>
                     <span className="orders-revenue-card__date-label">
-                      {dateRangeStart
-                        ? `${formatDate(dateRangeStart)}${dateRangeEnd ? ` – ${formatDate(dateRangeEnd)}` : ' – Select end'}`
-                        : 'Choose dates'}
+                      {dateRangeStart && dateRangeEnd
+                        ? `${formatDate(dateRangeStart)} – ${formatDate(dateRangeEnd)}`
+                        : dateRangeStart
+                        ? `From ${formatDate(dateRangeStart)}`
+                        : dateRangeEnd
+                        ? `Until ${formatDate(dateRangeEnd)}`
+                        : 'All dates'}
                     </span>
                   </button>
                 </div>
