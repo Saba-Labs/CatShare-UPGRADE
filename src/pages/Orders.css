@@ -1008,8 +1008,42 @@ html.dark .orders-filter-grabber span {
     align-items: center;
     justify-content: space-between;
     padding: 26px 32px !important;
+    border: 1px solid rgba(148, 163, 184, 0.18);
     border-radius: 20px !important;
-    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16) !important;
+    background: linear-gradient(112deg, #111827 0%, #172554 58%, #164e63 100%) !important;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.2) !important;
+  }
+
+  .orders-revenue-card > div:first-child {
+    background: rgba(45, 212, 191, 0.12) !important;
+  }
+
+  .orders-revenue-card > div:nth-child(2) {
+    align-items: center !important;
+  }
+
+  .orders-revenue-card > div:nth-child(2) > div:first-child > div:first-child {
+    color: #a5f3e8;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase;
+  }
+
+  .orders-revenue-card > div:nth-child(2) > div:first-child > div:last-child {
+    font-size: 40px !important;
+    letter-spacing: -1.4px !important;
+  }
+
+  .orders-revenue-card button {
+    width: 40px !important;
+    height: 40px !important;
+    background: rgba(45, 212, 191, 0.14) !important;
+    border: 1px solid rgba(153, 246, 228, 0.3) !important;
+  }
+
+  .orders-revenue-card button:hover {
+    background: rgba(45, 212, 191, 0.24) !important;
   }
 
   .orders-list-body {
