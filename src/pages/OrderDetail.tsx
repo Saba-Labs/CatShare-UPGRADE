@@ -2196,6 +2196,8 @@ useEffect(() => {
       <main className="order-detail-main" style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
         <div className={`order-detail-content${editMode ? ' order-detail-content--edit' : ' order-detail-content--view'}`} style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+          <div className="order-detail-scroll-columns">
+          <div className="order-detail-main-column">
           {/* ── Customer + items: edit mode vs snapshot ref for share/download image ── */}
           {editMode ? (
             <>
@@ -2979,7 +2981,12 @@ useEffect(() => {
                 </div>
               </div>
 
-              <div className="order-detail-integrations">
+            </>
+          )}
+          </div>
+          </div>
+          {!editMode && (
+            <div className="order-detail-integrations">
               <OdIntegrationsStack>
                 <OrderPaymentSection order={order} />
                 <OrderShipmentSection
@@ -3016,8 +3023,7 @@ useEffect(() => {
                   }}
                 />
               </OdIntegrationsStack>
-              </div>
-            </>
+            </div>
           )}
         </div>
       </main>
