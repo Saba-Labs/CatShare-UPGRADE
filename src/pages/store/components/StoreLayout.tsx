@@ -63,6 +63,8 @@ export default function StoreLayout({
               fullscreenChrome
                 ? 'flex min-h-0 flex-1 flex-col h-full w-full'
                 : `max-w-7xl mx-auto px-4 sm:px-6 ${
+                    isMainStorePage ? 'store-admin__dashboard-container ' : ''
+                  }${
                     immersive
                       ? 'flex min-h-0 flex-1 flex-col pb-4 sm:pb-5'
                       : isMainStorePage

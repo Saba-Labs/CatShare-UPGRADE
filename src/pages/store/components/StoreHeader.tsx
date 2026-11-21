@@ -33,10 +33,10 @@ export default function StoreHeader({
   };
 
   return (
-    <div className="mb-6">
-      <div className="mb-4">
+    <div className="store-dashboard__header mb-6">
+      <div className="store-dashboard__heading mb-4">
         <h1 className={STORE_PAGE_TITLE}>{storeName}</h1>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="store-dashboard__status flex items-center gap-2 mt-2">
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
               isLive
@@ -49,7 +49,7 @@ export default function StoreHeader({
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-800 rounded-2xl p-4 sm:p-5 mb-6 shadow-md">
+      <div className="store-dashboard__url-panel bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-800 rounded-2xl p-4 sm:p-5 mb-6 shadow-md">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-blue-100 mb-1.5 uppercase tracking-wide">

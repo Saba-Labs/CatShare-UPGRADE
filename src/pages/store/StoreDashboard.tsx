@@ -225,13 +225,13 @@ export default function StoreDashboard() {
         isLive={store?.isLive ?? false}
       />
 
-      <div className="space-y-8">
+      <div className="store-dashboard__categories space-y-8">
         {STORE_NAVIGATION.map((category) => (
-          <section key={category.title}>
-            <h2 className={`${STORE_CATEGORY_TITLE} mb-3`}>
+          <section key={category.title} className="store-dashboard__category">
+            <h2 className={`store-dashboard__category-title ${STORE_CATEGORY_TITLE} mb-3`}>
               {category.title}
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="store-dashboard__category-cards grid grid-cols-1 md:grid-cols-2 gap-4">
               {category.cards.map((card) => (
                 <NavigationCard
                   key={card.href}
@@ -240,6 +240,7 @@ export default function StoreDashboard() {
                   icon={<StoreIconTile iconKey={card.iconKey} />}
                   href={card.href}
                   proOnly={card.proOnly}
+                  className="store-dashboard__card"
                 />
               ))}
             </div>
@@ -247,7 +248,7 @@ export default function StoreDashboard() {
         ))}
       </div>
 
-      <div className="h-20 md:h-0"></div>
+      <div className="store-dashboard__bottom-spacer h-20 md:h-0"></div>
     </StoreLayout>
   );
 }
