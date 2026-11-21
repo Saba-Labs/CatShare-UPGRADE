@@ -5,6 +5,7 @@ import { SplashLoadingLayout } from './SplashLoadingLayout';
 import { resolveStoreSlugFromHostname } from '../utils/storefrontDomain';
 import { isPublicStorefrontPath } from '../utils/publicStorefrontPaths';
 import StoreView from '../pages/StoreView';
+import DesktopWorkspace from './DesktopWorkspace';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -31,6 +32,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <DesktopWorkspace>{children}</DesktopWorkspace>;
 };
-

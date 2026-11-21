@@ -1,7 +1,10 @@
 import { ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FiChevronRight, FiGrid } from 'react-icons/fi';
 import MainAppBottomNav from '../../../components/MainAppBottomNav';
 import SupportWhatsAppFab from '../../../components/SupportWhatsAppFab';
+import StoreIconTile from '../components/StoreIconTile';
+import { STORE_NAVIGATION } from '../config/storeNavigation';
 
 /** Matches legacy store / orders status bar height. */
 export const STORE_STATUS_BAR_HEIGHT_PX = 40;
@@ -12,7 +15,7 @@ export const STORE_SCROLL_BOTTOM_PADDING_CLASS =
 
 /** Extra scroll padding when a fixed save bar is shown above the tab bar. */
 export const STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS =
-  'pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]';
+  'store-admin__save-bottom pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]';
 
 /** Root wrapper class for all `/store/*` admin pages — compact in-app typography. */
 export const STORE_SHELL_CLASS = 'store-admin text-sm text-gray-900 dark:text-gray-100 antialiased';
@@ -50,9 +53,41 @@ export default function StoreLayout({
     <>
       <StoreStatusBar />
 
-      <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
+      <div className={`store-admin__frame${fullscreenChrome ? ' store-admin__frame--fullscreen' : ''} flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
+        <aside className="store-admin__nav" aria-label="Online Store navigation">
+          <div className="store-admin__nav-label">ONLINE STORE</div>
+          <Link
+            to="/store"
+            className={`store-admin__nav-link${isMainStorePage ? ' is-active' : ''}`}
+            aria-current={isMainStorePage ? 'page' : undefined}
+          >
+            <FiGrid aria-hidden="true" />
+            <span>Store overview</span>
+            {isMainStorePage ? <FiChevronRight aria-hidden="true" /> : null}
+          </Link>
+          {STORE_NAVIGATION.map((category) => (
+            <section className="store-admin__nav-section" key={category.title}>
+              <h2>{category.title}</h2>
+              {category.cards.map((card) => {
+                const active = location.pathname === card.href || location.pathname.startsWith(`${card.href}/`);
+                return (
+                  <Link
+                    key={card.href}
+                    to={card.href}
+                    className={`store-admin__nav-link${active ? ' is-active' : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <StoreIconTile iconKey={card.iconKey} size="sm" />
+                    <span>{card.title}</span>
+                    {active ? <FiChevronRight aria-hidden="true" /> : null}
+                  </Link>
+                );
+              })}
+            </section>
+          ))}
+        </aside>
         <main
-          className={`flex-1 min-h-0 pt-[40px] ${
+          className={`store-admin__main${fullscreenChrome ? ' store-admin__main--fullscreen' : ''} flex-1 min-h-0 pt-[40px] ${
             immersive
               ? `flex flex-col overflow-hidden${hideBottomNav ? '' : ` ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`}`
               : `overflow-y-auto overscroll-contain ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`
@@ -62,7 +97,9 @@ export default function StoreLayout({
             className={
               fullscreenChrome
                 ? 'flex min-h-0 flex-1 flex-col h-full w-full'
-                : `max-w-7xl mx-auto px-4 sm:px-6 ${
+                : `max-w-7xl mx-auto px-4 sm:px-6 store-admin__inner-container ${
+                    isMainStorePage ? 'store-admin__dashboard-container ' : ''
+                  }${
                     immersive
                       ? 'flex min-h-0 flex-1 flex-col pb-4 sm:pb-5'
                       : isMainStorePage

@@ -66,7 +66,6 @@ import { resolveOrderCheckoutTotals, resolveOrderGrandTotal } from '../utils/res
 import { getOrderCatalogueId } from '../utils/resolveOrderCatalogue';
 import {
   ORDER_STATUSES,
-  getStatusChangeLabel,
   getOrderStatusLabel,
   normalizeOrderStatus,
   orderStatusProgressWidth,
@@ -2089,12 +2088,12 @@ useEffect(() => {
   const statusCfg = getStatusConfig(order.status);
 
   return (
-    <div {...swipeHandlers} style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
+    <div {...swipeHandlers} className="order-detail-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
       {/* Status bar */}
-      <div style={{ position: 'fixed', inset: '0 0 auto', height: 40, background: '#1C1C1E', zIndex: 100 }} />
+      <div className="order-detail-status-bar" style={{ position: 'fixed', inset: '0 0 auto', height: 40, background: '#1C1C1E', zIndex: 100 }} />
 
       {/* ── Header ── */}
-      <div style={{
+      <div className="order-detail-header" style={{
         position: 'sticky', top: 40, zIndex: 50,
         background: 'rgba(245,245,247,0.92)',
         backdropFilter: 'blur(20px)',
@@ -2102,7 +2101,7 @@ useEffect(() => {
         borderBottom: `1px solid ${COLORS.border}`,
       }}>
         {/* Nav row */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 12 }}>
+        <div className="order-detail-header-inner" style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', gap: 12 }}>
           <button
             onClick={handleBack}
             style={{
@@ -2194,9 +2193,11 @@ useEffect(() => {
       </div>
 
       {/* ── Scrollable content ── */}
-      <main style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
-        <div style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <main className="order-detail-main" style={{ flex: 1, overflowY: 'auto', padding: '4px 4px calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+        <div className={`order-detail-content${editMode ? ' order-detail-content--edit' : ' order-detail-content--view'}`} style={{ animation: 'fadeUp 0.3s ease', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
+          <div className="order-detail-scroll-columns">
+          <div className="order-detail-main-column">
           {/* ── Customer + items: edit mode vs snapshot ref for share/download image ── */}
           {editMode ? (
             <>
@@ -2699,6 +2700,7 @@ useEffect(() => {
             <div
               ref={orderShareCaptureRef}
               data-order-snapshot-root
+              className="order-detail-snapshot"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -2891,7 +2893,7 @@ useEffect(() => {
                 const { orderNote, giftMessage } = getTrackedOrderCustomerNotes(order);
                 if (!orderNote && !giftMessage) return null;
                 return (
-                <div style={{ padding: '0 6px' }}>
+                <div className="order-detail-notes" style={{ padding: '0 6px' }}>
                   <SectionLabel>Notes</SectionLabel>
                   <Card>
                     <div style={{ padding: '12px 16px' }}>
@@ -2920,30 +2922,9 @@ useEffect(() => {
                 );
               })()}
 
-              <div style={{ padding: '0 6px' }}>
+              <div className="order-detail-actions" style={{ padding: '0 6px' }}>
                 <SectionLabel>Quick Actions</SectionLabel>
-                <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {ORDER_STATUSES.filter(s => s !== order.status).map(s => {
-                    const cfg = getStatusConfig(s);
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => handleStatusChange(s)}
-                        style={{
-                          flex: 1, padding: '11px 8px', borderRadius: 12,
-                          border: `1.5px solid ${cfg.dot}25`,
-                          background: cfg.bg, cursor: 'pointer',
-                          fontSize: 12.5, fontWeight: 600, color: cfg.text, fontFamily: FONT,
-                          transition: 'transform 0.1s',
-                        }}
-                      >
-                        {getStatusChangeLabel(s)}
-                      </button>
-                    );
-                  })}
-                </div>
-
+                <div className="order-detail-actions__content" style={{ padding: '4px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'stretch', gap: 12 }}>
                 <button
                   onClick={handleEnterEditMode}
                   style={{
@@ -2961,6 +2942,7 @@ useEffect(() => {
 
                 {showDeleteConfirm ? (
                   <div style={{
+                    gridColumn: '1 / -1',
                     background: '#FFF1F2', borderRadius: 14, border: `1.5px solid #FECDD3`,
                     padding: '16px',
                   }}>
@@ -2999,6 +2981,12 @@ useEffect(() => {
                 </div>
               </div>
 
+            </>
+          )}
+          </div>
+          </div>
+          {!editMode && (
+            <div className="order-detail-integrations">
               <OdIntegrationsStack>
                 <OrderPaymentSection order={order} />
                 <OrderShipmentSection
@@ -3035,7 +3023,7 @@ useEffect(() => {
                   }}
                 />
               </OdIntegrationsStack>
-            </>
+            </div>
           )}
         </div>
       </main>

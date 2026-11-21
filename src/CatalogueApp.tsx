@@ -1326,7 +1326,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
   const handleProductsTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     if (tab !== 'products') return;
     const target = e.target as HTMLElement;
-    if (target.closest('[data-rbd-drag-handle-draggable-id], button, input, textarea, select, a')) {
+    if (target.closest('[data-rfd-drag-handle-draggable-id], button, input, textarea, select, a')) {
       productPullActive.current = false;
       return;
     }
@@ -1502,7 +1502,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
   return (
     <div
-      className="w-full h-[100dvh] min-h-0 flex flex-col overflow-hidden bg-gradient-to-b from-white to-gray-100"
+      className="catalogue-app-shell w-full h-[100dvh] min-h-0 flex flex-col overflow-hidden bg-gradient-to-b from-white to-gray-100"
     >
       {isNestedLeafRoute ? (
         <Outlet />
@@ -1511,13 +1511,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
       {tab === "products" && (
         <>
           <div className="fixed inset-x-0 top-0 h-[40px] bg-black z-50"></div>
-          <div className="sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-          <header className="relative h-14 flex items-center gap-3 px-4">
+          <div className="catalogue-products-toolbar sticky top-[40px] z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+          <header className="catalogue-products-toolbar__inner relative h-14 flex items-center gap-3 px-4">
         
           {/* Menu Button */}
           <button
             onClick={() => setMenuOpen(true)}
-            className={`relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 transition-opacity duration-200 ${
+            className={`catalogue-products-menu relative w-8 h-8 shrink-0 flex items-center justify-center text-gray-700 transition-opacity duration-200 ${
               showSearch ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
             aria-label="Menu"
@@ -1531,7 +1531,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           {/* Center Title */}
           {!showSearch && (
             <h1
-              className="text-xl font-bold text-center flex-1 cursor-pointer transition-opacity duration-200 flex items-center justify-center leading-none"
+              className="catalogue-products-brand text-xl font-bold text-center flex-1 cursor-pointer transition-opacity duration-200 flex items-center justify-center leading-none"
               onClick={() => {
                 navigate("/");
               }}
@@ -1543,36 +1543,14 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             </h1>
           )}
 
-          {showSortMenu && (
-            <div
-              className="absolute top-14 right-4 z-50 bg-white rounded-xl shadow-xl border border-gray-200 w-48 animate-dropdown overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {[
-                { label: "Original", value: "" },
-                { label: "A - Z", value: "name" },
-                { label: "In Stock", value: catalogues[0]?.stockField || "wholesaleStock" },
-                { label: "Out of Stock", value: `${catalogues[0]?.stockField || "wholesaleStock"}:out` },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => handleSort(option.value)}
-                  className={`w-full text-left px-4 py-3 text-sm tracking-wide hover:bg-gray-50 transition-all ${
-                    sortBy === option.value ? "bg-gray-100 font-semibold text-blue-600" : "text-gray-800"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <h1 className="catalogue-products-page-title">Products</h1>
 
           {/* Flexible Spacer */}
           <div className="flex-1" />
 
           {/* Expanding Search Box (larger, smoother) */}
           <div
-            className={`transition-all duration-300 flex items-center overflow-hidden ${
+            className={`catalogue-products-search transition-all duration-300 flex items-center overflow-hidden ${
               showSearch ? "w-80 opacity-100 scale-10" : "w-0 opacity-0 scale-95"
             }`}
           >
@@ -1597,7 +1575,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           </div>
 
           {/* Fixed Icons Group (Glass + Sort) */}
-          <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="catalogue-products-actions flex items-center gap-2 shrink-0 ml-2">
             <motion.button
               type="button"
               className="hidden h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100/80 disabled:opacity-40 disabled:hover:bg-transparent md:flex"
@@ -1630,35 +1608,84 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
             </motion.button>
             <button
               onClick={() => setShowSearch((prev) => !prev)}
-              className="text-xl text-gray-600 hover:text-black"
+              className="catalogue-products-search-toggle text-xl text-gray-600 hover:text-black"
               title="Search"
             >
               <FiSearch />
             </button>
 
-            <button
-              onClick={() => window.dispatchEvent(new Event("toggle-sort"))}
-              className="text-xl text-gray-600 hover:text-black"
-              title="Sort"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                viewBox="0 0 24 24"
+            <div className="catalogue-products-sort-wrap relative">
+              <button
+                onClick={() => window.dispatchEvent(new Event("toggle-sort"))}
+                className="catalogue-products-sort text-xl text-gray-600 hover:text-black"
+                title="Sort"
+                aria-expanded={showSortMenu}
+                aria-haspopup="menu"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M6 12h12M10 17h8" />
-              </svg>
-            </button>
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M6 12h12M10 17h8" />
+                </svg>
+              </button>
+              {showSortMenu && (
+                <div
+                  className="catalogue-products-sort-menu absolute right-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl animate-dropdown"
+                  role="menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {[
+                    { label: "Original", value: "" },
+                    { label: "A - Z", value: "name" },
+                    { label: "In Stock", value: catalogues[0]?.stockField || "wholesaleStock" },
+                    { label: "Out of Stock", value: `${catalogues[0]?.stockField || "wholesaleStock"}:out` },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      role="menuitem"
+                      onClick={() => handleSort(option.value)}
+                      className={`w-full text-left px-4 py-3 text-sm tracking-wide hover:bg-gray-50 transition-all ${
+                        sortBy === option.value ? "bg-gray-100 font-semibold text-blue-600" : "text-gray-800"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => window.open("https://docs.google.com/forms/d/e/1FAIpQLSeRdoXJAaLXEpuyGZa3de45urVBCO86mvSUr2HO6xoHJzLlCQ/viewform?usp=dialog", "_blank")}
-              className="text-xl text-gray-600 hover:text-blue-600 transition-colors"
+              className="catalogue-products-feedback text-xl text-gray-600 hover:text-blue-600 transition-colors"
               title="Send Feedback"
               aria-label="Send Feedback"
             >
               <FiMessageSquare />
+            </button>
+            <button
+              type="button"
+              className="catalogue-products-bulk-add"
+              onClick={() => {
+                if (!guardCloudWrite()) return;
+                navigate('/create-bulk');
+              }}
+            >
+              <FiPlus aria-hidden="true" /> Bulk import
+            </button>
+            <button
+              type="button"
+              className="catalogue-products-add"
+              onClick={() => {
+                if (!guardCloudWrite()) return;
+                navigate('/create');
+              }}
+            >
+              <FiPlus aria-hidden="true" /> Add product
             </button>
           </div>
         </header>
@@ -1669,7 +1696,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
       <main
         ref={scrollRef}
-        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'pt-6' : ''} px-4 pb-24`}
+        className={`relative flex-1 min-h-0 overflow-y-auto ${tab === 'products' ? 'catalogue-products-scroll pt-6' : ''} ${tab === 'catalogues' && !selectedCatalogueInCataloguesTab ? 'catalogues-page-scroll' : ''} px-4 pb-24`}
         onTouchStart={handleProductsTouchStart}
         onTouchMove={handleProductsTouchMove}
         onTouchEnd={handleProductsTouchEnd}
@@ -1702,11 +1729,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         )}
 
         <div
+          className={tab === 'products' ? 'catalogue-products-content' : undefined}
           style={
             tab === 'products'
               ? {
-                  transform: `translateY(${productPullOffset}px)`,
-                  transition: productPullDragging ? "none" : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+                  position: "relative",
+                  top: `${productPullOffset}px`,
+                  transition: productPullDragging ? "none" : "top 220ms cubic-bezier(0.22, 1, 0.36, 1)",
                 }
               : undefined
           }
@@ -1760,6 +1789,13 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
         )}
 
         {tab === "products" && visible.length > 0 && (
+          <div className="catalogue-products-table-head" aria-hidden="true">
+            <span>PRODUCT</span>
+            <span>ACTIONS</span>
+          </div>
+        )}
+
+        {tab === "products" && visible.length > 0 && (
           <DragDropContext onDragEnd={({ source, destination }) => {
             if (!destination) return;
             if (source.droppableId !== destination.droppableId) return;
@@ -1775,7 +1811,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           }}>
             <Droppable droppableId="product-list">
               {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3 mt-4">
+                <div ref={provided.innerRef} {...provided.droppableProps} className="catalogue-products-list space-y-3 mt-4">
                   {visible.map((p, index) => (
                     <Draggable key={p.id} draggableId={p.id} index={index} isDragDisabled={cloudWriteBlockedOffline}>
                       {(provided) => (
@@ -1783,11 +1819,11 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           data-product-row-id={p.id}
-                          className="bg-white rounded-lg shadow p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between"
+                          className="catalogue-product-row bg-white rounded-lg shadow p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between"
                         >
                           {/* Left: Name + Subtitle + Drag + Image */}
                           <div
-                            className="flex items-center gap-3 cursor-pointer"
+                            className="catalogue-product-row__identity flex items-center gap-3 cursor-pointer"
                             onClick={() => {
                               setPreviewProduct(p);
                               setPreviewList(visible);
@@ -1796,7 +1832,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                             <div {...provided.dragHandleProps} className="text-gray-400 shrink-0">
                               ☰
                             </div>
-                            <div className="w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                            <div className="catalogue-product-row__image w-14 h-14 rounded border bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
                               {imageMap[p.id] ||
                               productImageDisplayUrl(
                                 getProductPrimaryImageUrl(p),
@@ -1837,7 +1873,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                           </div>
 
                           {/* Buttons: Stay right even when wrapped on small screens */}
-                          <div className="w-full sm:w-auto flex justify-end mt-3 sm:mt-0 sm:ml-4">
+                          <div className="catalogue-product-row__actions w-full sm:w-auto flex justify-end mt-3 sm:mt-0 sm:ml-4">
                             <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 onClick={() => {
@@ -1845,9 +1881,12 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                                   persistProductsListScrollForEdit(scrollRef.current);
                                   navigate(`/create?id=${p.id}`);
                                 }}
-                                className="text-blue-600 hover:text-blue-800"
+                                className="catalogue-product-action catalogue-product-edit text-blue-600 hover:text-blue-800"
+                                title="Edit product"
+                                aria-label="Edit product"
                               >
                                 <FiEdit size={16} />
+                                <span className="catalogue-product-action-label hidden">Edit</span>
                               </button>
                               <button
                                 onClick={() => {
@@ -1855,16 +1894,18 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
                                   setShelfTarget(p);
                                   setShowShelfConfirm(true);
                                 }}
-                                className="text-red-500 hover:text-red-800"
+                                className="catalogue-product-action catalogue-product-shelf text-red-500 hover:text-red-800"
                                 title="Shelf Item"
+                                aria-label="Shelf item"
                               >
                                 <MdInventory2 className="text-[18px]" />
+                                <span className="catalogue-product-action-label hidden">Shelf</span>
                               </button>
 
                               {/* Master Toggle Button - All Catalogues */}
                               <button
                                 onClick={() => handleMasterStockToggleRequest(p.id)}
-                                className={`text-xs font-semibold px-2 py-1 rounded ${
+                                className={`catalogue-product-stock-toggle text-xs font-semibold px-2 py-1 rounded ${
                                   catalogues.every((cat) => (p as any)[cat.stockField])
                                     ? "bg-green-600 text-white"
                                     : "bg-gray-300 text-gray-700"
@@ -1888,7 +1929,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
 
         {/* Stay mounted when switching to Products (or into a single catalogue) so preview images are not torn down */}
         <div
-          className="relative -mx-4"
+          className="catalogues-page relative -mx-4"
           hidden={tab !== "catalogues" || selectedCatalogueInCataloguesTab != null}
         >
           <CataloguesList
@@ -2258,7 +2299,7 @@ export default function CatalogueApp({ products, setProducts, deletedProducts, s
           </AnimatePresence>
 
           <div
-            className="fixed right-4 z-40 flex flex-col items-end gap-3"
+            className="catalogue-product-fab fixed right-4 z-40 flex flex-col items-end gap-3"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 64px)" }}
           >
           <AnimatePresence>

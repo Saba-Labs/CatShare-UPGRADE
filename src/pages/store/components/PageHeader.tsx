@@ -68,12 +68,12 @@ export default function PageHeader({
     <>
       <div
         ref={headerRef}
-        className={`fixed inset-x-0 z-[55] ${barSurfaceClass}`}
+        className={`store-page-header fixed inset-x-0 z-[55] ${barSurfaceClass}`}
         style={{ top: STORE_STATUS_BAR_HEIGHT_PX }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5">{content}</div>
       </div>
-      <div className="mb-4 shrink-0" style={{ height: barHeight }} aria-hidden />
+      <div className="store-page-header-spacer mb-4 shrink-0" style={{ height: barHeight }} aria-hidden />
     </>
   );
 }

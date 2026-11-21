@@ -75,8 +75,7 @@ function addUniformText(
   const safeText = String(text ?? '');
   const [r, g, b] = hexToRgb(color);
 
-  // jsPDF uses points for font size. Midway between original (2.6) and reduced (2.38).
-  const fontSizePt = Math.max(6.75, sizeMm * 2.5);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
 
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
@@ -84,7 +83,6 @@ function addUniformText(
   pdf.text(safeText, x, y, { align, baseline: 'middle' });
 }
 
-/** Footer only: original scaling so footer matches pre–size-tweak appearance. */
 function addFooterUniformText(
   pdf: jsPDF,
   text: string,
@@ -97,7 +95,7 @@ function addFooterUniformText(
 ) {
   const safeText = String(text ?? '');
   const [r, g, b] = hexToRgb(color);
-  const fontSizePt = Math.max(7, sizeMm * 2.6);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
   pdf.setTextColor(r, g, b);
@@ -155,7 +153,7 @@ function addCurrencyAmount(
   align: 'left' | 'center' | 'right' = 'left'
 ) {
   const [r, g, b] = hexToRgb(color);
-  const fontSizePt = Math.max(6.75, sizeMm * 2.5);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
   pdf.setTextColor(r, g, b);
@@ -203,19 +201,19 @@ function drawHeader(pdf: jsPDF, order: Order, business: BusinessProfile, pageWid
 function drawTableHeader(pdf: jsPDF, y: number, pageWidth: number) {
   const contentW = pageWidth - 2 * MARGIN;
   pdf.setFillColor(241, 245, 249); // Lighter background for header
-  pdf.rect(MARGIN, y, contentW, 14, 'F');
-  
-  const hY = y + 7;
+  pdf.rect(MARGIN, y, contentW, 9, 'F');
+
+  const hY = y + 4.5;
   const colQty = MARGIN + contentW * 0.65;
   const colRate = MARGIN + contentW * 0.82;
   const colTotal = MARGIN + contentW;
   
-  addUniformText(pdf, 'ITEM', MARGIN + 4, hY, 4.25, '#0F172A', true);
-  addUniformText(pdf, 'QTY', colQty, hY, 4.25, '#0F172A', true, 'center');
-  addUniformText(pdf, 'RATE', colRate, hY, 4.25, '#0F172A', true, 'center');
-  addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 4.25, '#0F172A', true, 'right');
-  
-  return y + 14;
+  addUniformText(pdf, 'ITEM', MARGIN + 4, hY, 3.4, '#0F172A', true);
+  addUniformText(pdf, 'QTY', colQty, hY, 3.4, '#0F172A', true, 'center');
+  addUniformText(pdf, 'RATE', colRate, hY, 3.4, '#0F172A', true, 'center');
+  addUniformText(pdf, 'TOTAL', colTotal - 4, hY, 3.4, '#0F172A', true, 'right');
+
+  return y + 9;
 }
 
 function drawFooter(pdf: jsPDF, pageWidth: number, pageHeight: number) {
@@ -247,11 +245,11 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
   drawHeader(pdf, order, business, pageWidth);
 
   // Bill To (Large Heading)
-  let currentY = 65;
-  addUniformText(pdf, 'BILL TO', MARGIN, currentY, 4.25, '#64748B', true);
-  currentY += 9;
-  addUniformText(pdf, order.customer_name, MARGIN, currentY, 6.6, '#000000', true);
-  currentY += 18;
+  let currentY = 58;
+  addUniformText(pdf, 'BILL TO', MARGIN, currentY, 3.6, '#64748B', true);
+  currentY += 6;
+  addUniformText(pdf, order.customer_name, MARGIN, currentY, 5.6, '#000000', true);
+  currentY += 12;
 
   // Table Start
   currentY = drawTableHeader(pdf, currentY, pageWidth);
@@ -261,7 +259,7 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
   const colQty = MARGIN + contentW * 0.65;
   const colRate = MARGIN + contentW * 0.82;
   const colTotal = MARGIN + contentW;
-  const rowH = 16;
+  const rowH = 7.2;
 
   items.forEach((item, index) => {
     // Check for page break
@@ -277,15 +275,15 @@ export async function generateInvoicePDF(order: Order, business: BusinessProfile
     pdf.line(MARGIN, currentY + rowH, MARGIN + contentW, currentY + rowH);
 
     // 1. Serial No + Item Name + Subtitle
-addUniformText(pdf, `${index + 1}.`, MARGIN + 4, currentY + 5.5, 4.75, '#363a3fff', false);
-addUniformText(pdf, item.name, MARGIN + 11, currentY + 5.5, 4.75, '#000000', false);
+addUniformText(pdf, `${index + 1}.`, MARGIN + 4, midY, 3.5, '#363a3fff', false);
+addUniformText(pdf, item.name, MARGIN + 11, item.subtitle ? currentY + 2.1 : midY, 3.5, '#000000', false);
 if (item.subtitle) {
-  addUniformText(pdf, item.subtitle, MARGIN + 11, currentY + 11.5, 3.6, '#64748B', false);
+  addUniformText(pdf, item.subtitle, MARGIN + 11, currentY + 5.3, 2.8, '#64748B', false);
 }
 
     // 2. Qty + Unit
     const qtyLabel = formatQuantityLabel(item.quantity, item.priceUnit);
-    addUniformText(pdf, qtyLabel, colQty, midY, 4.75, '#000000', false, 'center');
+    addUniformText(pdf, qtyLabel, colQty, midY, 3.5, '#000000', false, 'center');
     
     // 3. Rate (Now Black)
     addCurrencyAmount(
@@ -294,7 +292,7 @@ if (item.subtitle) {
       formatAmountNumber(item.unitPrice || 0),
       colRate,
       midY,
-      4.75,
+      3.5,
       '#000000',
       false,
       'center'
@@ -307,7 +305,7 @@ if (item.subtitle) {
       formatAmountNumber(item.rowTotal || (item.unitPrice || 0) * item.quantity),
       colTotal - 4,
       midY,
-      4.75,
+      3.5,
       '#000000',
       false,
       'right'
@@ -323,28 +321,28 @@ if (item.subtitle) {
     currentY = 20;
   }
 
-  currentY += 15;
-  addUniformText(pdf, 'GRAND TOTAL', MARGIN, currentY, 5.15, '#64748B', true);
+  currentY += 10;
+  addUniformText(pdf, 'GRAND TOTAL', MARGIN, currentY, 4.5, '#64748B', true);
   addCurrencyAmount(
     pdf,
     currency,
     formatAmountNumber(order.total_amount || 0, 'en-IN'),
     pageWidth - MARGIN - 4,
     currentY,
-    7.85,
+    6.6,
     '#16A34A',
     true,
     'right'
   );
 
   // Thank You Box
-  currentY += 15;
+  currentY += 10;
   pdf.setFillColor(248, 250, 252);
-  (pdf as any).roundedRect(MARGIN, currentY, pageWidth - (MARGIN * 2), 20, 2, 2, 'F');
+  (pdf as any).roundedRect(MARGIN, currentY, pageWidth - (MARGIN * 2), 16, 2, 2, 'F');
   pdf.setFillColor(22, 163, 74);
-  pdf.rect(MARGIN, currentY, 2.5, 20, 'F');
-  addUniformText(pdf, 'Thank you for your business!', MARGIN + 8, currentY + 7, 4.25, '#16A34A', true);
-  addUniformText(pdf, 'Please contact us if you have any questions regarding this invoice.', MARGIN + 8, currentY + 14, 3.6, '#64748B');
+  pdf.rect(MARGIN, currentY, 2.5, 16, 'F');
+  addUniformText(pdf, 'Thank you for your business!', MARGIN + 8, currentY + 5.5, 3.6, '#16A34A', true);
+  addUniformText(pdf, 'Please contact us if you have any questions regarding this invoice.', MARGIN + 8, currentY + 11.5, 3.1, '#64748B');
 
   // Final page footer
   drawFooter(pdf, pageWidth, pageHeight);

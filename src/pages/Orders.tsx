@@ -709,6 +709,7 @@ function IconCatalogueMeta() {
 }
 
 function OrderMetaHit({
+  className,
   open,
   onToggle,
   onClose,
@@ -716,6 +717,7 @@ function OrderMetaHit({
   icon,
   text,
 }: {
+  className?: string;
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -735,7 +737,7 @@ function OrderMetaHit({
   }, [open, onClose]);
 
   return (
-    <div ref={hitRef} className="order-row-meta-hit">
+    <div ref={hitRef} className={`order-row-meta-hit ${className || ''}`}>
       <div
         onClick={(e) => {
           e.stopPropagation();
@@ -979,12 +981,12 @@ function OrderRow({
       onClick={onClick}
     >
       {/* Top stripe by status */}
-      <div style={{ height: 3, background: statusCfg.dot, borderRadius: '14px 14px 0 0' }} />
+      <div className="order-row-status-stripe" style={{ height: 3, background: statusCfg.dot, borderRadius: '14px 14px 0 0' }} />
 
-      <div style={{ padding: '12px 14px 14px' }}>
+      <div className="order-row-content" style={{ padding: '12px 14px 14px' }}>
         {/* Row 1: Name + Total */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="order-row-primary" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+          <div className="order-row-customer" style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ord-text)', lineHeight: 1.2, marginBottom: 2 }}>
               {order.customer_name}
             </div>
@@ -995,7 +997,7 @@ function OrderRow({
               </div>
             ) : null}
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div className="order-row-total" style={{ textAlign: 'right', flexShrink: 0 }}>
             {total ? (
               <div style={{ fontSize: 17, fontWeight: 800, color: '#166534' }}>{total}</div>
             ) : (
@@ -1014,6 +1016,7 @@ function OrderRow({
           <div className="order-row-foot-tags" onClick={(e) => e.stopPropagation()}>
             {order.order_source ? (
               <OrderMetaHit
+                className="order-row-meta-hit--source"
                 open={metaInfoOpen === 'source'}
                 onToggle={() => toggleMetaInfo('source')}
                 onClose={() => setMetaInfoOpen(null)}
@@ -1027,6 +1030,7 @@ function OrderRow({
                     aria-expanded={metaInfoOpen === 'source'}
                   >
                     <FilterSourceIcon type={sourceKey === 'unknown' ? 'all' : sourceKey} />
+                    <span className="order-row-source-text">{getOrderSourceInfoText(order.order_source)}</span>
                   </button>
                 }
               />
@@ -1034,6 +1038,7 @@ function OrderRow({
 
             {catalogueLabel ? (
               <OrderMetaHit
+                className="order-row-meta-hit--catalogue"
                 open={metaInfoOpen === 'catalogue'}
                 onToggle={() => toggleMetaInfo('catalogue')}
                 onClose={() => setMetaInfoOpen(null)}
@@ -1215,7 +1220,7 @@ function DateRangePicker({
   }
 
   return (
-    <div style={{
+    <div className="orders-revenue-calendar" style={{
       position: 'relative', zIndex: 1,
       paddingTop: 14,
       borderTop: '1px solid rgba(255,255,255,0.15)',
@@ -2055,7 +2060,7 @@ export default function Orders() {
       )}
 
       {/* Status bar */}
-      <div style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
+      <div className="orders-status-bar" style={{ position: 'fixed', inset: '0 0 auto 0', height: 40, background: '#0F172A', zIndex: 50 }} />
 
       {/* Toolbar + tabs (fixed height, not sticky — list scrolls below) */}
       <div
@@ -2431,6 +2436,7 @@ export default function Orders() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', alignSelf: 'stretch' }}>
                   <button
+                    className="orders-revenue-card__date-toggle"
                     onClick={() => setShowDateFilters(!showDateFilters)}
                     style={{
                       width: 28, height: 28,
@@ -2460,12 +2466,21 @@ export default function Orders() {
                     >
                       <path d="M6 9l6 6 6-6" />
                     </svg>
+                    <span className="orders-revenue-card__date-label">
+                      {dateRangeStart && dateRangeEnd
+                        ? `${formatDate(dateRangeStart)} – ${formatDate(dateRangeEnd)}`
+                        : dateRangeStart
+                        ? `From ${formatDate(dateRangeStart)}`
+                        : dateRangeEnd
+                        ? `Until ${formatDate(dateRangeEnd)}`
+                        : 'All dates'}
+                    </span>
                   </button>
                 </div>
               </div>
 
               {(dateRangeStart || dateRangeEnd) && (
-                <div style={{
+                <div className="orders-revenue-card__selected-range" style={{
                   fontSize: 12,
                   opacity: 0.8,
                   fontWeight: 500,
@@ -2521,6 +2536,16 @@ export default function Orders() {
         )}
 
         <div className="orders-list-body">
+          {!loading && !error && filteredOrders.length > 0 && (
+            <div className="orders-list-head" aria-hidden="true">
+              <span>Customer</span>
+              <span>Order date</span>
+              <span>Total</span>
+              <span>Source</span>
+              <span>Catalogue</span>
+              <span>Status</span>
+            </div>
+          )}
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #E2E8F0', borderTopColor: '#3B82F6', animation: 'spin 0.8s linear infinite' }} />

@@ -14,3 +14,39 @@ input[type=number] {
 @keyframes spin { to { transform: rotate(360deg) } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
+
+.order-detail-scroll-columns, .order-detail-main-column { display: contents; }
+
+@media (min-width: 1024px) {
+  .desktop-workspace__content > .order-detail-root {
+    height: 100% !important;
+    min-height: 0;
+    overflow: hidden;
+    background: #f6f8fc !important;
+  }
+
+  .order-detail-status-bar { display: none; }
+  .order-detail-header { position: relative !important; top: auto !important; flex: 0 0 auto; background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .order-detail-header-inner { width: 100%; max-width: 1440px; min-height: 72px; margin: 0 auto; padding: 12px 32px !important; }
+  .order-detail-header-inner > div:nth-child(2) > div:first-child { font-size: 20px !important; }
+  .order-detail-main { display: flex; width: 100%; min-height: 0; overflow: hidden !important; padding: 24px 32px !important; }
+  .order-detail-content--view { display: grid !important; grid-template-columns: minmax(0, 1.35fr) minmax(340px, .9fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 20px; width: 100%; max-width: 1440px; height: 100%; min-height: 0; margin: 0 auto; }
+  .order-detail-scroll-columns { display: flex; grid-column: 1; grid-row: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 12px; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
+  .order-detail-main-column { display: flex; min-width: 0; flex: 0 0 auto; flex-direction: column; gap: 12px; }
+  .order-detail-snapshot { gap: 14px !important; padding: 0 !important; background: transparent !important; }
+  .order-detail-snapshot > .od-card { border-radius: 16px; box-shadow: 0 2px 12px rgb(15 23 42 / 5%); }
+  .order-detail-actions, .order-detail-notes { padding: 0 !important; }
+  .order-detail-actions__content { padding: 14px !important; border: 1px solid #e5eaf2; border-radius: 16px; background: #fff; box-shadow: 0 2px 12px rgb(15 23 42 / 5%); }
+  .order-detail-integrations { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; height: 100%; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
+  .order-detail-integrations .od-integrations-stack { gap: 14px; padding: 0; }
+  .order-detail-integrations .od-card { border-radius: 16px; box-shadow: 0 2px 12px rgb(15 23 42 / 5%); }
+  .order-detail-content--edit { width: 100%; max-width: 920px; height: 100%; min-height: 0; margin: 0 auto; gap: 16px !important; }
+  .order-detail-content--edit .order-detail-scroll-columns { display: flex; height: 100%; min-height: 0; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+  body:has(.desktop-workspace) .order-detail-root > .main-app-bottom-nav { display: none; }
+}
+
+@media (min-width: 1024px) and (max-width: 1200px) {
+  .order-detail-content--view { grid-template-columns: minmax(0, 1.2fr) minmax(320px, .95fr); gap: 16px; }
+  .order-detail-main { padding-right: 24px !important; padding-left: 24px !important; }
+  .order-detail-header-inner { padding-right: 24px !important; padding-left: 24px !important; }
+}
