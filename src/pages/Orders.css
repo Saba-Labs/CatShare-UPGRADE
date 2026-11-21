@@ -1095,7 +1095,7 @@ html.dark .orders-filter-grabber span {
   .orders-list-head {
     display: grid;
     grid-template-columns: minmax(125px, 1.3fr) minmax(105px, 1fr) minmax(82px, .7fr) minmax(95px, .9fr) minmax(100px, 1fr) minmax(108px, .95fr);
-    column-gap: 14px;
+    column-gap: 20px;
     align-items: center;
     min-height: 48px;
     padding: 0 20px;
@@ -1130,7 +1130,7 @@ html.dark .orders-filter-grabber span {
   .order-row-card:last-child { border-bottom: 0; }
   .order-row-card:hover { border-color: #edf0f4; background: #f8faff; box-shadow: none; }
   .order-row-status-stripe { height: 2px !important; border-radius: 0 !important; opacity: .55; }
-  .order-row-content { display: grid; grid-template-columns: minmax(125px, 1.3fr) minmax(105px, 1fr) minmax(82px, .7fr) minmax(95px, .9fr) minmax(100px, 1fr) minmax(108px, .95fr); column-gap: 14px; align-items: center; min-height: 84px; padding: 14px 20px !important; }
+  .order-row-content { display: grid; grid-template-columns: minmax(125px, 1.3fr) minmax(105px, 1fr) minmax(82px, .7fr) minmax(95px, .9fr) minmax(100px, 1fr) minmax(108px, .95fr); column-gap: 20px; align-items: center; min-height: 84px; padding: 14px 20px !important; }
   .order-row-primary, .order-row-foot { display: contents !important; }
   .order-row-customer { grid-column: 1; grid-row: 1; min-width: 0; }
   .order-row-customer > div:first-child { overflow: hidden; font-size: 14px !important; line-height: 1.35 !important; text-overflow: ellipsis; white-space: nowrap; }
