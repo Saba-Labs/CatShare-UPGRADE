@@ -53,7 +53,7 @@ export default function StoreLayout({
     <>
       <StoreStatusBar />
 
-      <div className={`store-admin__frame flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
+      <div className={`store-admin__frame${fullscreenChrome ? ' store-admin__frame--fullscreen' : ''} flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-gray-50 dark:bg-gray-950 ${STORE_SHELL_CLASS}`}>
         <aside className="store-admin__nav" aria-label="Online Store navigation">
           <div className="store-admin__nav-label">ONLINE STORE</div>
           <Link
@@ -87,7 +87,7 @@ export default function StoreLayout({
           ))}
         </aside>
         <main
-          className={`store-admin__main flex-1 min-h-0 pt-[40px] ${
+          className={`store-admin__main${fullscreenChrome ? ' store-admin__main--fullscreen' : ''} flex-1 min-h-0 pt-[40px] ${
             immersive
               ? `flex flex-col overflow-hidden${hideBottomNav ? '' : ` ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`}`
               : `overflow-y-auto overscroll-contain ${STORE_SCROLL_BOTTOM_PADDING_CLASS}`

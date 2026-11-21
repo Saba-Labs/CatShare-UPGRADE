@@ -64,7 +64,7 @@ export default function DesktopWorkspace({ children }: { children: ReactNode }) 
           </div>
         </aside>
         <div className="desktop-workspace__main">
-          <header className={`desktop-workspace__header${pathname === '/' ? ' desktop-workspace__header--products' : pathname === '/catalogues' ? ' desktop-workspace__header--catalogues' : pathname === '/orders' ? ' desktop-workspace__header--orders' : pathname.startsWith('/orders/') ? ' desktop-workspace__header--order-detail' : pathname === '/store' ? ' desktop-workspace__header--store' : ''}`}>
+          <header className={`desktop-workspace__header${pathname === '/' ? ' desktop-workspace__header--products' : pathname === '/catalogues' ? ' desktop-workspace__header--catalogues' : pathname === '/orders' ? ' desktop-workspace__header--orders' : pathname.startsWith('/orders/') ? ' desktop-workspace__header--order-detail' : pathname === '/store/homepage' ? ' desktop-workspace__header--store-homepage' : pathname === '/store' ? ' desktop-workspace__header--store' : ''}`}>
             <div><span className="desktop-workspace__eyebrow">YOUR WORKSPACE</span><strong>{title}</strong></div>
             <div className="desktop-workspace__header-actions">
               <Link to="/settings/pro" className="desktop-workspace__upgrade"><FiStar aria-hidden="true" /> Explore Pro</Link>
