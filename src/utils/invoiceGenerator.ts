@@ -75,8 +75,7 @@ function addUniformText(
   const safeText = String(text ?? '');
   const [r, g, b] = hexToRgb(color);
 
-  // jsPDF uses points for font size. Midway between original (2.6) and reduced (2.38).
-  const fontSizePt = Math.max(6.75, sizeMm * 2.5);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
 
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
@@ -84,7 +83,6 @@ function addUniformText(
   pdf.text(safeText, x, y, { align, baseline: 'middle' });
 }
 
-/** Footer only: original scaling so footer matches pre–size-tweak appearance. */
 function addFooterUniformText(
   pdf: jsPDF,
   text: string,
@@ -97,7 +95,7 @@ function addFooterUniformText(
 ) {
   const safeText = String(text ?? '');
   const [r, g, b] = hexToRgb(color);
-  const fontSizePt = Math.max(7, sizeMm * 2.6);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
   pdf.setTextColor(r, g, b);
@@ -155,7 +153,7 @@ function addCurrencyAmount(
   align: 'left' | 'center' | 'right' = 'left'
 ) {
   const [r, g, b] = hexToRgb(color);
-  const fontSizePt = Math.max(6.75, sizeMm * 2.5);
+  const fontSizePt = Math.max(6.5, sizeMm * 2.35);
   pdf.setFont('helvetica', bold ? 'bold' : 'normal');
   pdf.setFontSize(fontSizePt);
   pdf.setTextColor(r, g, b);
