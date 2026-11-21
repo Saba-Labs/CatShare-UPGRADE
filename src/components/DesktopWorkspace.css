@@ -273,4 +273,17 @@
   .desktop-workspace__content .store-dashboard__card h3 { color: #202d43; font-size: 13px; font-weight: 700; }
   .desktop-workspace__content .store-dashboard__card p { margin-top: 3px; color: #78869a; font-size: 11px; line-height: 1.45; }
   .desktop-workspace__content .store-dashboard__bottom-spacer { display: none; }
+  .desktop-workspace__content .store-admin__inner-container { width: 100%; max-width: 1320px; padding: 28px 32px 32px; }
+  .desktop-workspace__content .store-admin__save-bottom { width: 100%; max-width: 1040px; padding-bottom: 84px !important; }
+  .desktop-workspace__content .store-admin__save-bottom.max-w-lg { max-width: 920px; }
+  .desktop-workspace__content .store-admin__inner-container > .max-w-3xl { max-width: 1040px; }
+  .desktop-workspace__content .store-admin__inner-container > .max-w-lg { max-width: 920px; }
+  .desktop-workspace__content .store-admin__inner-container > .max-w-6xl { max-width: 100%; }
+  .desktop-workspace__content .store-page-header { position: relative !important; inset: auto !important; z-index: 1; width: 100%; margin: 0 0 22px; border: 1px solid #e1e7f0; border-radius: 14px; background: #fff; box-shadow: 0 5px 18px rgb(23 36 61 / 4%); backdrop-filter: none; }
+  .desktop-workspace__content .store-page-header > div { max-width: none; padding: 16px 20px; }
+  .desktop-workspace__content .store-page-header h1 { color: #18243a; font-size: 21px; font-weight: 750; letter-spacing: -.03em; }
+  .desktop-workspace__content .store-page-header-spacer { display: none !important; }
+  body:has(.desktop-workspace) .store-save-bar { right: 0; bottom: 0 !important; left: 244px; z-index: 65; padding: 12px 24px; }
+  body:has(.desktop-workspace) .store-save-bar__inner { max-width: 1260px; flex-direction: row; padding-right: 0; padding-left: 0; }
+  body:has(.desktop-workspace) .store-save-bar__inner > button { width: auto; }
 }

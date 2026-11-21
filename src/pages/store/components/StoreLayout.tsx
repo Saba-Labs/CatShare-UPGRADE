@@ -12,7 +12,7 @@ export const STORE_SCROLL_BOTTOM_PADDING_CLASS =
 
 /** Extra scroll padding when a fixed save bar is shown above the tab bar. */
 export const STORE_SCROLL_SAVE_BOTTOM_PADDING_CLASS =
-  'pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]';
+  'store-admin__save-bottom pb-[calc(8.5rem+env(safe-area-inset-bottom,0px))]';
 
 /** Root wrapper class for all `/store/*` admin pages — compact in-app typography. */
 export const STORE_SHELL_CLASS = 'store-admin text-sm text-gray-900 dark:text-gray-100 antialiased';
@@ -62,7 +62,7 @@ export default function StoreLayout({
             className={
               fullscreenChrome
                 ? 'flex min-h-0 flex-1 flex-col h-full w-full'
-                : `max-w-7xl mx-auto px-4 sm:px-6 ${
+                : `max-w-7xl mx-auto px-4 sm:px-6 store-admin__inner-container ${
                     isMainStorePage ? 'store-admin__dashboard-container ' : ''
                   }${
                     immersive

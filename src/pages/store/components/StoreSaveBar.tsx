@@ -28,10 +28,10 @@ export default function StoreSaveBar({
 
   const bar = (
     <div
-      className="fixed inset-x-0 z-[55] border-t border-gray-200 bg-white/95 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95"
+      className="store-save-bar fixed inset-x-0 z-[55] border-t border-gray-200 bg-white/95 p-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95"
       style={{ bottom: SAVE_BAR_BOTTOM }}
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="store-save-bar__inner mx-auto flex max-w-7xl flex-col gap-3 px-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         {hasChanges ? (
           <p className="text-sm text-gray-600 dark:text-gray-300">You have unsaved changes</p>
         ) : (
