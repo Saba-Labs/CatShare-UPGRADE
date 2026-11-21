@@ -1220,7 +1220,7 @@ function DateRangePicker({
   }
 
   return (
-    <div style={{
+    <div className="orders-revenue-calendar" style={{
       position: 'relative', zIndex: 1,
       paddingTop: 14,
       borderTop: '1px solid rgba(255,255,255,0.15)',
@@ -2436,6 +2436,7 @@ export default function Orders() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', alignSelf: 'stretch' }}>
                   <button
+                    className="orders-revenue-card__date-toggle"
                     onClick={() => setShowDateFilters(!showDateFilters)}
                     style={{
                       width: 28, height: 28,
@@ -2465,6 +2466,11 @@ export default function Orders() {
                     >
                       <path d="M6 9l6 6 6-6" />
                     </svg>
+                    <span className="orders-revenue-card__date-label">
+                      {dateRangeStart
+                        ? `${formatDate(dateRangeStart)}${dateRangeEnd ? ` – ${formatDate(dateRangeEnd)}` : ' – Select end'}`
+                        : 'Choose dates'}
+                    </span>
                   </button>
                 </div>
               </div>

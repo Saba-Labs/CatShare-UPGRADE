@@ -852,6 +852,7 @@ html.dark .orders-filter-grabber span {
 }
 
 .orders-list-head { display: none; }
+.orders-revenue-card__date-label { display: none; }
 
 @media (min-width: 1024px) {
   .orders-page-root {
@@ -1000,21 +1001,85 @@ html.dark .orders-filter-grabber span {
   }
 
   .orders-revenue-section {
+    position: relative;
+    z-index: 10;
     margin: 0 auto;
-    padding: 24px 0 18px !important;
+    padding: 18px 0 16px !important;
     border: 0 !important;
     background: transparent !important;
   }
 
   .orders-revenue-card {
-    min-height: 132px;
+    min-height: 112px;
     flex-direction: row !important;
     align-items: center;
     justify-content: space-between;
-    padding: 26px 32px !important;
-    border-radius: 20px !important;
+    padding: 20px 28px !important;
+    border-radius: 18px !important;
     box-shadow: 0 12px 28px rgba(37, 99, 235, 0.16) !important;
+    overflow: visible !important;
   }
+
+  .orders-revenue-card > div:first-child {
+    display: none;
+  }
+
+  .orders-revenue-card > div:nth-child(2) {
+    width: 100%;
+    align-items: center !important;
+  }
+
+  .orders-revenue-card > div:nth-child(2) > div:first-child > div:first-child {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: .08em !important;
+    text-transform: uppercase;
+  }
+
+  .orders-revenue-card > div:nth-child(2) > div:first-child > div:last-child {
+    margin-top: 3px !important;
+    font-size: 34px !important;
+    letter-spacing: -1px !important;
+    line-height: 1.1;
+  }
+
+  .orders-revenue-card > div:nth-child(2) > div:last-child {
+    align-self: center !important;
+  }
+
+  .orders-revenue-card__date-toggle {
+    width: auto !important;
+    height: 42px !important;
+    gap: 10px;
+    padding: 0 14px;
+    border-radius: 11px !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  .orders-revenue-card__date-label {
+    display: inline;
+  }
+
+  .orders-revenue-card > div:nth-child(3) {
+    display: none;
+  }
+
+  .orders-revenue-calendar {
+    position: absolute !important;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 80 !important;
+    width: 340px;
+    padding: 16px !important;
+    border: 0 !important;
+    border-radius: 16px;
+    background: linear-gradient(145deg, #1e40af 0%, #3b82f6 100%);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+  }
+
 
   .orders-list-body {
     display: block;
