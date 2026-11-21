@@ -98,13 +98,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StatusType = OrderStatus;
 
-const NEXT_ORDER_STATUS: Partial<Record<StatusType, StatusType>> = {
-  pending: 'processing',
-  processing: 'shipped',
-  shipped: 'completed',
-  cancelled: 'pending',
-};
-
 interface OrderItem {
   name: string;
   quantity: number;
@@ -1013,12 +1006,10 @@ function StatusDropdown({
   current,
   onChange,
   onClose,
-  excludedStatuses = [],
 }: {
   current: string;
   onChange: (s: StatusType) => void;
   onClose: () => void;
-  excludedStatuses?: StatusType[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -1030,7 +1021,7 @@ function StatusDropdown({
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const statuses: StatusType[] = ORDER_STATUSES.filter((status) => !excludedStatuses.includes(status));
+  const statuses: StatusType[] = [...ORDER_STATUSES];
 
   return (
     <div ref={ref} style={{
@@ -1273,7 +1264,6 @@ export default function OrderDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
-  const [showQuickStatusMenu, setShowQuickStatusMenu] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [shareImageLoading, setShareImageLoading] = useState(false);
@@ -1560,7 +1550,6 @@ useEffect(() => {
     const oldStatus = order.status;
 
     // Update local state immediately for optimistic UI
-    setShowQuickStatusMenu(false);
     setOrder(prev => prev ? { ...prev, status } : null);
 
     // Persist to backend
@@ -2097,9 +2086,6 @@ useEffect(() => {
   const orderDisplayTotal = resolveOrderGrandTotal(order, items);
   const phone = (order as any).customer_whatsapp || '';
   const statusCfg = getStatusConfig(order.status);
-  const normalizedStatus = normalizeOrderStatus(order.status) as StatusType;
-  const nextStatus = NEXT_ORDER_STATUS[normalizedStatus];
-  const nextStatusCfg = nextStatus ? getStatusConfig(nextStatus) : null;
 
   return (
     <div {...swipeHandlers} className="order-detail-root" style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: COLORS.bg, fontFamily: FONT, overflowX: 'hidden' }}>
@@ -2936,46 +2922,7 @@ useEffect(() => {
 
               <div className="order-detail-actions" style={{ padding: '0 6px' }}>
                 <SectionLabel>Quick Actions</SectionLabel>
-                <div className="order-detail-actions__content" style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div className="order-detail-status-actions">
-                  {nextStatus && nextStatusCfg ? (
-                    <button
-                      type="button"
-                      onClick={() => void handleStatusChange(nextStatus)}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        minHeight: 44, padding: '10px 14px', borderRadius: 12,
-                        border: `1.5px solid ${nextStatusCfg.border}`,
-                        background: nextStatusCfg.bg, cursor: 'pointer',
-                        fontSize: 13, fontWeight: 700, color: nextStatusCfg.text, fontFamily: FONT,
-                      }}
-                    >
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: nextStatusCfg.dot }} />
-                      {normalizedStatus === 'cancelled' ? 'Reopen order' : `Mark as ${getOrderStatusLabel(nextStatus)}`}
-                    </button>
-                  ) : null}
-                  <div className="order-detail-status-menu-wrap">
-                    <button
-                      type="button"
-                      className="order-detail-status-menu-trigger"
-                      aria-haspopup="menu"
-                      aria-expanded={showQuickStatusMenu}
-                      onClick={() => setShowQuickStatusMenu((open) => !open)}
-                    >
-                      <Ic.MoreVertical />
-                      <span>Other statuses</span>
-                    </button>
-                    {showQuickStatusMenu ? (
-                      <StatusDropdown
-                        current={order.status}
-                        excludedStatuses={[normalizedStatus, ...(nextStatus ? [nextStatus] : [])]}
-                        onChange={handleStatusChange}
-                        onClose={() => setShowQuickStatusMenu(false)}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-
+                <div className="order-detail-actions__content" style={{ padding: '4px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'stretch', gap: 12 }}>
                 <button
                   onClick={handleEnterEditMode}
                   style={{
@@ -2993,6 +2940,7 @@ useEffect(() => {
 
                 {showDeleteConfirm ? (
                   <div style={{
+                    gridColumn: '1 / -1',
                     background: '#FFF1F2', borderRadius: 14, border: `1.5px solid #FECDD3`,
                     padding: '16px',
                   }}>

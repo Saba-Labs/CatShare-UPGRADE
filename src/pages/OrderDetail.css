@@ -15,11 +15,6 @@ input[type=number] {
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
 
-.order-detail-status-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.order-detail-status-menu-wrap { position: relative; }
-.order-detail-status-menu-trigger { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid #e5eaf2; border-radius: 11px; background: #fff; color: #475569; font: 600 12px 'DM Sans', system-ui, sans-serif; cursor: pointer; transition: background-color .15s ease, border-color .15s ease; }
-.order-detail-status-menu-trigger:hover { border-color: #cbd5e1; background: #f8fafc; }
-
 @media (min-width: 1024px) {
   .desktop-workspace__content > .order-detail-root {
     height: 100% !important;
@@ -39,8 +34,6 @@ input[type=number] {
   .order-detail-actions { grid-column: 1; grid-row: 2; padding: 0 !important; }
   .order-detail-notes { grid-column: 1; grid-row: 3; padding: 0 !important; }
   .order-detail-actions__content { padding: 14px !important; border: 1px solid #e5eaf2; border-radius: 16px; background: #fff; box-shadow: 0 2px 12px rgb(15 23 42 / 5%); }
-  .order-detail-actions__content > div:first-child { flex-wrap: wrap; }
-  .order-detail-actions__content > div:first-child > button { min-width: 120px; }
   .order-detail-integrations { grid-column: 2; grid-row: 1 / span 3; min-width: 0; }
   .order-detail-integrations .od-integrations-stack { gap: 14px; padding: 0; }
   .order-detail-integrations .od-card { border-radius: 16px; box-shadow: 0 2px 12px rgb(15 23 42 / 5%); }
