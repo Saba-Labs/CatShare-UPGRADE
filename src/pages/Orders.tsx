@@ -964,8 +964,6 @@ function OrderRow({
       ? formatMoney(resolvedTotal, currencySymbol)
       : null;
   const phone = (order as any).customer_whatsapp || (order as any).customerWhatsapp || '';
-  const itemCount = (order.items || []).reduce((count, item) => count + (Number(item.quantity) || 0), 0);
-  const itemNames = (order.items || []).slice(0, 2).map((item) => item.name).filter(Boolean).join(', ');
 
   const sourceKey =
     order.order_source === 'link' || order.order_source === 'manual' || order.order_source === 'store'
@@ -996,11 +994,6 @@ function OrderRow({
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--ord-text-muted)', fontSize: 12 }}>
                 <IconPhone />
                 {phone}
-              </div>
-            ) : null}
-            {order.items?.length ? (
-              <div className="order-row-item-summary">
-                {itemCount} {itemCount === 1 ? 'item' : 'items'}{itemNames ? ` · ${itemNames}` : ''}
               </div>
             ) : null}
           </div>

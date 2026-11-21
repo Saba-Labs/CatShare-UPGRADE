@@ -750,8 +750,7 @@ html.dark .orders-filter-grabber span {
   background: #f1f5f9;
 }
 
-.order-row-source-text,
-.order-row-item-summary {
+.order-row-source-text {
   display: none;
 }
 
@@ -1071,7 +1070,6 @@ html.dark .orders-filter-grabber span {
   .order-row-customer { grid-column: 1; grid-row: 1; min-width: 0; }
   .order-row-customer > div:first-child { overflow: hidden; font-size: 14px !important; line-height: 1.35 !important; text-overflow: ellipsis; white-space: nowrap; }
   .order-row-customer > div:nth-child(2) { overflow: hidden; font-size: 11px !important; text-overflow: ellipsis; white-space: nowrap; }
-  .order-row-item-summary { display: block; overflow: hidden; margin-top: 5px; color: var(--ord-text-muted); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
   .order-row-date { grid-column: 2; grid-row: 1; font-size: 12px; color: var(--ord-text-muted); white-space: nowrap; }
   .order-row-total { grid-column: 3; grid-row: 1; text-align: right !important; }
   .order-row-total > div:first-child { font-size: 15px !important; }
